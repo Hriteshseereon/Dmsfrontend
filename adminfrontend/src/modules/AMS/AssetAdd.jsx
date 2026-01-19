@@ -365,8 +365,9 @@ export default function AssetManager() {
             <InputNumber className="w-full" min={0} max={100} disabled={disabled} />
           </Form.Item>
         </Col>
+        
       </Row>
-
+{/* helo */}
       <h6 className="text-amber-500 mt-4">Additional Details</h6>
       <Row gutter={16}>
         <Col span={8}>
