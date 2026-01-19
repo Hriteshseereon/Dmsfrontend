@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "name": "Transporter",
+    "email": "tp@123.com",
+    "password": "tp1234",
+    "status": "approved"
+  },
+  {
+    "id": 2,
+    "name": "Pending Transporter",
+    "email": "pending@example.com",
+    "password": "pending123",
+    "status": "pending"
+  }
+]

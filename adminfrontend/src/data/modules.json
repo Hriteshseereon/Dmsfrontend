@@ -1,0 +1,6 @@
+[
+  { "id": "DMS", "name": "Distributed Management System" },
+  { "id": "AMS", "name": "Asset Management System" },
+  { "id": "WMS", "name": "Wealth Management System" },
+  { "id": "HRMS", "name": "Human Resource Management System" }
+]

@@ -1,0 +1,84 @@
+/* Prevent page horizontal scroll */
+body {
+  overflow-x: hidden;
+}
+
+/* Wrapper for tabs (fixed width like AntD demo) */
+.wealth-tabs-wrapper {
+  width: 1000px;          /* 👈 adjust as needed */
+  max-width: 100%;
+  overflow: hidden;
+  border-bottom: 1px solid #eee;
+}
+
+/* Enable horizontal scroll on correct layer */
+.wealth-tabs-wrapper .ant-tabs-nav-wrap {
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  white-space: nowrap;
+  
+  
+  
+}
+
+/* Keep all tabs in one row */
+.wealth-tabs-wrapper .ant-tabs-nav-list {
+  display: flex;
+  flex-wrap: nowrap;
+  width: max-content;
+}
+
+/* Fixed width for each tab */
+.wealth-tabs-wrapper .ant-tabs-tab {
+ 
+  min-width: 10px;
+  text-align: center;
+  padding: 0.5px ;
+  
+}
+
+/* Hide Ant Design default ink bar */
+.wealth-tabs-wrapper .ant-tabs-ink-bar {
+  display: none !important;
+}
+
+/* Custom underline for active tab */
+.wealth-tabs-wrapper .ant-tabs-tab-btn {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wealth-tabs-wrapper .ant-tabs-tab-btn::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 3px;
+  background: #1890ff;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 220ms cubic-bezier(.2,.8,.2,1);
+  pointer-events: none;
+}
+
+.wealth-tabs-wrapper
+  .ant-tabs-tab.ant-tabs-tab-active
+  .ant-tabs-tab-btn::after {
+  transform: scaleX(1);
+}
+
+/* Scrollbar styling */
+.wealth-tabs-wrapper .ant-tabs-nav-wrap::-webkit-scrollbar {
+  height: 6px;
+    display: none;
+}
+
+.wealth-tabs-wrapper .ant-tabs-nav-wrap::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 4px;
+}

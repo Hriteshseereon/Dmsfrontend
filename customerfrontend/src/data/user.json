@@ -1,0 +1,34 @@
+[
+  {
+    "id": 1,
+    "name": "Jayashree",
+    "email": "admin@example.com",
+    "password": "admin123",
+    "status": "approved",
+    "role": "user"
+  },
+  {
+    "id": 2,
+    "name": "Pending User",
+    "email": "pending@example.com",
+    "password": "pending123",
+    "status": "pending",
+    "role": "user"
+  },
+  {
+    "id": 3,
+    "name": "Broker1",
+    "email": "broker1@gmail.com",
+    "password": "broker1",
+    "status": "approved",
+    "role": "broker"
+  },
+  {
+    "id": 4,
+    "name": "Broker2",
+    "email": "broker2@gmail.com",
+    "password": "broker2",
+    "status": "pending",
+    "role": "broker"
+  }
+]

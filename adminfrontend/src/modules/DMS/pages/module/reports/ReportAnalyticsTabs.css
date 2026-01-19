@@ -1,0 +1,101 @@
+/* Prevent page horizontal scroll */
+body {
+  overflow-x: hidden;
+}
+
+/* Wrapper width like WMS */
+.report-tabs {
+  width: 1000px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* Enable horizontal scroll */
+.report-tabs .ant-tabs-nav-wrap {
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  white-space: nowrap;
+}
+
+/* Keep tabs in one row */
+.report-tabs .ant-tabs-nav-list {
+  display: flex;
+  flex-wrap: nowrap;
+  width: max-content;
+}
+
+/* Tab sizing */
+.report-tabs .ant-tabs-tab {
+  min-width: 10px;
+  text-align: center;
+  padding: 4px 8px;
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Remove default ink bar */
+.report-tabs .ant-tabs-ink-bar {
+  display: none !important;
+}
+
+/* Base tab text */
+.report-tabs .ant-tabs-tab-btn {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #f59e0b !important;   /* Always amber */
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+/* Custom underline */
+.report-tabs .ant-tabs-tab-btn::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 3px;
+  background: #f59e0b;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 220ms cubic-bezier(.2,.8,.2,1);
+  pointer-events: none;
+}
+
+/* Active underline */
+.report-tabs
+  .ant-tabs-tab.ant-tabs-tab-active
+  .ant-tabs-tab-btn::after {
+  transform: scaleX(1);
+  background: #f59e0b !important;
+}
+
+/* Active tab text */
+.report-tabs
+  .ant-tabs-tab.ant-tabs-tab-active
+  .ant-tabs-tab-btn {
+  color: #f59e0b !important;
+  font-weight: 600;
+}
+
+/* Force amber on hover, focus, active */
+.report-tabs .ant-tabs-tab-btn:hover,
+.report-tabs .ant-tabs-tab-btn:focus,
+.report-tabs .ant-tabs-tab-btn:active {
+  color: #f59e0b !important;
+}
+
+/* Remove AntD blue focus outline */
+.report-tabs .ant-tabs-tab:focus-visible {
+  outline: none !important;
+}
+
+/* Hide scrollbar */
+.report-tabs .ant-tabs-nav-wrap::-webkit-scrollbar {
+  height: 6px;
+  display: none;
+}

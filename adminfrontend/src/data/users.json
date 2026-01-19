@@ -1,0 +1,69 @@
+[
+  {
+    "id": 1,
+    "email": "hr1@org12.com",
+    "password": "hr123",
+    "role": "hr",
+    "org": "Org1",
+    "permissions": {
+      "DMS": {
+        "submodules": {
+          "purchase": {
+            "tabs": ["dashboard", "souda", "invoice"]
+          }
+        }
+      }
+    }
+  },
+  {
+    "id": 2,
+    "email": "admin@dms.com",
+    "password": "admin123",
+    "role": "admin"
+  },
+  {
+    "id": 3,
+    "email": "hr1@org12.com",
+    "password": "hr123",
+    "role": "hr",
+    "org": "Org12"
+  },
+  {
+    "id": 4,
+    "email": "user1@org12.com",
+    "password": "user123",
+    "role": "user",
+    "org": "Org12"
+  },
+  {
+    "id": 5,
+    "email": "purchase@company.com",
+    "password": "purchase123",
+    "role": "purchase-manager",
+    "org": "Org1"
+  },
+  {
+    "id": 6,
+    "email": "sales@company.com",
+    "password": "sales123",
+    "role": "sales-manager",
+    "org": "Org1"
+  },
+  {
+    "id": 7,
+    "name": "Rohan",
+    "email": "rohan@gmail.com",
+    "password": "rohan123",
+    "role": "manager",
+    "org": "Org1",
+    "permissions": {
+      "DMS": {
+        "submodules": {
+          "purchase": {
+            "tabs": ["souda", "invoice"]
+          }
+        }
+      }
+    }
+  }
+]

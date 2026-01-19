@@ -1,0 +1,58 @@
+{
+    "hsn": [
+        {
+            "code": "0101",
+            "description": "Live horses, asses, mules"
+        },
+        {
+            "code": "0201",
+            "description": "Meat of bovine animals"
+        },
+        {
+            "code": "0401",
+            "description": "Milk and cream"
+        },
+        {
+            "code": "0701",
+            "description": "Potatoes"
+        },
+        {
+            "code": "1001",
+            "description": "Wheat and meslin"
+        },
+        {
+            "code": "1701",
+            "description": "Cane or beet sugar"
+        },
+        {
+            "code": "2106",
+            "description": "Food preparations"
+        }
+    ],
+    "sac": [
+        {
+            "code": "998311",
+            "description": "Management consulting services"
+        },
+        {
+            "code": "998312",
+            "description": "Business consulting services"
+        },
+        {
+            "code": "998313",
+            "description": "IT consulting services"
+        },
+        {
+            "code": "998314",
+            "description": "HR consulting services"
+        },
+        {
+            "code": "998315",
+            "description": "Marketing consulting services"
+        },
+        {
+            "code": "998316",
+            "description": "Financial advisory services"
+        }
+    ]
+}
