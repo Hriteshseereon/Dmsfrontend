@@ -10,10 +10,10 @@ export default function Login() {
   const { login, isAdmin } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
    try {
-      login(username, password);
+      await login(username, password);
       if (isAdmin) navigate("/organizations");
       else navigate("/dashboard");
     } catch (err) {

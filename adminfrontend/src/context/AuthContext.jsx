@@ -41,7 +41,7 @@ export const AuthProvider = ({ children }) => {
   //   }
   //   return false;
   // };
-  const login = (username, password) => {
+  const login = async (username, password) => {
     // const combinedUsers = [...users, ...getCustomUsers()];
 
     // const found = combinedUsers.find(
@@ -72,7 +72,7 @@ export const AuthProvider = ({ children }) => {
 
     // return true;
     try {
-      const authResponse = authLogin(username, password);
+      const authResponse = await authLogin(username, password);
       TokenStore.setTokens({
         accessToken: authResponse.access,
         refreshToken: authResponse.refresh,
