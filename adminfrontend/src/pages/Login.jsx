@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 export default function Login() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -12,11 +12,13 @@ export default function Login() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const success = login(email, password);
-    if (success) {
+   try {
+      login(username, password);
       if (isAdmin) navigate("/organizations");
       else navigate("/dashboard");
-    } else setError("Invalid credentials");
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   return (
@@ -44,13 +46,13 @@ export default function Login() {
           )}
 
           <label className="block text-sm font-medium mb-1 text-amber-700">
-            Email
+            Username
           </label>
           <input
-            type="email"
-            placeholder="Enter your email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="text"
+            placeholder="Enter your username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             className="w-full mb-4 px-3 py-2 border border-amber-300 rounded focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
             required
           />
