@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Form, Input, Select, Button, Card, Row, Col, Space, Upload, Radio, InputNumber, Divider, Checkbox, message as antMessage, DatePicker, Steps, Progress } from "antd";
 import { PlusOutlined, MinusCircleOutlined, UploadOutlined, ArrowLeftOutlined, ArrowRightOutlined, CheckOutlined } from "@ant-design/icons";
 import LocationPicker from "../modules/DMS/helpers/LocationPicker.jsx";
+import { useCreateOrganization } from "../queries/useCreateOrganization.js";
 const { Option } = Select;
 const { TextArea } = Input;
 
@@ -23,6 +24,7 @@ const modulesList = [
 ];
 
 export default function AddOrganisation() {
+  const { mutate, isPending, error } = useCreateOrganization();
   const [form] = Form.useForm();
   const [currentStep, setCurrentStep] = useState(0);
   const [orgType, setOrgType] = useState("");
@@ -87,6 +89,14 @@ export default function AddOrganisation() {
   const handleSubmit = (values) => {
     console.log("Form Values:", values);
     antMessage.success("Organisation created successfully!");
+    const payload = {
+      registered_name: values.registeredName,
+      email: values.email,
+      legal_type: values.organisationType, // TODO: add legal type field later
+      organisation_type: values.organisationType,
+      phone_number_1: values.phone,
+    }
+    mutate(payload);
   };
 
   const handleBack = () => {
@@ -1088,9 +1098,10 @@ export default function AddOrganisation() {
                     type="primary"
                     htmlType="submit"
                     size="large"
+                    disabled={isPending}
                     icon={<CheckOutlined />}
                     style={{ background: "linear-gradient(to right, #10b981, #059669)", borderColor: "transparent" }}>
-                    Create Organisation
+                    {isPending ? "Creating..." : "Create Organisation"}
                   </Button>
                 )}
               </Space>
