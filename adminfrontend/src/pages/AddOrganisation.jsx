@@ -8,7 +8,7 @@ const { TextArea } = Input;
 
 const ORG_RULES = {
   pvt: { label: "Director", askCount: true, showPercent: true, company_website: true },
-  llp: { label: "Partner", askCount: true, showPercent: true, company_website: true },
+  LLP: { label: "Partner", askCount: true, showPercent: true, company_website: true },
   partnership: { label: "Partner", askCount: true, showPercent: true, company_website: true },
   proprietor: { label: "Proprietor", askCount: false, showPercent: false },
   opc: { label: "One Person Company", askCount: false, showPercent: false },
