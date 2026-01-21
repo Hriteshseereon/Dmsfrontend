@@ -14,8 +14,8 @@ export default function Login() {
     e.preventDefault();
    try {
       await login(username, password);
-      if (isAdmin) navigate("/organizations");
-      else navigate("/dashboard");
+       navigate("/organizations");
+      // else navigate("/dashboard");
     } catch (err) {
       setError(err.message);
     }

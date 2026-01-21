@@ -77,6 +77,10 @@ export const AuthProvider = ({ children }) => {
         accessToken: authResponse.access,
         refreshToken: authResponse.refresh,
       });
+      setUser({
+      role: authResponse.is_admin ? "admin" : "user",
+      is_admin: authResponse.is_admin,
+    });
     } catch (err) {
       const message = err.response?.data?.detail || "Login failed";
       throw new Error(message);
