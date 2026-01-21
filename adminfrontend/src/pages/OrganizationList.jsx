@@ -14,6 +14,8 @@ import {
 import { useOrganizations } from "../queries/useOrganizations";
 
 export default function OrganizationList() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const { data: organizations, isLoading } = useOrganizations();
 
   if (isLoading) {
@@ -48,7 +50,7 @@ export default function OrganizationList() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {organizations.map((org) => (
+          {organizations?.map((org) => (
             <div
               key={org.id}
               className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden group"
@@ -58,7 +60,7 @@ export default function OrganizationList() {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
                     <h3 className="font-bold text-xl text-gray-800 mb-1">
-                      {org.name}
+                      {org.registered_name}
                     </h3>
                     <p className="text-xs text-gray-400 font-mono">
                       ID: {org.id}

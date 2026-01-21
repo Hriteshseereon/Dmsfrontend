@@ -1,4 +1,4 @@
-import { createContext, useState, useContext } from "react";
+import { createContext, useState, useContext, useEffect } from "react";
 import users from "../data/users.json";
 import orgs from "../data/organisations.json";
 import { login as authLogin } from "../api/authService";
@@ -41,6 +41,13 @@ export const AuthProvider = ({ children }) => {
   //   }
   //   return false;
   // };
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, [])
   const login = async (username, password) => {
     // const combinedUsers = [...users, ...getCustomUsers()];
 
@@ -77,10 +84,12 @@ export const AuthProvider = ({ children }) => {
         accessToken: authResponse.access,
         refreshToken: authResponse.refresh,
       });
-      setUser({
+      const userData = {
       role: authResponse.is_admin ? "admin" : "user",
       is_admin: authResponse.is_admin,
-    });
+    }
+      setUser(userData);
+    localStorage.setItem("user", JSON.stringify(userData));
     } catch (err) {
       const message = err.response?.data?.detail || "Login failed";
       throw new Error(message);
