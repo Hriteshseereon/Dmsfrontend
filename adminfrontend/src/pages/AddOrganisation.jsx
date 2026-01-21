@@ -86,7 +86,8 @@ export default function AddOrganisation() {
     }
   };
 
-  const handleSubmit = (values) => {
+  const handleSubmit = () => {
+    const values = form.getFieldsValue(true);
     console.log("Form Values:", values);
     antMessage.success("Organisation created successfully!");
     const payload = {
@@ -188,7 +189,7 @@ export default function AddOrganisation() {
             rules={[{ required: true, message: "Please select organisation type" }]}>
             <Select placeholder="Select organisation type" onChange={handleOrgTypeChange}>
               <Option value="pvt">Private Limited (Pvt Ltd)</Option>
-              <Option value="llp">LLP</Option>
+              <Option value="LLP">LLP</Option>
               <Option value="opc">OPC</Option>
               <Option value="partnership">Partnership</Option>
               <Option value="proprietor">Proprietor</Option>
