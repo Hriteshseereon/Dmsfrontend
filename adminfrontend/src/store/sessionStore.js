@@ -1,16 +1,14 @@
-import { create } from "zustand"
-import { persist } from "zustand/middleware"
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 const useSessionStore = create(
   persist(
-    (set, get) => ({
-      // state
+    (set) => ({
       accessToken: null,
       refreshToken: null,
       user: null,
       currentOrgId: null,
 
-      // setters
       setSession: ({ accessToken, refreshToken, user, currentOrgId }) =>
         set({ accessToken, refreshToken, user, currentOrgId }),
 
@@ -19,13 +17,6 @@ const useSessionStore = create(
       setUser: (user) => set({ user }),
       setCurrentOrgId: (currentOrgId) => set({ currentOrgId }),
 
-      // getters (sync, safe anywhere)
-      getAccessToken: () => get().accessToken,
-      getRefreshToken: () => get().refreshToken,
-      getUser: () => get().user,
-      getCurrentOrgId: () => get().currentOrgId,
-
-      // clear
       clearSession: () =>
         set({
           accessToken: null,
@@ -36,13 +27,9 @@ const useSessionStore = create(
     }),
     {
       name: "session",
-      storage: {
-        getItem: (key) => sessionStorage.getItem(key),
-        setItem: (key, value) => sessionStorage.setItem(key, value),
-        removeItem: (key) => sessionStorage.removeItem(key),
-      },
-    }
-  )
-)
+      storage: createJSONStorage(() => localStorage),
+    },
+  ),
+);
 
-export default useSessionStore
+export default useSessionStore;

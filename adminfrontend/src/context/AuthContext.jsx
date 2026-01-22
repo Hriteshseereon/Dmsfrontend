@@ -10,7 +10,10 @@ import useSessionStore from "../store/sessionStore";
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const { user, setSession, clearSession } = useSessionStore();
+  const user = useSessionStore((s) => s.user);
+  const setSession = useSessionStore((s) => s.setSession);
+  const clearSession = useSessionStore((s) => s.clearSession);
+
   const [orgModules, setOrgModules] = useState([]);
   const [organisations, setOrganisations] = useState([]);
 
@@ -25,31 +28,27 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (!user) return;
 
-    if (user.role === "admin") {
-      setOrgModules(modules.map((m) => m.id));
-      setOrganisations(orgs);
-    } else if (user.org) {
-      const org = findOrgByIdOrName(user.org);
-      setOrgModules(org?.modules || []);
-      setOrganisations([]);
-    }
+    // if (user.role === "admin") {
+    //   setOrgModules(modules.map((m) => m.id));
+    //   setOrganisations(orgs);
+    // } else if (user.org) {
+    //   const org = findOrgByIdOrName(user.org);
+    //   setOrgModules(org?.modules || []);
+    //   setOrganisations([]);
+    // }
   }, [user]);
 
   const login = async (username, password) => {
     try {
       const authResponse = await authLogin(username, password);
-      const userData = {
-        role: authResponse.is_admin ? "admin" : "user",
-        is_admin: authResponse.is_admin,
-        org: authResponse.org,
-        permissions: authResponse.permissions || [],
-      };
-
+      const { access, refresh, ...userData } = authResponse;
       setSession({
         accessToken: authResponse.access,
         refreshToken: authResponse.refresh,
-        user: userData,
-        currentOrgId: authResponse.org,
+        user: {
+          ...userData,
+        },
+        currentOrgId: userData.organisation_id,
       });
     } catch (err) {
       const message = err.response?.data?.detail || "Login failed";
