@@ -25,7 +25,7 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem("access_token");
+      TokenStore.removeTokens();
       window.location.href = "/";
     }
 
