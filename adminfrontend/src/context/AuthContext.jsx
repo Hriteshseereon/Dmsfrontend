@@ -28,14 +28,14 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (!user) return;
 
-    // if (user.role === "admin") {
-    //   setOrgModules(modules.map((m) => m.id));
-    //   setOrganisations(orgs);
-    // } else if (user.org) {
-    //   const org = findOrgByIdOrName(user.org);
-    //   setOrgModules(org?.modules || []);
-    //   setOrganisations([]);
-    // }
+    if (user.is_super_admin || user.admin) {
+      setOrgModules(modules.map((m) => m.id));
+      setOrganisations(orgs);
+    } else if (user.org) {
+      const org = findOrgByIdOrName(user.org);
+      setOrgModules(org?.modules || []);
+      setOrganisations([]);
+    }
   }, [user]);
 
   const login = async (username, password) => {
