@@ -1,8 +1,10 @@
-import { createContext, useState, useContext } from "react";
+import { createContext, useState, useContext, useEffect } from "react";
 import users from "../data/users.json";
 import orgs from "../data/organisations.json";
+import { login as authLogin } from "../api/authService";
 import modules from "../data/modules.json";
 import { getCustomUsers } from "../utils/customUsers";
+import TokenStore from "../utils/tokenStore";
 
 const AuthContext = createContext();
 
@@ -10,13 +12,13 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [orgModules, setOrgModules] = useState([]);
   const [organisations, setOrganisations] = useState([]);
-
+  const [accessToken, setAccessToken] = useState(null);
   // helper: normalize org lookup (org.id may be string)
   const findOrgByIdOrName = (idOrName) =>
     orgs.find(
       (o) =>
         String(o.id).toLowerCase() === String(idOrName).toLowerCase() ||
-        o.name.toLowerCase() === String(idOrName).toLowerCase()
+        o.name.toLowerCase() === String(idOrName).toLowerCase(),
     );
   // const login = (email, password) => {
   //   const combinedUsers = [...users, ...getCustomUsers()];
@@ -39,42 +41,67 @@ export const AuthProvider = ({ children }) => {
   //   }
   //   return false;
   // };
-  const login = (email, password) => {
-    const combinedUsers = [...users, ...getCustomUsers()];
 
-    const found = combinedUsers.find(
-      (u) =>
-        u.email?.toLowerCase() === email?.toLowerCase() &&
-        u.password === password
-    );
-
-    if (!found) return false;
-
-    setUser(found);
-
-    if (found.role === "admin") {
-      setOrganisations(orgs);
-    } else {
-      // if user has explicit modules array (rare)
-      if (found.modules && Array.isArray(found.modules)) {
-        setOrgModules(found.modules);
-      } else if (found.org) {
-        // lookup organization by id/name from organisations.json
-        const org = findOrgByIdOrName(found.org);
-        setOrgModules(org?.modules || []);
-      } else {
-        setOrgModules([]);
-      }
-      setOrganisations([]); // non-admins don't need full org list
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
     }
+  }, [])
+  const login = async (username, password) => {
+    // const combinedUsers = [...users, ...getCustomUsers()];
 
-    return true;
+    // const found = combinedUsers.find(
+    //   (u) =>
+    //     u.email?.toLowerCase() === email?.toLowerCase() &&
+    //     u.password === password
+    // );
+
+    // if (!found) return false;
+
+    // setUser(found);
+
+    // if (found.role === "admin") {
+    //   setOrganisations(orgs);
+    // } else {
+    //   // if user has explicit modules array (rare)
+    //   if (found.modules && Array.isArray(found.modules)) {
+    //     setOrgModules(found.modules);
+    //   } else if (found.org) {
+    //     // lookup organization by id/name from organisations.json
+    //     const org = findOrgByIdOrName(found.org);
+    //     setOrgModules(org?.modules || []);
+    //   } else {
+    //     setOrgModules([]);
+    //   }
+    //   setOrganisations([]); // non-admins don't need full org list
+    // }
+
+    // return true;
+    try {
+      const authResponse = await authLogin(username, password);
+      TokenStore.setTokens({
+        accessToken: authResponse.access,
+        refreshToken: authResponse.refresh,
+      });
+      const userData = {
+      role: authResponse.is_admin ? "admin" : "user",
+      is_admin: authResponse.is_admin,
+    }
+      setUser(userData);
+    localStorage.setItem("user", JSON.stringify(userData));
+    } catch (err) {
+      const message = err.response?.data?.detail || "Login failed";
+      throw new Error(message);
+    }
   };
   const isAdmin = user?.role === "admin";
   const logout = () => {
-    setUser(null);
-    setOrgModules([]);
-    setOrganisations([]);
+    // setUser(null);
+    // setOrgModules([]);
+    // setOrganisations([]);
+    TokenStore.removeTokens();
+    window.location.reload();
   };
 
   const hasModuleAccess = (module) => {
@@ -88,7 +115,15 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, login, logout, orgModules, isAdmin, organisations, setOrgModules }}
+      value={{
+        user,
+        login,
+        logout,
+        orgModules,
+        isAdmin,
+        organisations,
+        setOrgModules,
+      }}
     >
       {children}
     </AuthContext.Provider>

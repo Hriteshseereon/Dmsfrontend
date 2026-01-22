@@ -32,7 +32,7 @@ export default function AppRouter() {
               <Login />
             ) : (
               <Navigate
-                to={user.role === "admin" ? "/organizations" : "/dashboard"}
+                to={user.is_admin ? "/organizations" : "/dashboard"}
               />
             )
           }
