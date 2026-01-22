@@ -1,11 +1,12 @@
 import axios from "axios";
-import TokenStore from "../utils/tokenStore";
+import useSessionStore from "../store/sessionStore";
+
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
   headers: {
     "Content-Type": "application/json",
-    // "ngrok-skip-browser-warning": "true", // TODO: remove later, only use for ngrok backend tunneling
+    "ngrok-skip-browser-warning": "true", // TODO: remove later, only use for ngrok backend tunneling
   },
 });
 
@@ -14,7 +15,7 @@ api.interceptors.request.use((config) => {
   if (config.url.endsWith("/auth/login/")) {
     return config;
   }
-  const token = TokenStore.getAccessToken();
+  const token = useSessionStore.getState().getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -24,13 +25,21 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
-      TokenStore.removeTokens();
-      window.location.href = "/";
+    const status = error.response?.status;
+
+    if (status === 401) {
+      const { clearSession } = useSessionStore.getState();
+
+      clearSession();
+
+      // prevent redirect loop
+      if (window.location.pathname !== "/") {
+        window.location.replace("/");
+      }
     }
 
     return Promise.reject(error);
-  },
+  }
 );
 
 export default api;
