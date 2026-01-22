@@ -5,11 +5,14 @@ import { login as authLogin } from "../api/authService";
 import modules from "../data/modules.json";
 import { getCustomUsers } from "../utils/customUsers";
 import TokenStore from "../utils/tokenStore";
+import useSessionStore from "../store/sessionStore";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const { user, setSession, clearSession } = useSessionStore();
+  const [orgModules, setOrgModules] = useState([]);
+  const [organisations, setOrganisations] = useState([]);
 
   // helper: normalize org lookup (org.id may be string)
   const findOrgByIdOrName = (idOrName) =>
