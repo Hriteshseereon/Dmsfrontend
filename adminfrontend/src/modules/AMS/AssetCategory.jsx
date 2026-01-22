@@ -20,6 +20,7 @@ import {
   EditOutlined,
   DownloadOutlined,
 } from "@ant-design/icons";
+import useSessionStore from "../../store/sessionStore";
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -32,7 +33,7 @@ const depreciationMethods = [
 ];
 
 export default function AssetCategory() {
-   const DEFAULT_ORGANISATION_ID = "3d3a2f09-566d-4063-bfbd-f146dc4fcfb7";
+  const currentOrgId = useSessionStore((state) => state.currentOrgId);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -94,7 +95,7 @@ export default function AssetCategory() {
   setLoading(true);
   try {
     const apiData = {
-      organisation: DEFAULT_ORGANISATION_ID,
+      organisation: currentOrgId,
       category_name: values.categoryName,
       description: values.description,
       useful_life: values.usefulLife,

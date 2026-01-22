@@ -5,14 +5,18 @@ import { login as authLogin } from "../api/authService";
 import modules from "../data/modules.json";
 import { getCustomUsers } from "../utils/customUsers";
 import TokenStore from "../utils/tokenStore";
+import useSessionStore from "../store/sessionStore";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const user = useSessionStore((s) => s.user);
+  const setSession = useSessionStore((s) => s.setSession);
+  const clearSession = useSessionStore((s) => s.clearSession);
+
   const [orgModules, setOrgModules] = useState([]);
   const [organisations, setOrganisations] = useState([]);
-  const [accessToken, setAccessToken] = useState(null);
+
   // helper: normalize org lookup (org.id may be string)
   const findOrgByIdOrName = (idOrName) =>
     orgs.find(
@@ -20,76 +24,33 @@ export const AuthProvider = ({ children }) => {
         String(o.id).toLowerCase() === String(idOrName).toLowerCase() ||
         o.name.toLowerCase() === String(idOrName).toLowerCase(),
     );
-  // const login = (email, password) => {
-  //   const combinedUsers = [...users, ...getCustomUsers()];
-
-  //   const found = combinedUsers.find(
-  //     (u) => u.email === email && u.password === password
-  //   );
-  //   if (found) {
-  //     setUser(found);
-  //     if (found.role === "admin") {
-  //       setOrgModules(modules.map((m) => m.id));
-  //       setOrganisations(orgs);
-  //     } else if (found.modules) {
-  //       setOrgModules(found.modules);
-  //     } else {
-  //       const org = orgs.find((o) => o.id === found.org);
-  //       setOrgModules(org?.modules || []);
-  //     }
-  //     return true;
-  //   }
-  //   return false;
-  // };
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+    if (!user) return;
+
+    if (user.is_super_admin || user.admin) {
+      setOrgModules(modules.map((m) => m.id));
+      setOrganisations(orgs);
+    } else if (user.org) {
+      const org = findOrgByIdOrName(user.org);
+      setOrgModules(org?.modules || []);
+      setOrganisations([]);
     }
-  }, [])
+  }, [user]);
+
   const login = async (username, password) => {
-    // const combinedUsers = [...users, ...getCustomUsers()];
-
-    // const found = combinedUsers.find(
-    //   (u) =>
-    //     u.email?.toLowerCase() === email?.toLowerCase() &&
-    //     u.password === password
-    // );
-
-    // if (!found) return false;
-
-    // setUser(found);
-
-    // if (found.role === "admin") {
-    //   setOrganisations(orgs);
-    // } else {
-    //   // if user has explicit modules array (rare)
-    //   if (found.modules && Array.isArray(found.modules)) {
-    //     setOrgModules(found.modules);
-    //   } else if (found.org) {
-    //     // lookup organization by id/name from organisations.json
-    //     const org = findOrgByIdOrName(found.org);
-    //     setOrgModules(org?.modules || []);
-    //   } else {
-    //     setOrgModules([]);
-    //   }
-    //   setOrganisations([]); // non-admins don't need full org list
-    // }
-
-    // return true;
     try {
       const authResponse = await authLogin(username, password);
-      TokenStore.setTokens({
+      const { access, refresh, ...userData } = authResponse;
+      setSession({
         accessToken: authResponse.access,
         refreshToken: authResponse.refresh,
+        user: {
+          ...userData,
+          role: userData.is_super_admin || userData.is_admin ? "admin" : "user",
+        },
+        currentOrgId: userData.organisation_id,
       });
-      const userData = {
-      role: authResponse.is_admin ? "admin" : "user",
-      is_admin: authResponse.is_admin,
-    }
-      setUser(userData);
-    localStorage.setItem("user", JSON.stringify(userData));
     } catch (err) {
       const message = err.response?.data?.detail || "Login failed";
       throw new Error(message);
@@ -97,10 +58,7 @@ export const AuthProvider = ({ children }) => {
   };
   const isAdmin = user?.role === "admin";
   const logout = () => {
-    // setUser(null);
-    // setOrgModules([]);
-    // setOrganisations([]);
-    TokenStore.removeTokens();
+    clearSession();
     window.location.reload();
   };
 
