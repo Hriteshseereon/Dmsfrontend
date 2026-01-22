@@ -12,11 +12,13 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useOrganizations } from "../queries/useOrganizations";
+import useSessionStore from "../store/sessionStore";
 
 export default function OrganizationList() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { data: organizations, isLoading } = useOrganizations();
+  const { setCurrentOrgId } = useSessionStore();
 
   if (isLoading) {
     return <div>Loading organizations...</div>;
@@ -95,13 +97,15 @@ export default function OrganizationList() {
 
                 <button
                   onClick={() => {
-                    const firstModule = org.modules?.[0];
-                    setOrgModules(org.modules || []);
-                    if (firstModule) {
-                      navigate(`/${firstModule.toLowerCase()}`);
-                    } else {
-                      navigate(`/organization/${encodeURIComponent(org.id)}`);
-                    }
+                    // const firstModule = org.modules?.[0];
+                    // setOrgModules(org.modules || []);
+                    // if (firstModule) {
+                    //   navigate(`/${firstModule.toLowerCase()}`);
+                    // } else {
+                    //   navigate(`/organization/${encodeURIComponent(org.id)}`);
+                    // }
+                    setCurrentOrgId(org.id);
+                    navigate(`/dashboard`);
                   }}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-lg font-medium transition-all group-hover:shadow-md"
                 >

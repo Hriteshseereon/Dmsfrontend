@@ -20,6 +20,7 @@ import {
   EditOutlined,
   DownloadOutlined,
 } from "@ant-design/icons";
+import useSessionStore from "../../store/sessionStore";
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -32,7 +33,7 @@ const depreciationMethods = [
 ];
 
 export default function AssetCategory() {
-   const DEFAULT_ORGANISATION_ID = "3d3a2f09-566d-4063-bfbd-f146dc4fcfb7";
+  const currentOrgId = useSessionStore((state) => state.currentOrgId);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -91,34 +92,34 @@ export default function AssetCategory() {
   };
 
   const handleAddCategory = async (values) => {
-    setLoading(true);
-    try {
-      // Transform form values to match API format
-      const apiData = {
-        organisation: DEFAULT_ORGANISATION_ID,
-        category_name: values.categoryName,
-        description: values.description,
-        useful_life: values.usefulLife,
-        default_depreciation_method: values.defaultDepreciationMethod,
-        default_depreciation_rate: values.defaultDepreciationRate,
-      };
+  setLoading(true);
+  try {
+    const apiData = {
+      organisation: currentOrgId,
+      category_name: values.categoryName,
+      description: values.description,
+      useful_life: values.usefulLife,
+      default_depreciation_method: values.defaultDepreciationMethod,
+      default_depreciation_rate: Number(values.defaultDepreciationRate).toFixed(2),
+    };
 
-      const response = await addAssetCategory(apiData);
-      console.log("Added category:", response);
-      
-      message.success("Asset category added successfully");
-      setIsAddModalOpen(false);
-      addForm.resetFields();
-      
-      // Refresh the data
-      fetchAssetCategories();
-    } catch (error) {
-      console.error("Error adding asset category:", error);
-      message.error("Failed to add asset category");
-    } finally {
-      setLoading(false);
-    }
-  };
+    console.log("POST payload:", apiData);
+
+    const response = await addAssetCategory(apiData);
+    message.success("Asset category added successfully");
+    setIsAddModalOpen(false);
+    addForm.resetFields();
+    fetchAssetCategories();
+  } catch (error) {
+    console.log("Backend error:", error.response?.data);
+    message.error(
+      error.response?.data ? JSON.stringify(error.response.data) : "Failed to add asset category"
+    );
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleFormSubmit = (values, type) => {
     if (type === "add") {
