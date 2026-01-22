@@ -2,6 +2,18 @@ import React, { useState } from "react";
 import { Form, Input, Select, Button, Card, Row, Col, Space, Upload, Radio, InputNumber, Divider, Checkbox, message as antMessage, DatePicker, Steps, Progress } from "antd";
 import { PlusOutlined, MinusCircleOutlined, UploadOutlined, ArrowLeftOutlined, ArrowRightOutlined, CheckOutlined } from "@ant-design/icons";
 import LocationPicker from "../modules/DMS/helpers/LocationPicker.jsx";
+
+import {
+  createAddress,
+  createBranch,
+  createLegalDetails,
+  createOrganisation,
+  createPerson,
+  selectOrganisation,
+  enableModule
+} from "../api/organisationApi.js";
+import axiosInstance from "../api/axiosInstance.js";
+
 const { Option } = Select;
 const { TextArea } = Input;
 
@@ -22,12 +34,49 @@ const modulesList = [
   { id: "HRMS", label: "HRMS", description: "Human Resource Management System" },
 ];
 
+
+const ORG_TYPE_MAP = {
+  pvt: {
+    organisation_type: "PRIVATE_LIMITED",
+    legal_type: "PrivateLimited",
+    role: "DIRECTOR",
+  },
+  llp: {
+    organisation_type: "LLP",
+    legal_type: "LLP",
+    role: "PARTNER",
+  },
+  partnership: {
+    organisation_type: "PARTNERSHIP",
+    legal_type: "Partnership",
+    role: "PARTNER",
+  },
+  proprietor: {
+    organisation_type: "PROPRIETOR",
+    legal_type: "Proprietor",
+    role: "PROPRIETOR",
+  },
+  opc: {
+    organisation_type: "OPC",
+    legal_type: "OPC",
+    role: "DIRECTOR",
+  },
+};
+
+
+const formatAddress = (addr) =>
+  addr
+    ? `${addr.address || addr.address1 || ""}, ${addr.city || ""}, ${addr.state || ""}, ${addr.pin || ""}`
+    : null;
+
+
+
 export default function AddOrganisation() {
   const [form] = Form.useForm();
   const [currentStep, setCurrentStep] = useState(0);
   const [orgType, setOrgType] = useState("");
   const [hasBranch, setHasBranch] = useState(false);
-  
+
   const rule = ORG_RULES[orgType];
   const normFile = (e) => (Array.isArray(e) ? e : e?.fileList);
 
@@ -41,6 +90,8 @@ export default function AddOrganisation() {
 
   const handleOrgTypeChange = (value) => {
     setOrgType(value);
+    form.setFieldsValue({ organisationType: value });
+
     if (ORG_RULES[value].askCount) {
       form.setFieldsValue({ partners: [] });
     } else {
@@ -65,18 +116,28 @@ export default function AddOrganisation() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleBack = () => {
+    window.history.back();
+  };
+
   const getFieldsForStep = (step) => {
     switch (step) {
       case 0:
-        // return ['registeredName', 'phone', 'phone2', 'email', 'secondaryEmail', 
-        //         ['organisationAddress', 'address'], ['organisationAddress', 'city'],
-        //         ['organisationAddress', 'state'], ['organisationAddress', 'pin'],
-        //         'businessLocation', 'organisationType'];
-        return [];
+        return [
+          'registeredName',
+          'phone',
+          'email',
+          'businessLocation',
+          'organisationType',
+          ['organisationAddress', 'address'],
+          ['organisationAddress', 'city'],
+          ['organisationAddress', 'state'],
+          ['organisationAddress', 'pin'],
+        ];
       case 1:
         return orgType ? ['partners'] : [];
       case 2:
-        return []; // Legal details are optional
+        return [];
       case 3:
         return hasBranch ? ['branches'] : [];
       default:
@@ -84,14 +145,158 @@ export default function AddOrganisation() {
     }
   };
 
-  const handleSubmit = (values) => {
-    console.log("Form Values:", values);
-    antMessage.success("Organisation created successfully!");
+  const handleSubmit = async (values) => {
+    if (!values.organisationType || !ORG_TYPE_MAP[values.organisationType]) {
+      antMessage.error("Please select organisation type");
+      return;
+    }
+
+    const hide = antMessage.loading("Creating organisation...", 0);
+    try {
+
+      // CREATE ORGANISATION
+      const orgRes = await createOrganisation({
+        registered_name: values.registeredName,
+        organisation_type: ORG_TYPE_MAP[values.organisationType].organisation_type,
+        legal_type: ORG_TYPE_MAP[values.organisationType].legal_type,
+        phone_number_1: values.phone,
+        phone_number_2: values.phone2 || null,
+        email: values.email,
+        secondary_email: values.secondaryEmail || null,
+        number_of_partners: values.partnersCount || null,
+        head_office_location: values.businessLocation,
+        is_active: true,
+      });
+
+      const organisationId = orgRes.data.id;
+
+      // SELECT ORGANISATION
+      await selectOrganisation(organisationId);
+
+      await Promise.all(
+        modulesList
+          .filter(m => values[`module_${m.id}`])
+          .map(m =>
+            enableModule({
+              organisation: organisationId,
+              module: m.id,
+              is_enabled: true,
+            })
+          )
+      );
+
+      // CREATE HQ ADDRESS
+      if (values.organisationAddress) {
+        const hq = values.organisationAddress;
+        await createAddress({
+          organisation: organisationId,
+          address_line_1: hq.address || hq.address1,
+          address_line_2: hq.address2 || null,
+          city: hq.city,
+          state: hq.state,
+          country: "India",
+          pin_code: hq.pin,
+          address_type: "OWN",
+          address_category: "HQ",
+          is_branch: false,
+        });
+      }
+
+      // LEGAL DETAILS
+      if (values.legalPanNo || values.gstin || values.udyamNo) {
+        const fd = new FormData();
+        fd.append("organisation", organisationId);
+        fd.append("pan_no", values.legalPanNo || "");
+        fd.append("gstin", values.gstin || "");
+        fd.append("udyam_no", values.udyamNo || "");
+        fd.append("msme_no", values.msmeNo || "");
+
+        if (values.panDocument?.[0])
+          fd.append("pan_document", values.panDocument[0].originFileObj);
+
+        if (values.gstinDocument?.[0])
+          fd.append("gstin_document", values.gstinDocument[0].originFileObj);
+
+        await axiosInstance.post(
+          "/organisation/organisation-legal-details/",
+          fd,
+          { headers: { "Content-Type": "multipart/form-data" } }
+        );
+      }
+
+
+      // PERSONS (DIRECTORS / PARTNERS)
+      for (const person of values.partners || []) {
+        const fd = new FormData();
+        fd.append("organisation", organisationId);
+        fd.append("full_name", person.name);
+        fd.append("role", ORG_TYPE_MAP[values.organisationType].role);
+        fd.append(
+          "phone_number_1",
+          person.mobileNumber || person.contactNumber || values.phone
+        );
+        if (person.email) fd.append("email", person.email);
+        if (person.gender) fd.append("gender", person.gender.toUpperCase());
+        fd.append("present_address", formatAddress(person.currentAddress));
+        fd.append("permanent_address", formatAddress(person.permanentAddress));
+
+        if (person.photo?.[0])
+          fd.append("photo", person.photo[0].originFileObj);
+
+        await axiosInstance.post(
+          "/organisation/organisation-persons/",
+          fd,
+          { headers: { "Content-Type": "multipart/form-data" } }
+        );
+      }
+
+
+      // BRANCH
+      if (hasBranch && values.branches?.length) {
+        for (const branch of values.branches) {
+          const addrRes = await createAddress({
+            organisation: organisationId,
+            address_line_1: branch.address1,
+            address_line_2: branch.address2 || null,
+            city: branch.city,
+            state: branch.state,
+            country: "India",
+            pin_code: branch.pinNo,
+            address_type: "OWN",
+            address_category: "BRANCH",
+            is_branch: true,
+          });
+
+          await createBranch({
+            organisation: organisationId,
+            address: addrRes.data.id,
+            name: branch.branchName,
+            short_name: branch.shortName,
+            branch_head_name: "Branch Head",
+            phone_number_1: values.phone,
+            email: values.email,
+            type: "MAIN",
+          });
+        }
+      }
+
+
+      antMessage.success("Organisation created successfully!");
+      form.resetFields();
+      setCurrentStep(0);
+      setOrgType("");
+      setHasBranch(false);
+
+    } catch (error) {
+      console.error(error);
+      antMessage.error(
+        error.response?.data?.message || "Something went wrong"
+      );
+    } finally {
+      hide();
+    }
   };
 
-  const handleBack = () => {
-    window.history.back();
-  };
 
   // Step 0: Organisation Details
   const renderOrganisationDetails = () => (
@@ -111,7 +316,7 @@ export default function AddOrganisation() {
         </Col>
         <Col xs={24} sm={12} md={6}>
           <Form.Item label="Alternate Phone Number" name="phone2"
-            rules={[{ required: true, message: "Please enter phone number" }]}>
+            rules={[{ message: "Please enter phone number" }]}>
             <Input placeholder="Enter phone number" />
           </Form.Item>
         </Col>
@@ -127,7 +332,7 @@ export default function AddOrganisation() {
         <Col xs={24} sm={12} md={6}>
           <Form.Item label="Secondary Email" name="secondaryEmail"
             rules={[
-              { required: true, message: "Please enter email" },
+              { message: "Please enter email" },
               { type: "email", message: "Please enter valid email" },
             ]}>
             <Input placeholder="Enter email address" />
@@ -162,18 +367,18 @@ export default function AddOrganisation() {
             <Input placeholder="PIN" maxLength={6} />
           </Form.Item>
         </Col>
-              <Col xs={24} sm={12} md={6}>
-              <Form.Item 
-                label="Head Office Location" 
-                name="businessLocation"
-                rules={[{ required: true, message: "Please select location" }]}
-              >
-                {/* <LocationPicker /> */}
+        <Col xs={24} sm={12} md={6}>
+          <Form.Item
+            label="Head Office Location"
+            name="businessLocation"
+            rules={[{ required: true, message: "Please select location" }]}
+          >
+            {/* <LocationPicker /> */}
             <Input placeholder="Enter location" maxLength={6} />
-                
-              </Form.Item>
-            </Col>
-              <Col xs={24} sm={12} md={6}>
+
+          </Form.Item>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
           <Form.Item label="Organisation Type" name="organisationType"
             rules={[{ required: true, message: "Please select organisation type" }]}>
             <Select placeholder="Select organisation type" onChange={handleOrgTypeChange}>
@@ -185,16 +390,16 @@ export default function AddOrganisation() {
             </Select>
           </Form.Item>
         </Col>
-         {rule?.askCount && (     
+        {rule?.askCount && (
           <Col md={6}>
             <Form.Item label={`Number of ${rule.label}s`} name="partnersCount">
               <InputNumber min={1} style={{ width: "100%" }}
                 placeholder={`Enter number of ${rule.label}s (optional)`} />
             </Form.Item>
           </Col>
-      
-      )}
-      </Row>    
+
+        )}
+      </Row>
     </>
   );
 
@@ -211,13 +416,13 @@ export default function AddOrganisation() {
     }
 
     return (
-      
+
       <Form.List name="partners" initialValue={rule?.askCount ? [] : [{}]}>
         {(fields, { add, remove }) => (
           <>
             {fields.map(({ key, name, ...restField }) => (
               <Card key={key} size="small"
-                style={{ marginBottom: 16,  border: "1px solid #fef3c7" }}
+                style={{ marginBottom: 16, border: "1px solid #fef3c7" }}
                 title={`${rule.label} ${name + 1}`}
                 extra={
                   rule.askCount && fields.length > 1 && (
@@ -225,9 +430,9 @@ export default function AddOrganisation() {
                       style={{ color: "#ef4444", cursor: "pointer" }} />
                   )
                 }>
-                  
-                <Divider orientation="left" style={{ 
-                  fontSize: "15px", 
+
+                <Divider orientation="left" style={{
+                  fontSize: "15px",
                   fontWeight: "600",
                   color: "#374151",
                   marginTop: 0
@@ -279,12 +484,12 @@ export default function AddOrganisation() {
                   </Col>
                   <Col xs={24} sm={12} md={6}>
                     <Form.Item {...restField} label="Date of Birth" name={[name, "dob"]}
-                      rules={[{ required: true, message: "Please select date of birth" }]}>
+                      rules={[{ message: "Please select date of birth" }]}>
                       <DatePicker style={{ width: "100%" }} placeholder="Select DOB" format="DD-MM-YYYY" />
                     </Form.Item>
                   </Col>
-                 
-                  
+
+
                   {rule.showPercent && (
                     <Col xs={24} sm={12} md={6}>
                       <Form.Item {...restField} label="% of Interest" name={[name, "percentage"]}>
@@ -307,14 +512,14 @@ export default function AddOrganisation() {
                       <InputNumber min={0} placeholder="0" style={{ width: "100%" }} />
                     </Form.Item>
                   </Col>
-                   <Divider orientation="left" style={{ 
-                  fontSize: "15px", 
-                  fontWeight: "600",
-                  color: "#374151",
-                  marginTop: 0
-                }}>
-                  Director Address
-                </Divider>
+                  <Divider orientation="left" style={{
+                    fontSize: "15px",
+                    fontWeight: "600",
+                    color: "#374151",
+                    marginTop: 0
+                  }}>
+                    Director Address
+                  </Divider>
                   <Col xs={24}>
                     <Divider orientation="left" plain>Current Address</Divider>
                   </Col>
@@ -367,7 +572,7 @@ export default function AddOrganisation() {
                           });
                         }
                       }}> Same as Current Address </Checkbox>
-                    </Form.Item> 
+                    </Form.Item>
                   </Col>
                   <Col xs={24} sm={12} md={6}>
                     <Form.Item {...restField} label="Address Line1" name={[name, "permanentAddress", "address1"]}>
@@ -394,313 +599,313 @@ export default function AddOrganisation() {
                       <Input placeholder="PIN" maxLength={6} />
                     </Form.Item>
                   </Col>
-                 <Divider orientation="left" style={{ 
-                  fontSize: "15px", 
-                  fontWeight: "600",
-                  color: "#374151",
-                  marginTop: 0
-                }}>
-                  Director Documents
-                </Divider>
-                 
-                <Row gutter={[16, 16]}>
-                  <Col xs={24} sm={12}>
-                    <Form.Item 
-                      {...restField} 
-                      label={<span >Passport Size Photo</span>}
-                      name={[name, "photo"]}
-                      valuePropName="fileList" 
-                      getValueFromEvent={normFile}
-                    >
-                      <Upload beforeUpload={() => false}>
-                        <Button 
-                          icon={<UploadOutlined />} 
-                          
-                          style={{ borderRadius: "6px" }}
-                        >
-                          Upload Photo
-                        </Button>
-                      </Upload>
-                    </Form.Item>
-                  </Col>
-
-                  <Col xs={24} sm={12} md={6}>
-                    <Form.Item 
-                      {...restField}
-                      label={<span s>Aadhaar Number</span>}
-                      name={[name, "adharNo"]}
-                    >
-                      <Input 
-                        placeholder="1234 5678 9012"
-                        
-                        style={{ borderRadius: "6px" }}
-                      />
-                    </Form.Item>
-                  </Col>
-
-                  <Col xs={24} sm={12} md={4}>
-                    <Form.Item 
-                      {...restField}
-                      label={<span>Aadhaar Document</span>}
-                      name={[name, "adharDocument"]}
-                      valuePropName="fileList" 
-                      getValueFromEvent={normFile}
-                    >
-                      <Upload beforeUpload={() => false}>
-                        <Button 
-                          
-                          style={{ borderRadius: "6px" }}
-                        >
-                          Upload Aadhaar
-                        </Button>
-                      </Upload>
-                    </Form.Item>
-                  </Col>
-
-                  <Col xs={24} sm={12} md={6}>
-                    <Form.Item 
-                      {...restField}
-                      label={<span >PAN Number</span>}
-                      name={[name, "panNo"]}
-                    >
-                      <Input 
-                        placeholder="ABCDE1234F"
-                        
-                        style={{ borderRadius: "6px" }}
-                      />
-                    </Form.Item>
-                  </Col>
-
-                  <Col xs={24} sm={12} md={6}>
-                    <Form.Item 
-                      {...restField}
-                      label={<span>PAN Document</span>}
-                      name={[name, "panDocument"]}
-                      valuePropName="fileList" 
-                      getValueFromEvent={normFile}
-                    >
-                      <Upload beforeUpload={() => false}>
-                        <Button 
-                         
-                          style={{ borderRadius: "6px" }}
-                        >
-                          Upload PAN
-                        </Button>
-                      </Upload>
-                    </Form.Item>
-                  </Col>
-
-                  <Col xs={24} sm={12} md={6}>
-                    <Form.Item 
-                      {...restField}
-                      label={<span>GST Number</span>}
-                      name={[name, "gstNo"]}
-                    >
-                      <Input 
-                        placeholder="22AAAAA0000A1Z5"
-                        
-                        style={{ borderRadius: "6px" }}
-                      />
-                    </Form.Item>
-                  </Col>
-
-                  <Col xs={24} sm={12} md={4}>
-                    <Form.Item 
-                      {...restField}
-                      label={<span style={{ fontSize: "14px", fontWeight: "500" }}>GST Document</span>}
-                      name={[name, "gstDocument"]}
-                      valuePropName="fileList" 
-                      getValueFromEvent={normFile}
-                    >
-                      <Upload beforeUpload={() => false}>
-                        <Button 
-                         
-                          style={{ borderRadius: "6px" }}
-                        >
-                          Upload GST
-                        </Button>
-                      </Upload>
-                    </Form.Item>
-                  </Col>
-                </Row>
-                  <Divider orientation="left" style={{ 
-                  fontSize: "15px", 
-                  fontWeight: "600",
-                  color: "#374151"
-                }}>
-                  Bank Details
-                </Divider>
-
-                <Row gutter={[16, 16]}>
-                  <Col xs={24} sm={12} md={8}>
-                    <Form.Item 
-                      {...restField} 
-                      label={<span>Bank Name</span>}
-                      name={[name, "bankName"]}
-                    >
-                      <Input 
-                        placeholder="Enter bank name"
-                        
-                        style={{ borderRadius: "6px" }}
-                      />
-                    </Form.Item>
-                  </Col>
-
-                  <Col xs={24} sm={12} md={8}>
-                    <Form.Item 
-                      {...restField} 
-                      label={<span>Account Number</span>}
-                      name={[name, "accountNo"]}
-                    >
-                      <Input 
-                        placeholder="Enter account number"
-                        style={{ borderRadius: "6px" }}
-                      />
-                    </Form.Item>
-                  </Col>
-
-                  <Col xs={24} sm={12} md={8}>
-                    <Form.Item 
-                      {...restField} 
-                      label={<span>IFSC Code</span>}
-                      name={[name, "ifsc"]}
-                    >
-                      <Input 
-                        placeholder="SBIN0001234"
-                        style={{ borderRadius: "6px" }}
-                      />
-                    </Form.Item>
-                  </Col>
-                </Row>
-                  {SHOW_COMPANY_DETAILS_FOR.includes(orgType) && (
-                    <>
-                       <Divider orientation="left" style={{ 
-                    fontSize: "15px", 
+                  <Divider orientation="left" style={{
+                    fontSize: "15px",
                     fontWeight: "600",
-                    color: "#374151"
+                    color: "#374151",
+                    marginTop: 0
                   }}>
-                    Director Associate Company Details
+                    Director Documents
                   </Divider>
 
                   <Row gutter={[16, 16]}>
-                    {rule.company_website && (
-                      <Col xs={24} sm={6}>
-                        <Form.Item 
-                          {...restField} 
-                          label={<span style={{ fontSize: "14px", fontWeight: "500" }}>Company Website</span>}
-                          name={[name, "companyWebsite"]}
-                        >
-                          <Input 
-                            placeholder="https://www.example.com"
-                            
-                            style={{ borderRadius: "6px" }}
-                          />
-                        </Form.Item>
-                      </Col>
-                    )}
-
                     <Col xs={24} sm={12}>
-                      <Form.Item 
-                        {...restField} 
-                        label={<span>Company Certificate</span>}
-                        name={[name, "documents"]}
-                        valuePropName="fileList" 
+                      <Form.Item
+                        {...restField}
+                        label={<span >Passport Size Photo</span>}
+                        name={[name, "photo"]}
+                        valuePropName="fileList"
                         getValueFromEvent={normFile}
                       >
-                        <Upload beforeUpload={() => false} multiple>
-                          <Button 
-                            icon={<UploadOutlined />} 
+                        <Upload beforeUpload={() => false}>
+                          <Button
+                            icon={<UploadOutlined />}
+
                             style={{ borderRadius: "6px" }}
                           >
-                            Upload Certificate
+                            Upload Photo
                           </Button>
                         </Upload>
                       </Form.Item>
                     </Col>
 
                     <Col xs={24} sm={12} md={6}>
-                      <Form.Item 
-                        {...restField} 
-                        label={<span>Company Name</span>}
-                        name={[name, "companyDetails", "companyName"]}
+                      <Form.Item
+                        {...restField}
+                        label={<span s>Aadhaar Number</span>}
+                        name={[name, "adharNo"]}
                       >
-                        <Input 
-                          placeholder="Enter company name"
-                          style={{ borderRadius: "6px" }}
-                        />
-                      </Form.Item>
-                    </Col>
+                        <Input
+                          placeholder="1234 5678 9012"
 
-                    <Col xs={24} sm={12} md={6}>
-                      <Form.Item 
-                        {...restField} 
-                        label={<span >Registration Number</span>}
-                        name={[name, "companyDetails", "registrationNo"]}
-                      >
-                        <Input 
-                          placeholder="Enter registration number"
-                          style={{ borderRadius: "6px" }}
-                        />
-                      </Form.Item>
-                    </Col>
-
-                    <Col xs={24} sm={12} md={6}>
-                      <Form.Item 
-                        {...restField} 
-                        label={<span>Company GST Number</span>}
-                        name={[name, "companyDetails", "gstNo"]}
-                      >
-                        <Input 
-                          placeholder="22AAAAA0000A1Z5"
-                          style={{ borderRadius: "6px" }}
-                        />
-                      </Form.Item>
-                    </Col>
-
-                    <Col xs={24} sm={12} md={6}>
-                      <Form.Item 
-                        {...restField} 
-                        label={<span>City</span>}
-                        name={[name, "companyDetails", "address", "city"]}
-                      >
-                        <Input 
-                          placeholder="Enter city"
-                          style={{ borderRadius: "6px" }}
-                        />
-                      </Form.Item>
-                    </Col>
-
-                    <Col xs={24} sm={12} md={6}>
-                      <Form.Item 
-                        {...restField} 
-                        label={<span>State</span>}
-                        name={[name, "companyDetails", "address", "state"]}
-                      >
-                        <Input 
-                          placeholder="Enter state"
                           style={{ borderRadius: "6px" }}
                         />
                       </Form.Item>
                     </Col>
 
                     <Col xs={24} sm={12} md={4}>
-                      <Form.Item 
-                        {...restField} 
-                        label={<span>PIN Code</span>}
-                        name={[name, "companyDetails", "address", "pin"]}
+                      <Form.Item
+                        {...restField}
+                        label={<span>Aadhaar Document</span>}
+                        name={[name, "adharDocument"]}
+                        valuePropName="fileList"
+                        getValueFromEvent={normFile}
                       >
-                        <Input 
-                          maxLength={6}
-                          placeholder="123456"
-                        
+                        <Upload beforeUpload={() => false}>
+                          <Button
+
+                            style={{ borderRadius: "6px" }}
+                          >
+                            Upload Aadhaar
+                          </Button>
+                        </Upload>
+                      </Form.Item>
+                    </Col>
+
+                    <Col xs={24} sm={12} md={6}>
+                      <Form.Item
+                        {...restField}
+                        label={<span >PAN Number</span>}
+                        name={[name, "panNo"]}
+                      >
+                        <Input
+                          placeholder="ABCDE1234F"
+
+                          style={{ borderRadius: "6px" }}
+                        />
+                      </Form.Item>
+                    </Col>
+
+                    <Col xs={24} sm={12} md={6}>
+                      <Form.Item
+                        {...restField}
+                        label={<span>PAN Document</span>}
+                        name={[name, "panDocument"]}
+                        valuePropName="fileList"
+                        getValueFromEvent={normFile}
+                      >
+                        <Upload beforeUpload={() => false}>
+                          <Button
+
+                            style={{ borderRadius: "6px" }}
+                          >
+                            Upload PAN
+                          </Button>
+                        </Upload>
+                      </Form.Item>
+                    </Col>
+
+                    <Col xs={24} sm={12} md={6}>
+                      <Form.Item
+                        {...restField}
+                        label={<span>GST Number</span>}
+                        name={[name, "gstNo"]}
+                      >
+                        <Input
+                          placeholder="22AAAAA0000A1Z5"
+
+                          style={{ borderRadius: "6px" }}
+                        />
+                      </Form.Item>
+                    </Col>
+
+                    <Col xs={24} sm={12} md={4}>
+                      <Form.Item
+                        {...restField}
+                        label={<span style={{ fontSize: "14px", fontWeight: "500" }}>GST Document</span>}
+                        name={[name, "gstDocument"]}
+                        valuePropName="fileList"
+                        getValueFromEvent={normFile}
+                      >
+                        <Upload beforeUpload={() => false}>
+                          <Button
+
+                            style={{ borderRadius: "6px" }}
+                          >
+                            Upload GST
+                          </Button>
+                        </Upload>
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                  <Divider orientation="left" style={{
+                    fontSize: "15px",
+                    fontWeight: "600",
+                    color: "#374151"
+                  }}>
+                    Bank Details
+                  </Divider>
+
+                  <Row gutter={[16, 16]}>
+                    <Col xs={24} sm={12} md={8}>
+                      <Form.Item
+                        {...restField}
+                        label={<span>Bank Name</span>}
+                        name={[name, "bankName"]}
+                      >
+                        <Input
+                          placeholder="Enter bank name"
+
+                          style={{ borderRadius: "6px" }}
+                        />
+                      </Form.Item>
+                    </Col>
+
+                    <Col xs={24} sm={12} md={8}>
+                      <Form.Item
+                        {...restField}
+                        label={<span>Account Number</span>}
+                        name={[name, "accountNo"]}
+                      >
+                        <Input
+                          placeholder="Enter account number"
+                          style={{ borderRadius: "6px" }}
+                        />
+                      </Form.Item>
+                    </Col>
+
+                    <Col xs={24} sm={12} md={8}>
+                      <Form.Item
+                        {...restField}
+                        label={<span>IFSC Code</span>}
+                        name={[name, "ifsc"]}
+                      >
+                        <Input
+                          placeholder="SBIN0001234"
                           style={{ borderRadius: "6px" }}
                         />
                       </Form.Item>
                     </Col>
                   </Row>
+                  {SHOW_COMPANY_DETAILS_FOR.includes(orgType) && (
+                    <>
+                      <Divider orientation="left" style={{
+                        fontSize: "15px",
+                        fontWeight: "600",
+                        color: "#374151"
+                      }}>
+                        Director Associate Company Details
+                      </Divider>
+
+                      <Row gutter={[16, 16]}>
+                        {rule.company_website && (
+                          <Col xs={24} sm={6}>
+                            <Form.Item
+                              {...restField}
+                              label={<span style={{ fontSize: "14px", fontWeight: "500" }}>Company Website</span>}
+                              name={[name, "companyWebsite"]}
+                            >
+                              <Input
+                                placeholder="https://www.example.com"
+
+                                style={{ borderRadius: "6px" }}
+                              />
+                            </Form.Item>
+                          </Col>
+                        )}
+
+                        <Col xs={24} sm={12}>
+                          <Form.Item
+                            {...restField}
+                            label={<span>Company Certificate</span>}
+                            name={[name, "documents"]}
+                            valuePropName="fileList"
+                            getValueFromEvent={normFile}
+                          >
+                            <Upload beforeUpload={() => false} multiple>
+                              <Button
+                                icon={<UploadOutlined />}
+                                style={{ borderRadius: "6px" }}
+                              >
+                                Upload Certificate
+                              </Button>
+                            </Upload>
+                          </Form.Item>
+                        </Col>
+
+                        <Col xs={24} sm={12} md={6}>
+                          <Form.Item
+                            {...restField}
+                            label={<span>Company Name</span>}
+                            name={[name, "companyDetails", "companyName"]}
+                          >
+                            <Input
+                              placeholder="Enter company name"
+                              style={{ borderRadius: "6px" }}
+                            />
+                          </Form.Item>
+                        </Col>
+
+                        <Col xs={24} sm={12} md={6}>
+                          <Form.Item
+                            {...restField}
+                            label={<span >Registration Number</span>}
+                            name={[name, "companyDetails", "registrationNo"]}
+                          >
+                            <Input
+                              placeholder="Enter registration number"
+                              style={{ borderRadius: "6px" }}
+                            />
+                          </Form.Item>
+                        </Col>
+
+                        <Col xs={24} sm={12} md={6}>
+                          <Form.Item
+                            {...restField}
+                            label={<span>Company GST Number</span>}
+                            name={[name, "companyDetails", "gstNo"]}
+                          >
+                            <Input
+                              placeholder="22AAAAA0000A1Z5"
+                              style={{ borderRadius: "6px" }}
+                            />
+                          </Form.Item>
+                        </Col>
+
+                        <Col xs={24} sm={12} md={6}>
+                          <Form.Item
+                            {...restField}
+                            label={<span>City</span>}
+                            name={[name, "companyDetails", "address", "city"]}
+                          >
+                            <Input
+                              placeholder="Enter city"
+                              style={{ borderRadius: "6px" }}
+                            />
+                          </Form.Item>
+                        </Col>
+
+                        <Col xs={24} sm={12} md={6}>
+                          <Form.Item
+                            {...restField}
+                            label={<span>State</span>}
+                            name={[name, "companyDetails", "address", "state"]}
+                          >
+                            <Input
+                              placeholder="Enter state"
+                              style={{ borderRadius: "6px" }}
+                            />
+                          </Form.Item>
+                        </Col>
+
+                        <Col xs={24} sm={12} md={4}>
+                          <Form.Item
+                            {...restField}
+                            label={<span>PIN Code</span>}
+                            name={[name, "companyDetails", "address", "pin"]}
+                          >
+                            <Input
+                              maxLength={6}
+                              placeholder="123456"
+
+                              style={{ borderRadius: "6px" }}
+                            />
+                          </Form.Item>
+                        </Col>
+                      </Row>
                     </>
                   )}
-              </Row>
+                </Row>
               </Card>
             ))}
             {rule.askCount && (
@@ -730,7 +935,7 @@ export default function AddOrganisation() {
         </Form.Item>
       </Col>
       <Col xs={24} sm={12} md={6}>
-        <Form.Item label="PAN No" name="panNo">
+        <Form.Item label="PAN No" name="legalPanNo">
           <Input placeholder="Enter PAN" />
         </Form.Item>
       </Col>
@@ -858,7 +1063,7 @@ export default function AddOrganisation() {
                           </Form.Item>
                         </Col>
                         <Col xs={12} sm={6} md={5}>
-                          <Form.Item {...restField} label="Branch Name" name={[name, "branchName"]}>
+                          <Form.Item {...restField} label="Branch Name" name={[name, "branchName"]} rules={[{ required: true, message: "Branch name required" }]}>
                             <Input placeholder="Branch name" />
                           </Form.Item>
                         </Col>
@@ -950,44 +1155,44 @@ export default function AddOrganisation() {
         Enable Modules
       </Divider>
       <Row gutter={[16, 8]}>
-{modulesList.map((module) => (
-  <Col xs={24} sm={12} md={6} key={module.id}>
-    <Form.Item
-      name={`module_${module.id}`}
-      valuePropName="checked"
-      className="mb-0"
-    >
-      <Card
-        hoverable
-        className="
+        {modulesList.map((module) => (
+          <Col xs={24} sm={12} md={6} key={module.id}>
+            <Form.Item
+              name={`module_${module.id}`}
+              valuePropName="checked"
+              className="mb-0"
+            >
+              <Card
+                hoverable
+                className="
           relative h-full
           border-gray-200
           transition-all
           [&:has(input:checked)]:border-amber-500
           [&:has(input:checked)]:bg-amber-50
         "
-      >
-        {/* Checkbox – Top Right */}
-        <div className="absolute top-3 right-3">
-          <Checkbox />
-        </div>
+              >
+                {/* Checkbox – Top Right */}
+                <div className="absolute top-3 right-3">
+                  <Checkbox />
+                </div>
 
-        {/* Content */}
-        <div className="pt-4">
-          <h4 className="text-sm font-semibold text-gray-800">
-            {module.label}
-          </h4>
+                {/* Content */}
+                <div className="pt-4">
+                  <h4 className="text-sm font-semibold text-gray-800">
+                    {module.label}
+                  </h4>
 
-          {module.description && (
-            <p className="text-xs text-gray-500 mt-1">
-              {module.description}
-            </p>
-          )}
-        </div>
-      </Card>
-    </Form.Item>
-  </Col>
-))}
+                  {module.description && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {module.description}
+                    </p>
+                  )}
+                </div>
+              </Card>
+            </Form.Item>
+          </Col>
+        ))}
 
 
       </Row>
@@ -1043,11 +1248,11 @@ export default function AddOrganisation() {
           }
           bordered={false}
           style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.08)", borderRadius: "8px" }}>
-          
+
           {/* Progress Bar */}
           <div style={{ marginBottom: 32 }}>
-            <Progress 
-              percent={((currentStep + 1) / steps.length) * 100} 
+            <Progress
+              percent={((currentStep + 1) / steps.length) * 100}
               strokeColor="#d97706"
               showInfo={false}
               style={{ marginBottom: 16 }}
@@ -1072,7 +1277,7 @@ export default function AddOrganisation() {
                   icon={<ArrowLeftOutlined />}>
                   Previous
                 </Button>
-                
+
                 {currentStep < steps.length - 1 ? (
                   <Button
                     type="primary"
@@ -1099,5 +1304,5 @@ export default function AddOrganisation() {
         </Card>
       </div>
     </div>
-  );
+  )
 }
