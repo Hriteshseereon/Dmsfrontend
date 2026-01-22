@@ -23,7 +23,7 @@ const useSessionStore = create(
       getAccessToken: () => get().accessToken,
       getRefreshToken: () => get().refreshToken,
       getUser: () => get().user,
-      getCurrentOrganizationId: () => get().currentOrgId,
+      getCurrentOrgId: () => get().currentOrgId,
 
       // clear
       clearSession: () =>
