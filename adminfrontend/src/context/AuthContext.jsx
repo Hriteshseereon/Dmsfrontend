@@ -47,6 +47,7 @@ export const AuthProvider = ({ children }) => {
         refreshToken: authResponse.refresh,
         user: {
           ...userData,
+          role: userData.is_super_admin || userData.is_admin ? "admin" : "user",
         },
         currentOrgId: userData.organisation_id,
       });
