@@ -1,5 +1,5 @@
 // AssetMaintenance.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Table,
   Input,
@@ -24,39 +24,20 @@ import {
   FilterOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { useAuth } from "../../context/AuthContext";
+import { addAssetMaintenance, getAssetMaintenances, getAssets, updateAssetMaintenance } from "../../api/assets";
 
 const { Option } = Select;
 const { TextArea } = Input;
 
 export default function AssetMaintenance() {
-  const [data, setData] = useState([
-    {
-      key: 1,
-      maintenanceId: "MAINT-001",
-      assetId: "ASSET-001",
-      serviceType: "Preventive",
-      serviceProvider: "ServiceCo Pvt Ltd",
-      serviceDate: "2025-02-15",
-      nextServiceDue: "2025-08-15",
-      cost: 1200,
-      status: "Completed",
-      files: [],
-      remarks: "Quarterly preventive maintenance",
-    },
-    {
-      key: 2,
-      maintenanceId: "MAINT-002",
-      assetId: "ASSET-010",
-      serviceType: "Calibration",
-      serviceProvider: "CalibrateNow",
-      serviceDate: "2025-06-05",
-      nextServiceDue: "2026-06-05",
-      cost: 800,
-      status: "Scheduled",
-      files: [],
-      remarks: "Annual calibration",
-    },
-  ]);
+
+  const { currentOrgId } = useAuth();
+
+  const [assets, setAssets] = useState([]);
+
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -80,6 +61,52 @@ export default function AssetMaintenance() {
       (row[f] || "").toString().toLowerCase().includes(searchText.trim().toLowerCase())
     )
   );
+
+
+  const fetchMaintenances = async () => {
+    setLoading(true);
+    try {
+      const res = await getAssetMaintenances(currentOrgId);
+
+      const mapped = res.map((item) => ({
+        key: item.id,
+        id: item.id,
+
+        maintenanceId: item.maintenance_id,
+        assetId: item.asset?.asset_code,
+        assetPk: item.asset?.id,
+
+        serviceType: item.service_type,
+        serviceProvider: item.service_provider,
+
+        serviceDate: item.service_date,
+        nextServiceDue: item.next_service_due,
+
+        cost: item.cost,
+        status: item.status,
+        remarks: item.remarks,
+        files: item.documents || [],
+      }));
+
+      setData(mapped);
+    } catch {
+      message.error("Failed to load maintenance records");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAssets = async () => {
+    const res = await getAssets(currentOrgId);
+    setAssets(res);
+  };
+
+  useEffect(() => {
+    if (!currentOrgId) return;
+    fetchMaintenances();
+    fetchAssets();
+  }, [currentOrgId]);
+
 
   const columns = [
     {
@@ -150,6 +177,7 @@ export default function AssetMaintenance() {
               setSelectedRecord(record);
               viewForm.setFieldsValue({
                 ...record,
+                assetId: record.assetPk,
                 serviceDate: record.serviceDate ? dayjs(record.serviceDate) : undefined,
                 nextServiceDue: record.nextServiceDue ? dayjs(record.nextServiceDue) : undefined,
               });
@@ -162,6 +190,7 @@ export default function AssetMaintenance() {
               setSelectedRecord(record);
               editForm.setFieldsValue({
                 ...record,
+                assetId: record.assetPk,
                 serviceDate: record.serviceDate ? dayjs(record.serviceDate) : undefined,
                 nextServiceDue: record.nextServiceDue ? dayjs(record.nextServiceDue) : undefined,
               });
@@ -236,36 +265,66 @@ export default function AssetMaintenance() {
     },
   };
 
-  const handleAdd = (values) => {
-    const payload = {
-      ...values,
-      key: data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1,
-      serviceDate: values.serviceDate ? dayjs(values.serviceDate).format("YYYY-MM-DD") : undefined,
-      nextServiceDue: values.nextServiceDue ? dayjs(values.nextServiceDue).format("YYYY-MM-DD") : undefined,
-      files: addFileList,
-    };
-    setData((prev) => [payload, ...prev]);
-    setIsAddModalOpen(false);
-    addForm.resetFields();
-    setAddFileList([]);
-    message.success("Maintenance record added.");
+  const handleAdd = async (values) => {
+    try {
+      setLoading(true);
+
+      await addAssetMaintenance(currentOrgId, {
+        asset: values.assetId,
+        service_type: values.serviceType,
+        service_provider: values.serviceProvider,
+        service_date: values.serviceDate.format("YYYY-MM-DD"),
+        next_service_due: values.nextServiceDue
+          ? values.nextServiceDue.format("YYYY-MM-DD")
+          : null,
+        cost: values.cost || 0,
+        status: values.status,
+        remarks: values.remarks || "",
+      });
+
+      message.success("Maintenance record added");
+      setIsAddModalOpen(false);
+      addForm.resetFields();
+      setAddFileList([]);
+      fetchMaintenances();
+    } catch {
+      message.error("Failed to add maintenance record");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleEdit = (values) => {
-    const payload = {
-      ...selectedRecord,
-      ...values,
-      serviceDate: values.serviceDate ? dayjs(values.serviceDate).format("YYYY-MM-DD") : undefined,
-      nextServiceDue: values.nextServiceDue ? dayjs(values.nextServiceDue).format("YYYY-MM-DD") : undefined,
-      files: editFileList,
-    };
-    setData((prev) => prev.map((d) => (d.key === payload.key ? payload : d)));
-    setIsEditModalOpen(false);
-    editForm.resetFields();
-    setSelectedRecord(null);
-    setEditFileList([]);
-    message.success("Maintenance record updated.");
+
+  const handleEdit = async (values) => {
+    try {
+      setLoading(true);
+
+      await updateAssetMaintenance(selectedRecord.id, {
+        asset: values.assetId,
+        service_type: values.serviceType,
+        service_provider: values.serviceProvider,
+        service_date: values.serviceDate.format("YYYY-MM-DD"),
+        next_service_due: values.nextServiceDue
+          ? values.nextServiceDue.format("YYYY-MM-DD")
+          : null,
+        cost: values.cost || 0,
+        status: values.status,
+        remarks: values.remarks || "",
+      });
+
+      message.success("Maintenance updated");
+      setIsEditModalOpen(false);
+      editForm.resetFields();
+      setSelectedRecord(null);
+      setEditFileList([]);
+      fetchMaintenances();
+    } catch {
+      message.error("Failed to update maintenance");
+    } finally {
+      setLoading(false);
+    }
   };
+
 
   const renderFormFields = (form, disabled = false, mode = "add") => (
     <>
@@ -283,11 +342,17 @@ export default function AssetMaintenance() {
 
         <Col span={8}>
           <Form.Item
-            label={<span className="text-amber-700">Asset ID</span>}
+            label={<span className="text-amber-700">Asset</span>}
             name="assetId"
-            rules={[{ required: true, message: "Please enter Asset ID" }]}
+            rules={[{ required: true }]}
           >
-            <Input placeholder="Asset ID" disabled={disabled} />
+            <Select placeholder="Select asset">
+              {assets.map((a) => (
+                <Select.Option key={a.id} value={a.id}>
+                  {a.asset_name} ({a.asset_code})
+                </Select.Option>
+              ))}
+            </Select>
           </Form.Item>
         </Col>
 
@@ -404,10 +469,10 @@ export default function AssetMaintenance() {
       <div className="flex justify-between items-center mb-2">
         <div className="flex gap-2">
           <Input
-          prefix={<SearchOutlined className="text-amber-600!" />}
-                      placeholder="Search assets..."
-                      className="w-64! border-amber-300! focus:border-amber-500!"
-                          value={searchText}
+            prefix={<SearchOutlined className="text-amber-600!" />}
+            placeholder="Search assets..."
+            className="w-64! border-amber-300! focus:border-amber-500!"
+            value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
           />
           <Button
@@ -420,15 +485,15 @@ export default function AssetMaintenance() {
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} onClick={exportCSV} 
-           className="border-amber-400! text-amber-700! hover:bg-amber-100!">
-          Export
+          <Button icon={<DownloadOutlined />} onClick={exportCSV}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!">
+            Export
           </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
             className="bg-amber-500! hover:bg-amber-600! border-none!"
-           
+
             onClick={() => {
               addForm.resetFields();
               setAddFileList([]);
@@ -444,7 +509,11 @@ export default function AssetMaintenance() {
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">Asset Maintenance</h2>
         <p className="text-amber-600 mb-3">Manage maintenance, calibration & service records</p>
-        <Table columns={columns} dataSource={filteredData} pagination={{ pageSize: 6 }} />
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          loading={loading}
+          pagination={{ pageSize: 6 }} />
       </div>
 
       {/* Add Modal */}
@@ -468,13 +537,14 @@ export default function AssetMaintenance() {
                 addForm.resetFields();
                 setAddFileList([]);
               }}
-               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-        
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+
             >
               Cancel
             </Button>
-            <Button type="primary"  className="bg-amber-500! hover:bg-amber-600! border-none!"
-            htmlType="submit">
+            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit"
+              loading={loading}>
               Add
             </Button>
           </div>
@@ -504,13 +574,13 @@ export default function AssetMaintenance() {
                 setSelectedRecord(null);
                 setEditFileList([]);
               }}
-               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-        
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+
             >
               Cancel
             </Button>
-            <Button type="primary"  className="bg-amber-500! hover:bg-amber-600! border-none!"
-            htmlType="submit">
+            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit">
               Save Changes
             </Button>
           </div>

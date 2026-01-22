@@ -13,6 +13,26 @@ export const AuthProvider = ({ children }) => {
   const [orgModules, setOrgModules] = useState([]);
   const [organisations, setOrganisations] = useState([]);
   const [accessToken, setAccessToken] = useState(null);
+
+  const [currentOrgId, setCurrentOrgId] = useState(null);
+
+  useEffect(() => {
+    const storedOrg = localStorage.getItem("currentOrgId");
+    if (storedOrg) {
+      setCurrentOrgId(storedOrg);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentOrgId) {
+      localStorage.setItem("currentOrgId", currentOrgId);
+    } else {
+      localStorage.removeItem("currentOrgId");
+    }
+  }, [currentOrgId]);
+
+
+
   // helper: normalize org lookup (org.id may be string)
   const findOrgByIdOrName = (idOrName) =>
     orgs.find(
@@ -85,11 +105,11 @@ export const AuthProvider = ({ children }) => {
         refreshToken: authResponse.refresh,
       });
       const userData = {
-      role: authResponse.is_admin ? "admin" : "user",
-      is_admin: authResponse.is_admin,
-    }
+        role: authResponse.is_admin ? "admin" : "user",
+        is_admin: authResponse.is_admin,
+      }
       setUser(userData);
-    localStorage.setItem("user", JSON.stringify(userData));
+      localStorage.setItem("user", JSON.stringify(userData));
     } catch (err) {
       const message = err.response?.data?.detail || "Login failed";
       throw new Error(message);
@@ -101,6 +121,8 @@ export const AuthProvider = ({ children }) => {
     // setOrgModules([]);
     // setOrganisations([]);
     TokenStore.removeTokens();
+    localStorage.removeItem("user");
+    localStorage.removeItem("currentOrgId");
     window.location.reload();
   };
 
@@ -123,6 +145,8 @@ export const AuthProvider = ({ children }) => {
         isAdmin,
         organisations,
         setOrgModules,
+        currentOrgId,
+        setCurrentOrgId,
       }}
     >
       {children}

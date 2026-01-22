@@ -1,5 +1,5 @@
 // AssetManager.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Table,
   Input,
@@ -26,6 +26,8 @@ import {
   FilterOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { useAuth } from "../../context/AuthContext";
+import { addAsset, getAssetCategories, getAssets, updateAsset } from "../../api/assets";
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -50,48 +52,89 @@ const depreciationMethods = [
 
 const statusOptions = ["Active", "Inactive", "Lost", "Damaged", "Under Repair"];
 
-const initialAssets = [
-  {
-    key: 1,
-    assetName: "Dell Latitude 5430",
-    assetId: "ASSET-001",
-    assetCategory: "Computer Equipment",
-    assetType: "Movable",
-    serialNumber: "SN123456",
-    modelNumber: "L5430",
-    brand: "Dell",
-    purchaseDate: "2024-08-01",
-    purchaseVendor: "Tech Supplies",
-    purchaseInvoice: "INV-1001",
-    costPrice: 75000,
-    currentValue: 50000,
-    depreciationMethod: "Straight Line",
-    depreciationRate: 10,
-    assetLocation: "Head Office - IT",
-    assignedTo: "Ravi Kumar",
-    status: "Active",
-    warrantyExpiryDate: "2026-08-01",
-    insurancePolicy: "POL-2024-001",
-    insuranceExpiryDate: "2026-08-01",
-    barcodeNumber: "BC-1001",
-    additionalInfo: "Office laptop",
-    documents: [],
-  },
-];
 
 export default function AssetManager() {
-  const [data, setData] = useState(initialAssets);
+
+  const { currentOrgId } = useAuth();
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
 
+  const [categories, setCategories] = useState([]);
+
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
 
   const [fileList, setFileList] = useState([]);
+
+  const fetchCategories = async () => {
+    try {
+      const res = await getAssetCategories();
+      setCategories(res);
+    } catch {
+      message.error("Failed to load asset categories");
+    }
+  };
+
+
+  useEffect(() => {
+    if (!currentOrgId) return;
+    fetchAssets();
+    fetchCategories();
+  }, [currentOrgId]);
+
+  const fetchAssets = async () => {
+    setLoading(true);
+    try {
+      const response = await getAssets(currentOrgId);
+
+      const mapped = response.map((item) => ({
+        key: item.id,
+        id: item.id,
+
+        assetName: item.asset_name,
+        assetId: item.asset_code,
+        assetCategory: item.category?.category_name,
+        assetCategoryId: item.category?.id,
+
+        assetType: item.asset_type,
+        serialNumber: item.serial_number,
+        modelNumber: item.model_number,
+        brand: item.brand,
+
+        purchaseDate: item.purchase_date,
+        purchaseVendor: item.purchase_vendor?.vendor_name,
+        purchaseInvoice: item.purchase_invoice?.invoice_number,
+
+        costPrice: item.cost_price,
+        currentValue: item.current_value,
+
+        depreciationMethod: item.depreciation_method,
+        depreciationRate: item.depreciation_rate,
+
+        assetLocation: item.location_description,
+        assignedTo: item.assigned_to_employee,
+        status: item.status,
+
+        warrantyExpiryDate: item.warranty_expiry_date,
+        insurancePolicy: item.insurance_policy,
+        insuranceExpiryDate: item.insurance_expiry_date,
+        barcodeNumber: item.barcode_number,
+      }));
+
+      setData(mapped);
+    } catch (err) {
+      message.error("Failed to load assets");
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const uploadProps = {
     fileList,
@@ -114,49 +157,92 @@ export default function AssetManager() {
     )
   );
 
-  const handleAdd = (values) => {
-    const payload = {
-      ...values,
-      key: data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1,
-      purchaseDate: values.purchaseDate
-        ? dayjs(values.purchaseDate).format("YYYY-MM-DD")
-        : undefined,
-      warrantyExpiryDate: values.warrantyExpiryDate
-        ? dayjs(values.warrantyExpiryDate).format("YYYY-MM-DD")
-        : undefined,
-      insuranceExpiryDate: values.insuranceExpiryDate
-        ? dayjs(values.insuranceExpiryDate).format("YYYY-MM-DD")
-        : undefined,
-      documents: fileList,
-    };
-    setData((prev) => [payload, ...prev]);
-    setIsAddModalOpen(false);
-    addForm.resetFields();
-    setFileList([]);
-    message.success("Asset added successfully!");
+  const handleAdd = async (values) => {
+    try {
+      setLoading(true);
+
+      await addAsset(currentOrgId, {
+        asset_name: values.assetName,
+        asset_code: values.assetId,
+        category: values.assetCategoryId,
+        asset_type: values.assetType,
+
+        serial_number: values.serialNumber || null,
+        model_number: values.modelNumber || null,
+        brand: values.brand || null,
+
+        purchase_date: values.purchaseDate?.format("YYYY-MM-DD"),
+        cost_price: values.costPrice,
+        current_value: values.currentValue,
+
+        depreciation_method: values.depreciationMethod,
+        depreciation_rate: values.depreciationRate,
+
+        location_description: values.assetLocation,
+        assigned_to_employee: values.assignedTo,
+        status: values.status,
+
+        warranty_expiry_date: values.warrantyExpiryDate?.format("YYYY-MM-DD"),
+        insurance_policy: values.insurancePolicy,
+        insurance_expiry_date: values.insuranceExpiryDate?.format("YYYY-MM-DD"),
+        barcode_number: values.barcodeNumber,
+      });
+
+      message.success("Asset created successfully");
+      setIsAddModalOpen(false);
+      addForm.resetFields();
+      fetchAssets();
+    } catch {
+      message.error("Failed to create asset");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleEdit = (values) => {
-    const payload = {
-      ...selectedRecord,
-      ...values,
-      purchaseDate: values.purchaseDate
-        ? dayjs(values.purchaseDate).format("YYYY-MM-DD")
-        : undefined,
-      warrantyExpiryDate: values.warrantyExpiryDate
-        ? dayjs(values.warrantyExpiryDate).format("YYYY-MM-DD")
-        : undefined,
-      insuranceExpiryDate: values.insuranceExpiryDate
-        ? dayjs(values.insuranceExpiryDate).format("YYYY-MM-DD")
-        : undefined,
-      documents: fileList,
-    };
-    setData((prev) => prev.map((d) => (d.key === payload.key ? payload : d)));
-    setIsEditModalOpen(false);
-    editForm.resetFields();
-    setFileList([]);
-    message.success("Asset updated successfully!");
+
+  const handleEdit = async (values) => {
+    try {
+      setLoading(true);
+
+      await updateAsset(selectedRecord.id, {
+        asset_name: values.assetName,
+        asset_code: values.assetId,
+        category: values.assetCategoryId,
+        asset_type: values.assetType,
+
+        serial_number: values.serialNumber || null,
+        model_number: values.modelNumber || null,
+        brand: values.brand || null,
+
+        purchase_date: values.purchaseDate?.format("YYYY-MM-DD"),
+        cost_price: values.costPrice,
+        current_value: values.currentValue,
+
+        depreciation_method: values.depreciationMethod,
+        depreciation_rate: values.depreciationRate,
+
+        location_description: values.assetLocation,
+        assigned_to_employee: values.assignedTo,
+        status: values.status,
+
+        warranty_expiry_date: values.warrantyExpiryDate?.format("YYYY-MM-DD"),
+        insurance_policy: values.insurancePolicy,
+        insurance_expiry_date: values.insuranceExpiryDate?.format("YYYY-MM-DD"),
+        barcode_number: values.barcodeNumber,
+      });
+
+      message.success("Asset updated successfully");
+      setIsEditModalOpen(false);
+      editForm.resetFields();
+      setSelectedRecord(null);
+      fetchAssets();
+    } catch {
+      message.error("Failed to update asset");
+    } finally {
+      setLoading(false);
+    }
   };
+
 
   const columns = [
     {
@@ -228,6 +314,7 @@ export default function AssetManager() {
               setSelectedRecord(record);
               editForm.setFieldsValue({
                 ...record,
+                assetCategoryId: record.assetCategoryId,
                 purchaseDate: record.purchaseDate ? dayjs(record.purchaseDate) : undefined,
                 warrantyExpiryDate: record.warrantyExpiryDate ? dayjs(record.warrantyExpiryDate) : undefined,
                 insuranceExpiryDate: record.insuranceExpiryDate ? dayjs(record.insuranceExpiryDate) : undefined,
@@ -267,12 +354,14 @@ export default function AssetManager() {
         <Col span={8}>
           <Form.Item
             label={<span className="text-amber-700 font-medium">Asset Category</span>}
-            name="assetCategory"
-            rules={[{ required: true, message: "Please select Asset Category" }]}
+            name="assetCategoryId"
+            rules={[{ required: true }]}
           >
             <Select placeholder="Select Category" disabled={disabled}>
-              {assetCategories.map((c) => (
-                <Option key={c} value={c}>{c}</Option>
+              {categories.map((cat) => (
+                <Option key={cat.id} value={cat.id}>
+                  {cat.category_name}
+                </Option>
               ))}
             </Select>
           </Form.Item>
@@ -356,18 +445,18 @@ export default function AssetManager() {
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Depreciation Percent (%)</span>} name="depreciationRate">
+          <Form.Item label={<span className="text-amber-700 font-medium">Depreciation Percent (%)</span>} name="depreciationPercent">
             <InputNumber className="w-full" min={0} max={100} disabled={disabled} />
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Depreciation Value</span>} name="depreciationRate">
+          <Form.Item label={<span className="text-amber-700 font-medium">Depreciation Value</span>} name="depreciationValue">
             <InputNumber className="w-full" min={0} max={100} disabled={disabled} />
           </Form.Item>
         </Col>
-        
+
       </Row>
-{/* helo */}
+      {/* helo */}
       <h6 className="text-amber-500 mt-4">Additional Details</h6>
       <Row gutter={16}>
         <Col span={8}>
@@ -456,7 +545,7 @@ export default function AssetManager() {
 
         <div className="flex gap-2">
           <Button icon={<DownloadOutlined />} className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-       >Export</Button>
+          >Export</Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -476,7 +565,12 @@ export default function AssetManager() {
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">Assets</h2>
         <p className="text-amber-600 mb-3">Manage your fixed & movable assets</p>
-        <Table columns={columns} dataSource={filteredData} pagination={{ pageSize: 6 }} />
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          loading={loading}
+          pagination={{ pageSize: 6 }}
+        />
       </div>
 
       {/* Add Modal */}
@@ -495,15 +589,15 @@ export default function AssetManager() {
           form={addForm}
           layout="vertical"
           onFinish={handleAdd}
-          onValuesChange={() => {}}
+          onValuesChange={() => { }}
         >
           {renderFormFields(addForm, false)}
 
           <div className="flex justify-end gap-2 mt-4">
             <Button className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-        onClick={() => { setIsAddModalOpen(false); addForm.resetFields(); setFileList([]); }}>Cancel</Button>
-            <Button type="primary" htmlType="submit"  className="bg-amber-500! hover:bg-amber-600! border-none!"
-           >Add</Button>
+              onClick={() => { setIsAddModalOpen(false); addForm.resetFields(); setFileList([]); }}>Cancel</Button>
+            <Button type="primary" htmlType="submit" className="bg-amber-500! hover:bg-amber-600! border-none!"
+            >Add</Button>
           </div>
         </Form>
       </Modal>
@@ -529,9 +623,9 @@ export default function AssetManager() {
 
           <div className="flex justify-end gap-2 mt-4">
             <Button className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-            onClick={() => { setIsEditModalOpen(false); editForm.resetFields(); setFileList([]); }}>Cancel</Button>
-            <Button type="primary" htmlType="submit"  className="bg-amber-500! hover:bg-amber-600! border-none!"
-           >Save Changes</Button>
+              onClick={() => { setIsEditModalOpen(false); editForm.resetFields(); setFileList([]); }}>Cancel</Button>
+            <Button type="primary" htmlType="submit" className="bg-amber-500! hover:bg-amber-600! border-none!"
+            >Save Changes</Button>
           </div>
         </Form>
       </Modal>

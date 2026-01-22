@@ -1,5 +1,5 @@
 // AssetDisposal.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Table,
   Input,
@@ -24,37 +24,20 @@ import {
   FilterOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { useAuth } from "../../context/AuthContext";
+import { addAssetDisposal, getAssetDisposals, getAssets, updateAssetDisposal } from "../../api/assets";
 
 const { Option } = Select;
 const { TextArea } = Input;
 
 export default function AssetDisposal() {
-  const [data, setData] = useState([
-    {
-      key: 1,
-      assetId: "ASSET-001",
-      disposalId: "DISP-001",
-      disposalType: "Sold",
-      buyerName: "ABC Traders",
-      saleValue: 15000,
-      approvalDocument: "APPROVAL-001",
-      remarks: "Sold as scrap components",
-      files: [],
-      disposalDate: "2025-07-12",
-    },
-    {
-      key: 2,
-      assetId: "ASSET-010",
-      disposalId: "DISP-002",
-      disposalType: "Donation",
-      buyerName: "Local NGO",
-      saleValue: 0,
-      approvalDocument: "APPROVAL-002",
-      remarks: "Donated to community center",
-      files: [],
-      disposalDate: "2025-01-20",
-    },
-  ]);
+
+  const { currentOrgId } = useAuth();
+
+  const [data, setData] = useState([]);
+
+  const [assets, setAssets] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -77,6 +60,52 @@ export default function AssetDisposal() {
       (row[f] || "").toString().toLowerCase().includes(searchText.trim().toLowerCase())
     )
   );
+
+  const fetchAssets = async () => {
+    try {
+      const res = await getAssets(currentOrgId);
+      setAssets(res);
+    } catch {
+      message.error("Failed to load assets");
+    }
+  };
+
+  const fetchDisposals = async () => {
+    setLoading(true);
+    try {
+      const res = await getAssetDisposals(currentOrgId);
+
+      const mapped = res.map(item => ({
+        key: item.id,
+        id: item.id,
+
+        disposalId: item.disposal_id,
+        assetId: item.asset?.asset_code,
+        assetPk: item.asset?.id,
+
+        disposalType: item.disposal_type,
+        buyerName: item.buyer_name,
+        saleValue: item.sale_value,
+        disposalDate: item.disposal_date,
+        approvalDocument: item.approval_document,
+        remarks: item.remarks,
+        files: item.documents || [],
+      }));
+
+      setData(mapped);
+    } catch {
+      message.error("Failed to load disposal records");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  useEffect(() => {
+    if (!currentOrgId) return;
+    fetchDisposals();
+    fetchAssets();
+  }, [currentOrgId]);
 
   const columns = [
     {
@@ -138,6 +167,7 @@ export default function AssetDisposal() {
               setSelectedRecord(record);
               viewForm.setFieldsValue({
                 ...record,
+                assetId: record.assetPk,
                 disposalDate: record.disposalDate ? dayjs(record.disposalDate) : undefined,
               });
               setIsViewModalOpen(true);
@@ -149,6 +179,7 @@ export default function AssetDisposal() {
               setSelectedRecord(record);
               editForm.setFieldsValue({
                 ...record,
+                assetId: record.assetPk,
                 disposalDate: record.disposalDate ? dayjs(record.disposalDate) : undefined,
               });
               setEditFileList(record.files || []);
@@ -214,47 +245,79 @@ export default function AssetDisposal() {
     onRemove: (file) => setEditFileList((prev) => prev.filter((f) => f.uid !== file.uid)),
   };
 
-  const handleAdd = (values) => {
-    const payload = {
-      ...values,
-      key: data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1,
-      disposalDate: values.disposalDate ? dayjs(values.disposalDate).format("YYYY-MM-DD") : undefined,
-      files: addFileList,
-    };
-    setData((prev) => [payload, ...prev]);
-    setIsAddModalOpen(false);
-    addForm.resetFields();
-    setAddFileList([]);
-    message.success("Disposal record added.");
+  const handleAdd = async (values) => {
+    try {
+      setLoading(true);
+
+      await addAssetDisposal(currentOrgId, {
+        asset: values.assetId,
+        disposal_type: values.disposalType,
+        buyer_name: values.buyerName || "",
+        sale_value: values.saleValue || 0,
+        disposal_date: values.disposalDate.format("YYYY-MM-DD"),
+        approval_document: values.approvalDocument || "",
+        remarks: values.remarks || "",
+      });
+
+      message.success("Disposal record added");
+      setIsAddModalOpen(false);
+      addForm.resetFields();
+      setAddFileList([]);
+      fetchDisposals();
+    } catch {
+      message.error("Failed to add disposal record");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleEdit = (values) => {
-    const payload = {
-      ...selectedRecord,
-      ...values,
-      disposalDate: values.disposalDate ? dayjs(values.disposalDate).format("YYYY-MM-DD") : undefined,
-      files: editFileList,
-    };
-    setData((prev) => prev.map((d) => (d.key === payload.key ? payload : d)));
-    setIsEditModalOpen(false);
-    editForm.resetFields();
-    setEditFileList([]);
-    setSelectedRecord(null);
-    message.success("Disposal record updated.");
+
+  const handleEdit = async (values) => {
+    try {
+      setLoading(true);
+
+      await updateAssetDisposal(selectedRecord.id, {
+        asset: values.assetId,
+        disposal_type: values.disposalType,
+        buyer_name: values.buyerName || "",
+        sale_value: values.saleValue || 0,
+        disposal_date: values.disposalDate.format("YYYY-MM-DD"),
+        approval_document: values.approvalDocument || "",
+        remarks: values.remarks || "",
+      });
+
+      message.success("Disposal record updated");
+      setIsEditModalOpen(false);
+      editForm.resetFields();
+      setSelectedRecord(null);
+      setEditFileList([]);
+      fetchDisposals();
+    } catch {
+      message.error("Failed to update disposal record");
+    } finally {
+      setLoading(false);
+    }
   };
+
 
   const renderFormFields = (form, disabled = false, mode = "add") => (
     <>
       <h6 className="text-amber-500">Disposal Details</h6>
       <Row gutter={16}>
-        
+
         <Col span={8}>
           <Form.Item
             label={<span className="text-amber-700">Asset ID</span>}
             name="assetId"
             rules={[{ required: true, message: "Please enter Asset ID" }]}
           >
-            <Input placeholder="Asset ID" disabled={disabled} />
+            <Select placeholder="Select asset">
+              {assets.map(a => (
+                <Select.Option key={a.id} value={a.id}>
+                  {a.asset_name} ({a.asset_code})
+                </Select.Option>
+              ))}
+            </Select>
           </Form.Item>
         </Col>
 
@@ -345,10 +408,10 @@ export default function AssetDisposal() {
       <div className="flex justify-between items-center mb-2">
         <div className="flex gap-2">
           <Input
-           prefix={<SearchOutlined className="text-amber-600!" />}
-                       placeholder="Search assets..."
-                       className="w-64! border-amber-300! focus:border-amber-500!"
-                         value={searchText}
+            prefix={<SearchOutlined className="text-amber-600!" />}
+            placeholder="Search assets..."
+            className="w-64! border-amber-300! focus:border-amber-500!"
+            value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
           />
           <Button
@@ -362,14 +425,14 @@ export default function AssetDisposal() {
 
         <div className="flex gap-2">
           <Button icon={<DownloadOutlined />} onClick={exportCSV} className="border-amber-400! text-amber-700! hover:bg-amber-100!">
-          
+
             Export
           </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
-             className="bg-amber-500! hover:bg-amber-600! border-none!"
-           
+            className="bg-amber-500! hover:bg-amber-600! border-none!"
+
             onClick={() => {
               addForm.resetFields();
               setAddFileList([]);
@@ -385,7 +448,11 @@ export default function AssetDisposal() {
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">Asset Disposal</h2>
         <p className="text-amber-600 mb-3">Manage asset disposals, sales, donations, and write-offs</p>
-        <Table columns={columns} dataSource={filteredData} pagination={{ pageSize: 6 }} />
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          loading={loading}
+          pagination={{ pageSize: 6 }} />
       </div>
 
       {/* Add Modal */}
@@ -409,13 +476,13 @@ export default function AssetDisposal() {
                 addForm.resetFields();
                 setAddFileList([]);
               }}
-               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-        
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+
             >
               Cancel
             </Button>
-            <Button type="primary"  className="bg-amber-500! hover:bg-amber-600! border-none!"
-            htmlType="submit">
+            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit">
               Add
             </Button>
           </div>
@@ -445,13 +512,13 @@ export default function AssetDisposal() {
                 setEditFileList([]);
                 setSelectedRecord(null);
               }}
-               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-        
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+
             >
               Cancel
             </Button>
-            <Button type="primary"  className="bg-amber-500! hover:bg-amber-600! border-none!"
-            htmlType="submit">
+            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit">
               Save Changes
             </Button>
           </div>
