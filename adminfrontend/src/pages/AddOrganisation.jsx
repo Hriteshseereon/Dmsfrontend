@@ -85,18 +85,98 @@ export default function AddOrganisation() {
         return [];
     }
   };
+// add a payload builder to handle file uploads and nested structures
+const buildPayload = (values) => {
+  return {
+    registered_name: values.registeredName ?? "",
+    rms_org_id: values.rmsOrgId ?? "", // optional for now
+    organisation_type: values.organisationType ?? "",
+    legal_type: values.organisationType ?? "",
+    phone_number_1: values.phone ?? "",
+    email: values.email ?? "",
+    is_active: true,
+
+    // HQ Address (from organisationAddress)
+    addresses: [
+      {
+        address_line_1: values?.organisationAddress?.address ?? "",
+        address_line_2: values?.organisationAddress?.address2 ?? "",
+        city: values?.organisationAddress?.city ?? "",
+        state: values?.organisationAddress?.state ?? "",
+        country: "India",
+        pin_code: values?.organisationAddress?.pin ?? "",
+        address_type: "OWN",
+        address_category: "HQ",
+        is_branch: false,
+      },
+    ],
+
+    // Branches
+    branches: (values?.branches ?? []).map((b) => ({
+      name: b?.branchName ?? "",
+      short_name: b?.shortName ?? "",
+      branch_head_name: b?.branchHeadName ?? "",
+      phone_number_1: b?.phone ?? "",
+      email: b?.email ?? "",
+      type: "HQ",
+      address: {
+        address_line_1: b?.address1 ?? "",
+        address_line_2: b?.address2 ?? "",
+        city: b?.city ?? "",
+        state: b?.state ?? "",
+        country: "India",
+        pin_code: b?.pinNo ?? "",
+        address_type: "RENTED",
+      },
+    })),
+
+    // Depos (if not in UI yet keep empty)
+    depos: [],
+
+    // Persons (partners/directors)
+    persons: (values?.partners ?? []).map((p) => ({
+      full_name: p?.name ?? "",
+      role: "DIRECTOR",
+      phone_number_1: p?.mobileNumber ?? p?.contactNumber ?? "",
+      email: p?.email ?? "",
+
+      family_details: {
+        spouse_name: p?.spouseName ?? "",
+        children_details: p?.childrenCount ? `${p.childrenCount} child` : "",
+        parents_details: p?.fatherName ?? "",
+      },
+
+      bank_details: {
+        bank_name: p?.bankName ?? "",
+        account_holder_name: p?.name ?? "",
+        account_number: p?.accountNo ?? "",
+        ifsc_code: p?.ifsc ?? "",
+        branch_name: "",
+      },
+
+      company_details: {
+        company_name: p?.companyDetails?.companyName ?? "",
+        registration_no: p?.companyDetails?.registrationNo ?? "",
+        gst_no: p?.companyDetails?.gstNo ?? "",
+        address: p?.companyDetails?.address?.city ?? "",
+        location: p?.companyDetails?.address?.state ?? "",
+      },
+    })),
+  };
+};
 
   const handleSubmit = () => {
     const values = form.getFieldsValue(true);
     console.log("Form Values:", values);
     antMessage.success("Organisation created successfully!");
-    const payload = {
-      registered_name: values.registeredName,
-      email: values.email,
-      legal_type: values.organisationType, // TODO: add legal type field later
-      organisation_type: values.organisationType,
-      phone_number_1: values.phone,
-    }
+    // const payload = {
+    //   registered_name: values.registeredName,
+    //   email: values.email,
+    //   legal_type: values.organisationType, // TODO: add legal type field later
+    //   organisation_type: values.organisationType,
+    //   phone_number_1: values.phone,
+    // }
+    const payload = buildPayload(values);
     mutate(payload);
   };
 
