@@ -42,21 +42,21 @@ export const deleteAsset = async (id) => {
 
 
 // Asset Allocations
-
+export const getAssetAllocationById = async (id) => {
+  const res = await api.get(`/assets/allocations/${id}/`);
+  return res.data;
+}
 // LIST
-export const getAssetAllocations = async (orgId) => {
+export const getAssetAllocations = async () => {
   const res = await api.get(
-    `/assets/allocations/?organisation=${orgId}`
+    `/assets/allocations/`
   );
   return res.data;
 };
 
 // CREATE
-export const addAssetAllocation = async (orgId, payload) => {
-  const res = await api.post("/assets/allocations/", {
-    ...payload,
-    organisation: orgId,
-  });
+export const addAssetAllocation = async ( payload) => {
+  const res = await api.post("/assets/allocations/", payload);
   return res.data;
 };
 
