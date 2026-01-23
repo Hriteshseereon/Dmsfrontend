@@ -18,13 +18,13 @@ export const getAssets = async (orgId) => {
   const res = await api.get(`/assets/assets/?organisation=${orgId}`);
   return res.data;
 };
-
+export const getAllAssets = async () => {
+  const res = await api.get(`/assets/assets/`);
+  return res.data;
+};
 // CREATE
-export const addAsset = async (orgId, payload) => {
-  const res = await api.post("/assets/", {
-    ...payload,
-    organisation: orgId,
-  });
+export const addAsset = async (payload) => {
+  const res = await api.post("/assets/assets/", payload);
   return res.data;
 };
 
