@@ -25,14 +25,20 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useAuth } from "../../context/AuthContext";
-import { addAssetDepreciation, getAssetDepreciations, getAssets, updateAssetDepreciation } from "../../api/assets";
+import {
+  addAssetDepreciation,
+  getAssetDepreciations,
+  getAssets,
+  updateAssetDepreciation,
+} from "../../api/assets";
+import useSessionStore from "../../store/sessionStore";
 
 const { Option } = Select;
 const { TextArea } = Input;
 
 export default function AssetDepreciation() {
+  const currentOrgId = useSessionStore((state) => state.currentOrgId);
 
-  const { currentOrgId } = useAuth();
   const [assets, setAssets] = useState([]);
 
   const [data, setData] = useState([]);
@@ -51,27 +57,23 @@ export default function AssetDepreciation() {
   const [addFileList, setAddFileList] = useState([]);
   const [editFileList, setEditFileList] = useState([]);
 
-  const depreciationMethods = [
-    "Straight Line",
-    "Written Down Value",
-    "Double Declining Balance",
-    "Sum of Years Digits",
-  ];
+  const depreciationMethods = ["StraightLine", "ReducingBalance", "Other"];
 
   const statusOptions = ["Active", "Disposed", "Under Repair", "Sold"];
 
   const filteredData = data.filter((row) =>
     ["assetId", "fiscalYear", "status", "remarks"].some((f) =>
-      (row[f] || "").toString().toLowerCase().includes(searchText.trim().toLowerCase())
-    )
+      (row[f] || "")
+        .toString()
+        .toLowerCase()
+        .includes(searchText.trim().toLowerCase()),
+    ),
   );
-
 
   const fetchAssets = async () => {
     const res = await getAssets(currentOrgId);
     setAssets(res);
   };
-
 
   const fetchDepreciations = async () => {
     setLoading(true);
@@ -89,8 +91,8 @@ export default function AssetDepreciation() {
         depreciationRate: item.depreciation_rate,
         depreciationMethod: item.depreciation_method,
 
-        depreciationStartDate: item.start_date,
-        depreciationEndDate: item.end_date,
+        depreciationStartDate: item.depreciation_start_date,
+        depreciationEndDate: item.depreciation_end_date,
 
         currentValue: item.current_value,
         fiscalYear: item.fiscal_year,
@@ -115,19 +117,30 @@ export default function AssetDepreciation() {
 
   const columns = [
     {
+      title: <span className="text-amber-700 font-semibold">SL No</span>,
+      width: 80,
+      render: (_, __, index) => (
+        <span className="text-amber-800">{index + 1}</span>
+      ),
+    },
+    {
       title: <span className="text-amber-700 font-semibold">Asset ID</span>,
       dataIndex: "assetId",
       width: 140,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Purchase Value (₹)</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Purchase Value (₹)</span>
+      ),
       dataIndex: "purchaseValue",
       width: 160,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Depn Rate (%)</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Depn Rate (%)</span>
+      ),
       dataIndex: "depreciationRate",
       width: 120,
       render: (r) => <span className="text-amber-800">{r ?? "-"}</span>,
@@ -142,18 +155,27 @@ export default function AssetDepreciation() {
       title: <span className="text-amber-700 font-semibold">Start Date</span>,
       dataIndex: "depreciationStartDate",
       width: 130,
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : "-"}</span>,
+      render: (d) => (
+        <span className="text-amber-800">
+          {d ? dayjs(d).format("YYYY-MM-DD") : "-"}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">End Date</span>,
       dataIndex: "depreciationEndDate",
       width: 130,
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : "-"}</span>,
+      render: (d) => (
+        <span className="text-amber-800">
+          {d ? dayjs(d).format("YYYY-MM-DD") : "-"}
+        </span>
+      ),
     },
 
-
     {
-      title: <span className="text-amber-700 font-semibold">Current Value (₹)</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Current Value (₹)</span>
+      ),
       dataIndex: "currentValue",
       width: 150,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
@@ -170,15 +192,25 @@ export default function AssetDepreciation() {
       width: 120,
       render: (s) => {
         const base = "px-3 py-1 rounded-full text-sm font-semibold";
-        if (s === "Active") return <span className={`${base} bg-green-100 text-green-700`}>Active</span>;
-        if (s === "Disposed") return <span className={`${base} bg-red-100 text-red-700`}>Disposed</span>;
-        return <span className={`${base} bg-amber-100 text-amber-800`}>{s}</span>;
+        if (s === "Active")
+          return (
+            <span className={`${base} bg-green-100 text-green-700`}>
+              Active
+            </span>
+          );
+        if (s === "Disposed")
+          return (
+            <span className={`${base} bg-red-100 text-red-700`}>Disposed</span>
+          );
+        return (
+          <span className={`${base} bg-amber-100 text-amber-800`}>{s}</span>
+        );
       },
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       width: 100,
-      render: (record) => (
+      render: (_, record) => (
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
@@ -187,9 +219,9 @@ export default function AssetDepreciation() {
               viewForm.setFieldsValue({
                 ...record,
                 assetId: record.assetPk,
-                depreciationStartDate: record.depreciationStartDate ? dayjs(record.depreciationStartDate) : undefined,
-
-                depreciationEndDate: record.depreciationEndDate ? dayjs(record.depreciationEndDate) : undefined,
+                depreciationStartDate: record.depreciationStartDate
+                  ? dayjs(record.depreciationStartDate)
+                  : undefined,
               });
               setIsViewModalOpen(true);
             }}
@@ -201,11 +233,10 @@ export default function AssetDepreciation() {
               editForm.setFieldsValue({
                 ...record,
                 assetId: record.assetPk,
-                depreciationStartDate: record.depreciationStartDate ? dayjs(record.depreciationStartDate) : undefined,
-                depreciationEndDate: record.depreciationEndDate ? dayjs(record.depreciationEndDate) : undefined,
-
+                depreciationStartDate: record.depreciationStartDate
+                  ? dayjs(record.depreciationStartDate)
+                  : undefined,
               });
-              setEditFileList(record.files || []);
               setIsEditModalOpen(true);
             }}
           />
@@ -242,8 +273,11 @@ export default function AssetDepreciation() {
       r.status,
       (r.remarks || "").replace(/[\n\r]/g, " "),
     ]);
-    const csvContent =
-      [headers, ...rows].map((e) => e.map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`).join(",")).join("\n");
+    const csvContent = [headers, ...rows]
+      .map((e) =>
+        e.map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`).join(","),
+      )
+      .join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -259,7 +293,8 @@ export default function AssetDepreciation() {
       setAddFileList((prev) => [...prev, file]);
       return false;
     },
-    onRemove: (file) => setAddFileList((prev) => prev.filter((f) => f.uid !== file.uid)),
+    onRemove: (file) =>
+      setAddFileList((prev) => prev.filter((f) => f.uid !== file.uid)),
   };
 
   const editUploadProps = {
@@ -268,32 +303,36 @@ export default function AssetDepreciation() {
       setEditFileList((prev) => [...prev, file]);
       return false;
     },
-    onRemove: (file) => setEditFileList((prev) => prev.filter((f) => f.uid !== file.uid)),
+    onRemove: (file) =>
+      setEditFileList((prev) => prev.filter((f) => f.uid !== file.uid)),
   };
 
   const handleAdd = async (values) => {
     try {
       setLoading(true);
 
-      await addAssetDepreciation(currentOrgId, {
-        asset: values.assetId,
+      const payload = {
+        organisation: currentOrgId, // ✅ must send
+        asset: values.assetId, // ✅ asset UUID
         purchase_value: values.purchaseValue,
         depreciation_rate: values.depreciationRate,
         depreciation_method: values.depreciationMethod,
-        start_date: values.depreciationStartDate.format("YYYY-MM-DD"),
-        end_date: values.depreciationEndDate.format("YYYY-MM-DD"),
-        current_value: values.currentValue || 0,
+        depreciation_start_date:
+          values.depreciationStartDate.format("YYYY-MM-DD"),
         fiscal_year: values.fiscalYear,
-        status: values.status,
-        remarks: values.remarks || "",
-      });
+        current_value: values.currentValue,
+        status: values.status || "Calculated",
+        remarks: values.remarks || null,
+      };
+
+      await addAssetDepreciation(payload);
 
       message.success("Depreciation record added");
       setIsAddModalOpen(false);
       addForm.resetFields();
-      setAddFileList([]);
       fetchDepreciations();
-    } catch {
+    } catch (err) {
+      console.log(err?.response?.data);
       message.error("Failed to add depreciation record");
     } finally {
       setLoading(false);
@@ -304,31 +343,33 @@ export default function AssetDepreciation() {
     try {
       setLoading(true);
 
-      await updateAssetDepreciation(selectedRecord.id, {
+      const payload = {
         asset: values.assetId,
         purchase_value: values.purchaseValue,
         depreciation_rate: values.depreciationRate,
         depreciation_method: values.depreciationMethod,
-        start_date: values.depreciationStartDate.format("YYYY-MM-DD"),
-        end_date: values.depreciationEndDate.format("YYYY-MM-DD"),
-        current_value: values.currentValue || 0,
+        depreciation_start_date:
+          values.depreciationStartDate.format("YYYY-MM-DD"),
         fiscal_year: values.fiscalYear,
+        current_value: values.currentValue,
         status: values.status,
-        remarks: values.remarks || "",
-      });
+        remarks: values.remarks || null,
+      };
+
+      await updateAssetDepreciation(selectedRecord.id, payload);
 
       message.success("Depreciation updated");
       setIsEditModalOpen(false);
       editForm.resetFields();
       setSelectedRecord(null);
       fetchDepreciations();
-    } catch {
+    } catch (err) {
+      console.log(err?.response?.data);
       message.error("Failed to update depreciation");
     } finally {
       setLoading(false);
     }
   };
-
 
   const renderFormFields = (form, disabled = false, mode = "add") => (
     <>
@@ -362,11 +403,20 @@ export default function AssetDepreciation() {
 
         <Col span={8}>
           <Form.Item
-            label={<span className="text-amber-700">Depreciation Rate (%)</span>}
+            label={
+              <span className="text-amber-700">Depreciation Rate (%)</span>
+            }
             name="depreciationRate"
-            rules={[{ required: true, message: "Please enter Depreciation Rate" }]}
+            rules={[
+              { required: true, message: "Please enter Depreciation Rate" },
+            ]}
           >
-            <InputNumber className="w-full" min={0} max={100} disabled={disabled} />
+            <InputNumber
+              className="w-full"
+              min={0}
+              max={100}
+              disabled={disabled}
+            />
           </Form.Item>
         </Col>
       </Row>
@@ -391,7 +441,9 @@ export default function AssetDepreciation() {
 
         <Col span={8}>
           <Form.Item
-            label={<span className="text-amber-700">Depreciation Start Date</span>}
+            label={
+              <span className="text-amber-700">Depreciation Start Date</span>
+            }
             name="depreciationStartDate"
             rules={[{ required: true, message: "Please select start date" }]}
             initialValue={dayjs()}
@@ -401,7 +453,9 @@ export default function AssetDepreciation() {
         </Col>
         <Col span={8}>
           <Form.Item
-            label={<span className="text-amber-700">Depreciation End Date</span>}
+            label={
+              <span className="text-amber-700">Depreciation End Date</span>
+            }
             name="depreciationEndDate"
             rules={[{ required: true, message: "Please select end date" }]}
             initialValue={dayjs()}
@@ -409,7 +463,6 @@ export default function AssetDepreciation() {
             <DatePicker className="w-full" disabled={disabled} />
           </Form.Item>
         </Col>
-
 
         <Col span={8}>
           <Form.Item
@@ -450,8 +503,15 @@ export default function AssetDepreciation() {
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Remarks</span>} name="remarks">
-            <TextArea rows={1} placeholder="Optional remarks" disabled={disabled} />
+          <Form.Item
+            label={<span className="text-amber-700">Remarks</span>}
+            name="remarks"
+          >
+            <TextArea
+              rows={1}
+              placeholder="Optional remarks"
+              disabled={disabled}
+            />
           </Form.Item>
         </Col>
       </Row>
@@ -460,19 +520,33 @@ export default function AssetDepreciation() {
       <Row gutter={16}>
         <Col span={24}>
           <Form.Item
-            label={<span className="text-amber-700">Choose File (Invoice, Report etc)</span>}
+            label={
+              <span className="text-amber-700">
+                Choose File (Invoice, Report etc)
+              </span>
+            }
             name="files"
-            extra={<span className="text-amber-600 text-sm">PDF, JPG, PNG etc (client-only)</span>}
+            extra={
+              <span className="text-amber-600 text-sm">
+                PDF, JPG, PNG etc (client-only)
+              </span>
+            }
           >
             {mode === "add" ? (
               <Upload {...addUploadProps} maxCount={5} multiple>
-                <Button icon={<UploadOutlined />} className="border-amber-400 text-amber-700 hover:bg-amber-100">
+                <Button
+                  icon={<UploadOutlined />}
+                  className="border-amber-400 text-amber-700 hover:bg-amber-100"
+                >
                   Click to Upload
                 </Button>
               </Upload>
             ) : (
               <Upload {...editUploadProps} maxCount={5} multiple>
-                <Button icon={<UploadOutlined />} className="border-amber-400 text-amber-700 hover:bg-amber-100">
+                <Button
+                  icon={<UploadOutlined />}
+                  className="border-amber-400 text-amber-700 hover:bg-amber-100"
+                >
                   Click to Upload
                 </Button>
               </Upload>
@@ -505,7 +579,9 @@ export default function AssetDepreciation() {
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} onClick={exportCSV}
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={exportCSV}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Export
@@ -514,13 +590,11 @@ export default function AssetDepreciation() {
             type="primary"
             icon={<PlusOutlined />}
             className="bg-amber-500! hover:bg-amber-600! border-none!"
-
             onClick={() => {
               addForm.resetFields();
               setAddFileList([]);
               setIsAddModalOpen(true);
             }}
-
           >
             Add New
           </Button>
@@ -529,18 +603,27 @@ export default function AssetDepreciation() {
 
       {/* Table */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
-        <h2 className="text-lg font-semibold text-amber-700 mb-0">Asset Depreciation</h2>
-        <p className="text-amber-600 mb-3">Manage depreciation schedules & current values</p>
+        <h2 className="text-lg font-semibold text-amber-700 mb-0">
+          Asset Depreciation
+        </h2>
+        <p className="text-amber-600 mb-3">
+          Manage depreciation schedules & current values
+        </p>
         <Table
           columns={columns}
           dataSource={filteredData}
           loading={loading}
-          pagination={{ pageSize: 6 }} />
+          pagination={{ pageSize: 6 }}
+        />
       </div>
 
       {/* Add Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Add Depreciation Record</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Add Depreciation Record
+          </span>
+        }
         open={isAddModalOpen}
         onCancel={() => {
           setIsAddModalOpen(false);
@@ -560,13 +643,15 @@ export default function AssetDepreciation() {
                 setAddFileList([]);
               }}
               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-
             >
               Cancel
             </Button>
-            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!"
+            <Button
+              type="primary"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
               htmlType="submit"
-              loading={loading}>
+              loading={loading}
+            >
               Add
             </Button>
           </div>
@@ -575,7 +660,11 @@ export default function AssetDepreciation() {
 
       {/* Edit Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Edit Depreciation Record</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Edit Depreciation Record
+          </span>
+        }
         open={isEditModalOpen}
         onCancel={() => {
           setIsEditModalOpen(false);
@@ -597,12 +686,14 @@ export default function AssetDepreciation() {
                 setSelectedRecord(null);
               }}
               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-
             >
               Cancel
             </Button>
-            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!"
-              htmlType="submit">
+            <Button
+              type="primary"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit"
+            >
               Save Changes
             </Button>
           </div>

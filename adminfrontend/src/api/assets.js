@@ -100,25 +100,20 @@ export const deleteAssetMaintenance = async (id) => {
 // ASSET DEPRECIATION
 
 // CREATE
-export const addAssetDepreciation = async (orgId, data) => {
-  const res = await api.post("/assets/depreciation/", {
-    organization: orgId,
-    ...data,
-  });
+export const addAssetDepreciation = async (payload) => {
+  const res = await api.post("/assets/depreciation/", payload);
   return res.data;
 };
 
 // LIST
-export const getAssetDepreciations = async (orgId) => {
-  const res = await api.get("/assets/depreciation/", {
-    params: { organization: orgId },
-  });
+export const getAssetDepreciations = async () => {
+  const res = await api.get("/assets/depreciation/");
   return res.data;
 };
 
 // UPDATE
-export const updateAssetDepreciation = async (id, data) => {
-  const res = await api.patch(`/assets/depreciation/${id}/`, data);
+export const updateAssetDepreciation = async (id, payload) => {
+  const res = await api.patch(`/assets/depreciation/${id}/`, payload);
   return res.data;
 };
 
