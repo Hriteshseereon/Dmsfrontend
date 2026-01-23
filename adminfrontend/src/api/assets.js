@@ -127,8 +127,8 @@ export const deleteAssetDepreciation = async (id) => {
 // ASSET DISPOSAL
 
 // LIST
-export const getAssetDisposals = async (orgId) => {
-  const res = await api.get(`/assets/disposals/?organisation=${orgId}`);
+export const getAssetDisposals = async () => {
+  const res = await api.get(`/assets/disposals/`);
   return res.data;
 };
 
@@ -139,11 +139,8 @@ export const getAssetDisposalById = async (id) => {
 };
 
 // CREATE
-export const addAssetDisposal = async (orgId, payload) => {
-  const res = await api.post("/assets/disposals/", {
-    ...payload,
-    organisation: orgId,
-  });
+export const addAssetDisposal = async (payload) => {
+  const res = await api.post("/assets/disposals/", payload);
   return res.data;
 };
 
