@@ -1,5 +1,5 @@
 // AssetAllocation.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Table,
   Input,
@@ -20,35 +20,16 @@ import {
   FilterOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { useAuth } from "../../context/AuthContext";
+import { addAssetAllocation, getAssetAllocations, getAssets, updateAssetAllocation } from "../../api/assets";
 
 export default function AssetAllocation() {
-  const [data, setData] = useState([
-    {
-      key: 1,
-      allocationId: "ALLOC-001",
-      assetName: "ALLOC-001",
-      assetId: "ASSET-001",
-      assignedTo: "Ravi Kumar",
-      allocationDate: "2024-09-01",
-      returnDate: "",
-      conditionAtIssue: "Good",
-      conditionAtReturn: "",
-      remarks: "Issued for project X",
-    },
-    {
-      key: 2,
-      allocationId: "ALLOC-002",
-      assetName: "ALLOC-001",
 
-      assetId: "ASSET-010",
-      assignedTo: "Priya Singh",
-      allocationDate: "2025-03-12",
-      returnDate: "2025-06-05",
-      conditionAtIssue: "New",
-      conditionAtReturn: "Good",
-      remarks: "Returned after short-term assignment",
-    },
-  ]);
+  const { currentOrgId } = useAuth();
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const [assets, setAssets] = useState([]);
 
   const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -67,6 +48,49 @@ export default function AssetAllocation() {
       (row[f] || "").toString().toLowerCase().includes(searchText.trim().toLowerCase())
     )
   );
+
+  const fetchAssets = async () => {
+    try {
+      const res = await getAssets(currentOrgId);
+      setAssets(res);
+    } catch {
+      message.error("Failed to load assets");
+    }
+  };
+
+  const fetchAllocations = async () => {
+    setLoading(true);
+    try {
+      const response = await getAssetAllocations(currentOrgId);
+
+      const transformed = response.map((item) => ({
+        key: item.id,
+        id: item.id,
+        allocationId: item.allocation_id,
+        assetId: item.asset?.asset_code,
+        assetPk: item.asset?.id,
+        assetName: item.asset?.asset_name,
+        assignedTo: item.assigned_to,
+        allocationDate: item.allocation_date,
+        returnDate: item.return_date,
+        conditionAtIssue: item.condition_at_issue,
+        conditionAtReturn: item.condition_at_return,
+        remarks: item.remarks,
+      }));
+
+      setData(transformed);
+    } catch (err) {
+      message.error("Failed to load allocations");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!currentOrgId) return;
+    fetchAllocations();
+    fetchAssets();
+  }, [currentOrgId]);
 
   const columns = [
     {
@@ -141,6 +165,7 @@ export default function AssetAllocation() {
               setSelectedRecord(record);
               editForm.setFieldsValue({
                 ...record,
+                assetId: record.assetPk,
                 allocationDate: record.allocationDate ? dayjs(record.allocationDate) : undefined,
                 returnDate: record.returnDate ? dayjs(record.returnDate) : undefined,
               });
@@ -152,32 +177,63 @@ export default function AssetAllocation() {
     },
   ];
 
-  const handleAdd = (values) => {
-    const payload = {
-      ...values,
-      key: data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1,
-      allocationDate: values.allocationDate ? dayjs(values.allocationDate).format("YYYY-MM-DD") : undefined,
-      returnDate: values.returnDate ? dayjs(values.returnDate).format("YYYY-MM-DD") : "",
-    };
-    setData((prev) => [payload, ...prev]);
-    setIsAddModalOpen(false);
-    addForm.resetFields();
-    message.success("Asset allocation added.");
+  const handleAdd = async (values) => {
+    try {
+      setLoading(true);
+
+      await addAssetAllocation(currentOrgId, {
+        asset: values.assetId,
+        assigned_to: values.assignedTo,
+        allocation_date: values.allocationDate.format("YYYY-MM-DD"),
+        return_date: values.returnDate
+          ? values.returnDate.format("YYYY-MM-DD")
+          : null,
+        condition_at_issue: values.conditionAtIssue,
+        condition_at_return: values.conditionAtReturn || null,
+        remarks: values.remarks || "",
+      });
+
+      message.success("Asset allocated successfully");
+      setIsAddModalOpen(false);
+      addForm.resetFields();
+      fetchAllocations();
+    } catch (err) {
+      message.error("Failed to allocate asset");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleEdit = (values) => {
-    const payload = {
-      ...selectedRecord,
-      ...values,
-      allocationDate: values.allocationDate ? dayjs(values.allocationDate).format("YYYY-MM-DD") : undefined,
-      returnDate: values.returnDate ? dayjs(values.returnDate).format("YYYY-MM-DD") : "",
-    };
-    setData((prev) => prev.map((d) => (d.key === payload.key ? payload : d)));
-    setIsEditModalOpen(false);
-    editForm.resetFields();
-    setSelectedRecord(null);
-    message.success("Allocation updated.");
+
+  const handleEdit = async (values) => {
+    try {
+      setLoading(true);
+
+      await updateAssetAllocation(selectedRecord.id, {
+        asset: values.assetId,
+        assigned_to: values.assignedTo,
+        allocation_date: values.allocationDate.format("YYYY-MM-DD"),
+        return_date: values.returnDate
+          ? values.returnDate.format("YYYY-MM-DD")
+          : null,
+        condition_at_issue: values.conditionAtIssue,
+        condition_at_return: values.conditionAtReturn || null,
+        remarks: values.remarks || "",
+      });
+
+
+      message.success("Allocation updated");
+      setIsEditModalOpen(false);
+      editForm.resetFields();
+      setSelectedRecord(null);
+      fetchAllocations();
+    } catch {
+      message.error("Failed to update allocation");
+    } finally {
+      setLoading(false);
+    }
   };
+
 
   const exportCSV = () => {
     // simple CSV export (client-side)
@@ -221,22 +277,28 @@ export default function AssetAllocation() {
       <h6 className="text-amber-500">Allocation Details</h6>
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item
+          {/* <Form.Item
             label={<span className="text-amber-700">Assset Name</span>}
             name="allocationId"
             rules={[{ required: true, message: "Please enter Allocation ID" }]}
           >
             <Input placeholder="e.g. ALLOC-001" disabled={disabled} />
-          </Form.Item>
+          </Form.Item> */}
         </Col>
 
         <Col span={8}>
           <Form.Item
-            label={<span className="text-amber-700">Asset ID</span>}
+            label={<span className="text-amber-700">Asset</span>}
             name="assetId"
-            rules={[{ required: true, message: "Please enter Asset ID" }]}
+            rules={[{ required: true, message: "Please select asset" }]}
           >
-            <Input placeholder="Asset ID" disabled={disabled} />
+            <Select placeholder="Select asset">
+              {assets.map((a) => (
+                <Select.Option key={a.id} value={a.id}>
+                  {a.asset_name} ({a.asset_code})
+                </Select.Option>
+              ))}
+            </Select>
           </Form.Item>
         </Col>
 
@@ -320,10 +382,10 @@ export default function AssetAllocation() {
       <div className="flex justify-between items-center mb-2">
         <div className="flex gap-2">
           <Input
-           prefix={<SearchOutlined className="text-amber-600!" />}
-                       placeholder="Search assets..."
-                       className="w-64! border-amber-300! focus:border-amber-500!"
-                        value={searchText}
+            prefix={<SearchOutlined className="text-amber-600!" />}
+            placeholder="Search assets..."
+            className="w-64! border-amber-300! focus:border-amber-500!"
+            value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
           />
           <Button
@@ -336,14 +398,14 @@ export default function AssetAllocation() {
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} onClick={exportCSV}  className="border-amber-400! text-amber-700! hover:bg-amber-100!">
+          <Button icon={<DownloadOutlined />} onClick={exportCSV} className="border-amber-400! text-amber-700! hover:bg-amber-100!">
             Export
           </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
             className="bg-amber-500! hover:bg-amber-600! border-none!"
-           
+
             onClick={() => {
               addForm.resetFields();
               setIsAddModalOpen(true);
@@ -358,7 +420,12 @@ export default function AssetAllocation() {
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">Asset Allocations</h2>
         <p className="text-amber-600 mb-3">Manage asset issuance & returns</p>
-        <Table columns={columns} dataSource={filteredData} pagination={{ pageSize: 6 }} />
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          pagination={{ pageSize: 6 }}
+          loading={loading}
+        />
       </div>
 
       {/* Add Modal */}
@@ -376,7 +443,7 @@ export default function AssetAllocation() {
           form={addForm}
           layout="vertical"
           onFinish={handleAdd}
-          onValuesChange={() => {}}
+          onValuesChange={() => { }}
         >
           {renderFormFields(addForm, false)}
 
@@ -386,12 +453,12 @@ export default function AssetAllocation() {
                 setIsAddModalOpen(false);
                 addForm.resetFields();
               }}
-               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
             >
               Cancel
             </Button>
-            <Button type="primary" htmlType="submit"  className="bg-amber-500! hover:bg-amber-600! border-none!"
-           >
+            <Button type="primary" htmlType="submit" className="bg-amber-500! hover:bg-amber-600! border-none!"
+            >
               Add
             </Button>
           </div>
@@ -424,12 +491,12 @@ export default function AssetAllocation() {
                 editForm.resetFields();
                 setSelectedRecord(null);
               }}
-               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
             >
               Cancel
             </Button>
-            <Button type="primary" htmlType="submit"  className="bg-amber-500! hover:bg-amber-600! border-none!"
-           >
+            <Button type="primary" htmlType="submit" className="bg-amber-500! hover:bg-amber-600! border-none!"
+            >
               Save Changes
             </Button>
           </div>
