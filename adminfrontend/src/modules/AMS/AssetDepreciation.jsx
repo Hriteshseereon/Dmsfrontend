@@ -1,5 +1,5 @@
 // AssetDepreciation.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Table,
   Input,
@@ -24,41 +24,19 @@ import {
   FilterOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { useAuth } from "../../context/AuthContext";
+import { addAssetDepreciation, getAssetDepreciations, getAssets, updateAssetDepreciation } from "../../api/assets";
 
 const { Option } = Select;
 const { TextArea } = Input;
 
 export default function AssetDepreciation() {
-  const [data, setData] = useState([
-    {
-      key: 1,
-      assetId: "ASSET-001",
-      purchaseValue: 75000,
-      depreciationRate: 10,
-      depreciationMethod: "Straight Line",
-      depreciationStartDate: "2023-04-01",
-      depreciationEndDate:"2023-04-01",
-      currentValue: 50000,
-      fiscalYear: "2024-25",
-      status: "Active",
-      files: [],
-      remarks: "Standard SL depreciation",
-    },
-    {
-      key: 2,
-      assetId: "ASSET-010",
-      purchaseValue: 150000,
-      depreciationRate: 15,
-      depreciationMethod: "Written Down Value",
-      depreciationStartDate: "2022-10-15",
-      depreciationEndDate:"2022-12-05",
-      currentValue: 90000,
-      fiscalYear: "2024-25",
-      status: "Active",
-      files: [],
-      remarks: "WDV applied",
-    },
-  ]);
+
+  const { currentOrgId } = useAuth();
+  const [assets, setAssets] = useState([]);
+
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -87,6 +65,53 @@ export default function AssetDepreciation() {
       (row[f] || "").toString().toLowerCase().includes(searchText.trim().toLowerCase())
     )
   );
+
+
+  const fetchAssets = async () => {
+    const res = await getAssets(currentOrgId);
+    setAssets(res);
+  };
+
+
+  const fetchDepreciations = async () => {
+    setLoading(true);
+    try {
+      const res = await getAssetDepreciations(currentOrgId);
+
+      const mapped = res.map((item) => ({
+        key: item.id,
+        id: item.id,
+
+        assetId: item.asset?.asset_code,
+        assetPk: item.asset?.id,
+
+        purchaseValue: item.purchase_value,
+        depreciationRate: item.depreciation_rate,
+        depreciationMethod: item.depreciation_method,
+
+        depreciationStartDate: item.start_date,
+        depreciationEndDate: item.end_date,
+
+        currentValue: item.current_value,
+        fiscalYear: item.fiscal_year,
+        status: item.status,
+        remarks: item.remarks,
+        files: item.documents || [],
+      }));
+
+      setData(mapped);
+    } catch {
+      message.error("Failed to load depreciation records");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!currentOrgId) return;
+    fetchDepreciations();
+    fetchAssets();
+  }, [currentOrgId]);
 
   const columns = [
     {
@@ -119,13 +144,13 @@ export default function AssetDepreciation() {
       width: 130,
       render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : "-"}</span>,
     },
-     {
+    {
       title: <span className="text-amber-700 font-semibold">End Date</span>,
       dataIndex: "depreciationEndDate",
       width: 130,
       render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : "-"}</span>,
     },
-    
+
 
     {
       title: <span className="text-amber-700 font-semibold">Current Value (₹)</span>,
@@ -161,8 +186,9 @@ export default function AssetDepreciation() {
               setSelectedRecord(record);
               viewForm.setFieldsValue({
                 ...record,
+                assetId: record.assetPk,
                 depreciationStartDate: record.depreciationStartDate ? dayjs(record.depreciationStartDate) : undefined,
-                
+
                 depreciationEndDate: record.depreciationEndDate ? dayjs(record.depreciationEndDate) : undefined,
               });
               setIsViewModalOpen(true);
@@ -174,9 +200,10 @@ export default function AssetDepreciation() {
               setSelectedRecord(record);
               editForm.setFieldsValue({
                 ...record,
+                assetId: record.assetPk,
                 depreciationStartDate: record.depreciationStartDate ? dayjs(record.depreciationStartDate) : undefined,
                 depreciationEndDate: record.depreciationEndDate ? dayjs(record.depreciationEndDate) : undefined,
-              
+
               });
               setEditFileList(record.files || []);
               setIsEditModalOpen(true);
@@ -244,36 +271,64 @@ export default function AssetDepreciation() {
     onRemove: (file) => setEditFileList((prev) => prev.filter((f) => f.uid !== file.uid)),
   };
 
-  const handleAdd = (values) => {
-    const payload = {
-      ...values,
-      key: data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1,
-      depreciationStartDate: values.depreciationStartDate ? dayjs(values.depreciationStartDate).format("YYYY-MM-DD") : undefined,  
-      depreciationEndDate: values.depreciationEndDate ? dayjs(values.depreciationEndDate).format("YYYY-MM-DD") : undefined ,
-      files: addFileList,
-    };
-    setData((prev) => [payload, ...prev]);
-    setIsAddModalOpen(false);
-    addForm.resetFields();
-    setAddFileList([]);
-    message.success("Depreciation record added.");
+  const handleAdd = async (values) => {
+    try {
+      setLoading(true);
+
+      await addAssetDepreciation(currentOrgId, {
+        asset: values.assetId,
+        purchase_value: values.purchaseValue,
+        depreciation_rate: values.depreciationRate,
+        depreciation_method: values.depreciationMethod,
+        start_date: values.depreciationStartDate.format("YYYY-MM-DD"),
+        end_date: values.depreciationEndDate.format("YYYY-MM-DD"),
+        current_value: values.currentValue || 0,
+        fiscal_year: values.fiscalYear,
+        status: values.status,
+        remarks: values.remarks || "",
+      });
+
+      message.success("Depreciation record added");
+      setIsAddModalOpen(false);
+      addForm.resetFields();
+      setAddFileList([]);
+      fetchDepreciations();
+    } catch {
+      message.error("Failed to add depreciation record");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleEdit = (values) => {
-    const payload = {
-      ...selectedRecord,
-      ...values,
-      depreciationStartDate: values.depreciationStartDate ? dayjs(values.depreciationStartDate).format("YYYY-MM-DD") : undefined,
-      depreciationEndDate: values.depreciationEndDate ? dayjs(values.depreciationEndDate).format("YYYY-MM-DD") : undefined ,
-      files: editFileList,
-    };
-    setData((prev) => prev.map((d) => (d.key === payload.key ? payload : d)));
-    setIsEditModalOpen(false);
-    editForm.resetFields();
-    setEditFileList([]);
-    setSelectedRecord(null);
-    message.success("Depreciation record updated.");
+  const handleEdit = async (values) => {
+    try {
+      setLoading(true);
+
+      await updateAssetDepreciation(selectedRecord.id, {
+        asset: values.assetId,
+        purchase_value: values.purchaseValue,
+        depreciation_rate: values.depreciationRate,
+        depreciation_method: values.depreciationMethod,
+        start_date: values.depreciationStartDate.format("YYYY-MM-DD"),
+        end_date: values.depreciationEndDate.format("YYYY-MM-DD"),
+        current_value: values.currentValue || 0,
+        fiscal_year: values.fiscalYear,
+        status: values.status,
+        remarks: values.remarks || "",
+      });
+
+      message.success("Depreciation updated");
+      setIsEditModalOpen(false);
+      editForm.resetFields();
+      setSelectedRecord(null);
+      fetchDepreciations();
+    } catch {
+      message.error("Failed to update depreciation");
+    } finally {
+      setLoading(false);
+    }
   };
+
 
   const renderFormFields = (form, disabled = false, mode = "add") => (
     <>
@@ -281,11 +336,17 @@ export default function AssetDepreciation() {
       <Row gutter={16}>
         <Col span={8}>
           <Form.Item
-            label={<span className="text-amber-700">Asset ID</span>}
+            label={<span className="text-amber-700">Asset</span>}
             name="assetId"
-            rules={[{ required: true, message: "Please enter Asset ID" }]}
+            rules={[{ required: true }]}
           >
-            <Input placeholder="Asset ID" disabled={disabled} />
+            <Select placeholder="Select asset">
+              {assets.map((a) => (
+                <Select.Option key={a.id} value={a.id}>
+                  {a.asset_name} ({a.asset_code})
+                </Select.Option>
+              ))}
+            </Select>
           </Form.Item>
         </Col>
 
@@ -428,38 +489,38 @@ export default function AssetDepreciation() {
       <div className="flex justify-between items-center mb-2">
         <div className="flex gap-2">
           <Input
-           prefix={<SearchOutlined className="text-amber-600!" />}
-                       placeholder="Search assets..."
-                       className="w-64! border-amber-300! focus:border-amber-500!"
-                          value={searchText}
+            prefix={<SearchOutlined className="text-amber-600!" />}
+            placeholder="Search assets..."
+            className="w-64! border-amber-300! focus:border-amber-500!"
+            value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
           />
           <Button
             icon={<FilterOutlined />}
             onClick={() => setSearchText("")}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-           >
+          >
             Reset
           </Button>
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} onClick={exportCSV} 
- className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-        >
+          <Button icon={<DownloadOutlined />} onClick={exportCSV}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
             Export
           </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
             className="bg-amber-500! hover:bg-amber-600! border-none!"
-           
+
             onClick={() => {
               addForm.resetFields();
               setAddFileList([]);
               setIsAddModalOpen(true);
             }}
-            
+
           >
             Add New
           </Button>
@@ -470,7 +531,11 @@ export default function AssetDepreciation() {
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">Asset Depreciation</h2>
         <p className="text-amber-600 mb-3">Manage depreciation schedules & current values</p>
-        <Table columns={columns} dataSource={filteredData} pagination={{ pageSize: 6 }} />
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          loading={loading}
+          pagination={{ pageSize: 6 }} />
       </div>
 
       {/* Add Modal */}
@@ -494,13 +559,14 @@ export default function AssetDepreciation() {
                 addForm.resetFields();
                 setAddFileList([]);
               }}
-               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-        
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+
             >
               Cancel
             </Button>
-            <Button type="primary"  className="bg-amber-500! hover:bg-amber-600! border-none!"
-            htmlType="submit">
+            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit"
+              loading={loading}>
               Add
             </Button>
           </div>
@@ -530,13 +596,13 @@ export default function AssetDepreciation() {
                 setEditFileList([]);
                 setSelectedRecord(null);
               }}
-               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-        
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+
             >
               Cancel
             </Button>
-            <Button type="primary"  className="bg-amber-500! hover:bg-amber-600! border-none!"
-            htmlType="submit">
+            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit">
               Save Changes
             </Button>
           </div>

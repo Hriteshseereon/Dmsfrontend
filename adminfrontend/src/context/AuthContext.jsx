@@ -16,6 +16,26 @@ export const AuthProvider = ({ children }) => {
 
   const [orgModules, setOrgModules] = useState([]);
   const [organisations, setOrganisations] = useState([]);
+  const [accessToken, setAccessToken] = useState(null);
+
+  const [currentOrgId, setCurrentOrgId] = useState(null);
+
+  useEffect(() => {
+    const storedOrg = localStorage.getItem("currentOrgId");
+    if (storedOrg) {
+      setCurrentOrgId(storedOrg);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentOrgId) {
+      localStorage.setItem("currentOrgId", currentOrgId);
+    } else {
+      localStorage.removeItem("currentOrgId");
+    }
+  }, [currentOrgId]);
+
+
 
   // helper: normalize org lookup (org.id may be string)
   const findOrgByIdOrName = (idOrName) =>
@@ -28,7 +48,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (!user) return;
 
-    if (user.is_super_admin || user.admin) {
+    if (user.is_super_admin || user.is_admin) {
       setOrgModules(modules.map((m) => m.id));
       setOrganisations(orgs);
     } else if (user.org) {
@@ -41,24 +61,46 @@ export const AuthProvider = ({ children }) => {
   const login = async (username, password) => {
     try {
       const authResponse = await authLogin(username, password);
-      const { access, refresh, ...userData } = authResponse;
+
+      const {
+        access,
+        refresh,
+        organisation_id,
+        is_super_admin,
+        is_admin,
+        ...rest
+      } = authResponse;
+
+      const userPayload = {
+        ...rest,
+        is_super_admin,
+        is_admin,
+        role: is_super_admin || is_admin ? "admin" : "user",
+      };
+
       setSession({
-        accessToken: authResponse.access,
-        refreshToken: authResponse.refresh,
-        user: {
-          ...userData,
-          role: userData.is_super_admin || userData.is_admin ? "admin" : "user",
-        },
-        currentOrgId: userData.organisation_id,
+        accessToken: access,
+        refreshToken: refresh,
+        user: userPayload,
+        currentOrgId: organisation_id,
       });
+
+      setCurrentOrgId(organisation_id);
+
     } catch (err) {
       const message = err.response?.data?.detail || "Login failed";
       throw new Error(message);
     }
   };
+
   const isAdmin = user?.role === "admin";
+
   const logout = () => {
+    // setUser(null);
+    // setOrgModules([]);
+    // setOrganisations([]);
     clearSession();
+    localStorage.removeItem("currentOrgId");
     window.location.reload();
   };
 
@@ -68,7 +110,7 @@ export const AuthProvider = ({ children }) => {
   // create a isadmin for check the role of the user as admin
   const hasSubmoduleAccess = (module, submodule) => {
     const modulePermission = user?.permissions.find((p) => p.module === module);
-    return modulePermission?.submodues.hasOwnProperty(submodule);
+    return modulePermission?.submodules?.hasOwnProperty(submodule);
   };
 
   return (
@@ -81,6 +123,8 @@ export const AuthProvider = ({ children }) => {
         isAdmin,
         organisations,
         setOrgModules,
+        currentOrgId,
+        setCurrentOrgId,
       }}
     >
       {children}
