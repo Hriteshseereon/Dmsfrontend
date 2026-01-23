@@ -69,17 +69,19 @@ export const updateAssetAllocation = async (id, payload) => {
 // ASSET MAINTENANCE
 
 // LIST
-export const getAssetMaintenances = async (orgId) => {
-  const res = await api.get(`/assets/maintenance/?organisation=${orgId}`);
+export const getAssetMaintenances = async () => {
+  const res = await api.get(`/assets/maintenance/`);
   return res.data;
 };
 
+// get all asset maintenance by 
+export const getAssetMaintenanceById = async (id) => {
+  const res = await api.get(`/assets/maintenance/${id}/`);
+  return res.data;
+}
 // CREATE
-export const addAssetMaintenance = async (orgId, payload) => {
-  const res = await api.post("/assets/maintenance/", {
-    ...payload,
-    organisation: orgId,
-  });
+export const addAssetMaintenance = async (payload) => {
+  const res = await api.post("/assets/maintenance/", payload);
   return res.data;
 };
 
