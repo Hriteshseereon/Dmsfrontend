@@ -10,17 +10,28 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  // return config if url is login
+  // Skip token for login
   if (config.url.endsWith("/auth/login/")) {
     return config;
   }
-  const token = useSessionStore.getState().accessToken;
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  
+  const { accessToken, currentOrgId } = useSessionStore.getState();
+  
+  // Add authorization token
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
   }
+  
+  // Add organization parameter to GET requests
+  if (config.method === 'get' && currentOrgId) {
+    config.params = {
+      ...config.params,
+      organisation: currentOrgId
+    };
+  }
+  
   return config;
 });
-
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
