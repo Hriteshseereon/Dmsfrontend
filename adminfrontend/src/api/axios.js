@@ -9,6 +9,18 @@ const api = axios.create({
   },
 });
 
+// api.interceptors.request.use((config) => {
+//   // return config if url is login
+//   if (config.url.endsWith("/auth/login/")) {
+//     return config;
+//   }
+//   const token = useSessionStore.getState().accessToken;
+//   if (token) {
+//     config.headers.Authorization = `Bearer ${token}`;
+//   }
+//   return config;
+// });
+
 api.interceptors.request.use((config) => {
   // Skip token for login
   if (config.url.endsWith("/auth/login/")) {
