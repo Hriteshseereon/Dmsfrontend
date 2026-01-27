@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { Form, Input, Button, Card, Alert } from "antd";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import {TruckOutlined} from "@ant-design/icons"
+import { TruckOutlined } from "@ant-design/icons"
+
 export default function Login() {
+
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState(null);
@@ -34,7 +36,7 @@ export default function Login() {
     }, 500);
   };
 
- return (
+  return (
     <div className="flex items-center justify-center min-h-screen bg-amber-50">
       <div className="bg-white p-8 rounded-2xl shadow-lg w-96 text-center">
         {/* Logo */}
@@ -50,7 +52,7 @@ export default function Login() {
           Sign in to your transport management account .
         </p>
 
-     {alert && (
+        {alert && (
           <Alert
             type={alert.type}
             message={alert.message}
@@ -63,24 +65,24 @@ export default function Login() {
 
         <Form layout="vertical" onFinish={onFinish}>
           <Form.Item
-  label="Email ID"
-  name="email"
-  rules={[
-    { required: true, message: "Email is required" },
-    { 
-      pattern: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, 
-      message: "Invalid email (example@email.com)" 
-    }
-  ]}
->
-  <Input placeholder="example@email.com" />
-</Form.Item>
+            label="Email ID"
+            name="email"
+            rules={[
+              { required: true, message: "Email is required" },
+              {
+                pattern: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+                message: "Invalid email (example@email.com)"
+              }
+            ]}
+          >
+            <Input placeholder="example@email.com" />
+          </Form.Item>
 
 
           <Form.Item
             label={<span className="text-amber-700 font-semibold">Password</span>}
             name="password"
-            rules={[{ required: true, min: 6,message:"Please enter a valid 6-digit password" }]}
+            rules={[{ required: true, min: 6, message: "Please enter a valid 6-digit password" }]}
           >
             <Input.Password />
           </Form.Item>
@@ -117,4 +119,3 @@ export default function Login() {
     </div>
   );
 }
-

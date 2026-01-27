@@ -1,0 +1,44 @@
+import axios from "axios";
+import useSessionStore from "../store/sessionStore";
+
+const api = axios.create({
+    baseURL: import.meta.env.VITE_API_URL,
+    headers: {
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
+    },
+});
+
+api.interceptors.request.use((config) => {
+
+    if (config.url.endsWith("/auth/login/")) {
+        return config;
+    }
+    const token = useSessionStore.getState().accessToken;
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
+
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const status = error.response?.status;
+
+        if (status === 401) {
+            const { clearSession } = useSessionStore.getState();
+
+            clearSession();
+
+            // prevent redirect loop
+            if (window.location.pathname !== "/") {
+                window.location.replace("/");
+            }
+        }
+
+        return Promise.reject(error);
+    },
+);
+
+export default api;

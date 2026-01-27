@@ -1,0 +1,32 @@
+[
+    {
+        "id": "Org12",
+        "name": "Org12 Pvt Ltd",
+        "modules": [
+            "DMS",
+            "AMS",
+            "WMS"
+        ]
+    },
+    {
+        "id": "Org3",
+        "name": "Org3 Technologies",
+        "modules": [
+            "WMS"
+        ]
+    },
+    {
+        "id": "Org1",
+        "name": "Org1 Technologies",
+        "modules": [
+            "DMS"
+        ]
+    },
+    {
+        "id": "Org11",
+        "name": "Org11 Technologies",
+        "modules": [
+            "AMS"
+        ]
+    }
+]
