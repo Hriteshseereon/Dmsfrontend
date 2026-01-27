@@ -8,10 +8,24 @@ const useSessionStore = create(
             refreshToken: null,
             user: null,
             currentOrgId: null,
+            currentTransporterId: null,
 
-            setSession: ({ accessToken, refreshToken, user, currentOrgId }) =>
-                set({ accessToken, refreshToken, user, currentOrgId }),
+            setSession: ({
+                accessToken,
+                refreshToken,
+                user,
+                currentOrgId,
+                currentTransporterId, }) =>
+                set({
+                    accessToken,
+                    refreshToken,
+                    user,
+                    currentOrgId,
+                    currentTransporterId,
+                }),
 
+            setCurrentTransporterId: (id) =>
+                set({ currentTransporterId: id }),
             setAccessToken: (accessToken) => set({ accessToken }),
             setRefreshToken: (refreshToken) => set({ refreshToken }),
             setUser: (user) => set({ user }),
@@ -23,6 +37,7 @@ const useSessionStore = create(
                     refreshToken: null,
                     user: null,
                     currentOrgId: null,
+                    currentTransporterId: null,
                 }),
         }),
         {

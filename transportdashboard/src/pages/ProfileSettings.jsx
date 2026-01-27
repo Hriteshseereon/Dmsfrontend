@@ -1,40 +1,109 @@
-import React from "react";
-import { Card, Form, Input, Avatar, Button, Row, Col } from "antd";
+import React, { useEffect, useState } from "react";
+import { Card, Form, Input, Avatar, Button, Row, Col, message } from "antd";
 import { UserOutlined, MailOutlined, TeamOutlined } from "@ant-design/icons";
 
+import { useParams } from "react-router-dom";
+import useSessionStore from "../store/sessionStore";
+import {
+  getTransporterById,
+  updateTransporter,
+} from "../api/transporterApi";
+
+
 export default function ProfileSettings() {
+
   const [form] = Form.useForm();
 
-  const user = {
-    registeredName: "John Administrator",
-    password: "John@123",
-    address1: "123 Main St",
-    address2: "Suite 101",
-    phone: "9876543210",
-    telephone: "0123456789",
-    fax: "0123-456789",
-    email: "john.admin@transportcorp.com",
-    contactPerson: "Jane Doe",
-    pan: "ABCDE1234F",
-    gstin: "22AAAAA0000A1Z5",
-    state: "Karnataka",
-    city: "Bangalore",
-    district: "Bangalore Urban",
-    pin: "560001",
-    name: "John Administrator",
-    role: "Operations Manager",
-  };
+  const { transporterId } = useParams();
 
-  const onFinish = (values) => {
-    const updatedProfileJSON = JSON.stringify(values, null, 2);
-    console.log("Updated Profile (JSON):", updatedProfileJSON);
-    alert("Updated Profile JSON:\n" + updatedProfileJSON);
+  const currentOrgId = useSessionStore((s) => s.currentOrgId);
+  const user = useSessionStore((s) => s.user);
+  const orgId = currentOrgId || user?.organisation_id;
+
+  const [loading, setLoading] = useState(false);
+
+  // LOAD TRANSPORTER DATA
+  useEffect(() => {
+    if (!orgId || !transporterId) return;
+
+    const loadTransporter = async () => {
+      try {
+        const data = await getTransporterById(transporterId, orgId);
+
+        // Map backend → form fields
+        form.setFieldsValue({
+          registeredName: data.registered_name,
+          email: data.email_id,
+          phone: data.phone_number,
+          telephone: data.telephone_number,
+          fax: data.fax_no,
+          contactPerson: data.contact_person_name,
+          pan: data.pan,
+          gstin: data.gstin,
+          address1: data.address_1,
+          address2: data.address_2,
+          state: data.state,
+          city: data.city,
+          district: data.district,
+          pin: data.pin,
+        });
+      } catch (err) {
+        message.error("Failed to load transporter");
+      }
+    };
+
+    loadTransporter();
+  }, [orgId, transporterId, form]);
+
+  // UPDATE TRANSPORTER
+  const onFinish = async (values) => {
+    try {
+      if (!orgId || !transporterId) {
+        message.error("Missing organisation or transporter");
+        return;
+      }
+
+      setLoading(true);
+
+      const payload = {
+        registered_name: values.registeredName,
+        email_id: values.email,
+        password: values.password || undefined,
+        phone_number: values.phone,
+        telephone_number: values.telephone || "",
+        fax_no: values.fax || "",
+        contact_person_name: values.contactPerson,
+        pan: values.pan,
+        gstin: values.gstin,
+        address_1: values.address1,
+        address_2: values.address2,
+        state: values.state,
+        city: values.city,
+        district: values.district,
+        pin: values.pin,
+      };
+
+      // remove undefined
+      Object.keys(payload).forEach(
+        (k) => payload[k] === undefined && delete payload[k]
+      );
+
+      await updateTransporter(transporterId, orgId, payload);
+
+      message.success("Profile updated successfully");
+    } catch (err) {
+      message.error(
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        "Update failed"
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div>
-     
-
       <Card className="rounded-xl! shadow-sm! border! border-amber-200!">
         {/* User Info */}
         <div className="flex items-center mb-6">
@@ -52,7 +121,6 @@ export default function ProfileSettings() {
         <Form
           form={form}
           layout="vertical"
-          initialValues={user}
           onFinish={onFinish}
         >
           <Row gutter={16}>
@@ -62,30 +130,30 @@ export default function ProfileSettings() {
                 name="registeredName"
                 rules={[{ required: true, message: "Please enter registered name" }]}
               >
-            <Input placeholder="ABC Transport Pvt Ltd" />
+                <Input placeholder="ABC Transport Pvt Ltd" />
               </Form.Item>
             </Col>
-<Col span={6}>
+            <Col span={6}>
               <Form.Item
-  label="Email ID"
-  name="email"
-  rules={[
-    { required: true, message: "Email is required" },
-    { 
-      pattern: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, 
-      message: "Invalid email (example@email.com)" 
-    }
-  ]}
->
-  <Input placeholder="example@email.com" />
-</Form.Item>
+                label="Email ID"
+                name="email"
+                rules={[
+                  { required: true, message: "Email is required" },
+                  {
+                    pattern: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+                    message: "Invalid email (example@email.com)"
+                  }
+                ]}
+              >
+                <Input placeholder="example@email.com" />
+              </Form.Item>
 
             </Col>
             <Col span={6}>
-             
-              <Form.Item label="Password" name="password" rules={[{ required: true, min: 6 ,message: "Please enter a valid 6-digit password" }]}>
-              <Input.Password placeholder="Enter password" />
-            </Form.Item>
+
+              <Form.Item label="Password" name="password" rules={[{ required: true, min: 6, message: "Please enter a valid 6-digit password" }]}>
+                <Input.Password placeholder="Enter password" />
+              </Form.Item>
             </Col>
 
             <Col span={6}>
@@ -94,23 +162,23 @@ export default function ProfileSettings() {
                 name="address1"
                 rules={[{ required: true, message: "Please enter address 1" }]}
               >
-              <Input placeholder="Street / Area" />
-               
+                <Input placeholder="Street / Area" />
+
               </Form.Item>
             </Col>
 
-           
+
           </Row>
 
           <Row gutter={16}>
-             <Col span={6}>
+            <Col span={6}>
               <Form.Item
                 label="Address 2"
                 name="address2"
-                rules={[{ required: false , message: "Please enter address 2"}]}
+                rules={[{ required: false, message: "Please enter address 2" }]}
               >
-              <Input placeholder=" Locality" />
-                
+                <Input placeholder=" Locality" />
+
               </Form.Item>
             </Col>
             <Col span={6}>
@@ -140,12 +208,12 @@ export default function ProfileSettings() {
             </Col>
 
             <Col span={6}>
-               <Form.Item label="Fax No" name="fax" rules={[{ required: true, message:"Please enter Fax No" }]}>
-              <Input placeholder="033-87654321" />
-            </Form.Item>
+              <Form.Item label="Fax No" name="fax" rules={[{ required: true, message: "Please enter Fax No" }]}>
+                <Input placeholder="033-87654321" />
+              </Form.Item>
             </Col>
 
-            
+
           </Row>
 
           <Row gutter={16}>
@@ -175,7 +243,7 @@ export default function ProfileSettings() {
                 name="gstin"
                 rules={[{ required: true, message: "Please enter GSTIN" }]}
               >
-                <Input  placeholder="22ABCDE1234F1Z5"/>
+                <Input placeholder="22ABCDE1234F1Z5" />
               </Form.Item>
             </Col>
 
@@ -185,7 +253,7 @@ export default function ProfileSettings() {
                 name="state"
                 rules={[{ required: true, message: "Please enter state" }]}
               >
-                <Input placeholder="Odisha"/>
+                <Input placeholder="Odisha" />
               </Form.Item>
             </Col>
           </Row>
@@ -197,7 +265,7 @@ export default function ProfileSettings() {
                 name="city"
                 rules={[{ required: true, message: "Please enter city" }]}
               >
-                <Input  placeholder="Bhubnewar"/>
+                <Input placeholder="Bhubnewar" />
               </Form.Item>
             </Col>
 
@@ -207,7 +275,7 @@ export default function ProfileSettings() {
                 name="district"
                 rules={[{ required: true, message: "Please enter district" }]}
               >
-                <Input placeholder="Khorda"/>
+                <Input placeholder="Khorda" />
               </Form.Item>
             </Col>
 
@@ -220,10 +288,10 @@ export default function ProfileSettings() {
                   { pattern: /^\d{6}$/, message: "Enter valid 6-digit PIN" },
                 ]}
               >
-                <Input placeholder="700001"/>
+                <Input placeholder="700001" />
               </Form.Item>
             </Col>
-           
+
           </Row>
 
 
