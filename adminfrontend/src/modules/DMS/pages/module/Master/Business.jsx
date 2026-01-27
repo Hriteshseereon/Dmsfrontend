@@ -27,7 +27,7 @@ import VendorForm from "./VendorForm";
 import TransportForm from "./TransportForm";
 import BrokerForm from "./BrokerForm";
 import InventoryForm from "./InventoryForm";
-
+import { getVendors } from "../../../../../api/bussinesspatnr";
 const { Option } = Select;
 
 // helper to parse date strings into dayjs objects
@@ -36,7 +36,7 @@ const parseDateFields = (record) => {
     "tinDate",
     "etDate",
     "cstDate",
-    "brokerCommissionSetupDate", 
+    "brokerCommissionSetupDate",
   ];
 
   const newRecord = { ...record };
@@ -51,7 +51,6 @@ const parseDateFields = (record) => {
 
   return newRecord;
 };
-
 
 // sample seed data
 const businessDataJSON = [
@@ -78,49 +77,7 @@ const businessDataJSON = [
     creditFacility: "Credit Limit",
     securityForCreditFacility: "Bank Guarantee",
   },
-  {
-    key: 2,
-    partnerType: "Vendor",
-    shortName: "RSI",
-    name: "RUCHI SOYA INDUSTRIES LIMITED",
-    address:
-      "201, MAHAKOSH HOUSE, 7/5, SOUTH TUKOGANJ, NATH MANDIR ROAD, INDORE-452001",
-    phoneNo: "0731-4056012,2513281,82/83,4071109",
-    faxNo: "4056019",
-    tinNo: "4056019",
-    tinDate: "10:01:2025",
-    panNo: "4056019",
-    gstIn: "4056019",
-    etno: "4056019",
-    etDate: "10:01:2025",
-    cstNo: "4056019",
-    cstDate: "10:01:2025",
-    tradeNo: "4056019",
-    websiteUrl: "http://localhost:3000/login",
-    email: "manoj_padtar@gmail.com",
-    transactionType: "Super Stockist",
-    tranStatus: "Inside",
-    igstApplicable: "No",
-    state: "Madhya Pradesh",
-    location: "Indore",
-    status: "Active",
-    district: "Indore",
-    city: "Indore",
-    pinCode: "452001",
-    plants: [
-      {
-        plantName: "Indore Plant",
-        address: "7/5, South Tukoganj, Indore",
-        phoneNo: "1234567890",
-        email: "indoreplant@ruchi.com",
-        state: "Madhya Pradesh",
-        faxNo: "1234",
-        district: "Indore",
-        city: "Indore",
-        pin: "452001",
-      },
-    ],
-  },
+
   // You can add sample Transport records here if you want.
 ].map((record) => parseDateFields(record));
 const FORM_CARDS = [
@@ -148,6 +105,34 @@ export default function Business() {
   const [viewForm] = Form.useForm();
   const [data, setData] = useState(businessDataJSON);
 
+  const fetchVendors = async () => {
+    try {
+      const res = await getVendors();
+      console.log("Vendors fetched:", res);
+      // if API returns { results: [] }
+      const vendorList = res?.results || res || [];
+
+      const mapped = vendorList.map((v, index) => ({
+        key: v.id || index + 1,
+        id: v.id,
+        partnerType: "Vendor",
+        name: v.name,
+        email: v.email_address || "",
+        phoneNo: v.phone_number || "",
+        status: v?.is_active ? "Active" : "Inactive",
+      }));
+
+      setData(mapped);
+    } catch (err) {
+      console.log("Fetch Vendors Error:", err);
+    }
+  };
+  useEffect(() => {
+    if (activeForm === "Vendor") {
+      fetchVendors();
+      console.log("Fetching vendors data...");
+    }
+  }, [activeForm]);
   useEffect(() => {
     if (isEditModalOpen && selectedRecord) {
       const recordWithParsedDates = parseDateFields(selectedRecord);
@@ -158,7 +143,14 @@ export default function Business() {
     } else if (isEditModalOpen && !selectedRecord) {
       form.resetFields();
     }
-  }, [isEditModalOpen, isViewModalOpen, selectedRecord, activeForm, form, viewForm]);
+  }, [
+    isEditModalOpen,
+    isViewModalOpen,
+    selectedRecord,
+    activeForm,
+    form,
+    viewForm,
+  ]);
 
   // ================= Table Columns =================
   const columns = [
@@ -237,7 +229,12 @@ export default function Business() {
   // ================= Handle Save =================
   const handleSave = (values) => {
     const formattedValues = { ...values };
-    const dateFields = ["tinDate", "etDate", "cstDate", "brokerCommissionSetupDate"];
+    const dateFields = [
+      "tinDate",
+      "etDate",
+      "cstDate",
+      "brokerCommissionSetupDate",
+    ];
     dateFields.forEach((field) => {
       if (formattedValues[field] && dayjs.isDayjs(formattedValues[field])) {
         formattedValues[field] = formattedValues[field].format("DD:MM:YYYY");
@@ -263,8 +260,8 @@ export default function Business() {
       // Edit
       setData((prev) =>
         prev.map((item) =>
-          item.key === selectedRecord.key ? { ...item, ...finalValues } : item
-        )
+          item.key === selectedRecord.key ? { ...item, ...finalValues } : item,
+        ),
       );
     } else {
       // Add
@@ -301,7 +298,8 @@ export default function Business() {
           <Button
             icon={<FilterOutlined />}
             onClick={() => setSearchText("")}
-            className="border-amber-400! text-amber-700! hover:bg-amber-100!"  >
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
             Reset Search
           </Button>
           <Select
@@ -318,24 +316,24 @@ export default function Business() {
         <div className="flex gap-2">
           <Button
             icon={<DownloadOutlined />}
-            className="border-amber-400! text-amber-700! hover:bg-amber-100!"   >
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
             Export
           </Button>
-         <Button
-  type="primary"
-  icon={<PlusOutlined />}
-  onClick={() => {
-    setSelectedRecord(null);
-    setActiveForm(null);   // ⬅ no form selected
-    setShowForm(false);    // ⬅ show cards first
-    form.resetFields();
-    setIsEditModalOpen(true);
-  }}
-  className="bg-amber-500! hover:bg-amber-600! border-none!"
->
-  Add Partner
-</Button>
-
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => {
+              setSelectedRecord(null);
+              setActiveForm(null); // ⬅ no form selected
+              setShowForm(false); // ⬅ show cards first
+              form.resetFields();
+              setIsEditModalOpen(true);
+            }}
+            className="bg-amber-500! hover:bg-amber-600! border-none!"
+          >
+            Add Partner
+          </Button>
         </div>
       </div>
 
@@ -359,43 +357,45 @@ export default function Business() {
       <Modal
         title={
           <span className="text-amber-700 font-semibold">
-            {isViewModalOpen ? "View" : selectedRecord ? "Edit " : "Add Business Partner"}{" "}
+            {isViewModalOpen
+              ? "View"
+              : selectedRecord
+                ? "Edit "
+                : "Add Business Partner"}{" "}
             {activeForm}
           </span>
         }
         open={isEditModalOpen || isViewModalOpen}
         onCancel={() => {
-        setIsEditModalOpen(false);
-        setIsViewModalOpen(false);
-        setSelectedRecord(null);
-        setShowForm(false);
-        setActiveForm("Customer");
-        form.resetFields();
-        viewForm.resetFields();
-      }}
-
+          setIsEditModalOpen(false);
+          setIsViewModalOpen(false);
+          setSelectedRecord(null);
+          setShowForm(false);
+          setActiveForm("Customer");
+          form.resetFields();
+          viewForm.resetFields();
+        }}
         footer={null}
         width={1200}
-        
-         bodyStyle={{
-    height: "80vh",        // ⬅ increases modal body height
-    overflowY: "auto",     // ⬅ enables scrolling
-    paddingRight: 16,
-  }}
+        bodyStyle={{
+          height: "80vh", // ⬅ increases modal body height
+          overflowY: "auto", // ⬅ enables scrolling
+          paddingRight: 16,
+        }}
       >
-{/* CARD SELECTION – only for ADD */}
-{!selectedRecord && !isViewModalOpen && !showForm && (
-  <Row gutter={16} className="mb-6">
-    {FORM_CARDS.map((card) => (
-      <Col span={6} key={card.type}>
-        <Card
-  hoverable
-  onClick={() => {
-    setActiveForm(card.type);
-    setShowForm(true);
-    form.resetFields();
-  }}
-  className="
+        {/* CARD SELECTION – only for ADD */}
+        {!selectedRecord && !isViewModalOpen && !showForm && (
+          <Row gutter={16} className="mb-6">
+            {FORM_CARDS.map((card) => (
+              <Col span={6} key={card.type}>
+                <Card
+                  hoverable
+                  onClick={() => {
+                    setActiveForm(card.type);
+                    setShowForm(true);
+                    form.resetFields();
+                  }}
+                  className="
     group!
     cursor-pointer!
     text-center!
@@ -410,11 +410,11 @@ export default function Business() {
     hover:border-amber-400!
     hover:-translate-y-1!
   "
->
-  <div className="flex flex-col items-center gap-2 py-6">
-    {/* Icon circle */}
-    <div
-      className="
+                >
+                  <div className="flex flex-col items-center gap-2 py-6">
+                    {/* Icon circle */}
+                    <div
+                      className="
         flex items-center justify-center
         w-14 h-14
         rounded-full
@@ -427,33 +427,31 @@ export default function Business() {
         group-hover:bg-amber-500
         group-hover:text-white
       "
-    >
-      {card.type.charAt(0)}
-    </div>
+                    >
+                      {card.type.charAt(0)}
+                    </div>
 
-    {/* Title */}
-    <h3 className="text-lg font-semibold text-amber-800">
-      {card.type}
-    </h3>
+                    {/* Title */}
+                    <h3 className="text-lg font-semibold text-amber-800">
+                      {card.type}
+                    </h3>
 
-    {/* Description */}
-    <p className="text-sm text-amber-600 text-center px-2">
-      {card.description}
-    </p>
-  </div>
-  
-</Card>
-
-      </Col>
-    ))}
-  </Row>
-  
-)}
- {/* tip card design */}
- {/* TIP CARD BELOW PARTNER SELECTION */}
-{!selectedRecord && !isViewModalOpen && !showForm && (
-  <div className="mt-8 flex justify-center">
-    <div className="
+                    {/* Description */}
+                    <p className="text-sm text-amber-600 text-center px-2">
+                      {card.description}
+                    </p>
+                  </div>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        )}
+        {/* tip card design */}
+        {/* TIP CARD BELOW PARTNER SELECTION */}
+        {!selectedRecord && !isViewModalOpen && !showForm && (
+          <div className="mt-8 flex justify-center">
+            <div
+              className="
       max-w-4xl
       w-full
       bg-amber-50
@@ -463,66 +461,49 @@ export default function Business() {
       px-6
       py-4
       shadow-sm
-    ">
-      <h4 className="text-lg font-semibold text-amber-800 mb-1">
-        💡 Tip
-      </h4>
-      <p className="text-base text-amber-700">
-        Choose a partner type above to start adding your business partner details.
-        You can manage customers, vendors, transporters, and brokers from one place.
-      </p>
-    </div>
-  </div>
-)}
+    "
+            >
+              <h4 className="text-lg font-semibold text-amber-800 mb-1">
+                💡 Tip
+              </h4>
+              <p className="text-base text-amber-700">
+                Choose a partner type above to start adding your business
+                partner details. You can manage customers, vendors,
+                transporters, and brokers from one place.
+              </p>
+            </div>
+          </div>
+        )}
 
-{(showForm || selectedRecord || isViewModalOpen) && (
-  <Form
-    layout="vertical"
-    form={isViewModalOpen ? viewForm : form}
-    onFinish={handleSave}
-    className="max-h-[70vh] overflow-y-auto pr-4 custom-scroll-form"
-  >
+        {(showForm || selectedRecord || isViewModalOpen) && (
+          <>
+            {/* BACK BUTTON */}
+            {showForm && !selectedRecord && !isViewModalOpen && (
+              <div className="mb-4">
+                <Button
+                  type="link"
+                  onClick={() => {
+                    setShowForm(false);
+                    setActiveForm(null);
+                    form.resetFields();
+                  }}
+                  className="text-amber-600! text-2xl px-0!"
+                >
+                  ← Back to Partner Type
+                </Button>
+              </div>
+            )}
 
-    {/* BACK BUTTON */}
-    {showForm && !selectedRecord && !isViewModalOpen && (
-      <div className="mb-4">
-        <Button
-          type="link"
-          onClick={() => {
-            setShowForm(false);
-            setActiveForm(null);
-            form.resetFields();
-          }}
-          className="text-amber-600! text-2xl px-0!"
-        >
-          ← Back to Partner Type
-        </Button>
-      </div>
-    )}
-
-    <ActiveFormComponent disabled={isViewModalOpen} />
-
-    {!isViewModalOpen && (
-      <div className="flex justify-end gap-2 mt-4">
-        <Button
-          onClick={() => setIsEditModalOpen(false)}
-          className="border-amber-400! text-amber-700!"
-        >
-          Cancel
-        </Button>
-        <Button
-          type="primary"
-          htmlType="submit"
-          className="bg-amber-500!"
-        >
-          {selectedRecord ? "Update" : "Add"}
-        </Button>
-      </div>
-    )}
-  </Form>
-)}
-
-
+            <ActiveFormComponent
+              disabled={isViewModalOpen}
+              form={isViewModalOpen ? viewForm : form}
+              onSuccess={() => {
+                if (activeForm === "Vendor") fetchVendors();
+                setIsEditModalOpen(false);
+              }}
+            />
+          </>
+        )}
       </Modal>
     </div>
   );
