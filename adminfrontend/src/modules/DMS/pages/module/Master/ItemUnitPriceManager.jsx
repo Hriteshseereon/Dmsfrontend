@@ -488,12 +488,12 @@ function ItemMasterTab({ items, setItems, setSelectedItem }) {
           ...i,
           itemName: i.name,
           itemType: i.product_type,
-          companyName: i.vendor,
-          groupName: i.product_group,
+          companyName: i.vendor_name,
+          groupName: i.product_group_name,
           baseUnit: i.base_unit?.toUpperCase(),
           gstPercent: i.gst_percentage,
           currentStock: i.current_stock,
-          hsnCode: i.hsn_code,
+          hsnCode: i.hsn_code_value,
           sacCode: i.sac_code,
         }))}
       />
