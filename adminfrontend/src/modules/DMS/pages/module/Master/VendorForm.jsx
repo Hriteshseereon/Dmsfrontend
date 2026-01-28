@@ -10,6 +10,7 @@ import {
   Button,
   Card,
   message,
+  InputNumber,
 } from "antd";
 import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
@@ -140,7 +141,7 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Short Name" name="shortName">
+            <Form.Item label="Short Name" name="shortName" rules={[{required:true}]}>
               <Input
                 className={inputClass}
                 disabled={disabled}
@@ -150,57 +151,95 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Mobile No 1" name="mobileNo1">
-              <Input
+            <Form.Item label="Mobile No 1" name="mobileNo1"   rules={[
+    { required: true, message: "Mobile number is required" },
+    {
+      pattern: /^[6-9]\d{9}$/,
+      message: "Enter a valid 10-digit mobile number",
+    },
+  ]}>
+              <InputNumber
                 className={inputClass}
                 disabled={disabled}
                 placeholder="9984568331"
+                style={{ width: "100%" }}
               />
             </Form.Item>
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Mobile No 2" name="mobileNo2">
-              <Input
+            <Form.Item label="Mobile No 2" name="mobileNo2"   rules={[
+    {  message: "Mobile number is required" },
+    {
+      pattern: /^[6-9]\d{9}$/,
+      message: "Enter a valid 10-digit mobile number",
+    },
+  ]}>
+              <InputNumber
                 className={inputClass}
                 disabled={disabled}
                 placeholder="7984568331"
+                style={{ width: "100%" }}
               />
             </Form.Item>
           </Col>
 
-          <Col span={6}>
-            <Form.Item label="Primary Email" name="email1">
-              <Input
-                className={inputClass}
-                disabled={disabled}
-                placeholder="example@gmail.com"
-              />
-            </Form.Item>
-          </Col>
+        <Col span={6}>
+  <Form.Item
+    label="Primary Email"
+    name="email1"
+    rules={[
+      { required: true, message: "Primary email is required" },
+      { type: "email", message: "Please enter a valid email address" },
+    ]}
+  >
+    <Input
+      className={inputClass}
+      disabled={disabled}
+      placeholder="example@gmail.com"
+    />
+  </Form.Item>
+</Col>
 
-          <Col span={6}>
-            <Form.Item label="Secondary Email" name="email2">
-              <Input
-                className={inputClass}
-                disabled={disabled}
-                placeholder="example@gmail.com"
-              />
-            </Form.Item>
-          </Col>
+
+           <Col span={6}>
+  <Form.Item
+    label="Secondary Email"
+    name="email2"
+    rules={[
+      {  message: "Secondary email is required" },
+      { type: "email", message: "Please enter a valid email address" },
+    ]}
+  >
+    <Input
+      className={inputClass}
+      disabled={disabled}
+      placeholder="example@gmail.com"
+    />
+  </Form.Item>
+</Col>
 
           <Col span={4}>
-            <Form.Item label="WhatsApp No" name="whatsappNo">
-              <Input
+            <Form.Item label="WhatsApp No" name="whatsappNo"  rules={[
+    {  message: "Mobile number is required" },
+    {
+      pattern: /^[6-9]\d{9}$/,
+      message: "Enter a valid 10-digit mobile number",
+    },
+  ]}>
+              <InputNumber
                 className={inputClass}
                 disabled={disabled}
                 placeholder="9984568331"
+                style={{ width: "100%" }}
               />
             </Form.Item>
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Social Link" name="socialLink">
+            <Form.Item label="Social Link" name="socialLink" rules={[
+              { type: 'url', message: 'Please enter a valid URL' },
+            ]}>
               <Input
                 className={inputClass}
                 disabled={disabled}
@@ -210,7 +249,9 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
           </Col>
 
           <Col span={6}>
-            <Form.Item label="Company Website" name="websiteUrl">
+            <Form.Item label="Company Website" name="websiteUrl" rules={[
+              { type: 'url', message: 'Please enter a valid URL' },
+            ]}   >
               <Input
                 className={inputClass}
                 disabled={disabled}
@@ -229,7 +270,7 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
 
         <Row gutter={24}>
           <Col span={6}>
-            <Form.Item label="Contact Person Name" name="contactPerson">
+            <Form.Item label="Contact Person Name" name="contactPerson" rules={[{required:true}]}>
               <Input
                 className={inputClass}
                 disabled={disabled}
@@ -239,21 +280,29 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Mobile No" name="contactMobile">
-              <Input
+            <Form.Item label="Mobile No" name="contactMobile"   rules={[
+    { required: true, message: "Mobile number is required" },
+    {
+      pattern: /^[6-9]\d{9}$/,
+      message: "Enter a valid 10-digit mobile number",
+    },
+  ]} >
+              <InputNumber
                 className={inputClass}
                 disabled={disabled}
                 placeholder="9984568331"
+                style={{ width: "100%" }}
               />
             </Form.Item>
           </Col>
 
           <Col span={4}>
             <Form.Item label="WhatsApp No" name="contactWhatsapp">
-              <Input
+              <InputNumber
                 className={inputClass}
                 disabled={disabled}
                 placeholder="9984568331"
+                style={{ width: "100%" }}
               />
             </Form.Item>
           </Col>
@@ -269,7 +318,10 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
           </Col>
 
           <Col span={6}>
-            <Form.Item label="Email" name="contactEmail">
+            <Form.Item label="Email" name="contactEmail" rules={[
+              { required: true, message: "Email is required" },
+              { type: "email", message: "Please enter a valid email address" },
+            ]}>
               <Input
                 className={inputClass}
                 disabled={disabled}
@@ -279,8 +331,13 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
           </Col>
 
           <Col span={6}>
-            <Form.Item label="Aadhar No" name="aadharNo">
-              <Input
+            <Form.Item label="Aadhar No" name="aadharNo" rules={[
+              {
+                pattern: /^\d{12}$/,
+                message: "Please enter a valid 12-digit Aadhar number"
+              }
+            ]}>
+              <InputNumber
                 className={inputClass}
                 disabled={disabled}
                 placeholder="123456789012"
@@ -305,7 +362,12 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
 
         <Row gutter={24}>
           <Col span={4}>
-            <Form.Item label="TIN No" name="tinNo">
+            <Form.Item label="TIN No" name="tinNo" rules={[
+              {
+                pattern: /^[A-Z0-9]{11,15}$/,
+                message: "Please enter a valid TIN number"
+              }
+            ]}>
               <Input
                 className={inputClass}
                 disabled={disabled}
@@ -327,7 +389,8 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
           </Col>
 
           <Col span={4}>
-            <Form.Item label="PAN No" name="panNo">
+            <Form.Item label="PAN No" name="panNo" rules={[
+               ]}>
               <Input
                 className={inputClass}
                 disabled={disabled}
@@ -343,7 +406,12 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
           </Col>
 
           <Col span={4}>
-            <Form.Item label="GSTIN No" name="gstIn">
+            <Form.Item label="GSTIN No" name="gstIn" rules={[
+              {
+                pattern: /^[A-Z0-9]{15}$/,
+                message: "Please enter a valid GSTIN number"
+              }
+            ]}>
               <Input
                 className={inputClass}
                 disabled={disabled}
@@ -353,7 +421,7 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
           </Col>
 
           <Col span={4}>
-            <Form.Item label="GSTIN Document" name="gstDoc">
+            <Form.Item label="GSTIN Document" name="gstDoc" >
               <Input type="file" disabled={disabled} />
             </Form.Item>
           </Col>
@@ -397,7 +465,7 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Location" name="location">
+            <Form.Item label="Location" name="location" rules={[{required:true}]}>
               <Input
                 className={inputClass}
                 disabled={disabled}
@@ -437,8 +505,14 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Pin Code" name="pinCode">
-              <Input
+            <Form.Item label="Pin Code" name="pinCode" 
+            rules={[
+              {
+                pattern: /^[0-9]{6}$/,
+                message: "Please enter a valid Pin Code"
+              }
+            ]}>
+              <InputNumber
                 className={inputClass}
                 disabled={disabled}
                 placeholder="Enter Pin Code"
@@ -529,10 +603,18 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
                         {...restField}
                         name={[name, "phoneNo"]}
                         label="Phone No"
+                        rules={[
+    { required: true, message: "Mobile number is required" },
+    {
+      pattern: /^[6-9]\d{9}$/,
+      message: "Enter a valid 10-digit mobile number",
+    },
+  ]}
                       >
-                        <Input
+                        <InputNumber
                           disabled={disabled}
                           placeholder="Enter Phone Number"
+                          style={{ width: "100%" }}
                         />
                       </Form.Item>
                     </Col>
@@ -542,6 +624,10 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
                         {...restField}
                         name={[name, "email"]}
                         label="Email"
+                         rules={[
+      { required: true, message: "Secondary email is required" },
+      { type: "email", message: "Please enter a valid email address" },
+    ]}
                       >
                         <Input disabled={disabled} placeholder="Enter Email" />
                       </Form.Item>
@@ -585,8 +671,14 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
                         {...restField}
                         name={[name, "pin"]}
                         label="Pin"
+                         rules={[
+              {
+                pattern: /^[0-9]{6}$/,
+                message: "Please enter a valid Pin Code"
+              }
+            ]}
                       >
-                        <Input disabled={disabled} placeholder="Enter Pin" />
+                        <InputNumber disabled={disabled} placeholder="Enter Pin" />
                       </Form.Item>
                     </Col>
 
@@ -595,6 +687,7 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
                         {...restField}
                         name={[name, "faxNo"]}
                         label="Fax No"
+
                       >
                         <Input disabled={disabled} placeholder="Enter Fax No" />
                       </Form.Item>
