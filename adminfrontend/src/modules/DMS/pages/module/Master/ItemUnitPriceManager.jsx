@@ -488,7 +488,7 @@ function ItemMasterTab({ items, setItems, setSelectedItem }) {
           ...i,
           itemName: i.name,
           itemType: i.product_type,
-          companyName: i.organisation,
+          companyName: i.vendor,
           groupName: i.product_group,
           baseUnit: i.base_unit?.toUpperCase(),
           gstPercent: i.gst_percentage,
