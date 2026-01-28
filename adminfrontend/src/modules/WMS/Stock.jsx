@@ -19,35 +19,11 @@ import {
   EditOutlined,
   FilterOutlined,
 } from "@ant-design/icons";
+import { createWmsStock,getWmsStocks,updateWmsStock } from "../../api/wms";
 
-/**
- * StockEtf.jsx
- * - Table-first layout
- * - Top controls: Search / Reset / Export / Add New (amber theme)
- * - Add/Edit/View modals (width 920) with the fields you provided
- * - Auto-calculates Purchase Amount and Total Amount from inputs
- */
-
-const initialData = [
-  {
-    key: 1,
-    assetName: "Reliance Industries Ltd - ETF",
-    purchaseQuantity: 100,
-    purchasePrice: 2400,
-    brokerage: 50,
-    purchaseAmount: 240000, // qty * price
-    stt: 48,
-    stampCharges: 10,
-    otherCharges: 25,
-    gstAndSTax: 18,
-    transactionalCharges: 5,
-    totalAmount: 240161, // computed
-    remarks: "Long term buy",
-  },
-];
 
 export default function StockEtf() {
-  const [data, setData] = useState(initialData);
+  const [data, setData] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -57,37 +33,132 @@ export default function StockEtf() {
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
-
-  // Helper: compute derived amounts from values
-  const computeAmounts = (values) => {
-    const qty = Number(values.purchaseQuantity || 0);
-    const price = Number(values.purchasePrice || 0);
-    const brokerage = Number(values.brokerage || 0);
-    const stt = Number(values.stt || 0);
-    const stampCharges = Number(values.stampCharges || 0);
-    const otherCharges = Number(values.otherCharges || 0);
-    const gstAndSTax = Number(values.gstAndSTax || 0);
-    const transactionalCharges = Number(values.transactionalCharges || 0);
-
-    const purchaseAmount = qty * price;
-    // total amount = purchaseAmount + all charges (including brokerage & taxes)
-    const totalAmount =
-      purchaseAmount +
-      brokerage +
-      stt +
-      stampCharges +
-      otherCharges +
-      gstAndSTax +
-      transactionalCharges;
-
-    return {
-      purchaseAmount,
-      totalAmount,
-    };
+  const fetchStocks = async () => {
+    try {
+      const stocks = await getWmsStocks();  
+      // Transform stocks data if necessary
+      setData(stocks);
+      console.log("Fetched stocks:", stocks);
+    } catch (error) {
+      console.error("Error fetching stocks:", error);
+      message.error("Failed to fetch stocks.");
+    }
   };
 
+  React.useEffect(() => {
+    fetchStocks();
+  }, []); 
+
+  const handleAddStock = async (values) => {
+  try {
+    message.loading({ content: "Saving stock...", key: "stockAdd" });
+
+    const calcs = computeAmounts(values);
+
+    const payload = {
+      asset_name: values.asset_name,
+      purchase_quantity: values.purchase_quantity,
+      purchase_price: values.purchase_price,
+
+      brokerage: values.brokerage || 0,
+      stt: values.stt || 0,
+      stamp_charges: values.stamp_charges || 0,
+      other_charges: values.other_charges || 0,
+      gst_tax: values.gst_tax || 0,
+      transactional_charges: values.transactional_charges || 0,
+
+      purchase_amount: calcs.purchase_amount,
+      total_amount: calcs.total_amount,
+      remarks: values.remarks || "",
+    };
+
+    await createWmsStock(payload);
+
+    message.success({ content: "Stock added successfully", key: "stockAdd" });
+
+    setIsAddModalOpen(false);
+    addForm.resetFields();
+
+    // reload table data
+    fetchStocks();
+  } catch (error) {
+    console.error(error);
+    message.error({ content: "Failed to add stock", key: "stockAdd" });
+  }
+};
+
+const handleUpdateStock = async (values) => {
+  try {
+    message.loading({ content: "Updating stock...", key: "stockUpdate" });
+
+    const calcs = computeAmounts(values);
+
+    const payload = {
+      asset_name: values.asset_name,
+      purchase_quantity: values.purchase_quantity,
+      purchase_price: values.purchase_price,
+
+      brokerage: values.brokerage || 0,
+      stt: values.stt || 0,
+      stamp_charges: values.stamp_charges || 0,
+      other_charges: values.other_charges || 0,
+      gst_tax: values.gst_tax || 0,
+      transactional_charges: values.transactional_charges || 0,
+
+      purchase_amount: calcs.purchase_amount,
+      total_amount: calcs.total_amount,
+      remarks: values.remarks || "",
+    };
+
+    // IMPORTANT: use backend ID
+    await updateWmsStock(selectedRecord.id, payload);
+
+    message.success({ content: "Stock updated successfully", key: "stockUpdate" });
+
+    setIsEditModalOpen(false);
+    editForm.resetFields();
+    setSelectedRecord(null);
+
+    // refresh table
+    fetchStocks();
+  } catch (error) {
+    console.error(error);
+    message.error({ content: "Failed to update stock", key: "stockUpdate" });
+  }
+};
+
+  // Helper: compute derived amounts from values
+ const computeAmounts = (values) => {
+  const qty = Number(values.purchase_quantity || 0);
+  const price = Number(values.purchase_price || 0);
+
+  const brokerage = Number(values.brokerage || 0);
+  const stt = Number(values.stt || 0);
+  const stampCharges = Number(values.stamp_charges || 0);
+  const otherCharges = Number(values.other_charges || 0);
+  const gstTax = Number(values.gst_tax || 0);
+  const transactionalCharges = Number(values.transactional_charges || 0);
+
+  const purchase_amount = qty * price;
+
+  const total_amount =
+    purchase_amount +
+    brokerage +
+    stt +
+    stampCharges +
+    otherCharges +
+    gstTax +
+    transactionalCharges;
+
+  return {
+    purchase_amount,
+    total_amount,
+  };
+};
+
+
   const filteredData = data.filter((row) =>
-    ["assetName", "remarks"]
+    ["asset_name", "remarks"]
       .some((f) => (row[f] || "").toString().toLowerCase()
         .includes(searchText.trim().toLowerCase()))
   );
@@ -95,25 +166,25 @@ export default function StockEtf() {
   const columns = [
     {
       title: <span className="text-amber-700 font-semibold">Asset Name</span>,
-      dataIndex: "assetName",
+      dataIndex: "asset_name",
       width: 100,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Qty</span>,
-      dataIndex: "purchaseQuantity",
+      dataIndex: "purchase_quantity",
       width: 100,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Price (₹)</span>,
-      dataIndex: "purchasePrice",
+      dataIndex: "purchase_price",
       width: 100,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Purchase Amount (₹)</span>,
-      dataIndex: "purchaseAmount",
+      dataIndex: "purchase_amount",
       width: 100,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
     },
@@ -125,13 +196,13 @@ export default function StockEtf() {
     },
     {
       title: <span className="text-amber-700 font-semibold">GST / S.Tax (₹)</span>,
-      dataIndex: "gstAndSTax",
+      dataIndex: "gst_tax",
       width: 100,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Total Amount (₹)</span>,
-      dataIndex: "totalAmount",
+      dataIndex: "total_amount",
       width: 100,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
     },
@@ -182,17 +253,17 @@ export default function StockEtf() {
       "Remarks",
     ];
     const rows = data.map((r) => [
-      r.assetName,
-      r.purchaseQuantity,
-      r.purchasePrice,
+      r.asset_name,
+      r.purchase_quantity,
+      r.purchase_price,
       r.brokerage,
-      r.purchaseAmount,
+      r.purchase_amount,
       r.stt,
-      r.stampCharges,
-      r.otherCharges,
-      r.gstAndSTax,
-      r.transactionalCharges,
-      r.totalAmount,
+      r.stamp_charges,
+      r.other_charges,
+      r.gst_tax,
+      r.transactional_charges,
+      r.total_amount,
       (r.remarks || "").replace(/[\n\r]/g, " "),
     ]);
     const csvContent = [headers, ...rows]
@@ -215,7 +286,7 @@ export default function StockEtf() {
         <Col span={6}>
           <Form.Item
             label={<span className="text-amber-700">Asset Name</span>}
-            name="assetName"
+            name="asset_name"
             rules={[{ required: true, message: "Please enter Asset Name" }]}
           >
             <Input placeholder="Asset / ETF name" disabled={disabled} />
@@ -225,7 +296,7 @@ export default function StockEtf() {
         <Col span={6}>
           <Form.Item
             label={<span className="text-amber-700">Purchase Quantity</span>}
-            name="purchaseQuantity"
+            name="purchase_quantity"
             rules={[{ required: true, message: "Please enter quantity" }]}
           >
             <InputNumber className="w-full!" min={0} disabled={disabled} />
@@ -235,7 +306,7 @@ export default function StockEtf() {
         <Col span={6}>
           <Form.Item
             label={<span className="text-amber-700">Purchase Price (₹)</span>}
-            name="purchasePrice"
+            name="purchase_price"
             rules={[{ required: true, message: "Please enter price" }]}
           >
             <InputNumber className="w-full!" min={0} disabled={disabled} />
@@ -258,18 +329,18 @@ export default function StockEtf() {
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Stamp Charges (₹)</span>} name="stampCharges">
+          <Form.Item label={<span className="text-amber-700">Stamp Charges (₹)</span>} name="stamp_charges">
             <InputNumber className="w-full!" min={0} disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Other charges (₹)</span>} name="otherCharges">
+          <Form.Item label={<span className="text-amber-700">Other charges (₹)</span>} name="other_charges">
             <InputNumber className="w-full!" min={0} disabled={disabled} />
           </Form.Item>
         </Col>
          <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">GST / S.Tax (₹)</span>} name="gstAndSTax">
+          <Form.Item label={<span className="text-amber-700">GST / S.Tax (₹)</span>} name="gst_tax">
             <InputNumber className="w-full!" min={0} disabled={disabled} />
           </Form.Item>
         </Col>
@@ -279,18 +350,18 @@ export default function StockEtf() {
 
       <Row gutter={24}>
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Transactional Charges (₹)</span>} name="transactionalCharges">
+          <Form.Item label={<span className="text-amber-700">Transactional Charges (₹)</span>} name="transactional_charges">
             <InputNumber className="w-full!" min={0} disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Purchase Amount (₹)</span>} name="purchaseAmount">
+          <Form.Item label={<span className="text-amber-700">Purchase Amount (₹)</span>} name="purchase_amount">
             <InputNumber className="w-full!" disabled />
           </Form.Item>
         </Col>
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Total Amount (₹)</span>} name="totalAmount">
+          <Form.Item label={<span className="text-amber-700">Total Amount (₹)</span>} name="total_amount">
             <InputNumber className="w-full!" disabled />
           </Form.Item>
         </Col>
@@ -363,26 +434,16 @@ export default function StockEtf() {
         footer={null}
         width={920}
       >
-        <Form
-          form={addForm}
-          layout="vertical"
-          onFinish={(values) => {
-            const calcs = computeAmounts(values);
-            const payload = {
-              ...values,
-              ...calcs,
-              key: data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1,
-            };
-            setData((prev) => [payload, ...prev]);
-            setIsAddModalOpen(false);
-            addForm.resetFields();
-            message.success("Purchase added.");
-          }}
-          onValuesChange={(changed, allValues) => {
-            const calcs = computeAmounts(allValues);
-            addForm.setFieldsValue(calcs);
-          }}
-        >
+       <Form
+  form={addForm}
+  layout="vertical"
+  onFinish={handleAddStock}
+  onValuesChange={(changed, allValues) => {
+    const calcs = computeAmounts(allValues);
+    addForm.setFieldsValue(calcs);
+  }}
+>
+
           {renderFormFields(addForm, false)}
 
           <div className="flex justify-end gap-2 mt-4">
@@ -415,23 +476,16 @@ export default function StockEtf() {
         footer={null}
         width={920}
       >
-        <Form
-          form={editForm}
-          layout="vertical"
-          onFinish={(values) => {
-            const calcs = computeAmounts(values);
-            const payload = { ...selectedRecord, ...values, ...calcs };
-            setData((prev) => prev.map((d) => (d.key === payload.key ? payload : d)));
-            setIsEditModalOpen(false);
-            editForm.resetFields();
-            setSelectedRecord(null);
-            message.success("Purchase updated.");
-          }}
-          onValuesChange={(changed, allValues) => {
-            const calcs = computeAmounts(allValues);
-            editForm.setFieldsValue(calcs);
-          }}
-        >
+      <Form
+  form={editForm}
+  layout="vertical"
+  onFinish={handleUpdateStock}
+  onValuesChange={(changed, allValues) => {
+    const calcs = computeAmounts(allValues);
+    editForm.setFieldsValue(calcs);
+  }}
+>
+
           {renderFormFields(editForm, false)}
 
           <div className="flex justify-end gap-2 mt-4">
