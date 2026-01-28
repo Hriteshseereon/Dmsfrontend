@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Card, Table, Button, Modal, Checkbox, Popconfirm } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
-import hsnSacData from './hsnSacData.json'
-
+import hsnSacData from "./hsnSacData.json";
+import { getHSNSACCodes } from "../../../../../api/product";
 
 /* ================= Code Selector (Structured Modal) ================= */
 const CodeSelector = ({ open, title, data, onClose, onAdd }) => {
@@ -16,7 +16,7 @@ const CodeSelector = ({ open, title, data, onClose, onAdd }) => {
     setSelected((prev) =>
       prev.some((i) => i.code === item.code)
         ? prev.filter((i) => i.code !== item.code)
-        : [...prev, item]
+        : [...prev, item],
     );
   };
 
@@ -30,7 +30,9 @@ const CodeSelector = ({ open, title, data, onClose, onAdd }) => {
   return (
     <Modal
       open={open}
-      title={<span className="text-lg! font-bold! text-amber-800!">{title}</span>}
+      title={
+        <span className="text-lg! font-bold! text-amber-800!">{title}</span>
+      }
       onCancel={onClose}
       footer={null}
       width={650}
@@ -46,8 +48,12 @@ const CodeSelector = ({ open, title, data, onClose, onAdd }) => {
                 onChange={() => toggleSelect(item)}
               >
                 <div className="leading-tight">
-                  <span className="text-amber-700 font-bold mr-1">{item.code}</span>
-                  <span className="text-amber-800/80 font-medium">– {item.description}</span>
+                  <span className="text-amber-700 font-bold mr-1">
+                    {item.code}
+                  </span>
+                  <span className="text-amber-800/80 font-medium">
+                    – {item.description}
+                  </span>
                 </div>
               </Checkbox>
             </div>
@@ -75,7 +81,9 @@ const CodeSelector = ({ open, title, data, onClose, onAdd }) => {
             disabled={!selected.length}
             onClick={handleAdd}
             className={`px-8 rounded shadow-sm border-none ${
-              selected.length ? "bg-amber-500! hover:bg-amber-600!" : "bg-gray-100!"
+              selected.length
+                ? "bg-amber-500! hover:bg-amber-600!"
+                : "bg-gray-100!"
             }`}
           >
             Add Selected
@@ -91,31 +99,81 @@ const HsnSacManager = () => {
   const [hsnList, setHsnList] = useState([]);
   const [sacList, setSacList] = useState([]);
   const [modalType, setModalType] = useState(null);
+  // const fetAllHSNSACCodes = async () => {
+  //   try {
+  //     const data = await getHSNSACCodes();
+  //     setHsnList(data);
+  //     setSacList(data.sac);
+  //     console.log("Fetched HSN codes:", data);
+  //     console.log("Fetched SAC codes:", data.sac);
+  //     return data;
+  //   } catch (error) {
+  //     console.error("Error fetching HSN/SAC codes:", error);
+  //     return { hsn: [], sac: [] };
+  //   }
+  // };
+  const fetAllHSNSACCodes = async () => {
+    try {
+      const data = await getHSNSACCodes();
+
+      console.log("RAW API DATA 👉", data);
+
+      // If API returns only HSN array
+      const normalizedHsn = Array.isArray(data)
+        ? data.map((item) => ({
+            ...item,
+            code: item.hsn_code, // 👈 normalize here
+          }))
+        : [];
+
+      setHsnList(normalizedHsn);
+
+      // TEMP: SAC empty until backend provides it
+      setSacList([]);
+
+      hsnSacData.hsn = normalizedHsn;
+      hsnSacData.sac = [];
+
+      return { hsn: normalizedHsn, sac: [] };
+    } catch (error) {
+      console.error("Error fetching HSN/SAC codes:", error);
+      return { hsn: [], sac: [] };
+    }
+  };
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      const data = await fetAllHSNSACCodes();
+      hsnSacData.hsn = data;
+      hsnSacData.sac = data.sac;
+    };
+    fetchData();
+  }, []);
 
   const columns = (onDelete) => [
-    { 
-      title: <span className="text-amber-600!">Code</span>, 
-      dataIndex: "code", 
-      width: 100,
-      render: (text) => <span className=" text-amber-700!">{text}</span>
-    },
-    { title:  <span className="text-amber-600!">Description</span>, dataIndex: "description" ,  width: 180, render: (text) => <span className=" text-amber-700!">{text}</span>
-  },
     {
-      title: <span className="text-amber-600!">Action</span>, 
+      title: <span className="text-amber-600!">Code</span>,
+      dataIndex: "code",
+      width: 100,
+      render: (text) => <span className=" text-amber-700!">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-600!">Description</span>,
+      dataIndex: "description",
+      width: 180,
+      render: (text) => <span className=" text-amber-700!">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-600!">Action</span>,
       width: 80,
-      align: 'center',
+      align: "center",
       render: (_, record) => (
-        
-         <Popconfirm
-            title=" Are you sure you want to delete ?"
-            onConfirm={() =>
-              onDelete(record.code)
-    
-            }
-          >
-            <DeleteOutlined className="cursor-pointer! text-red-500!" />
-          </Popconfirm>
+        <Popconfirm
+          title=" Are you sure you want to delete ?"
+          onConfirm={() => onDelete(record.code)}
+        >
+          <DeleteOutlined className="cursor-pointer! text-red-500!" />
+        </Popconfirm>
       ),
     },
   ];
@@ -130,10 +188,10 @@ const HsnSacManager = () => {
 
   return (
     <div className="p-2">
-       <h2 className="text-lg font-semibold text-amber-700 mb-2 mt-0 pt-0">
-      Easily manage your HSN and SAC code masters </h2>
+      <h2 className="text-lg font-semibold text-amber-700 mb-2 mt-0 pt-0">
+        Easily manage your HSN and SAC code masters{" "}
+      </h2>
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4">
-        
         {/* HSN TABLE CARD */}
         <Card
           title={<span className="text-amber-700">HSN Codes</span>}
@@ -152,12 +210,12 @@ const HsnSacManager = () => {
           <Table
             rowKey="code"
             columns={columns((code) =>
-              setHsnList((prev) => prev.filter((i) => i.code !== code))
+              setHsnList((prev) => prev.filter((i) => i.code !== code)),
             )}
             dataSource={hsnList}
             pagination={{ pageSize: 5 }}
             size="small"
-             scroll={{y:100}}
+            scroll={{ y: 100 }}
           />
         </Card>
 
@@ -179,12 +237,12 @@ const HsnSacManager = () => {
           <Table
             rowKey="code"
             columns={columns((code) =>
-              setSacList((prev) => prev.filter((i) => i.code !== code))
+              setSacList((prev) => prev.filter((i) => i.code !== code)),
             )}
             dataSource={sacList}
             pagination={{ pageSize: 5 }}
             size="small"
-            scroll={{y:100}}
+            scroll={{ y: 100 }}
           />
         </Card>
       </div>
