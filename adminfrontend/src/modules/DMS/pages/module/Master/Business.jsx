@@ -27,7 +27,11 @@ import VendorForm from "./VendorForm";
 import TransportForm from "./TransportForm";
 import BrokerForm from "./BrokerForm";
 import InventoryForm from "./InventoryForm";
-import { getVendors } from "../../../../../api/bussinesspatnr";
+import {
+  getVendors,
+  addcustomer,
+  getCustomers,
+} from "../../../../../api/bussinesspatnr";
 const { Option } = Select;
 
 // helper to parse date strings into dayjs objects
@@ -127,10 +131,108 @@ export default function Business() {
       console.log("Fetch Vendors Error:", err);
     }
   };
+  // fetch customers function
+  const fetchCustomers = async () => {
+    try {
+      const res = await getCustomers();
+
+      // API may return array OR { results: [] }
+      const list = Array.isArray(res) ? res : res?.results || [];
+
+      const mappedCustomers = list.map((c, index) => ({
+        key: c.id || index + 1,
+        id: c.id,
+        partnerType: "Customer",
+
+        // table columns
+        name: c.name,
+        email: c.email_id,
+        phoneNo: c.phone_number,
+        status: "Active", // backend does not send status yet
+
+        // optional (for view/edit later)
+        address: `${c.address_line1 || ""} ${c.address_line2 || ""}`,
+        city: c.city,
+        state: c.state,
+        pinCode: c.pin,
+        billingType: c.billing_type,
+        customerCode: c.customer_code,
+      }));
+
+      setData(mappedCustomers);
+    } catch (error) {
+      console.error("Fetch Customers Error:", error);
+    }
+  };
+
+  const handleSubmit = async (values) => {
+    try {
+      if (activeForm !== "Customer") return;
+
+      const payload = {
+        customer_name: values.name,
+        business_name: values.branchName,
+        phone_number: values.phoneNo,
+        mobile_number: values.mobileNo,
+        email_address: values.email,
+        customer_type: values.type,
+        status: values.status,
+
+        address: values.address,
+        country: values.country,
+        state: values.state,
+        city: values.city,
+        pin_code: values.pinCode,
+        location: values.location,
+
+        credit_facility: values.creditFacility,
+        security_for_credit: values.securityForCreditFacility,
+        advance_cheque_no: values.advCheque,
+        amount_limit: Number(values.amountLimit),
+        days_limit: Number(values.noDaysLimit),
+        invoice_limit: Number(values.noInvoiceLimit),
+        souda_limit_ton: Number(values.soudaLimit),
+
+        gst_number: values.gstNo,
+        tin_number: values.tinNo,
+        pan_number: values.panNo,
+        aadhaar_number: values.aadharNo,
+        fssai_number: values.fssaiNo,
+        license_number: values.licenseNo,
+
+        tds_applicable: values.tdsApplicable === "Yes",
+        billing_type: values.billingType?.toUpperCase(),
+      };
+
+      const res = await addcustomer(payload);
+
+      setData((prev) => [
+        ...prev,
+        {
+          key: res?.id || prev.length + 1,
+          partnerType: "Customer",
+          name: payload.customer_name,
+          email: payload.email_address,
+          phoneNo: payload.phone_number,
+          status: payload.status,
+        },
+      ]);
+
+      setIsEditModalOpen(false);
+      setShowForm(false);
+      form.resetFields();
+    } catch (error) {
+      console.error("Add Customer Error:", error);
+    }
+  };
+
   useEffect(() => {
     if (activeForm === "Vendor") {
       fetchVendors();
       console.log("Fetching vendors data...");
+    }
+    if (activeForm === "Customer") {
+      fetchCustomers();
     }
   }, [activeForm]);
   useEffect(() => {
@@ -476,7 +578,11 @@ export default function Business() {
         )}
 
         {(showForm || selectedRecord || isViewModalOpen) && (
-          <>
+          <Form
+            form={isViewModalOpen ? viewForm : form}
+            layout="vertical"
+            onFinish={handleSubmit}
+          >
             {/* BACK BUTTON */}
             {showForm && !selectedRecord && !isViewModalOpen && (
               <div className="mb-4">
@@ -494,15 +600,30 @@ export default function Business() {
               </div>
             )}
 
-            <ActiveFormComponent
-              disabled={isViewModalOpen}
-              form={isViewModalOpen ? viewForm : form}
-              onSuccess={() => {
-                if (activeForm === "Vendor") fetchVendors();
-                setIsEditModalOpen(false);
-              }}
-            />
-          </>
+            <ActiveFormComponent disabled={isViewModalOpen} />
+            {!isViewModalOpen && (
+              <div className="flex justify-end gap-3 mt-6">
+                <Button
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setSelectedRecord(null);
+                    setShowForm(false);
+                    form.resetFields();
+                  }}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  className="bg-amber-500! hover:bg-amber-600!"
+                >
+                  Save
+                </Button>
+              </div>
+            )}
+          </Form>
         )}
       </Modal>
     </div>
