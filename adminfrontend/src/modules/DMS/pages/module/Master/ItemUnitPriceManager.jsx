@@ -30,6 +30,7 @@ import {
   getProducts,
   getProductUnitConversions,
   addProductUnitConversion,
+  getProductReferenceUnits,
 } from "../../../../../api/product";
 
 import useSessionStore from "../../../../../store/sessionStore";
@@ -791,18 +792,12 @@ function UnitConversionTab({
         setLoading(true);
 
         // 1️⃣ Reference units (BASE + UNITs)
-        const refRes = await api.get(
-          `${baseURL}/product/product-unit-conversions/reference-units/`,
-          {
-            params: {
-              organisation: currentOrgId,
-              product: selectedItem.id,
-            },
-          },
-        );
 
-        setBaseUnit(refRes.data.base_unit);
-        setReferenceUnits(refRes.data.units);
+        const data = await getProductReferenceUnits(selectedItem.id);
+        console.log(data);
+
+        setBaseUnit(data.base_unit);
+        setReferenceUnits(data.units);
 
         // 2️⃣ Existing unit conversions
         const conversions = await getProductUnitConversions();
@@ -834,31 +829,42 @@ function UnitConversionTab({
   };
 
   const itemUnits = selectedItem
-    ? unitConversions.filter((u) => u.itemId === selectedItem.id)
+    ? unitConversions.filter((u) => u.product === selectedItem.id)
     : [];
-  const tableData = unitConversions.map((u) => ({
-    id: u.id,
-    unitName: u.unit_name,
-    multiplier: u.multiplier,
-    baseUnitRef:
-      u.reference_type === "BASE"
-        ? baseUnit?.label
-        : referenceUnits.find((r) => r.id === u.reference_unit_id)?.label,
-    isDisplayUnit: u.set_as_display,
-  }));
+  const tableData = unitConversions.map((u) => {
+    // Find the reference unit label
+    let baseUnitRefLabel;
+    if (u.reference_type === "BASE") {
+      baseUnitRefLabel = baseUnit?.label?.toUpperCase();
+    } else {
+      baseUnitRefLabel = referenceUnits
+        .find((r) => r.id === u.reference_unit_id)
+        ?.label?.toUpperCase();
+    }
+
+    return {
+      id: u.id,
+      unitName: u.unit_name?.toUpperCase(),
+      multiplier: u.multiplier,
+      baseUnitRef: baseUnitRefLabel,
+      isDisplayUnit: u.set_as_display,
+      reference_type: u.reference_type,
+      reference_unit_id: u.reference_unit_id,
+    };
+  });
 
   // Calculate total multiplier to base unit
   const calculateToBaseUnit = (unit) => {
     let totalMultiplier = unit.multiplier;
-    let currentRef = unit.baseUnitRef;
+    // let currentRef = unit.baseUnitRef;
 
-    // Keep multiplying until we reach the base unit
-    while (currentRef !== selectedItem.baseUnit) {
-      const refUnit = itemUnits.find((u) => u.unitName === currentRef);
-      if (!refUnit) break;
-      totalMultiplier *= refUnit.multiplier;
-      currentRef = refUnit.baseUnitRef;
-    }
+    // // Keep multiplying until we reach the base unit
+    // while (currentRef !== selectedItem.baseUnit) {
+    //   const refUnit = itemUnits.find((u) => u.unitName === currentRef);
+    //   if (!refUnit) break;
+    //   totalMultiplier *= refUnit.multiplier;
+    //   currentRef = refUnit.baseUnitRef;
+    // }
 
     return totalMultiplier;
   };
@@ -919,7 +925,8 @@ function UnitConversionTab({
   const handleSetDisplayUnit = (unitId) => {
     setUnitConversions((prev) =>
       prev.map((u) =>
-        u.itemId === selectedItem.id
+        // u.itemId === selectedItem.id
+        u.product === selectedItem.id
           ? { ...u, isDisplayUnit: u.id === unitId }
           : u,
       ),

@@ -46,3 +46,20 @@ export const getProductUnitConversions = async () => {
       const res = await api.post('/product/product-unit-conversion/', payload, {params: {organisation: currentOrgId}});
       return res.data;
   }    
+
+  // product unit conversion reference units
+export const getProductReferenceUnits = async (productId) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get(
+    '/product/product-unit-conversions/reference-units/',
+    {
+      params: {
+        organisation: currentOrgId,
+        product: productId,
+      },
+    }
+  );
+
+  return res.data;
+};
