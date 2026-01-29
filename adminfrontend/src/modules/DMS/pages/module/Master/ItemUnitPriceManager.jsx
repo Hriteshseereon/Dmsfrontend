@@ -31,8 +31,9 @@ import {
   getProductUnitConversions,
   addProductUnitConversion,
 } from "../../../../../api/product";
-const { Option } = Select;
 
+import useSessionStore from "../../../../../store/sessionStore";
+const { Option } = Select;
 // ==================== DUMMY DATA ====================
 const HSN_CODES = [
   { code: "15159010", description: "Mustard Oil" },
@@ -203,6 +204,43 @@ export default function ItemUnitPriceManager() {
   );
   const [prices, setPrices] = useState(INITIAL_PRICES);
   const [selectedItem, setSelectedItem] = useState(null);
+  const normalizeProduct = (p) => ({
+    ...p, // keep EVERYTHING from backend
+
+    // UI-friendly aliases
+    itemName: p.name,
+    baseUnit: p.base_unit?.toUpperCase(),
+    itemType: p.product_type,
+    companyName: p.vendor_name,
+    groupName: p.product_group_name,
+    gstPercent: p.gst_percentage,
+    currentStock: p.current_stock,
+  });
+  const loadProducts = async () => {
+    try {
+      const data = await getProducts();
+      setItems(data.map(normalizeProduct));
+    } catch {
+      message.error("Failed to load products");
+    }
+  };
+
+  // useEffect(() => {
+  //   const loadProducts = async () => {
+  //     try {
+  //       const data = await getProducts();
+  //       console.log("Loaded products:", data);
+  //       setItems(data);
+  //     } catch {
+  //       message.error("Failed to load products");
+  //     }
+  //   };
+
+  //   loadProducts();
+  // }, []);
+  useEffect(() => {
+    loadProducts();
+  }, []);
 
   return (
     <div style={{ padding: 24, background: "#f0f2f5", minHeight: "100vh" }}>
@@ -361,19 +399,6 @@ function ItemMasterTab({ items, setItems, setSelectedItem }) {
       setLoading(false);
     }
   };
-  useEffect(() => {
-    const loadProducts = async () => {
-      try {
-        const data = await getProducts();
-        console.log("Loaded products:", data);
-        setItems(data);
-      } catch {
-        message.error("Failed to load products");
-      }
-    };
-
-    loadProducts();
-  }, []);
 
   const columns = [
     {
@@ -751,10 +776,76 @@ function UnitConversionTab({
   const [open, setOpen] = useState(false);
   const [editUnit, setEditUnit] = useState(null);
   const [formData, setFormData] = useState({});
+  const [referenceUnits, setReferenceUnits] = useState([]);
+  const [baseUnit, setBaseUnit] = useState(null);
+  // const [unitConversions, setUnitConversions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const currentOrgId = useSessionStore.getState();
+  const baseURL = import.meta.env.VITE_API_URL;
+
+  useEffect(() => {
+    if (!selectedItem?.id) return;
+
+    const loadUnits = async () => {
+      try {
+        setLoading(true);
+
+        // 1️⃣ Reference units (BASE + UNITs)
+        const refRes = await api.get(
+          `${baseURL}/product/product-unit-conversions/reference-units/`,
+          {
+            params: {
+              organisation: currentOrgId,
+              product: selectedItem.id,
+            },
+          },
+        );
+
+        setBaseUnit(refRes.data.base_unit);
+        setReferenceUnits(refRes.data.units);
+
+        // 2️⃣ Existing unit conversions
+        const conversions = await getProductUnitConversions();
+        setUnitConversions(
+          conversions.filter((u) => u.product === selectedItem.id),
+        );
+      } catch (err) {
+        message.error("Failed to load unit data");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUnits();
+  }, [selectedItem]);
+
+  const buildUnitPayload = () => {
+    const isBase = formData.reference === "BASE";
+
+    return {
+      product: selectedItem.id,
+      unit_name: formData.unitName,
+      multiplier: Number(formData.multiplier),
+      set_as_display: false,
+
+      reference_type: isBase ? "BASE" : "UNIT",
+      reference_unit_id: isBase ? null : formData.reference,
+    };
+  };
 
   const itemUnits = selectedItem
     ? unitConversions.filter((u) => u.itemId === selectedItem.id)
     : [];
+  const tableData = unitConversions.map((u) => ({
+    id: u.id,
+    unitName: u.unit_name,
+    multiplier: u.multiplier,
+    baseUnitRef:
+      u.reference_type === "BASE"
+        ? baseUnit?.label
+        : referenceUnits.find((r) => r.id === u.reference_unit_id)?.label,
+    isDisplayUnit: u.set_as_display,
+  }));
 
   // Calculate total multiplier to base unit
   const calculateToBaseUnit = (unit) => {
@@ -783,36 +874,31 @@ function UnitConversionTab({
     return units;
   };
 
-  const handleSave = () => {
-    if (!formData.unitName || !formData.multiplier || !formData.baseUnitRef) {
-      message.error("Please fill all fields");
+  const handleSave = async () => {
+    if (!formData.unitName || !formData.multiplier || !formData.reference) {
+      message.error("Please fill all required fields");
       return;
     }
 
-    // Check for circular reference
-    if (formData.baseUnitRef === formData.unitName) {
-      message.error("Unit cannot reference itself!");
-      return;
-    }
+    try {
+      setLoading(true);
 
-    if (editUnit) {
-      setUnitConversions((prev) =>
-        prev.map((u) => (u.id === editUnit.id ? { ...u, ...formData } : u)),
-      );
-      message.success("Unit updated!");
-    } else {
-      const newUnit = {
-        ...formData,
-        id: Date.now(),
-        itemId: selectedItem.id,
-        isDisplayUnit: false,
-      };
-      setUnitConversions((prev) => [...prev, newUnit]);
-      message.success("Unit added!");
+      const payload = buildUnitPayload();
+      await addProductUnitConversion(payload);
+
+      message.success("Unit added successfully");
+
+      // 🔁 Refresh units after add
+      const updated = await getProductUnitConversions();
+      setUnitConversions(updated.filter((u) => u.product === selectedItem.id));
+
+      setOpen(false);
+      setFormData({});
+    } catch (err) {
+      message.error("Failed to add unit");
+    } finally {
+      setLoading(false);
     }
-    setOpen(false);
-    setEditUnit(null);
-    setFormData({});
   };
 
   const handleDelete = (id) => {
@@ -907,7 +993,7 @@ function UnitConversionTab({
     return (
       <Card>
         <Empty description="Select an item below">
-          <Select
+          {/* <Select
             showSearch
             style={{ width: 400 }}
             placeholder="Search and select an item"
@@ -922,7 +1008,22 @@ function UnitConversionTab({
                 {item.itemName} ({item.baseUnit})
               </Option>
             ))}
-          </Select>
+          </Select> */}
+          <Select
+            showSearch
+            style={{ width: 400 }}
+            placeholder="Search and Select an item"
+            optionFilterProp="label"
+            value={selectedItem?.id}
+            onChange={(value) => {
+              const item = items.find((i) => i.id === value);
+              setSelectedItem(item);
+            }}
+            options={items.map((item) => ({
+              value: item.id,
+              label: `${item.itemName} (${item.baseUnit})`,
+            }))}
+          />
         </Empty>
       </Card>
     );
@@ -961,7 +1062,7 @@ function UnitConversionTab({
               type="primary"
               icon={<PlusOutlined />}
               onClick={() => {
-                setFormData({ baseUnitRef: selectedItem.baseUnit });
+                setFormData({ reference: "BASE" }); // Set a default reference
                 setOpen(true);
               }}
               className="bg-amber-500! hover:bg-amber-600! border-none! "
@@ -996,7 +1097,7 @@ function UnitConversionTab({
           "
           rowKey="id"
           columns={columns}
-          dataSource={itemUnits}
+          dataSource={tableData}
           pagination={false}
         />
       </Card>
@@ -1038,7 +1139,7 @@ function UnitConversionTab({
             />
           </FormField>
 
-          <FormField label="Reference Unit" required>
+          {/* <FormField label="Reference Unit" required>
             <Select
               placeholder="Select reference unit"
               style={{ width: "100%" }}
@@ -1050,6 +1151,25 @@ function UnitConversionTab({
               {getAvailableUnits().map((unit) => (
                 <Option key={unit.name} value={unit.name}>
                   {unit.name} {unit.isBase && "(Base Unit)"}
+                </Option>
+              ))}
+            </Select>
+          </FormField> */}
+          <FormField label="Reference Unit" required>
+            <Select
+              placeholder="Select reference unit"
+              value={formData.reference}
+              onChange={(value) =>
+                setFormData({ ...formData, reference: value })
+              }
+            >
+              <Option value="BASE">
+                {baseUnit?.label?.toUpperCase()} (Base Unit)
+              </Option>
+
+              {referenceUnits.map((u) => (
+                <Option key={u.id} value={u.id}>
+                  {u.label}
                 </Option>
               ))}
             </Select>

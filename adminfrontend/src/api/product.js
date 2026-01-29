@@ -39,10 +39,10 @@ export const getVendors = async () => {
 export const getProductUnitConversions = async () => {
     const { currentOrgId } = useSessionStore.getState();
     const res = await api.get('/product/product-unit-conversion/', {params: {organisation: currentOrgId}});
-    return res.data;
-}
-export const addProductUnitConversion = async ( payload) => {
-    const { currentOrgId } = useSessionStore.getState();
-    const res = await api.post('/product/product-unit-conversion/', payload, {params: {organisation: currentOrgId}});
-    return res.data;
-}
+      return res.data;
+  }
+  export const addProductUnitConversion = async ( payload) => {
+      const { currentOrgId } = useSessionStore.getState();
+      const res = await api.post('/product/product-unit-conversion/', payload, {params: {organisation: currentOrgId}});
+      return res.data;
+  }    
