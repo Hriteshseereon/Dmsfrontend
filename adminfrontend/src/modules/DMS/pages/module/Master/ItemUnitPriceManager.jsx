@@ -800,7 +800,7 @@ function UnitConversionTab({
         setReferenceUnits(data.units);
 
         // 2️⃣ Existing unit conversions
-        const conversions = await getProductUnitConversions();
+        const conversions = await getProductUnitConversions(selectedItem.id);
         setUnitConversions(
           conversions.filter((u) => u.product === selectedItem.id),
         );
@@ -895,7 +895,7 @@ function UnitConversionTab({
       message.success("Unit added successfully");
 
       // 🔁 Refresh units after add
-      const updated = await getProductUnitConversions();
+      const updated = await getProductUnitConversions(selectedItem.id);
       setUnitConversions(updated.filter((u) => u.product === selectedItem.id));
 
       setOpen(false);
