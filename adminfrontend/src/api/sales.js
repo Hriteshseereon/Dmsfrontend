@@ -14,8 +14,8 @@ export const getSalesGroups = async () => {
 // }  
 export const createsalesContract = async (payload) => {
   const currentOrgId = useSessionStore.getState();
-  const res = await api.post(`/sales/contracts/`, payload, {
-    params: { organization: currentOrgId.currentOrgId }
+  const res = await api.post(`/sales/contracts/`, payload, {   
+    params: { organisation: currentOrgId.currentOrgId }
   });
   return res.data;
 }  
@@ -28,7 +28,7 @@ export const getproductbyVendor = async (vendorId) => {
 }
 export const getCustomers = async () => {
     const { currentOrgId } = useSessionStore.getState();
-  const res = await api.get("/customers/", {params: {organisation: currentOrgId}});
+  const res = await api.get("/sales/orders/customers/", {params: {organisation: currentOrgId}});
   return res.data;
 }
 export const getVendors = async () => {

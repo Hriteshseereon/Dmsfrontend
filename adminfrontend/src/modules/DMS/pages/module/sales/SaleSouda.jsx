@@ -1,5 +1,6 @@
 // SalesSouda.jsx
 import React, { useState, useEffect, useMemo } from "react";
+import useSessionStore from "../../../../../store/sessionStore";
 import {
   Table,
   Input,
@@ -222,6 +223,7 @@ export default function SalesSouda() {
 
   const [searchText, setSearchText] = useState("");
   const [data, setData] = useState(salesSoudaJSONModified2.initialData);
+  const { currentOrgId } = useSessionStore.getState();
   // get the all customer data
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -239,21 +241,21 @@ export default function SalesSouda() {
   }, []);
 
   // get all product by vendor id
-  useEffect(() => {
-    if (!selectedVendorId) return;
+  // useEffect(() => {
+  //   if (!selectedVendorId) return;
 
-    const fetchVendorProducts = async () => {
-      try {
-        const res = await getproductbyVendor(selectedVendorId);
-        // assume res = [{ id, name, code }]
-        setVendorItems(res || []);
-      } catch (err) {
-        console.error("Failed to fetch vendor products", err);
-      }
-    };
+  //   const fetchVendorProducts = async () => {
+  //     try {
+  //       const res = await getproductbyVendor(selectedVendorId);
+  //       // assume res = [{ id, name, code }]
+  //       setVendorItems(res || []);
+  //     } catch (err) {
+  //       console.error("Failed to fetch vendor products", err);
+  //     }
+  //   };
 
-    fetchVendorProducts();
-  }, [selectedVendorId]);
+  //   fetchVendorProducts();
+  // }, [selectedVendorId]);
 
   // get all vendors
   useEffect(() => {
@@ -273,7 +275,36 @@ export default function SalesSouda() {
 
   // payload for create sales contract
   const buildCreateContractPayload = (values) => {
+    // First, build items to calculate taxable amount
+    const items = (values.items || []).map((it) => {
+      const netQty = Number(it.qty || 0);
+      const freeQty = Number(it.freeQty || 0);
+      const grossQty = netQty + freeQty;
+      const mrp = Number(it.rate || 0);
+      const discountPercent = Number(it.discountPercent || 0);
+      const grossAmount = netQty * mrp;
+      const discountAmount = (grossAmount * discountPercent) / 100;
+
+      return {
+        vendor_id: it.vendorId,
+        product_id: it.item,
+        uom: it.uom ? it.uom.toLowerCase() : null,
+        net_qty: netQty,
+        gross_qty: grossQty,
+        free_qty: freeQty,
+        mrp,
+        discount_percent: discountPercent,
+        discount_amount: Number(discountAmount.toFixed(2)), // ✅ Round to 2 decimals
+        line_total: Number((grossAmount - discountAmount).toFixed(2)), // ✅ Round to 2 decimals
+      };
+    });
+
+    // Calculate taxable amount from items
+
+    // Calculate tax amounts and round to 2 decimal places
+
     return {
+      organisation: currentOrgId,
       customer_id: values.customerId,
       from_date: values.startDate
         ? dayjs(values.startDate).format("YYYY-MM-DD")
@@ -284,35 +315,16 @@ export default function SalesSouda() {
       customer_mobile: values.customerMobile || "",
       customer_email: values.customerEmail || "",
       narration: "Admin created contract",
-      cgst: String(values.orderTaxAndTotals?.cgstPercent || "0"),
-      sgst: String(values.orderTaxAndTotals?.sgstPercent || "0"),
-      igst: String(values.orderTaxAndTotals?.igstPercent || "0"),
-      tcs_amount: String(values.orderTaxAndTotals?.tcsAmt || "0"),
-      cash_discount: "0",
-      round_off_amount: "0",
-      items: (values.items || []).map((it) => {
-        const netQty = Number(it.qty || 0);
-        const freeQty = Number(it.freeQty || 0);
-        const grossQty = netQty + freeQty;
-        const mrp = Number(it.rate || 0);
-        const discountPercent = Number(it.discountPercent || 0);
-        const grossAmount = netQty * mrp;
-        const discountAmount = (grossAmount * discountPercent) / 100;
-        const lineTotal = grossAmount - discountAmount;
 
-        return {
-          vendor_id: it.vendorId,
-          product_id: it.item, // productId
-          uom: it.uom || null,
-          net_qty: String(netQty),
-          gross_qty: String(grossQty),
-          free_qty: String(freeQty),
-          mrp: String(mrp),
-          discount_percent: String(discountPercent),
-          discount_amount: String(discountAmount),
-          line_total: String(lineTotal),
-        };
-      }),
+      sgst: Number(values.orderTaxAndTotals?.sgstPercent || 0),
+      cgst: Number(values.orderTaxAndTotals?.cgstPercent || 0),
+      igst: Number(values.orderTaxAndTotals?.igstPercent || 0),
+
+      tcs_amount: Number(values.orderTaxAndTotals?.tcsAmt || 0),
+      cash_discount: 0,
+      round_off_amount: 0,
+
+      items,
     };
   };
 
@@ -818,21 +830,25 @@ export default function SalesSouda() {
     try {
       const payload = buildCreateContractPayload(values);
 
-      console.log("CREATE SALES CONTRACT PAYLOAD:", payload);
+      // 🔍 Debug logging
+      console.log("=== PAYLOAD DEBUG ===");
+      console.log("Tax values:", {
+        cgst: payload.cgst,
+        sgst: payload.sgst,
+        igst: payload.igst,
+      });
+      console.log("Full payload:", JSON.stringify(payload, null, 2));
 
       await createsalesContract(payload);
 
-      // Optional: optimistic UI update (or refetch list)
       setIsAddModalOpen(false);
       addForm.resetFields();
-
-      // OPTIONAL: reload list from backend instead
-      // fetchSalesContracts();
     } catch (error) {
       console.error("Failed to create sales contract", error);
+      // 🔍 Log the error response
+      console.error("Error response:", error.response?.data);
     }
   };
-
   const handleEditFinish = (values) => {
     const computed = computeFromFormValues(values);
     const payload = {
@@ -1013,7 +1029,7 @@ export default function SalesSouda() {
                 rules={[{ required: true }]}
                 initialValue={dayjs()}
               >
-                <DatePicker className="w-full" />
+                <DatePicker className="w-full" disabled />
               </Form.Item>
             </Col>
 
@@ -1061,7 +1077,11 @@ export default function SalesSouda() {
                   }}
                 >
                   {customers.map((c) => (
-                    <Select.Option key={c.id} value={c.id} label={c.name}>
+                    <Select.Option
+                      key={c.id}
+                      value={c.customer_id}
+                      label={c.name}
+                    >
                       {c.name}
                     </Select.Option>
                   ))}
@@ -1077,7 +1097,14 @@ export default function SalesSouda() {
                 <Input placeholder="Customer Email" />
               </Form.Item>
             </Col>
-
+            <Col span={6}>
+              <Form.Item
+                label={<span className="text-amber-700">Customer Mobile</span>}
+                name="customerMobile"
+              >
+                <Input placeholder="Customer Mobile" />
+              </Form.Item>
+            </Col>
             <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">Status</span>}
@@ -1094,7 +1121,7 @@ export default function SalesSouda() {
               </Form.Item>
             </Col>
 
-            <Col span={6}>
+            {/* <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">Location</span>}
                 name="location"
@@ -1107,7 +1134,7 @@ export default function SalesSouda() {
                   ))}
                 </Select>
               </Form.Item>
-            </Col>
+            </Col> */}
 
             <Col span={6}>
               <Form.Item
