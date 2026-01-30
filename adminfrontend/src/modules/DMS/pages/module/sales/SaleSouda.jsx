@@ -214,7 +214,7 @@ export default function SalesSouda() {
   const [customers, setCustomers] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [selectedVendorId, setSelectedVendorId] = useState(null);
-  const [vendorItems, setVendorItems] = useState([]);
+  // const [vendorItems, setVendorItems] = useState([]);
   const [vendorProductsMap, setVendorProductsMap] = useState({});
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
@@ -270,6 +270,51 @@ export default function SalesSouda() {
 
     fetchVendors();
   }, []);
+
+  // payload for create sales contract
+  const buildCreateContractPayload = (values) => {
+    return {
+      customer_id: values.customerId,
+      from_date: values.startDate
+        ? dayjs(values.startDate).format("YYYY-MM-DD")
+        : null,
+      to_date: values.endDate
+        ? dayjs(values.endDate).format("YYYY-MM-DD")
+        : null,
+      customer_mobile: values.customerMobile || "",
+      customer_email: values.customerEmail || "",
+      narration: "Admin created contract",
+      cgst: String(values.orderTaxAndTotals?.cgstPercent || "0"),
+      sgst: String(values.orderTaxAndTotals?.sgstPercent || "0"),
+      igst: String(values.orderTaxAndTotals?.igstPercent || "0"),
+      tcs_amount: String(values.orderTaxAndTotals?.tcsAmt || "0"),
+      cash_discount: "0",
+      round_off_amount: "0",
+      items: (values.items || []).map((it) => {
+        const netQty = Number(it.qty || 0);
+        const freeQty = Number(it.freeQty || 0);
+        const grossQty = netQty + freeQty;
+        const mrp = Number(it.rate || 0);
+        const discountPercent = Number(it.discountPercent || 0);
+        const grossAmount = netQty * mrp;
+        const discountAmount = (grossAmount * discountPercent) / 100;
+        const lineTotal = grossAmount - discountAmount;
+
+        return {
+          vendor_id: it.vendorId,
+          product_id: it.item, // productId
+          uom: it.uom || null,
+          net_qty: String(netQty),
+          gross_qty: String(grossQty),
+          free_qty: String(freeQty),
+          mrp: String(mrp),
+          discount_percent: String(discountPercent),
+          discount_amount: String(discountAmount),
+          line_total: String(lineTotal),
+        };
+      }),
+    };
+  };
 
   // derive company options (from seed and existing data)
   const companyOptions = useMemo(() => {
@@ -769,27 +814,23 @@ export default function SalesSouda() {
   };
 
   // Add / Edit submit handlers - ensure startDate/endDate are saved (company moved into items)
-  const handleAddFinish = (values) => {
-    const computed = computeFromFormValues(values);
-    const payload = {
-      ...values,
-      items: computed.items,
-      orderTaxAndTotals: computed.orderTaxAndTotals,
-      orderTotals: computed.orderTotals,
-      key: data.length + 1,
-      soudaDate: values.soudaDate
-        ? dayjs(values.soudaDate).format("YYYY-MM-DD")
-        : undefined,
-      startDate: values.startDate
-        ? dayjs(values.startDate).format("YYYY-MM-DD")
-        : undefined,
-      endDate: values.endDate
-        ? dayjs(values.endDate).format("YYYY-MM-DD")
-        : undefined,
-    };
-    setData((prev) => [...prev, payload]);
-    setIsAddModalOpen(false);
-    addForm.resetFields();
+  const handleAddFinish = async (values) => {
+    try {
+      const payload = buildCreateContractPayload(values);
+
+      console.log("CREATE SALES CONTRACT PAYLOAD:", payload);
+
+      await createsalesContract(payload);
+
+      // Optional: optimistic UI update (or refetch list)
+      setIsAddModalOpen(false);
+      addForm.resetFields();
+
+      // OPTIONAL: reload list from backend instead
+      // fetchSalesContracts();
+    } catch (error) {
+      console.error("Failed to create sales contract", error);
+    }
   };
 
   const handleEditFinish = (values) => {
