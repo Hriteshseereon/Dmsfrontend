@@ -30,11 +30,16 @@ export const addproduct = async (payload) => {
 
 export const getProducts = async () => {
   const { currentOrgId } = useSessionStore.getState();
+
   const res = await api.get("/product/products/", {
     params: { organisation: currentOrgId },
   });
-  return res.data;
+
+  return Array.isArray(res.data)
+    ? res.data
+    : res.data?.results || [];
 };
+
 export const getVendors = async () => {
   const { currentOrgId } = useSessionStore.getState();
   const res = await api.get("/vendors/vendors/", {
@@ -45,11 +50,20 @@ export const getVendors = async () => {
 // product unit conversion api
 export const getProductUnitConversions = async (productId) => {
   const { currentOrgId } = useSessionStore.getState();
+
   const res = await api.get("/product/product-unit-conversions/", {
-    params: { organisation: currentOrgId, product: productId },
+    params: {
+      organisation: currentOrgId,
+      product: productId,
+    },
   });
-  return res.data;
+
+  // ✅ ALWAYS return an array
+  return Array.isArray(res.data)
+    ? res.data
+    : res.data?.results || [];
 };
+
 export const addProductUnitConversion = async (payload) => {
   const { currentOrgId } = useSessionStore.getState();
   const res = await api.post("/product/product-unit-conversions/", payload, {
