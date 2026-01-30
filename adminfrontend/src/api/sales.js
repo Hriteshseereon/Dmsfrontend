@@ -1,8 +1,9 @@
 import api from './axios';
 import useSessionStore from '../store/sessionStore';
 // section work on sales group
-export const getSalesGroups = async () => {
-  const res = await api.get(`/sales/contracts/`);
+export const getSalescontractGroups = async () => {
+  const currentOrgId = useSessionStore.getState();
+  const res = await api.get(`/sales/contracts/`, { params: { organisation: currentOrgId.currentOrgId } });
   return res.data;
 }
 // export const createSalesGroup = async (data) => {

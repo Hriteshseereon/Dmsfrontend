@@ -29,165 +29,10 @@ import {
   createsalesContract,
   getproductbyVendor,
   getVendors,
+  getSalescontractGroups,
 } from "../../../../../api/sales";
 /** trimmed/embedded seed data (same as you provided) */
 const salesSoudaJSONModified2 = {
-  initialData: [
-    {
-      key: 1,
-      soudaDate: "2025-10-01",
-      deliveryDate: "2025-10-05",
-      startDate: "2025-09-01",
-      endDate: "2025-10-31",
-      companyName: "ABC Oils Ltd",
-      customer: "Bhubaneswar Market",
-      customerEmail: "contact@bhubaneswarmarket.com",
-      saleType: "Local",
-      billType: "Tax Invoice",
-      billMode: "Credit",
-      transporter: "Blue Transport",
-      location: "Warehouse A",
-      depoName: "Depo A",
-      brokerName: "Broker 1",
-      type: "Retail",
-      status: "Approved",
-      items: [
-        {
-          lineKey: 1,
-          companyName: "ABC Oils Ltd",
-          item: "Mustard Oil",
-          itemCode: "MUS001",
-          uom: "Ltrs",
-          qty: 2000,
-          freeQty: 100,
-          totalQty: 2100,
-          rate: 125,
-          discountPercent: 5,
-          discountAmt: 100000,
-          grossWt: 2100,
-          totalGrossWt: 2100,
-          grossAmount: 262500,
-        },
-        {
-          lineKey: 2,
-          companyName: "RUCHI SOYA INDUSTRIES LIMITED",
-          item: "Sunflower Oil",
-          itemCode: "SUN001",
-          uom: "Ltrs",
-          qty: 500,
-          freeQty: 0,
-          totalQty: 500,
-          rate: 95,
-          discountPercent: 2,
-          discountAmt: 9500,
-          grossWt: 500,
-          totalGrossWt: 500,
-          grossAmount: 47500,
-        },
-      ],
-      orderTaxAndTotals: {
-        grossAmountTotal: 310000,
-        discountTotal: 109500,
-        taxableAmount: 200500,
-        sgstPercent: 5,
-        cgstPercent: 5,
-        igstPercent: 0,
-        sgst: 10025,
-        cgst: 10025,
-        igst: 0,
-        totalGST: 20050,
-        tcsAmt: 500,
-        grandTotal: 221050,
-      },
-      orderTotals: {
-        qtyTotal: 2500,
-        freeQtyTotal: 100,
-        totalQty: 2600,
-      },
-    },
-    {
-      key: 2,
-      soudaDate: "2025-11-15",
-      deliveryDate: "2025-11-20",
-      startDate: "2025-11-01",
-      endDate: "2025-11-30",
-      companyName: "ABC Oils Ltd",
-      customer: "Cuttack Supermarket",
-      customerEmail: "sales@cuttacksupermarket.com",
-      saleType: "Interstate",
-      billType: "Retail Invoice",
-      billMode: "Cash",
-      transporter: "Green Express",
-      location: "Warehouse B",
-      depoName: "Depo B",
-      brokerName: "Broker 2",
-      type: "Wholesale",
-      status: "Pending",
-      items: [
-        {
-          lineKey: 1,
-          companyName: "Another Company",
-          item: "Coconut Oil",
-          itemCode: "COC001",
-          uom: "Kg",
-          qty: 1000,
-          freeQty: 50,
-          totalQty: 1050,
-          rate: 150,
-          discountPercent: 3,
-          discountAmt: 4500,
-          grossWt: 1050,
-          totalGrossWt: 1050,
-          grossAmount: 150000,
-        },
-        {
-          lineKey: 2,
-          companyName: "ABC Oils Ltd",
-          item: "Mustard Oil",
-          itemCode: "MUS001",
-          uom: "Kg",
-          qty: 200,
-          freeQty: 0,
-          totalQty: 200,
-          rate: 130,
-          discountPercent: 0,
-          discountAmt: 0,
-          grossWt: 200,
-          totalGrossWt: 200,
-          grossAmount: 26000,
-        },
-      ],
-      orderTaxAndTotals: {
-        grossAmountTotal: 176000,
-        discountTotal: 4500,
-        taxableAmount: 171500,
-        sgstPercent: 0,
-        cgstPercent: 0,
-        igstPercent: 12,
-        sgst: 0,
-        cgst: 0,
-        igst: 20580,
-        totalGST: 20580,
-        tcsAmt: 0,
-        grandTotal: 192080,
-      },
-      orderTotals: {
-        qtyTotal: 1200,
-        freeQtyTotal: 50,
-        totalQty: 1250,
-      },
-    },
-  ],
-
-  itemOptions: [
-    { name: "Mustard Oil", code: "MUS001" },
-    { name: "Sunflower Oil", code: "SUN001" },
-    { name: "Coconut Oil", code: "COC001" },
-    { name: "Groundnut Oil", code: "GND001" },
-  ],
-
-  uomOptions: ["Ltrs", "Kg", "Bottles"],
-
   statusOptions: ["Approved", "Pending", "Rejected"],
 
   typeOptions: ["Retail", "Wholesale"],
@@ -195,10 +40,6 @@ const salesSoudaJSONModified2 = {
   locationOptions: ["Warehouse A", "Warehouse B", "Warehouse C"],
 
   depoOptions: ["Depo A", "Depo B", "Depo C"],
-
-  brokerOptions: ["Broker 1", "Broker 2", "Broker 3"],
-
-  saleTypeOptions: ["Local", "Interstate"],
 
   billTypeOptions: ["Tax Invoice", "Retail Invoice"],
 
@@ -220,7 +61,7 @@ export default function SalesSouda() {
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
-
+  const [allSalesGroups, setAllSalesGroups] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [data, setData] = useState(salesSoudaJSONModified2.initialData);
   const { currentOrgId } = useSessionStore.getState();
@@ -241,21 +82,21 @@ export default function SalesSouda() {
   }, []);
 
   // get all product by vendor id
-  // useEffect(() => {
-  //   if (!selectedVendorId) return;
+  useEffect(() => {
+    if (!selectedVendorId) return;
 
-  //   const fetchVendorProducts = async () => {
-  //     try {
-  //       const res = await getproductbyVendor(selectedVendorId);
-  //       // assume res = [{ id, name, code }]
-  //       setVendorItems(res || []);
-  //     } catch (err) {
-  //       console.error("Failed to fetch vendor products", err);
-  //     }
-  //   };
+    const fetchVendorProducts = async () => {
+      try {
+        const res = await getproductbyVendor(selectedVendorId);
+        // assume res = [{ id, name, code }]
+        setVendorItems(res || []);
+      } catch (err) {
+        console.error("Failed to fetch vendor products", err);
+      }
+    };
 
-  //   fetchVendorProducts();
-  // }, [selectedVendorId]);
+    fetchVendorProducts();
+  }, [selectedVendorId]);
 
   // get all vendors
   useEffect(() => {
@@ -271,6 +112,34 @@ export default function SalesSouda() {
     };
 
     fetchVendors();
+  }, []);
+  // fetch all sales contract groups
+  // Add this useEffect to fetch existing contracts on mount
+  useEffect(() => {
+    const fetchSalesContracts = async () => {
+      try {
+        const res = await getSalescontractGroups(); // or whatever API fetches all contracts
+        console.log("Fetched sales contracts:", res);
+
+        // Map the API response to table format
+        const mappedData = (res || []).map((contract) => ({
+          key: contract.sale_contract_id,
+          saleContractNumber: contract.sale_contract_number,
+          customer: contract.customer_name,
+          startDate: contract.from_date,
+          endDate: contract.to_date,
+          status: contract.status,
+          items: contract.items,
+          grandTotal: contract.grand_total,
+        }));
+
+        setData(mappedData);
+      } catch (err) {
+        console.error("Failed to fetch sales contracts", err);
+      }
+    };
+
+    fetchSalesContracts();
   }, []);
 
   // payload for create sales contract
@@ -329,35 +198,35 @@ export default function SalesSouda() {
   };
 
   // derive company options (from seed and existing data)
-  const companyOptions = useMemo(() => {
-    const fromData = Array.from(
-      new Set(
-        data
-          .flatMap((d) => (d.items || []).map((it) => it.companyName))
-          .filter(Boolean),
-      ),
-    );
-    const topLevel = Array.from(
-      new Set(data.map((d) => d.companyName).filter(Boolean)),
-    );
-    return Array.from(
-      new Set([
-        ...fromData,
-        ...topLevel,
-        "ABC Oils Ltd",
-        "RUCHI SOYA INDUSTRIES LIMITED",
-      ]),
-    );
-  }, [data]);
+  // const companyOptions = useMemo(() => {
+  //   const fromData = Array.from(
+  //     new Set(
+  //       data
+  //         .flatMap((d) => (d.items || []).map((it) => it.companyName))
+  //         .filter(Boolean),
+  //     ),
+  //   );
+  //   const topLevel = Array.from(
+  //     new Set(data.map((d) => d.companyName).filter(Boolean)),
+  //   );
+  //   return Array.from(
+  //     new Set([
+  //       ...fromData,
+  //       ...topLevel,
+  //       "ABC Oils Ltd",
+  //       "RUCHI SOYA INDUSTRIES LIMITED",
+  //     ]),
+  //   );
+  // }, [data]);
 
-  const filteredData = data.filter((d) =>
-    ["customer", "status"].some((field) =>
-      (d[field] || "")
-        .toString()
-        .toLowerCase()
-        .includes(searchText.toLowerCase()),
-    ),
-  );
+  // const filteredData = data.filter((d) =>
+  //   ["customer", "status"].some((field) =>
+  //     (d[field] || "")
+  //       .toString()
+  //       .toLowerCase()
+  //       .includes(searchText.toLowerCase()),
+  //   ),
+  // );
 
   // compute per-item + order totals
   const computeFromFormValues = (values) => {
@@ -435,121 +304,154 @@ export default function SalesSouda() {
     };
   };
 
+  // Add these functions before the return statement
+  const mapApiRecordToForm = (record) => {
+    return {
+      saleContractNumber: record.saleContractNumber,
+      customer: record.customer,
+      status: record.status,
+
+      soudaDate: record.created_at ? dayjs(record.created_at) : undefined,
+      startDate: record.startDate ? dayjs(record.startDate) : undefined,
+      endDate: record.endDate ? dayjs(record.endDate) : undefined,
+
+      items: (record.items || []).map((it, idx) => ({
+        lineKey: it.id || idx + 1,
+
+        vendorId: it.vendor_id,
+        vendorName: it.vendor_name,
+
+        item: it.product_id,
+        itemName: it.product_name,
+
+        uom: it.uom?.unit_name || "",
+        qty: Number(it.net_qty),
+        freeQty: Number(it.free_qty),
+        totalQty: Number(it.gross_qty),
+
+        rate: Number(it.mrp),
+        discountPercent: Number(it.discount_percent),
+        discountAmt: Number(it.discount_amount),
+
+        grossAmount: Number(it.line_total),
+        grossWt: 0,
+        totalGrossWt: 0,
+      })),
+
+      orderTaxAndTotals: {
+        sgstPercent: Number(record.sgst),
+        cgstPercent: Number(record.cgst),
+        igstPercent: Number(record.igst),
+        tcsAmt: Number(record.tcs_amount),
+
+        grossAmountTotal: Number(record.total_amount),
+        discountTotal: Number(
+          (record.items || []).reduce(
+            (s, i) => s + Number(i.discount_amount || 0),
+            0,
+          ),
+        ),
+        totalGST:
+          Number(record.sgst) + Number(record.cgst) + Number(record.igst),
+
+        grandTotal: Number(record.grand_total),
+      },
+    };
+  };
+
+  const openView = (record) => {
+    const mapped = mapApiRecordToForm(record);
+
+    setSelectedRecord(record);
+    viewForm.setFieldsValue(mapped);
+    setIsViewModalOpen(true);
+  };
+
+  const openEdit = (record) => {
+    const mapped = mapApiRecordToForm(record);
+
+    setSelectedRecord(record);
+    editForm.setFieldsValue(mapped);
+    setIsEditModalOpen(true);
+  };
+
   // table columns: replace deliveryDate / company with startDate / endDate
   const columns = [
+    // 🆕 Contract Number
     {
-      title: <span className="text-amber-700 font-semibold">Souda Date</span>,
-      dataIndex: "soudaDate",
-      width: 110,
-      render: (text) => (
-        <span className="text-amber-800">
-          {text ? dayjs(text).format("YYYY-MM-DD") : ""}
-        </span>
-      ),
+      title: <span className="text-amber-700 font-semibold">Contract No</span>,
+      dataIndex: "saleContractNumber",
+      width: 160,
+      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
+
     {
       title: <span className="text-amber-700 font-semibold">Start Date</span>,
       dataIndex: "startDate",
       width: 110,
-      render: (text) => (
+      render: (date) => (
         <span className="text-amber-800">
-          {text ? dayjs(text).format("YYYY-MM-DD") : ""}
+          {date ? dayjs(date).format("YYYY-MM-DD") : "-"}
         </span>
       ),
     },
-    {
-      title: <span className="text-amber-700 font-semibold">End Date</span>,
-      dataIndex: "endDate",
-      width: 110,
-      render: (text) => (
-        <span className="text-amber-800">
-          {text ? dayjs(text).format("YYYY-MM-DD") : ""}
-        </span>
-      ),
-    },
+
+    // {
+    //   title: <span className="text-amber-700 font-semibold">End Date</span>,
+    //   dataIndex: "endDate",
+    //   width: 110,
+    //   render: (date) => dayjs(date).format("YYYY-MM-DD"),
+    // },
+
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
       dataIndex: "customer",
-      width: 140,
-      render: (text) => <span className="text-amber-800">{text}</span>,
+      width: 160,
+      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
+
     {
-      title: <span className="text-amber-700 font-semibold">Item(s)</span>,
+      title: <span className="text-amber-700 font-semibold">Items</span>,
       dataIndex: "items",
-      width: 240,
+      width: 100,
       render: (items = []) => (
         <span className="text-amber-800">
-          {items
-            .map(
-              (it) =>
-                `${it.companyName ? `${it.companyName}: ` : ""}${it.item}`,
-            )
-            .join(" • ")}
+          {items.length ? items.map((i) => i.product_name).join(" • ") : "-"}
         </span>
       ),
     },
+
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
-      width: 110,
-      render: (status) => {
-        const base = "px-3 py-1 rounded-full text-sm font-semibold";
-        if (status === "Approved")
-          return (
-            <span className={`${base} bg-green-100 text-green-700`}>
-              Approved
-            </span>
-          );
-        if (status === "Pending")
-          return (
-            <span className={`${base} bg-yellow-100 text-yellow-700`}>
-              Pending
-            </span>
-          );
-        return (
-          <span className={`${base} bg-red-100 text-red-700`}>{status}</span>
-        );
-      },
+      width: 120,
+      render: (status) => (
+        <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700">
+          {status}
+        </span>
+      ),
     },
+
+    {
+      title: <span className="text-amber-700 font-semibold">Total (₹)</span>,
+      dataIndex: "grandTotal",
+      width: 130,
+      render: (amt) => (
+        <span className="text-amber-800 font-semibold">
+          {amt !== undefined && amt !== null
+            ? `₹ ${Number(amt).toFixed(2)}`
+            : "-"}
+        </span>
+      ),
+    },
+
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       width: 120,
       render: (record) => (
         <div className="flex gap-3">
-          <EyeOutlined
-            className="cursor-pointer! text-blue-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              viewForm.setFieldsValue({
-                ...record,
-                soudaDate: record.soudaDate
-                  ? dayjs(record.soudaDate)
-                  : undefined,
-                startDate: record.startDate
-                  ? dayjs(record.startDate)
-                  : undefined,
-                endDate: record.endDate ? dayjs(record.endDate) : undefined,
-              });
-              setIsViewModalOpen(true);
-            }}
-          />
-          <EditOutlined
-            className="cursor-pointer! text-red-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              editForm.setFieldsValue({
-                ...record,
-                soudaDate: record.soudaDate
-                  ? dayjs(record.soudaDate)
-                  : undefined,
-                startDate: record.startDate
-                  ? dayjs(record.startDate)
-                  : undefined,
-                endDate: record.endDate ? dayjs(record.endDate) : undefined,
-              });
-              setIsEditModalOpen(true);
-            }}
-          />
+          <EyeOutlined onClick={() => openView(record)} />
+          <EditOutlined onClick={() => openEdit(record)} />
         </div>
       ),
     },
@@ -839,10 +741,32 @@ export default function SalesSouda() {
       });
       console.log("Full payload:", JSON.stringify(payload, null, 2));
 
-      await createsalesContract(payload);
+      // ✅ Capture the response from the API
+      const response = await createsalesContract(payload);
 
+      // ✅ The response contains the created contract data
+      const contract = response; // or response.data depending on your API structure
+
+      // ✅ Map the API response to your table row format
+      const row = {
+        key: contract.sale_contract_id, // AntD rowKey
+        saleContractNumber: contract.sale_contract_number,
+        customer: contract.customer_name,
+        customerEmail: contract.customer_email,
+        startDate: contract.from_date,
+        endDate: contract.to_date,
+        status: contract.status,
+        items: contract.items,
+        grandTotal: contract.grand_total,
+      };
+
+      // ✅ Add the new row to the table data
+      setData((prev) => [row, ...prev]);
       setIsAddModalOpen(false);
       addForm.resetFields();
+
+      // ✅ Optional: Show success message
+      console.log("Sales contract created successfully:", row);
     } catch (error) {
       console.error("Failed to create sales contract", error);
       // 🔍 Log the error response
@@ -900,24 +824,24 @@ export default function SalesSouda() {
   };
 
   // when opening edit modal, preload startDate/endDate (dayjs) + items
-  useEffect(() => {
-    if (isEditModalOpen && selectedRecord) {
-      const preloaded = {
-        ...selectedRecord,
-        soudaDate: selectedRecord.soudaDate
-          ? dayjs(selectedRecord.soudaDate)
-          : undefined,
-        startDate: selectedRecord.startDate
-          ? dayjs(selectedRecord.startDate)
-          : undefined,
-        endDate: selectedRecord.endDate
-          ? dayjs(selectedRecord.endDate)
-          : undefined,
-      };
-      editForm.setFieldsValue(preloaded);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditModalOpen, selectedRecord]);
+  // useEffect(() => {
+  //   if (isEditModalOpen && selectedRecord) {
+  //     const preloaded = {
+  //       ...selectedRecord,
+  //       soudaDate: selectedRecord.soudaDate
+  //         ? dayjs(selectedRecord.soudaDate)
+  //         : undefined,
+  //       startDate: selectedRecord.startDate
+  //         ? dayjs(selectedRecord.startDate)
+  //         : undefined,
+  //       endDate: selectedRecord.endDate
+  //         ? dayjs(selectedRecord.endDate)
+  //         : undefined,
+  //     };
+  //     editForm.setFieldsValue(preloaded);
+  //   }
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [isEditModalOpen, selectedRecord]);
 
   return (
     <div>
@@ -955,7 +879,7 @@ export default function SalesSouda() {
                 items: [
                   {
                     lineKey: new Date().getTime(),
-                    companyName: companyOptions[0] || undefined,
+                    // companyName: companyOptions[0] || undefined,
                     qty: 0,
                     freeQty: 0,
                     totalQty: 0,
@@ -992,7 +916,7 @@ export default function SalesSouda() {
         </h2>
         <Table
           columns={columns}
-          dataSource={filteredData}
+          dataSource={data}
           pagination={false}
           scroll={{ y: 220 }}
           rowKey="key"
@@ -1319,7 +1243,7 @@ export default function SalesSouda() {
             <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">Customer Email</span>}
-                name="customerEmail"
+                name="customer_email"
               >
                 <Input placeholder="Customer Email" />
               </Form.Item>
@@ -1491,7 +1415,7 @@ export default function SalesSouda() {
             <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">Customer Name</span>}
-                name="customer"
+                name="customerEmail"
               >
                 <Input disabled />
               </Form.Item>
@@ -1500,7 +1424,7 @@ export default function SalesSouda() {
             <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">Customer Email</span>}
-                name="customerEmail"
+                name="customer_email"
               >
                 <Input disabled />
               </Form.Item>
@@ -1535,13 +1459,15 @@ export default function SalesSouda() {
               key={it.lineKey}
               className="grid grid-cols-12 gap-2 items-center py-2 border-b"
             >
-              <div className="col-span-3 text-amber-800">{it.companyName}</div>
-              <div className="col-span-3 text-amber-800">{it.item}</div>
-              <div className="col-span-1 text-amber-800">{it.uom}</div>
-              <div className="col-span-1 text-amber-800">{it.qty}</div>
-              <div className="col-span-1 text-amber-800">{it.freeQty}</div>
-              <div className="col-span-1 text-amber-800">{it.totalQty}</div>
-              <div className="col-span-1 text-amber-800">{it.rate}</div>
+              <div className="col-span-3 text-amber-800">{it.vendor_name}</div>
+              <div className="col-span-3 text-amber-800">{it.product_name}</div>
+              <div className="col-span-1 text-amber-800">
+                {it.uom?.unit_name || "-"}
+              </div>
+              <div className="col-span-1 text-amber-800">{it.net_qty}</div>
+              <div className="col-span-1 text-amber-800">{it.free_qty}</div>
+              <div className="col-span-1 text-amber-800">{it.gross_qty}</div>
+              <div className="col-span-1 text-amber-800">{it.mrp}</div>
               <div className="col-span-1 text-amber-800">{it.grossAmount}</div>
             </div>
           ))}
@@ -1577,7 +1503,7 @@ export default function SalesSouda() {
             <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">IGST %</span>}
-                name={["orderTaxAndTotals", "igstPercent"]}
+                name={["igst"]}
               >
                 <Input
                   disabled
