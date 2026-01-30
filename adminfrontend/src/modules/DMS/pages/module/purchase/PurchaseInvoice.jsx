@@ -21,6 +21,15 @@ import {
   EditOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import {
+  getPurchaseOrders,
+  getPurchaseInvoices,
+  createPurchaseInvoice,
+  updatePurchaseInvoice
+} from "../../../../../api/purchase";
+import api from "../../../../../api/axios";
+import useSessionStore from "../../../../../store/sessionStore";
+
 
 const { Option } = Select;
 
@@ -198,7 +207,12 @@ const purchaseInvoiceJSON = {
 };
 
 export default function PurchaseInvoice() {
-  const [data, setData] = useState(purchaseInvoiceJSON.records);
+
+  const [data, setData] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [transporters, setTransporters] = useState([]);
+  const [loading, setLoading] = useState(false);
+
   const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -214,20 +228,88 @@ export default function PurchaseInvoice() {
   const [viewForm] = Form.useForm();
   const [assignForm] = Form.useForm();
 
+  const PURCHASE_TYPES = ["Local", "Import"];
+  const BILL_MODES = ["NetBanking", "Cash", "Credit"];
+  const STATUSES = ["Fresh", "Approved", "Expired", "Updated"];
+  const BILL_TYPES = ["Tax Invoice", "Regular Invoice"];
+  const COMPANIES = [];
+  const PLANTS = [];
+  const DEPOS = [];
+
+
+  useEffect(() => {
+    loadInitialData();
+  }, []);
+
+  const loadInitialData = async () => {
+    try {
+      setLoading(true);
+
+      const [orderRes, invoiceRes, transporterRes] = await Promise.all([
+        getPurchaseOrders(),
+        getPurchaseInvoices(),
+        api.get("/transport/transporters/", {
+          params: { organisation: useSessionStore.getState().currentOrgId }
+        })
+      ]);
+
+      setOrders(orderRes);
+      setTransporters(transporterRes.data);
+
+      // Map invoices to table format
+      setData(mapInvoicesToTable(invoiceRes));
+    } catch (err) {
+      message.error("Failed to load purchase invoice data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const mapInvoicesToTable = (invoices) => {
+    return invoices.map((inv, index) => ({
+      key: inv.id,
+      id: inv.id,
+
+      indentNo: inv.order?.order_number || "-",
+
+      totalQty: inv.items?.length
+        ? inv.items.reduce((s, i) => s + Number(i.gross_qty || i.net_qty || 0), 0)
+        : "-",
+
+      uom: "-",
+      totalAmount: inv.grand_total ?? "-",
+
+      transporterName:
+        inv.transporter_details?.registered_name ||
+        inv.transporter_name ||
+        inv.transporter ||
+        "-",
+
+      assigned: Boolean(inv.transporter),
+      raw: inv
+    }));
+  };
+
+
   // Search handler
   const handleSearch = (value) => {
     setSearchText(value);
+
     if (!value) {
-      setData(purchaseInvoiceJSON.records);
-    } else {
-      const filtered = purchaseInvoiceJSON.records.filter((item) =>
-        Object.values(item).some((field) =>
-          String(field).toLowerCase().includes(value.toLowerCase())
-        )
-      );
-      setData(filtered);
+      loadInitialData();
+      return;
     }
+
+    setData(prev =>
+      prev.filter(row =>
+        Object.values(row)
+          .join(" ")
+          .toLowerCase()
+          .includes(value.toLowerCase())
+      )
+    );
   };
+
 
   const columns = [
     {
@@ -330,63 +412,35 @@ export default function PurchaseInvoice() {
 
   // Open view modal
   const openView = (record) => {
-    setSelectedRecord(record);
-
-    const itemFromRoot = (record.items && record.items[0]) || {
-      itemName: record.itemName,
-      itemCode: record.itemCode,
-      qty: record.qty,
-      freeQty: record.freeQty,
-      totalQty: record.totalQty,
-      uom: record.uom,
-      rate: record.rate,
-      discountPercent: record.discountPercent,
-      discountAmount: record.discountAmount,
-      grossWt: record.grossWt,
-      totalGrossWt: record.totalGrossWt,
-      grossAmount: record.grossAmount,
-    };
+    const invoice = record.raw;
+    setSelectedRecord(invoice);
 
     viewForm.setFieldsValue({
-      ...record,
-      invoiceDate: record.invoiceDate ? dayjs(record.invoiceDate) : null,
-      receiveDate: record.receiveDate ? dayjs(record.receiveDate) : null,
-      deliveryDate: record.deliveryDate ? dayjs(record.deliveryDate) : null,
-      items: record.items && record.items.length ? record.items : [itemFromRoot],
+      ...invoice,
+      invoiceDate: dayjs(invoice.invoice_date),
+      receiveDate: dayjs(invoice.invoice_receiving_date),
+      items: invoice.items
     });
 
     setIsViewModalOpen(true);
   };
 
+
   // Open edit modal
   const openEdit = (record) => {
-    setSelectedRecord(record);
-
-    const itemFromRoot = (record.items && record.items[0]) || {
-      itemName: record.itemName,
-      itemCode: record.itemCode,
-      qty: record.qty,
-      freeQty: record.freeQty,
-      totalQty: record.totalQty,
-      uom: record.uom,
-      rate: record.rate,
-      discountPercent: record.discountPercent,
-      discountAmount: record.discountAmount,
-      grossWt: record.grossWt,
-      totalGrossWt: record.totalGrossWt,
-      grossAmount: record.grossAmount,
-    };
+    const invoice = record.raw;
+    setSelectedRecord(invoice);
 
     editForm.setFieldsValue({
-      ...record,
-      invoiceDate: record.invoiceDate ? dayjs(record.invoiceDate) : null,
-      receiveDate: record.receiveDate ? dayjs(record.receiveDate) : null,
-      deliveryDate: record.deliveryDate ? dayjs(record.deliveryDate) : null,
-      items: record.items && record.items.length ? record.items : [itemFromRoot],
+      ...invoice,
+      invoiceDate: dayjs(invoice.invoice_date),
+      receiveDate: dayjs(invoice.invoice_receiving_date),
+      items: invoice.items
     });
 
     setIsEditModalOpen(true);
   };
+
 
   // Open assign modal
   const openAssignModal = (record) => {
@@ -473,69 +527,62 @@ export default function PurchaseInvoice() {
     });
   };
 
-  const handleFormSubmit = (values) => {
-    const items = values.items || [];
-    const firstItem = items[0] || {};
-
+  const handleFormSubmit = async (values) => {
     const payload = {
-      ...values,
-      invoiceDate: values.invoiceDate
-        ? dayjs(values.invoiceDate).format("YYYY-MM-DD")
-        : dayjs().format("YYYY-MM-DD"),
-      receiveDate: values.receiveDate
-        ? dayjs(values.receiveDate).format("YYYY-MM-DD")
-        : null,
-      deliveryDate: values.deliveryDate
-        ? dayjs(values.deliveryDate).format("YYYY-MM-DD")
-        : null,
-        deliveryAddress: values.deliveryAddress || "",
-      items,
-      // top-level mappings (for table / backward compatibility)
-      itemName: firstItem.itemName,
-      itemCode: firstItem.itemCode,
-      qty: firstItem.qty,
-      freeQty: firstItem.freeQty,
-      uom: firstItem.uom,
-      rate: firstItem.rate,
-      discountPercent: firstItem.discountPercent,
-      discountAmount: firstItem.discountAmount,
-      grossWt: firstItem.grossWt,
-      totalGrossWt: firstItem.totalGrossWt,
-      grossAmount: firstItem.grossAmount,
-      totalQty: values.totalQty,
-      sgstPercent: values.sgstPercent,
-      cgstPercent: values.cgstPercent,
-      igstPercent: values.igstPercent,
-      sgst: values.sgst,
-      cgst: values.cgst,
-      igst: values.igst,
-      totalGST: values.totalGST,
-      tcsAmt: values.tcsAmt,
-      totalAmount: values.totalAmount,
-      assigned: false,
-      transporterName: null,
+      invoice_number: values.invoice_number,
+      invoice_date: dayjs(values.invoiceDate).format("YYYY-MM-DD"),
+      invoice_receiving_date: dayjs(values.receiveDate).format("YYYY-MM-DD"),
+      order: values.order,
+      vendor: values.vendor,
+      crn: values.crn,
+      vehicle_number: values.vehicle_number,
+      waybill_no: values.waybillNo,
+      narration: values.narration,
+
+      sgst: Number(values.sgst || 0),
+      cgst: Number(values.cgst || 0),
+      igst: Number(values.igst || 0),
+      tcs_amount: Number(values.tcsAmt || 0),
+      cash_discount: Number(values.cash_discount || 0),
+      round_off_amount: Number(values.round_off_amount || 0),
+      total_amount: Number(values.totalAmount),
+      grand_total: Number(values.totalAmount),
+
+      items: values.items.map(it => ({
+        order_item: it.order_item,
+        product: it.product,
+        product_name: it.product_name,
+        hsn_code: it.hsn_code,
+
+        net_qty: Number(it.qty),
+        gross_qty: Number(it.qty) + Number(it.freeQty || 0),
+        mrp_per_unit: Number(it.rate),
+        total_amount: Number(it.grossAmount)
+      }))
+
     };
 
-    if (isEditModalOpen) {
-      setData((prev) =>
-        prev.map((item) =>
-          item.key === selectedRecord.key ? { ...payload, key: item.key } : item
-        )
-      );
-      message.success(`Invoice ${payload.indentNo} updated successfully!`);
-      editForm.resetFields();
-      setIsEditModalOpen(false);
-    } else if (isAddModalOpen) {
-      setData((prev) => [...prev, { ...payload, key: prev.length + 1 }]);
-      message.success(`Invoice ${payload.indentNo} added successfully!`);
-      addForm.resetFields();
+    try {
+      if (isEditModalOpen) {
+        await updatePurchaseInvoice(selectedRecord.id, payload);
+        message.success("Invoice updated successfully");
+      } else {
+        await createPurchaseInvoice(payload);
+        message.success("Invoice created successfully");
+      }
+
+      loadInitialData();
       setIsAddModalOpen(false);
+      setIsEditModalOpen(false);
+    } catch (err) {
+      message.error("Failed to save invoice");
     }
   };
 
+
   // Render form fields - show only after indent selected (per request)
   const renderFormFields = (formInstance, disabled = false) => {
-    const indentChosen = formInstance.getFieldValue("indentNo");
+    const indentChosen = formInstance.getFieldValue("order");
 
     return (
       <>
@@ -548,17 +595,21 @@ export default function PurchaseInvoice() {
               rules={[{ required: true, message: "Please select Indent No" }]}
             >
               <Select
-                placeholder="Select Indent No"
-                onChange={(val) => onIndentChange(val, formInstance)}
+                placeholder="Select Order No"
+                onChange={(val) => onOrderChange(val, formInstance)}
                 disabled={disabled}
               >
-                {purchaseInvoiceJSON.options.indentOptions.map((val) => (
-                  <Select.Option key={val} value={val}>
-                    {val}
-                  </Select.Option>
+                {orders.map(order => (
+                  <Option key={order.id} value={order.id}>
+                    {order.order_number}
+                  </Option>
                 ))}
               </Select>
             </Form.Item>
+            <Form.Item name="order" hidden />
+            <Form.Item name="vendor" hidden />
+            <Form.Item name="crn" hidden />
+
           </Col>
 
           {/* admin-only editable fields (visible immediately but editable only for admin) */}
@@ -576,7 +627,7 @@ export default function PurchaseInvoice() {
           <Col span={6}>
             <Form.Item label="Purchase Type" name="purchaseType">
               <Select disabled={!isAdmin || disabled} placeholder="Select Type">
-                {purchaseInvoiceJSON.options.purchaseTypeOptions.map((val) => (
+                {PURCHASE_TYPES.map((val) => (
                   <Option key={val} value={val}>
                     {val}
                   </Option>
@@ -588,7 +639,7 @@ export default function PurchaseInvoice() {
           <Col span={6}>
             <Form.Item label="Bill Type" name="billType">
               <Select disabled={!isAdmin || disabled} placeholder="Select Bill Type">
-                {purchaseInvoiceJSON.options.billTypeOptions.map((val) => (
+                {BILL_TYPES.map((val) => (
                   <Option key={val} value={val}>
                     {val}
                   </Option>
@@ -602,7 +653,7 @@ export default function PurchaseInvoice() {
           <Col span={6}>
             <Form.Item label="Bill Mode" name="billMode">
               <Select disabled={!isAdmin || disabled} placeholder="Select Bill Mode">
-                {purchaseInvoiceJSON.options.billModeOptions.map((val) => (
+                {BILL_MODES.map((val) => (
                   <Option key={val} value={val}>
                     {val}
                   </Option>
@@ -620,7 +671,7 @@ export default function PurchaseInvoice() {
           <Col span={6}>
             <Form.Item label="Status" name="status">
               <Select disabled={!isAdmin || disabled} placeholder="Select Status">
-                {purchaseInvoiceJSON.options.statusOptions.map((opt) => (
+                {STATUSES.map((opt) => (
                   <Option key={opt} value={opt}>
                     {opt}
                   </Option>
@@ -631,13 +682,7 @@ export default function PurchaseInvoice() {
 
           <Col span={6}>
             <Form.Item label="Company Name" name="companyName">
-              <Select disabled placeholder="Auto filled">
-                {purchaseInvoiceJSON.options.companyOptions.map((val) => (
-                  <Option key={val} value={val}>
-                    {val}
-                  </Option>
-                ))}
-              </Select>
+              <Select disabled />
             </Form.Item>
           </Col>
         </Row>
@@ -648,13 +693,7 @@ export default function PurchaseInvoice() {
             <Row gutter={24}>
               <Col span={6}>
                 <Form.Item label="Plant Name" name="plantName">
-                  <Select disabled placeholder="Auto filled">
-                    {purchaseInvoiceJSON.options.plantOptions.map((opt) => (
-                      <Option key={opt.name} value={opt.name}>
-                        {opt.name}
-                      </Option>
-                    ))}
-                  </Select>
+                  <Select disabled />
                 </Form.Item>
               </Col>
 
@@ -666,13 +705,7 @@ export default function PurchaseInvoice() {
 
               <Col span={6}>
                 <Form.Item label="Depo Name" name="depoName">
-                  <Select disabled placeholder="Auto filled">
-                    {purchaseInvoiceJSON.options.depoOptions.map((val) => (
-                      <Option key={val} value={val}>
-                        {val}
-                      </Option>
-                    ))}
-                  </Select>
+                  <Select disabled />
                 </Form.Item>
               </Col>
               <Col span={6}>
@@ -681,16 +714,16 @@ export default function PurchaseInvoice() {
                 </Form.Item>
               </Col>
               <Col span={8}>
-              <Form.Item
-                label="Delivery Address"
-                name="deliveryAddress"
-                rules={[{ required: true, message: "Please enter delivery address" }]}
-              >
-                <Input disabled={!isAdmin || disabled} placeholder="Delivery address" />
-              </Form.Item>
-            </Col>
+                <Form.Item
+                  label="Delivery Address"
+                  name="deliveryAddress"
+                  rules={[{ required: true, message: "Please enter delivery address" }]}
+                >
+                  <Input disabled={!isAdmin || disabled} placeholder="Delivery address" />
+                </Form.Item>
+              </Col>
 
-              
+
             </Row>
 
             <h6 className=" text-amber-500 ">Item & Pricing Details</h6>
@@ -704,6 +737,13 @@ export default function PurchaseInvoice() {
                       key={field.key}
                       className="border border-amber-200 rounded-lg p-3 mb-3"
                     >
+
+                      <Form.Item {...field} name={[field.name, "order_item"]} hidden />
+                      <Form.Item {...field} name={[field.name, "product"]} hidden />
+                      <Form.Item {...field} name={[field.name, "product_name"]} hidden />
+                      <Form.Item {...field} name={[field.name, "hsn_code"]} hidden />
+
+
                       <div className="flex justify-between items-center mb-2">
                         <span className="font-semibold text-amber-700">Item #{index + 1}</span>
                       </div>
@@ -857,7 +897,7 @@ export default function PurchaseInvoice() {
               </Col>
 
               <Col span={6}>
-                <Form.Item label="Total Amount (₹)" name="totalAmount" rules={[{ required: true }]}> 
+                <Form.Item label="Total Amount (₹)" name="totalAmount" rules={[{ required: true }]}>
                   <InputNumber className="w-full bg-gray-50" disabled />
                 </Form.Item>
               </Col>
@@ -869,32 +909,42 @@ export default function PurchaseInvoice() {
   };
 
   // onIndentChange: populate form from indentData
-  const onIndentChange = (indentNo, formInstance) => {
-    const indent = purchaseInvoiceJSON.indentData[indentNo];
-    if (!indent) return;
+  const onOrderChange = (orderId, form) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
 
-    // deep-clone
-    const indentClone = JSON.parse(JSON.stringify(indent));
+    form.setFieldsValue({
+      order: order.id,
+      indentNo: order.order_number,
+      companyName: order.company_name,
+      vendor: order.vendor,
+      crn: order.crn,
+      deliveryAddress: order.delivery_address,
+      purchaseType: order.purchase_type,
+      billMode: order.bill_mode,
+      status: order.status,
+      invoiceDate: dayjs(),
+      receiveDate: dayjs(order.expected_receiving_date),
 
-    // set default items mapping (compute derived fields after set)
-    formInstance.setFieldsValue({
-      ...indentClone,
-      invoiceDate: indentClone.invoiceDate ? dayjs(indentClone.invoiceDate) : null,
-      receiveDate: indentClone.receiveDate ? dayjs(indentClone.receiveDate) : null,
-      deliveryDate: indentClone.deliveryDate ? dayjs(indentClone.deliveryDate) : null,
-      deliveryAddress: indentClone.deliveryAddress || "",
-      items: indentClone.items.map((it) => ({
-        ...it,
-        totalQty: (Number(it.qty || 0) + Number(it.freeQty || 0)),
-        discountAmount: (Number(it.qty || 0) * Number(it.rate || 0) * (Number(it.discountPercent || 0) / 100)),
-        grossAmount: Number(it.qty || 0) * Number(it.rate || 0),
-        totalGrossWt: Number(it.grossWt || 0),
-      })),
+      items: order.items.map(it => ({
+        order_item: it.id,
+        product: it.product,
+        product_name: "Oil",
+        hsn_code: "1234",
+
+        qty: Number(it.qty),
+        freeQty: Number(it.free_qty),
+        rate: Number(order.total_amount),
+        grossAmount: Number(order.total_amount),
+
+        uom: "",
+        discountPercent: 0,
+        grossWt: 0
+      }))
+
     });
-
-    // schedule recalc
-    setTimeout(() => recalcAll(formInstance), 50);
   };
+
 
   // Hooks to wire formInstance for render callbacks inside Form.List (workaround)
   let formInstance = null;
@@ -948,7 +998,7 @@ export default function PurchaseInvoice() {
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">Purchase Invoice Records</h2>
         <p className="text-amber-600 mb-3">Manage your purchase invoice data</p>
-        <Table columns={columns} dataSource={data} pagination={false} scroll={{ y: 240 }} />
+        <Table columns={columns} loading={loading} dataSource={data} pagination={false} scroll={{ y: 240 }} />
       </div>
 
       {/* ➤ Add Modal */}
@@ -1048,8 +1098,10 @@ export default function PurchaseInvoice() {
               placeholder="Select transporter"
               onChange={(val) => setSelectedTransporter(val)}
             >
-              {purchaseInvoiceJSON.options.transporterOptions.map((t) => (
-                <Option key={t} value={t}>{t}</Option>
+              {transporters.map(t => (
+                <Option key={t.id} value={t.id}>
+                  {t.registered_name}
+                </Option>
               ))}
             </Select>
           </Form.Item>

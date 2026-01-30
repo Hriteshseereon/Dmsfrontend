@@ -1,5 +1,5 @@
 // PurchaseReturn.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Table,
   Input,
@@ -21,6 +21,13 @@ import {
   FilterOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import {
+  getPurchaseReturns,
+  createPurchaseReturn,
+  updatePurchaseReturn,
+  getPurchaseInvoices,
+  getProducts
+} from "../../../../../api/purchase";
 
 // 🔹 JSON Data
 const purchaseReturnJSON = {
@@ -93,7 +100,11 @@ const purchaseReturnJSON = {
 };
 
 export default function PurchaseReturn() {
-  const [data, setData] = useState(purchaseReturnJSON.records);
+
+  const [data, setData] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(false);
+
   const [searchText, setSearchText] = useState("");
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -105,19 +116,130 @@ export default function PurchaseReturn() {
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
 
-  const handleSearch = (value) => {
-    setSearchText(value);
-    if (!value) {
-      setData(purchaseReturnJSON.records);
-    } else {
-      const filtered = purchaseReturnJSON.records.filter((item) =>
-        Object.values(item).some((field) =>
-          String(field).toLowerCase().includes(value.toLowerCase())
-        )
-      );
-      setData(filtered);
+  const [returns, setReturns] = useState([]);
+
+  const loadInitialData = async () => {
+    try {
+      setLoading(true);
+
+      const [returnRes, invoiceRes] = await Promise.all([
+        getPurchaseReturns(),
+        getPurchaseInvoices()
+      ]);
+
+      setReturns(returnRes);
+      setInvoices(invoiceRes);
+    } finally {
+      setLoading(false);
     }
   };
+
+  const [products, setProducts] = useState([]);
+
+  useEffect(() => {
+    if (!returns.length || !products.length) return;
+    setData(mapReturnsToTable(returns));
+  }, [returns, products, invoices]);
+
+
+  useEffect(() => {
+    getProducts().then(setProducts);
+  }, []);
+
+
+  const productMap = useMemo(() => {
+    const map = {};
+    products.forEach(p => {
+      map[p.id] = p.name;
+    });
+    return map;
+  }, [products]);
+
+
+  const RETURN_REASONS = [
+    "Quality Issue",
+    "Damaged Packaging",
+    "Expired",
+    "Wrong Item",
+    "Other"
+  ];
+
+  const invoiceMap = useMemo(() => {
+    const map = {};
+    invoices.forEach(inv => {
+      map[inv.id] = inv.invoice_number;
+    });
+    return map;
+  }, [invoices]);
+
+  useEffect(() => {
+    loadInitialData();
+  }, []);
+
+
+  const mapReturnsToTable = (returns) => {
+    return returns.map(ret => ({
+      key: ret.id,
+      id: ret.id,
+
+      invoiceNo: invoiceMap[ret.invoice] || "-",
+
+      item: productMap[ret.items?.[0]?.product] || "-",
+
+      quantity: Number(ret.items?.[0]?.qty || 0),
+      freeQty: Number(ret.items?.[0]?.free_qty || 0),
+      uom: ret.items?.[0]?.uom || "-",
+
+      rate: Number(ret.items?.[0]?.rate || 0),
+
+      returnDate: ret.return_date,
+      returnReason: ret.reason,
+      status: ret.status,
+
+      companyName: "",
+      plantName: ret.plant_name,
+      plantCode: ret.plant_code,
+      branchName: ret.branch_name,
+      depo: ret.depo_name,
+
+      discountPercent: Number(ret.items?.[0]?.discount_percent || 0),
+      discountAmount: Number(ret.items?.[0]?.discount_amount || 0),
+
+      sgstPercent: Number(ret.items?.[0]?.sgst_percent || 0),
+      cgstPercent: Number(ret.items?.[0]?.cgst_percent || 0),
+      igstPercent: Number(ret.items?.[0]?.igst_percent || 0),
+
+      otherCharges: Number(ret.items?.[0]?.other_charges || 0),
+      roundOff: Number(ret.items?.[0]?.round_off || 0),
+
+      grossAmount: Number(ret.items?.[0]?.gross_amount || 0),
+      grandTotal:
+        Number(ret.items?.[0]?.gross_amount || 0) -
+        Number(ret.items?.[0]?.discount_amount || 0),
+
+      raw: ret
+    }));
+  };
+
+
+  const handleSearch = (value) => {
+    setSearchText(value);
+
+    if (!value) {
+      loadInitialData();
+      return;
+    }
+
+    setData(prev =>
+      prev.filter(row =>
+        Object.values(row)
+          .join(" ")
+          .toLowerCase()
+          .includes(value.toLowerCase())
+      )
+    );
+  };
+
 
   const calculateTotals = (values) => {
     const qty = parseFloat(values.quantity || 0);
@@ -163,7 +285,7 @@ export default function PurchaseReturn() {
         record.discountAmount ||
         ((record.grossAmount || (record.quantity || 0) * (record.rate || 0)) *
           (record.discountPercent || 0)) /
-          100,
+        100,
       grandTotal: record.grandTotal || record.totalAmount || 0,
     };
 
@@ -177,33 +299,58 @@ export default function PurchaseReturn() {
       targetForm.setFieldsValue(base);
     }
   };
-  const handleSubmit = (values, mode) => {
-    const record = {
-      ...values,
-      returnDate: values.returnDate
-        ? values.returnDate.format("YYYY-MM-DD")
-        : null,
+
+  const handleSubmit = async (values, mode) => {
+    const payload = {
+      return_number: values.return_number,
+      return_date: values.returnDate.format("YYYY-MM-DD"),
+      invoice: values.invoice,
+
+      plant_name: values.plantName,
+      plant_code: values.plantCode,
+      branch_name: values.branchName,
+      depo_name: values.depo,
+
+      status: values.status || "DRAFT",
+      reason: values.returnReason,
+
+      items: [
+        {
+          product: values.product,
+          uom: values.uom,
+
+          quantity: Number(values.quantity),
+          free_quantity: Number(values.freeQty),
+          total_quantity:
+            Number(values.quantity) + Number(values.freeQty),
+
+          rate: Number(values.rate),
+          gross_amount: Number(values.grossAmount),
+
+          discount_percent: Number(values.discountPercent),
+          discount_amount: Number(values.discountAmount),
+
+          sgst_percent: Number(values.sgstPercent),
+          cgst_percent: Number(values.cgstPercent),
+          igst_percent: Number(values.igstPercent),
+
+          other_charges: Number(values.otherCharges || 0),
+          round_off: Number(values.roundOff || 0)
+        }
+      ]
     };
 
-    if (record.returnReason === "Other") {
-      record.returnReason = record.otherReasonText || "Other";
+    if (mode === "add") {
+      await createPurchaseReturn(payload);
+    } else {
+      await updatePurchaseReturn(selectedRecord.id, payload);
     }
-    delete record.otherReasonText;
 
-    if (mode === "edit") {
-      setData((prev) =>
-        prev.map((item) =>
-          item.key === selectedRecord.key ? { ...item, ...record } : item
-        )
-      );
-      setIsEditModalOpen(false);
-    } else if (mode === "add") {
-      setData((prev) => [...prev, { ...record, key: prev.length + 1 }]);
-      setIsAddModalOpen(false);
-    }
-    addForm.resetFields();
-    editForm.resetFields();
+    await loadInitialData();
+    setIsAddModalOpen(false);
+    setIsEditModalOpen(false);
   };
+
 
   const handleAddClick = () => {
     addForm.resetFields();
@@ -211,27 +358,47 @@ export default function PurchaseReturn() {
     setIsAddModalOpen(true);
   };
 
-  const onInvoiceSelectForAdd = (invoiceNo, formType) => {
-    const source = data.find((r) => r.invoiceNo === invoiceNo);
-    if (!source) return;
+  const onInvoiceSelectForAdd = (invoiceId, formType) => {
+    const invoice = invoices.find(i => i.id === invoiceId);
+    if (!invoice) return;
+
+    const item = invoice.items[0];
+
+    const rate =
+      Number(item.qty) > 0
+        ? Number(item.gross_amount) / Number(item.qty)
+        : 0;
+
 
     const values = {
-      ...source,
-      returnDate: dayjs(),
-      status: "Pending",
-      totalQtyDisplay: (source.quantity || 0) + (source.freeQty || 0),
-      grossAmount: (source.quantity || 0) * (source.rate || 0),
-      discountAmount:
-        ((source.quantity || 0) *
-          (source.rate || 0) *
-          (source.discountPercent || 0)) /
-        100,
-      grandTotal: source.grandTotal || source.totalAmount || 0,
+      invoice: invoice.id,
+      invoiceNo: invoice.invoice_number,
+
+      product: item.product,
+
+      plantName: "",
+      plantCode: "",
+
+      quantity: Number(item.qty),
+      freeQty: Number(item.free_qty),
+      rate,
+
+      totalQtyDisplay:
+        Number(item.qty) + Number(item.free_qty),
+
+      grossAmount: Number(item.gross_amount),
+      discountPercent: Number(item.dis_percent || 0),
+      discountAmount: Number(item.dis_amount || 0),
+
+      sgstPercent: 9,
+      cgstPercent: 9,
+      igstPercent: 0
     };
 
     if (formType === "add") addForm.setFieldsValue(values);
     if (formType === "edit") editForm.setFieldsValue(values);
   };
+
 
   const renderFormFields = (mode = "view") => {
     const isView = mode === "view";
@@ -252,9 +419,18 @@ export default function PurchaseReturn() {
         <h6 className="text-amber-500">Invoice & Party Details</h6>
         <Row gutter={16}>
           <Col span={6}>
+            <Form.Item name="product" hidden />
+            <Form.Item
+              label="Return Number"
+              name="return_number"
+              rules={[{ required: true, message: "Return number is required" }]}
+            >
+              <Input placeholder="PR-0007" />
+            </Form.Item>
+
             <Form.Item
               label="Invoice No"
-              name="invoiceNo"
+              name="invoice"
               rules={[{ required: true }]}
             >
               <Select
@@ -264,9 +440,9 @@ export default function PurchaseReturn() {
                 }}
                 disabled={isView}
               >
-                {data.map((r) => (
-                  <Select.Option key={r.invoiceNo} value={r.invoiceNo}>
-                    {r.invoiceNo}
+                {invoices.map(inv => (
+                  <Select.Option key={inv.id} value={inv.id}>
+                    {inv.invoice_number}
                   </Select.Option>
                 ))}
               </Select>
@@ -385,7 +561,7 @@ export default function PurchaseReturn() {
                   }
                 }}
               >
-                {purchaseReturnJSON.options.returnReasonOptions.map((v) => (
+                {RETURN_REASONS.map((v) => (
                   <Select.Option key={v}>{v}</Select.Option>
                 ))}
                 <Select.Option key="Other" value="Other">
@@ -568,7 +744,7 @@ export default function PurchaseReturn() {
             value={searchText}
             onChange={(e) => handleSearch(e.target.value)}
             className="w-64! border-amber-300! focus:border-amber-500!"
-          
+
           />
           <Button
             icon={<FilterOutlined />}
@@ -619,7 +795,7 @@ export default function PurchaseReturn() {
           editForm
             .validateFields()
             .then((values) => handleSubmit(values, "edit"))
-            .catch(() => {});
+            .catch(() => { });
         }}
         width={1000}
       >
@@ -645,7 +821,7 @@ export default function PurchaseReturn() {
           addForm
             .validateFields()
             .then((values) => handleSubmit(values, "add"))
-            .catch(() => {});
+            .catch(() => { });
         }}
         width={1000}
       >

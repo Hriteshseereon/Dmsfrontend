@@ -1,9 +1,11 @@
 // PurchaseSouda.jsx
-import React, { useState, useEffect, useMemo } from "react";
-import { positiveNumberInputProps, 
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import {
+  positiveNumberInputProps,
   percentageInputProps,
-  blockNonNumericInput  } from "../../../helpers/numberInput";
-import { requiredPositiveNumber,optionalPositiveNumber,percentageValidation } from "../../../helpers/formValidation";
+  blockNonNumericInput
+} from "../../../helpers/numberInput";
+import { requiredPositiveNumber, optionalPositiveNumber, percentageValidation } from "../../../helpers/formValidation";
 import { updateItemComputedFields } from "../../../helpers/calculation";
 import {
   Table,
@@ -18,6 +20,7 @@ import {
   Col,
   Card,
   Divider,
+  message,
 } from "antd";
 import {
   SearchOutlined,
@@ -29,6 +32,8 @@ import {
   DeleteOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { createPurchaseContract, getProductGroups, getProducts, getPurchaseContracts, getVendors, updatePurchaseContract } from "../../../../../api/purchase";
+import useSessionStore from "../../../../../store/sessionStore";
 
 const { Option } = Select;
 
@@ -85,12 +90,140 @@ const purchaseSoudaJSON = {
     { name: "Sunflower Oil", code: "It3", rate: 100, uom: "Litre" },
   ],
   uomOptions: ["Litre", "Kg", "Packet", "Box"],
-  statusOptions: ["Approved", "Pending", "Rejected"],
+  statusOptions: [
+    { label: "Fresh", value: "Fresh" },
+    { label: "Approved", value: "Approved" },
+    { label: "Expired", value: "Expired" },
+    { label: "Updated", value: "Updated" },
+  ],
 };
-const companyOptions = ["Jay Traders", "Another Co", "RUCHI SOYA INDUSTRIES LIMITED"];
 
 
 export default function PurchaseSouda() {
+
+  const isEditInitializing = useRef(false);
+
+  const [vendors, setVendors] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [productGroups, setProductGroups] = useState([]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setVendors(await getVendors());
+        setProducts(await getProducts());
+        setProductGroups(await getProductGroups());
+      } catch {
+        message.error("Failed to load master data");
+      }
+    };
+    load();
+  }, []);
+
+  const money = (n) => Number(Number(n || 0).toFixed(2));
+
+  const buildAddContractPayload = (values) => ({
+    contract_number: `PC-${Date.now()}`,
+    vendor: values.vendor,
+    product_group_name: values.product_group_name,
+    status: values.status,
+
+    from_date: dayjs(values.startDate).format("YYYY-MM-DD"),
+    to_date: dayjs(values.endDate).format("YYYY-MM-DD"),
+
+    customer_mobile: "NA",
+    customer_email: "na@na.com",
+
+    total_qty: money(values.orderTotals?.totalQty),
+    gross_amount: money(values.orderTotals?.totalGrossAmount),
+    total_discount: money(values.orderTotals?.totalDiscount),
+    total_gst_amount: money(values.orderTotals?.totalGST),
+    total_amount: money(values.orderTotals?.grandTotal),
+    grand_total: money(values.orderTotals?.grandTotal),
+
+    narration: "Purchase Contract",
+
+    items: values.items.map((it) => ({
+      product: it.product,
+      hsn_code: it.hsn_code,
+
+      qty: money(it.qty),
+      free_qty: money(it.freeQty),
+      total_qty: money(it.totalQty),
+
+      rate: money(it.rate),
+
+      discount_percent: money(it.discountPercent),
+      discount_amount: money(it.discountAmt),
+
+      gross_amount: money(it.grossAmount),
+
+      sgst_percent: money(it.sgstPercent),
+      cgst_percent: money(it.cgstPercent),
+      igst_percent: money(it.igstPercent),
+
+      sgst_amount: money(it.sgst),
+      cgst_amount: money(it.cgst),
+      igst_amount: money(it.igst),
+
+      total_gst_amount: money(it.totalGST),
+      total_amount: money(it.totalAmt),
+    })),
+  });
+
+
+  const buildUpdateContractPayload = (values) => ({
+    vendor: values.vendor,
+    product_group_name: values.product_group_name,
+    status: values.status,
+
+    from_date: values.startDate
+      ? dayjs(values.startDate).format("YYYY-MM-DD")
+      : null,
+
+    to_date: values.endDate
+      ? dayjs(values.endDate).format("YYYY-MM-DD")
+      : null,
+
+    total_qty: money(values.orderTotals?.totalQty),
+    gross_amount: money(values.orderTotals?.totalGrossAmount),
+    total_discount: money(values.orderTotals?.totalDiscount),
+    total_gst_amount: money(values.orderTotals?.totalGST),
+    total_amount: money(values.orderTotals?.grandTotal),
+    grand_total: money(values.orderTotals?.grandTotal),
+
+    narration: "Updated Purchase Contract",
+
+    items: values.items.map((it) => ({
+      product: it.product,
+      hsn_code: it.hsn_code,
+
+      qty: money(it.qty),
+      free_qty: money(it.freeQty),
+      total_qty: money(it.totalQty),
+
+      rate: money(it.rate),
+
+      discount_percent: money(it.discountPercent),
+      discount_amount: money(it.discountAmt),
+
+      gross_amount: money(it.grossAmount),
+
+      sgst_percent: money(it.sgstPercent),
+      cgst_percent: money(it.cgstPercent),
+      igst_percent: money(it.igstPercent),
+
+      sgst_amount: money(it.sgst),
+      cgst_amount: money(it.cgst),
+      igst_amount: money(it.igst),
+
+      total_gst_amount: money(it.totalGST),
+      total_amount: money(it.totalAmt),
+    })),
+  });
+
+
+
   // forms
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
@@ -101,28 +234,74 @@ export default function PurchaseSouda() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
 
-  const [data, setData] = useState(purchaseSoudaJSON.records);
   const [searchText, setSearchText] = useState("");
 
-  // helper: map of itemOptions for quick lookup
-  const itemMap = useMemo(() => {
-    const m = {};
-    purchaseSoudaJSON.itemOptions.forEach((it) => (m[it.name] = it));
-    return m;
-  }, []);
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  // search (simple)
+  const loadContracts = async () => {
+    try {
+      setLoading(true);
+      const res = await getPurchaseContracts();
+
+      // normalize backend response
+      const mapped = res.map((c) => ({
+        id: c.id,
+        key: c.id,
+        plantName: c.product_group_name,
+        companyName: vendorMap[c.vendor] || "",
+        startDate: c.from_date,
+        endDate: c.to_date,
+        status: c.status,
+        raw: c,
+      }));
+
+      setData(mapped);
+    } catch (e) {
+      message.error("Failed to load purchase contracts");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (vendors.length) {
+      loadContracts();
+    }
+  }, [vendors]);
+
+
+  // product map
+  const productMap = useMemo(() => {
+    const m = {};
+    products.forEach((p) => (m[p.id] = p));
+    return m;
+  }, [products]);
+
+  const vendorMap = useMemo(() => {
+    const map = {};
+    vendors.forEach(v => {
+      map[v.id] = v.name;
+    });
+    return map;
+  }, [vendors]);
+
+
+  // search
   const handleSearch = (value) => {
     setSearchText(value);
+
     if (!value) {
-      setData(purchaseSoudaJSON.records);
+      loadContracts();
       return;
     }
-    const filtered = purchaseSoudaJSON.records.filter((item) =>
+
+    const filtered = data.filter((item) =>
       JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
     );
     setData(filtered);
   };
+
 
   // ---------- Table columns ----------
   const columns = [
@@ -202,12 +381,22 @@ export default function PurchaseSouda() {
       width: 120,
       render: (status) => {
         const base = "px-3 py-1 rounded-full text-sm font-semibold";
+
+        if (status === "Fresh")
+          return <span className={`${base} bg-yellow-100 text-yellow-700`}>Fresh</span>;
+
         if (status === "Approved")
           return <span className={`${base} bg-green-100 text-green-700`}>Approved</span>;
-        if (status === "Pending")
-          return <span className={`${base} bg-yellow-100 text-yellow-700`}>Pending</span>;
-        return <span className={`${base} bg-red-200 text-red-700`}>{status}</span>;
+
+        if (status === "Updated")
+          return <span className={`${base} bg-blue-100 text-blue-700`}>Updated</span>;
+
+        if (status === "Expired")
+          return <span className={`${base} bg-red-200 text-red-700`}>Expired</span>;
+
+        return <span className={`${base} bg-gray-200 text-gray-700`}>{status}</span>;
       },
+
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
@@ -217,28 +406,67 @@ export default function PurchaseSouda() {
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
             onClick={() => {
-              setSelectedRecord(record);
-              // prepare view form values
+              const c = record.raw;
+              setSelectedRecord(c);
+
               viewForm.setFieldsValue({
-                ...record,
-                soudaDate: record.soudaDate ? dayjs(record.soudaDate) : undefined,
-                startDate: record.startDate ? dayjs(record.startDate) : undefined,
-                endDate: record.endDate ? dayjs(record.endDate) : undefined,
+                vendor: c.vendor,
+                product_group_name: c.product_group_name,
+                status: c.status,
+                startDate: c.from_date ? dayjs(c.from_date) : null,
+                endDate: c.to_date ? dayjs(c.to_date) : null,
+                items: c.items || [],
               });
+
               setIsViewModalOpen(true);
             }}
+
           />
           <EditOutlined
             className="cursor-pointer! text-red-500!"
             onClick={() => {
-              setSelectedRecord(record);
+              isEditInitializing.current = true;
+
+              setSelectedRecord(record.raw);
               // preload edit form (convert dates)
               editForm.setFieldsValue({
-                ...record,
-                soudaDate: record.soudaDate ? dayjs(record.soudaDate) : undefined,
-                startDate: record.startDate ? dayjs(record.startDate) : undefined,
-                endDate: record.endDate ? dayjs(record.endDate) : undefined,
+                ...record.raw,
+                startDate: record.raw.from_date ? dayjs(record.raw.from_date) : null,
+                endDate: record.raw.to_date ? dayjs(record.raw.to_date) : null,
+                product_group_name: record.raw.product_group_name,
+                vendor: record.raw.vendor,
+                status: record.raw.status,
+                items: (record.raw.items || []).map(it => ({
+                  product: it.product,
+                  hsn_code: it.hsn_code,
+
+                  qty: it.qty,
+                  freeQty: it.free_qty,
+                  totalQty: it.total_qty,
+
+                  rate: it.rate,
+                  discountPercent: it.discount_percent,
+                  discountAmt: it.discount_amount,
+
+                  grossAmount: it.gross_amount,
+
+                  sgstPercent: it.sgst_percent,
+                  cgstPercent: it.cgst_percent,
+                  igstPercent: it.igst_percent,
+
+                  sgst: it.sgst_amount,
+                  cgst: it.cgst_amount,
+                  igst: it.igst_amount,
+
+                  totalGST: it.total_gst_amount,
+                  totalAmt: it.total_amount,
+                })),
               });
+
+              setTimeout(() => {
+                isEditInitializing.current = false;
+              }, 0);
+
               setIsEditModalOpen(true);
             }}
           />
@@ -299,38 +527,49 @@ export default function PurchaseSouda() {
   };
 
   // on form values change, recompute derived fields and set them back
-  const handleFormValuesChangeFactory = (form) => (_changed, allValues) => {
-    const computed = computeAllFromFormValues(allValues || {});
-    // write back per-item computed fields
+  const handleFormValuesChangeFactory = (form) => (changed, allValues) => {
+    // prevent loops caused by setFieldsValue
+    if (isEditInitializing.current) return;
+    if (!changed?.items) return;
+    if (!allValues?.items?.length) return;
+
+    const computed = computeAllFromFormValues(allValues);
+
     form.setFieldsValue({
       items: computed.items,
-      // optionally set order-level fields if you have those
       orderTotals: computed.orderTotals,
     });
   };
 
-  // ---------- Form submit ----------
-  const handleFormSubmit = (formValues, mode) => {
-    // formValues will already have computed fields set by onValuesChange
-    const payload = {
-      ...formValues,
-      // format dates to string
-      soudaDate: formValues.soudaDate ? dayjs(formValues.soudaDate).format("YYYY-MM-DD") : undefined,
-      startDate: formValues.startDate ? dayjs(formValues.startDate).format("YYYY-MM-DD") : undefined,
-      endDate: formValues.endDate ? dayjs(formValues.endDate).format("YYYY-MM-DD") : undefined,
-    };
 
-    if (mode === "edit" && selectedRecord) {
-      setData((prev) => prev.map((r) => (r.key === selectedRecord.key ? { ...payload, key: r.key } : r)));
-      setIsEditModalOpen(false);
-      editForm.resetFields();
-      setSelectedRecord(null);
-    } else {
-      setData((prev) => [...prev, { ...payload, key: prev.length + 1 }]);
+  // ---------- Form submit ----------
+  const handleFormSubmit = async (values, mode) => {
+    try {
+      if (mode === "add") {
+        const payload = buildAddContractPayload(values);
+
+        await createPurchaseContract(payload);
+        message.success("Purchase contract created");
+      }
+
+      if (mode === "edit") {
+        const payload = buildUpdateContractPayload(values);
+
+        await updatePurchaseContract(selectedRecord.id, payload);
+        message.success("Purchase contract updated");
+      }
+
       setIsAddModalOpen(false);
+      setIsEditModalOpen(false);
       addForm.resetFields();
+      editForm.resetFields();
+      loadContracts();
+    } catch (err) {
+      message.error("Operation failed");
     }
   };
+
+
 
   // ---------- Render Form Sections ----------
   // render item list (Form.List)
@@ -543,361 +782,338 @@ export default function PurchaseSouda() {
   //     )}
   //   </Form.List>
   // );
-// ItemsList component with proper validation
-const ItemsList = ({ form, disabled = false }) => (
-  <Form.List name="items">
-    {(fields, { add, remove }) => (
-      <>
-        <div className="mb-2 flex justify-between items-center">
-          <h6 className="text-amber-500">Items</h6>
-          {!disabled && (
-            <Button
-              type="dashed"
-              icon={<PlusOutlined />}
-              onClick={() =>
-                add({
-                  lineKey: new Date().getTime(),
-                  item: undefined,
-                  itemCode: undefined,
-                  qty: 0,
-                  freeQty: 0,
-                  totalQty: 0,
-                  rate: 0,
-                  discountPercent: 0,
-                  discountAmt: 0,
-                  grossAmount: 0,
-                  uom: purchaseSoudaJSON.uomOptions[0],
-                })
+  // ItemsList component with proper validation
+  const ItemsList = ({ form, disabled = false }) => (
+    <Form.List name="items">
+      {(fields, { add, remove }) => (
+        <>
+          <div className="mb-2 flex justify-between items-center">
+            <h6 className="text-amber-500">Items</h6>
+            {!disabled && (
+              <Button
+                type="dashed"
+                icon={<PlusOutlined />}
+                onClick={() =>
+                  add({
+                    lineKey: new Date().getTime(),
+                    item: undefined,
+                    itemCode: undefined,
+                    qty: 0,
+                    freeQty: 0,
+                    totalQty: 0,
+                    rate: 0,
+                    discountPercent: 0,
+                    discountAmt: 0,
+                    grossAmount: 0,
+                    uom: purchaseSoudaJSON.uomOptions[0],
+                  })
+                }
+              >
+                Add Item
+              </Button>
+            )}
+          </div>
+
+          {fields.map((field, index) => (
+            <Card
+              key={field.key}
+              size="small"
+              style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
+              bodyStyle={{ padding: 12 }}
+              extra={
+                !disabled && (
+                  <Button
+                    type="text"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => remove(field.name)}
+                  />
+                )
               }
             >
-              Add Item
-            </Button>
-          )}
-        </div>
-
-        {fields.map((field, index) => (
-          <Card
-            key={field.key}
-            size="small"
-            style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
-            extra={
-              !disabled && (
-                <Button
-                  type="text"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={() => remove(field.name)}
-                />
-              )
-            }
-          >
-            <Row gutter={12} align="middle">
-              <Col span={6}>
-                <Form.Item
-                  {...field}
-                  label="Item Name"
-                  name={[field.name, "item"]}
-                  fieldKey={[field.fieldKey, "item"]}
-                  rules={[{ required: true, message: "Item is required" }]}
-                >
-                  <Select
-                    placeholder="Select Item"
-                    disabled={disabled}
-                    onChange={(val) => {
-                      const selected = itemMap[val];
-                      const baseForm = form;
-                      baseForm.setFields([
-                        { name: ["items", field.name, "itemCode"], value: selected?.code || "" },
-                        { name: ["items", field.name, "rate"], value: selected?.rate ?? 0 },
-                        { name: ["items", field.name, "uom"], value: selected?.uom ?? purchaseSoudaJSON.uomOptions[0] },
-                      ]);
-                      const all = baseForm.getFieldsValue();
-                      const computed = computeAllFromFormValues(all || {});
-                      baseForm.setFieldsValue({ items: computed.items });
-                    }}
+              <Row gutter={12} align="middle">
+                <Col span={6}>
+                  <Form.Item
+                    key={field.key}
+                    label="Item Name"
+                    name={[field.name, "product"]}
+                    fieldKey={[field.fieldKey, "product"]}
+                    rules={[{ required: true, message: "Item is required" }]}
                   >
-                    {purchaseSoudaJSON.itemOptions.map((opt) => (
-                      <Option key={opt.name} value={opt.name}>
-                        {opt.name}
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
+                    <Select
+                      placeholder="Select Item"
+                      disabled={disabled}
+                      onChange={(productId) => {
+                        const p = productMap[productId];
+                        if (!p) return;
 
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="Item Code" 
-                  name={[field.name, "itemCode"]} 
-                  fieldKey={[field.fieldKey, "itemCode"]}
-                >
-                  <Input disabled />
-                </Form.Item>
-              </Col>
+                        form.setFields([
+                          { name: ["items", field.name, "product"], value: p.id },
+                          { name: ["items", field.name, "hsn_code"], value: p.hsn_code_value },
+                          { name: ["items", field.name, "sgstPercent"], value: p.sgst },
+                          { name: ["items", field.name, "cgstPercent"], value: p.cgst },
+                          { name: ["items", field.name, "rate"], value: p.mrp || 0 },
+                        ]);
+                      }}
+                    >
+                      {products.map((p) => (
+                        <Option key={p.id} value={p.id}>
+                          {p.name}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
 
-              {/* FIX: Qty with proper validation */}
-               <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="Qty" 
-                  name={[field.name, "qty"]} 
-                  rules={requiredPositiveNumber("Quantity")}
-                >
-                  <InputNumber 
-                    {...positiveNumberInputProps}
-                    disabled={disabled} 
-                    onChange={() => {
-                      const all = form.getFieldsValue();
-                      const computed = computeAllFromFormValues(all || {});
-                      form.setFieldsValue({ items: computed.items });
-                    }} 
-                  />
-                </Form.Item>
-              </Col>
-              {/* FIX: Free Qty with proper validation */}
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="Free Qty" 
-                  name={[field.name, "freeQty"]} 
-                  fieldKey={[field.fieldKey, "freeQty"]}
-                  rules={optionalPositiveNumber("Free Qty")}
-                >
-                  <InputNumber 
-                    {...positiveNumberInputProps}
-                    disabled={disabled} 
-                    onChange={() => {
-                      const all = form.getFieldsValue();
-                      const computed = computeAllFromFormValues(all || {});
-                      form.setFieldsValue({ items: computed.items });
-                    }} 
-                  />
-                </Form.Item>
-              </Col>
+                <Col span={4}>
+                  <Form.Item
+                    key={field.key}
+                    label="Item Code"
+                    name={[field.name, "itemCode"]}
+                    fieldKey={[field.fieldKey, "itemCode"]}
+                  >
+                    <Input disabled />
+                  </Form.Item>
+                </Col>
 
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="Total Qty" 
-                  name={[field.name, "totalQty"]} 
-                  fieldKey={[field.fieldKey, "totalQty"]}
-                >
-                  <InputNumber className="w-full" disabled />
-                </Form.Item>
-              </Col>
+                {/* FIX: Qty with proper validation */}
+                <Col span={4}>
+                  <Form.Item
+                    key={field.key}
+                    label="Qty"
+                    name={[field.name, "qty"]}
+                    rules={requiredPositiveNumber("Quantity")}
+                    validateTrigger="onBlur"
+                  >
+                    <InputNumber
+                      {...positiveNumberInputProps}
+                      disabled={disabled}
+                    />
+                  </Form.Item>
+                </Col>
+                {/* FIX: Free Qty with proper validation */}
+                <Col span={4}>
+                  <Form.Item
+                    key={field.key}
+                    label="Free Qty"
+                    name={[field.name, "freeQty"]}
+                    fieldKey={[field.fieldKey, "freeQty"]}
+                    rules={optionalPositiveNumber("Free Qty")}
+                    validateTrigger="onBlur"
+                  >
+                    <InputNumber
+                      {...positiveNumberInputProps}
+                      disabled={disabled}
 
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="UOM" 
-                  name={[field.name, "uom"]} 
-                  fieldKey={[field.fieldKey, "uom"]}
-                >
-                  <Select disabled={disabled}>
-                    {purchaseSoudaJSON.uomOptions.map((u) => (
-                      <Option key={u} value={u}>
-                        {u}
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
+                    />
+                  </Form.Item>
+                </Col>
 
-              {/* FIX: Rate with proper validation */}
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="Rate" 
-                  name={[field.name, "rate"]} 
-                  fieldKey={[field.fieldKey, "rate"]}
-                  rules={requiredPositiveNumber("Rate")}
-                >
-                  <InputNumber 
-                    {...positiveNumberInputProps}
-                    disabled={disabled} 
-                    onChange={() => {
-                      const all = form.getFieldsValue();
-                      const computed = computeAllFromFormValues(all || {});
-                      form.setFieldsValue({ items: computed.items });
-                    }} 
-                  />
-                </Form.Item>
-              </Col>
+                <Col span={4}>
+                  <Form.Item
+                    key={field.key}
+                    label="Total Qty"
+                    name={[field.name, "totalQty"]}
+                    fieldKey={[field.fieldKey, "totalQty"]}
+                  >
+                    <InputNumber className="w-full" disabled />
+                  </Form.Item>
+                </Col>
 
-              {/* FIX: Discount% with proper validation */}
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="Dis%" 
-                  name={[field.name, "discountPercent"]} 
-                  fieldKey={[field.fieldKey, "discountPercent"]}
-                  rules={percentageValidation("Discount")}
-                >
-                  <InputNumber 
-                    {...positiveNumberInputProps}
-                    max={100}
-                    disabled={disabled} 
-                    onChange={() => {
-                      const all = form.getFieldsValue();
-                      const computed = computeAllFromFormValues(all || {});
-                      form.setFieldsValue({ items: computed.items });
-                    }} 
-                  />
-                </Form.Item>
-              </Col>
+                <Col span={4}>
+                  <Form.Item
+                    key={field.key}
+                    label="UOM"
+                    name={[field.name, "uom"]}
+                    fieldKey={[field.fieldKey, "uom"]}
+                  >
+                    <Select disabled={disabled}>
+                      {purchaseSoudaJSON.uomOptions.map((u) => (
+                        <Option key={u} value={u}>
+                          {u}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
 
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="Gross Amount (₹)" 
-                  name={[field.name, "grossAmount"]} 
-                  fieldKey={[field.fieldKey, "grossAmount"]}
-                >
-                  <InputNumber className="w-full" disabled />
-                </Form.Item>
-              </Col>
+                {/* FIX: Rate with proper validation */}
+                <Col span={4}>
+                  <Form.Item
+                    key={field.key}
+                    label="Rate"
+                    name={[field.name, "rate"]}
+                    fieldKey={[field.fieldKey, "rate"]}
+                    rules={requiredPositiveNumber("Rate")}
+                    validateTrigger="onBlur"
+                  >
+                    <InputNumber
+                      {...positiveNumberInputProps}
+                      disabled={disabled}
 
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="Discount Amt (₹)" 
-                  name={[field.name, "discountAmt"]} 
-                  fieldKey={[field.fieldKey, "discountAmt"]}
-                >
-                  <InputNumber className="w-full" disabled />
-                </Form.Item>
-              </Col>
+                    />
+                  </Form.Item>
+                </Col>
 
-              {/* FIX: SGST% with proper validation */}
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="SGST %" 
-                  name={[field.name, "sgstPercent"]} 
-                  fieldKey={[field.fieldKey, "sgstPercent"]}
-                  rules={percentageValidation("SGST")}
-                >
-                  <InputNumber 
-                    {...positiveNumberInputProps}
-                    max={100}
-                    disabled={disabled} 
-                    onChange={() => {
-                      const all = form.getFieldsValue();
-                      const computed = computeAllFromFormValues(all || {});
-                      form.setFieldsValue({ items: computed.items });
-                    }} 
-                  />
-                </Form.Item>
-              </Col>
+                {/* FIX: Discount% with proper validation */}
+                <Col span={4}>
+                  <Form.Item
+                    key={field.key}
+                    label="Dis%"
+                    name={[field.name, "discountPercent"]}
+                    fieldKey={[field.fieldKey, "discountPercent"]}
+                    rules={percentageValidation("Discount")}
+                    validateTrigger="onBlur"
+                  >
+                    <InputNumber
+                      {...positiveNumberInputProps}
+                      max={100}
+                      disabled={disabled}
 
-              {/* FIX: CGST% with proper validation */}
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="CGST %" 
-                  name={[field.name, "cgstPercent"]} 
-                  fieldKey={[field.fieldKey, "cgstPercent"]}
-                  rules={percentageValidation("CGST")}
-                >
-                  <InputNumber 
-                    {...positiveNumberInputProps}
-                    max={100}
-                    disabled={disabled} 
-                    onChange={() => {
-                      const all = form.getFieldsValue();
-                      const computed = computeAllFromFormValues(all || {});
-                      form.setFieldsValue({ items: computed.items });
-                    }} 
-                  />
-                </Form.Item>
-              </Col>
+                    />
+                  </Form.Item>
+                </Col>
 
-              {/* FIX: IGST% with proper validation */}
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="IGST %" 
-                  name={[field.name, "igstPercent"]} 
-                  fieldKey={[field.fieldKey, "igstPercent"]}
-                  rules={percentageValidation("IGST")}
-                >
-                  <InputNumber 
-                    {...positiveNumberInputProps}
-                    max={100}
-                    disabled={disabled} 
-                    onChange={() => {
-                      const all = form.getFieldsValue();
-                      const computed = computeAllFromFormValues(all || {});
-                      form.setFieldsValue({ items: computed.items });
-                    }} 
-                  />
-                </Form.Item>
-              </Col>
+                <Col span={4}>
+                  <Form.Item
+                    key={field.key}
+                    label="Gross Amount (₹)"
+                    name={[field.name, "grossAmount"]}
+                    fieldKey={[field.fieldKey, "grossAmount"]}
+                  >
+                    <InputNumber className="w-full" disabled />
+                  </Form.Item>
+                </Col>
 
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="Total GST (₹)" 
-                  name={[field.name, "totalGST"]} 
-                  fieldKey={[field.fieldKey, "totalGST"]}
-                >
-                  <InputNumber className="w-full" disabled />
-                </Form.Item>
-              </Col>
+                <Col span={4}>
+                  <Form.Item
+                    key={field.key}
+                    label="Discount Amt (₹)"
+                    name={[field.name, "discountAmt"]}
+                    fieldKey={[field.fieldKey, "discountAmt"]}
+                  >
+                    <InputNumber className="w-full" disabled />
+                  </Form.Item>
+                </Col>
 
-              <Col span={6}>
-                <Form.Item 
-                  {...field} 
-                  label="Total Amount (₹)" 
-                  name={[field.name, "totalAmt"]} 
-                  fieldKey={[field.fieldKey, "totalAmt"]}
-                >
-                  <InputNumber className="w-full" disabled />
-                </Form.Item>
-              </Col>
-            </Row>
-          </Card>
-        ))}
-      </>
-    )}
-  </Form.List>
-);
+                {/* FIX: SGST% with proper validation */}
+                <Col span={4}>
+                  <Form.Item
+                    key={field.key}
+                    label="SGST %"
+                    name={[field.name, "sgstPercent"]}
+                    fieldKey={[field.fieldKey, "sgstPercent"]}
+                    rules={percentageValidation("SGST")}
+                    validateTrigger="onBlur"
+                  >
+                    <InputNumber
+                      {...positiveNumberInputProps}
+                      max={100}
+                      disabled={disabled}
+
+                    />
+                  </Form.Item>
+                </Col>
+
+                {/* FIX: CGST% with proper validation */}
+                <Col span={4}>
+                  <Form.Item
+                    key={field.key}
+                    label="CGST %"
+                    name={[field.name, "cgstPercent"]}
+                    fieldKey={[field.fieldKey, "cgstPercent"]}
+                    rules={percentageValidation("CGST")}
+                    validateTrigger="onBlur"
+                  >
+                    <InputNumber
+                      {...positiveNumberInputProps}
+                      max={100}
+                      disabled={disabled}
+
+                    />
+                  </Form.Item>
+                </Col>
+
+                {/* FIX: IGST% with proper validation */}
+                <Col span={4}>
+                  <Form.Item
+                    key={field.key}
+                    label="IGST %"
+                    name={[field.name, "igstPercent"]}
+                    fieldKey={[field.fieldKey, "igstPercent"]}
+                    rules={percentageValidation("IGST")}
+                    validateTrigger="onBlur"
+                  >
+                    <InputNumber
+                      {...positiveNumberInputProps}
+                      max={100}
+                      disabled={disabled}
+
+                    />
+                  </Form.Item>
+                </Col>
+
+                <Col span={4}>
+                  <Form.Item
+                    key={field.key}
+                    label="Total GST (₹)"
+                    name={[field.name, "totalGST"]}
+                    fieldKey={[field.fieldKey, "totalGST"]}
+                  >
+                    <InputNumber className="w-full" disabled />
+                  </Form.Item>
+                </Col>
+
+                <Col span={6}>
+                  <Form.Item
+                    key={field.key}
+                    label="Total Amount (₹)"
+                    name={[field.name, "totalAmt"]}
+                    fieldKey={[field.fieldKey, "totalAmt"]}
+                  >
+                    <InputNumber className="w-full" disabled />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Card>
+          ))}
+        </>
+      )}
+    </Form.List>
+  );
   // ---------- Combined form content (Basic Info, Items, Tax) ----------
   const RenderFormBody = ({ form, disabled = false }) => (
     <>
       <Card size="small" style={{ marginBottom: 12, border: "1px solid #FDE68A" }} bodyStyle={{ padding: 12 }}>
         <h6 className="text-amber-500">Basic Information</h6>
         <Row gutter={16}>
-           <Col span={6}>
-          <Form.Item
-            label="Company Name"
-            name="companyName"
-            rules={[{ required: true }]}
-          >
-            <Select placeholder="Select Company" disabled={disabled}>
-              {companyOptions.map((c) => (
-                <Select.Option key={c} value={c}>
-                  {c}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-        </Col>
           <Col span={6}>
-            <Form.Item label="Plant Name" name="plantName" rules={[{ required: true }]}>
+            <Form.Item
+              label="Company Name"
+              name="vendor"
+              rules={[{ required: true }]}
+            >
+              <Select placeholder="Select Company" disabled={disabled}>
+                {vendors.map((v) => (
+                  <Select.Option key={v.id} value={v.id}>
+                    {v.name}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+          </Col>
+          <Col span={6}>
+            <Form.Item
+              label="Plant Name"
+              name="product_group_name"
+              rules={[{ required: true }]}>
               <Select
                 placeholder="Select Plant"
                 disabled={disabled}
-                onChange={(value) => {
-                  const selectedPlant = purchaseSoudaJSON.plantOptions.find((p) => p.name === value);
-                  form.setFieldsValue({ plantCode: selectedPlant ? selectedPlant.code : "" });
-                }}
               >
-                {purchaseSoudaJSON.plantOptions.map((opt) => (
-                  <Option key={opt.name} value={opt.name}>
-                    {opt.name}
+                {productGroups.map((pg) => (
+                  <Option key={pg.id} value={pg.name}>
+                    {pg.name}
                   </Option>
                 ))}
               </Select>
@@ -910,7 +1126,7 @@ const ItemsList = ({ form, disabled = false }) => (
             </Form.Item>
           </Col> */}
 
-         
+
 
 
           {/* <Col span={6}>
@@ -985,8 +1201,8 @@ const ItemsList = ({ form, disabled = false }) => (
             <Form.Item label="Status" name="status" rules={[{ required: true }]}>
               <Select placeholder="Select Status" disabled={disabled}>
                 {purchaseSoudaJSON.statusOptions.map((opt) => (
-                  <Option key={opt} value={opt}>
-                    {opt}
+                  <Option key={opt.value} value={opt.value}>
+                    {opt.label}
                   </Option>
                 ))}
               </Select>
@@ -997,20 +1213,6 @@ const ItemsList = ({ form, disabled = false }) => (
     </>
   );
 
-  // ---------- Add / Edit / View modals + wiring ----------
-  useEffect(() => {
-    // when opening edit modal, ensure computed fields exist
-    if (isEditModalOpen && selectedRecord) {
-      // convert dates to dayjs for DatePicker
-      const pre = {
-        ...selectedRecord,
-        soudaDate: selectedRecord.soudaDate ? dayjs(selectedRecord.soudaDate) : undefined,
-        startDate: selectedRecord.startDate ? dayjs(selectedRecord.startDate) : undefined,
-        endDate: selectedRecord.endDate ? dayjs(selectedRecord.endDate) : undefined,
-      };
-      editForm.setFieldsValue(pre);
-    }
-  }, [isEditModalOpen, selectedRecord, editForm]);
 
   return (
     <div>
@@ -1042,6 +1244,7 @@ const ItemsList = ({ form, disabled = false }) => (
               addForm.resetFields();
               // initialize an empty item row
               addForm.setFieldsValue({
+                status: "Fresh",
                 items: [
                   {
                     lineKey: new Date().getTime(),
@@ -1074,7 +1277,13 @@ const ItemsList = ({ form, disabled = false }) => (
       {/* Table */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">Purchase Contract Records</h2>
-        <Table columns={columns} dataSource={data} pagination={false} rowKey="key" scroll={{ y: 300 }} />
+        <Table
+          columns={columns}
+          dataSource={data}
+          loading={loading}
+          pagination={false}
+          rowKey="id"
+          scroll={{ y: 300 }} />
       </div>
 
       {/* Add Modal */}
@@ -1110,7 +1319,12 @@ const ItemsList = ({ form, disabled = false }) => (
         footer={null}
         width={1000}
       >
-        <Form form={editForm} layout="vertical" onFinish={(vals) => handleFormSubmit(vals, "edit")} onValuesChange={handleFormValuesChangeFactory(editForm)}>
+        <Form
+          form={editForm}
+          layout="vertical"
+          onFinish={(vals) => handleFormSubmit(vals, "edit")}
+          onValuesChange={handleFormValuesChangeFactory(editForm)}
+        >
           <RenderFormBody form={editForm} disabled={false} />
           <div className="flex justify-end gap-2 mt-4">
             <Button onClick={() => setIsEditModalOpen(false)}>Cancel</Button>

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { positiveNumberInputProps } from "../../../helpers/numberInput";
 import {
   requiredPositiveNumber,
@@ -28,141 +28,140 @@ import {
   DownloadOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { getPurchaseOrders, createPurchaseOrder, updatePurchaseOrder, getPurchaseContracts, getVendors, getProducts } from "../../../../../api/purchase";
 
 const { Option } = Select;
 
-// -----------------------
-// Sample SOUDA master data (maps soudaNo -> list of items + basic info)
-// In real app this will come from backend when soudaNo is selected.
-const soudaMaster = {
-  "SOUDA-001": {
-    soudaNo: "SOUDA-001",
-    plantName: "Kalinga Oils Pvt. Ltd.",
-    plantCode: "PC1",
-    companyName: "Jay Traders",
-    depoName: "Bhubaneswar Depot",
-    deliveryAddress: "Plot 12, Industrial Area, Bhubaneswar",
-    items: [
-      { item: "Mustard Oil", itemCode: "ITM-MUST-1", uom: "Litre", rate: 120 },
-      { item: "Sunflower Oil", itemCode: "ITM-SUN-1", uom: "Litre", rate: 110 },
-    ],
-  },
-  "SOUDA-002": {
-    soudaNo: "SOUDA-002",
-    plantName: "Oils Pvt. Ltd.",
-    plantCode: "PC2",
-    companyName: "Saheree Traders",
-    depoName: "Aul Depot",
-    deliveryAddress: "Sector 4, Aul Industrial, Jagatsinghpur",
-    items: [
-      { item: "Coconut Oil", itemCode: "ITM-COC-1", uom: "Litre", rate: 140 },
-    ],
-  },
-};
-
-const purchaseIndentJSON = {
-  records: [
-    {
-      key: 1,
-      soudaNo: "SOUDA-001",
-      plantName: "Kalinga Oils Pvt. Ltd.",
-      plantCode: "PC1",
-      indentDate: "2024-10-01",
-      deliveryDate: "2024-12-09",
-      deliveryAddress: "Plot 12, Industrial Area, Bhubaneswar",
-      companyName: "Jay Traders",
-      depoName: "Bhubaneswar Depot",
-      items: [
-        {
-          item: "Mustard Oil",
-          itemCode: "ITM-MUST-1",
-          qty: 5000,
-          freeQty: 200,
-          totalQty: 5200,
-          uom: "Litre",
-          rate: 120,
-          discountPercent: 2,
-          discountAmt: 12000,
-          grossWt: 2100,
-          totalGrossWt: 1020,
-          grossAmount: 67080,
-        },
-      ],
-      totalQty: 5200,
-      totalAmt: 588000,
-      status: "Approved",
-    },
-  ],
-  uomOptions: ["Litre", "Kg", "Packet", "Box"],
-  statusOptions: ["Approved", "Pending", "Rejected"],
-  soudaNoOptions: ["SOUDA-001", "SOUDA-002", "SOUDA-003"],
-};
 
 export default function PurchaseIndent() {
+
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const [vendors, setVendors] = useState([]);
+  const [products, setProducts] = useState([]);
+
+  useEffect(() => {
+    const loadMasters = async () => {
+      try {
+        setVendors(await getVendors());
+        setProducts(await getProducts());
+      } catch {
+        message.error("Failed to load master data");
+      }
+    };
+    loadMasters();
+  }, []);
+
+
+  const vendorMap = React.useMemo(() => {
+    const m = {};
+    vendors.forEach(v => m[v.id] = v.name);
+    return m;
+  }, [vendors]);
+
+  const productMap = React.useMemo(() => {
+    const m = {};
+    products.forEach(p => m[p.id] = p);
+    return m;
+  }, [products]);
+
+
+  const [contracts, setContracts] = useState([]);
+
+  useEffect(() => {
+    loadContracts();
+  }, []);
+
+  const loadContracts = async () => {
+    try {
+      const res = await getPurchaseContracts();
+      setContracts(res);
+    } catch {
+      message.error("Failed to load Souda (contracts)");
+    }
+  };
+
+  const STATUS_OPTIONS = [
+    { label: "Fresh", value: "Fresh" },
+    { label: "Approved", value: "Approved" },
+    { label: "Expired", value: "Expired" },
+    { label: "Updated", value: "Updated" },
+  ];
+  const UOM_OPTIONS = ["Litre", "Kg", "Packet", "Box"];
+
+
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const [data, setData] = useState(purchaseIndentJSON.records);
   const [searchText, setSearchText] = useState("");
 
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
 
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const handleContractSelect = (contractId, form) => {
+    const contract = contracts.find((c) => c.id === contractId);
+    if (!contract) return;
+
+    form.setFieldsValue({
+      contractId: contract.id,
+      vendorId: contract.vendor,
+      plantName: contract.product_group_name,
+      companyName: vendorMap[contract.vendor] || "",
+      items: contract.items.map((it) => ({
+        id: it.id,
+        productId: it.product,
+        item: productMap[it.product]?.name,
+        itemCode: it.item_code,
+        qty: it.qty,
+        freeQty: it.free_qty,
+        rate: it.rate,
+        discountPercent: it.discount_percent,
+        discountAmt: it.discount_amount,
+        grossAmount: it.gross_amount,
+        grossWt: 0,
+      })),
+    });
+
+    setTimeout(() => recalcAll(form), 0);
+  };
+
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const res = await getPurchaseOrders();
+      console.log("PURCHASE ORDERS API RESPONSE", res);
+      setData(res);
+    } catch (err) {
+      message.error("Failed to load purchase orders");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   const handleSearch = (value) => {
     setSearchText(value);
+
     if (!value) {
-      setData(purchaseIndentJSON.records);
+      fetchOrders();
       return;
     }
-    const filtered = purchaseIndentJSON.records.filter((item) =>
-      Object.values(item)
-        .flatMap((v) =>
-          Array.isArray(v) ? v.map((x) => JSON.stringify(x)) : v
-        )
-        .join(" ")
-        .toLowerCase()
-        .includes(value.toLowerCase())
+
+    const filtered = data.filter((item) =>
+      JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
     );
+
     setData(filtered);
   };
 
-  // when souda selected - populate basic info AND items list (user can add/remove items)
-  const handleSoudaSelect = (soudaNo, formInstance) => {
-    if (!soudaNo) return;
-    const souda = soudaMaster[soudaNo];
-    if (!souda) return;
-
-    // map items into form list entries (qty/free qty blank so user can fill)
-    const itemsForForm = souda.items.map((it) => ({
-      item: it.item,
-      itemCode: it.itemCode,
-      qty: undefined,
-      freeQty: 0,
-      totalQty: undefined,
-      uom: it.uom || purchaseIndentJSON.uomOptions[0],
-      rate: it.rate || 0,
-      discountPercent: 0,
-      discountAmt: 0,
-      grossWt: 0,
-      totalGrossWt: 0,
-      grossAmount: 0,
-    }));
-
-    formInstance.setFieldsValue({
-      soudaNo: souda.soudaNo,
-      plantName: souda.plantName,
-      plantCode: souda.plantCode,
-      companyName: souda.companyName,
-      depoName: souda.depoName,
-      deliveryAddress: souda.deliveryAddress || "",
-      items: itemsForForm,
-    });
-
-    // recalc after a tick
-    setTimeout(() => recalcAll(formInstance), 50);
-  };
 
   // recalc same as before, but for multi items
   const recalcAll = (formInstance) => {
@@ -222,83 +221,108 @@ export default function PurchaseIndent() {
     });
   };
 
-  const handleFormSubmit = (values, type) => {
-    const payloadBase = {
-      ...values,
-      indentDate: values.indentDate
-        ? values.indentDate.format("YYYY-MM-DD")
-        : null,
-      deliveryDate: values.deliveryDate
-        ? values.deliveryDate.format("YYYY-MM-DD")
-        : null,
-    };
+  const handleFormSubmit = async (values, type) => {
+    console.log("FORM VALUES", values);
 
-    const items = values.items || [];
+    try {
+      const items = values.items.map((item) => ({
+        product: item.productId,
 
-    const payload = {
-      ...payloadBase,
-      items,
-      totalQty: values.totalQty,
-      totalAmt: values.totalAmt,
-      status: values.status || "Pending",
-    };
+        net_qty: item.qty || 0,
+        gross_qty: (item.qty || 0) + (item.freeQty || 0),
+        free_qty: item.freeQty || 0,
 
-    if (type === "edit" && selectedRecord) {
-      setData((prev) =>
-        prev.map((i) =>
-          i.key === selectedRecord.key ? { ...payload, key: i.key } : i
-        )
-      );
-      setIsEditModalOpen(false);
-      editForm.resetFields();
-      message.success("Indent updated");
-    } else {
-      setData((prev) => [...prev, { ...payload, key: Date.now() }]);
-      setIsAddModalOpen(false);
+        unit: item.uom || "Kg",
+        mrp: item.rate || 0,
+
+        discount_percent: item.discountPercent || 0,
+        discount_amount: item.discountAmt || 0,
+
+        line_total: item.grossAmount || 0,
+
+        sgst: 0,
+        cgst: 0,
+        igst: 0,
+        tcs_amount: 0,
+      }));
+
+      const requestBody = {
+        contract: values.contractId,
+        vendor: values.vendorId,
+
+        order_number: `PO-${Date.now()}`,
+        purchase_type: "Local",
+        bill_mode: "NetBanking",
+
+        order_date: values.indentDate
+          ? values.indentDate.format("YYYY-MM-DD")
+          : null,
+
+        expected_receiving_date: values.deliveryDate
+          ? values.deliveryDate.format("YYYY-MM-DD")
+          : null,
+
+        delivery_address: values.deliveryAddress,
+
+        sgst: 0,
+        cgst: 0,
+        igst: 0,
+        tcs_amount: values.tcsAmt || 0,
+        cash_discount: 0,
+        round_off_amount: 0,
+
+        total_amount: values.totalAmt,
+        grand_total: values.totalAmt,
+
+        items,
+      };
+
+      if (type === "edit" && selectedRecord?.id) {
+        await updatePurchaseOrder(selectedRecord.id, requestBody);
+        message.success("Purchase Order updated");
+        setIsEditModalOpen(false);
+      } else {
+        await createPurchaseOrder(requestBody);
+        message.success("Purchase Order created");
+        setIsAddModalOpen(false);
+      }
+
       addForm.resetFields();
-      message.success("Indent added");
+      editForm.resetFields();
+      fetchOrders();
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to save purchase order");
     }
   };
+
 
   const columns = [
     {
       title: <span className="text-amber-700 font-semibold">Souda No</span>,
-      dataIndex: "soudaNo",
-      width: 120,
-      render: (t) => <span className="text-amber-800">{t}</span>,
+      dataIndex: "order_number",
+      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Plant</span>,
       dataIndex: "plantName",
-      width: 150,
-      render: (t) => <span className="text-amber-800">{t}</span>,
+      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Company</span>,
       dataIndex: "companyName",
-      width: 150,
-      render: (t) => <span className="text-amber-800">{t}</span>,
+      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
-    // {
-    //   title: <span className="text-amber-700 font-semibold">Delivery Date</span>,
-    //   dataIndex: "deliveryDate",
-    //   width: 120,
-    //   render: (t) => <span className="text-amber-800">{t}</span>,
-    // },
     {
       title: <span className="text-amber-700 font-semibold">Total Qty</span>,
-      dataIndex: "totalQty",
-      width: 120,
-      render: (_, record) => (
-        <span className="text-amber-800">{record.totalQty} </span>
-      ),
+      dataIndex: "total_qty_all_items",
+      render: (t) => <span className="text-amber-800">{t || 0}</span>,
     },
     {
       title: (
         <span className="text-amber-700 font-semibold">Total Amount (₹)</span>
       ),
-      dataIndex: "totalAmt",
-      width: 160,
+      dataIndex: "total_amount",
       render: (t) => (
         <span className="text-amber-800">
           ₹{Number(t || 0).toLocaleString()}
@@ -308,29 +332,35 @@ export default function PurchaseIndent() {
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
-      width: 120,
       render: (status) => {
         const base = "px-3 py-1 rounded-full text-sm font-semibold";
+
+        if (status === "Fresh")
+          return <span className={`${base} bg-blue-100 text-blue-700`}>Fresh</span>;
+
         if (status === "Approved")
           return (
             <span className={`${base} bg-green-100 text-green-700`}>
-              {status}
+              Approved
             </span>
           );
-        if (status === "Pending")
+
+        if (status === "Expired")
           return (
-            <span className={`${base} bg-yellow-100 text-yellow-700`}>
-              {status}
+            <span className={`${base} bg-gray-200 text-gray-700`}>
+              Expired
             </span>
           );
+
         return (
-          <span className={`${base} bg-red-100 text-red-700`}>{status}</span>
+          <span className={`${base} bg-yellow-100 text-yellow-700`}>
+            Updated
+          </span>
         );
       },
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
-      width: 120,
       render: (record) => (
         <div className="flex gap-3">
           <EyeOutlined
@@ -346,31 +376,65 @@ export default function PurchaseIndent() {
     },
   ];
 
+
   const handleView = (record) => {
     setSelectedRecord(record);
-    const convert = (v) => (v ? dayjs(v) : null);
 
-    viewForm.setFieldsValue({
-      ...record,
-      indentDate: convert(record.indentDate),
-      deliveryDate: convert(record.deliveryDate),
-    });
+    const formValues = mapOrderToForm(record);
+
+    viewForm.setFieldsValue(formValues);
 
     setIsViewModalOpen(true);
   };
 
+
+  const mapOrderToForm = (order) => {
+    const contract = contracts.find(c => c.id === order.contract);
+
+    return {
+      contractId: order.contract,
+      vendorId: order.vendor,
+
+      plantName: contract?.product_group_name || "",
+      companyName: vendorMap[order.vendor] || "",
+
+      indentDate: order.order_date ? dayjs(order.order_date) : null,
+      deliveryDate: order.expected_receiving_date
+        ? dayjs(order.expected_receiving_date)
+        : null,
+
+      deliveryAddress: order.delivery_address,
+      status: order.status,
+
+      items: (order.items || []).map(it => ({
+        productId: it.product,
+        qty: Number(it.net_qty),
+        freeQty: Number(it.free_qty),
+        totalQty: Number(it.net_qty) + Number(it.free_qty),
+        uom: it.unit,
+        rate: Number(it.mrp),
+        discountPercent: Number(it.discount_percent),
+        discountAmt: Number(it.discount_amount),
+        grossAmount: Number(it.line_total),
+        grossWt: 0,
+        totalGrossWt: 0,
+      })),
+    };
+  };
+
   const handleEdit = (record) => {
     setSelectedRecord(record);
-    const convert = (v) => (v ? dayjs(v) : null);
 
-    editForm.setFieldsValue({
-      ...record,
-      indentDate: convert(record.indentDate),
-      deliveryDate: convert(record.deliveryDate),
-    });
+    const formValues = mapOrderToForm(record);
+
+    editForm.setFieldsValue(formValues);
+
+    // recalc totals after setting values
+    setTimeout(() => recalcAll(editForm), 0);
 
     setIsEditModalOpen(true);
   };
+
 
   // Render form fields (used by Add/Edit/View). When soudaNo is selected, items are prefilled and user can add/remove entries.
   const renderFormFields = (formInstance, disabled = false) => (
@@ -380,19 +444,22 @@ export default function PurchaseIndent() {
         <Col span={6}>
           <Form.Item
             label="Souda No"
-            name="soudaNo"
+            name="contractId"
             rules={[{ required: true }]}
           >
             <Select
               disabled={disabled}
-              onChange={(v) => handleSoudaSelect(v, formInstance)}
+              onChange={(v) => handleContractSelect(v, formInstance)}
             >
-              {purchaseIndentJSON.soudaNoOptions.map((opt) => (
-                <Option key={opt} value={opt}>
-                  {opt}
+              {contracts.map((c) => (
+                <Option key={c.id} value={c.id}>
+                  {c.contract_number}
                 </Option>
               ))}
             </Select>
+          </Form.Item>
+          <Form.Item name="vendorId" hidden>
+            <Input />
           </Form.Item>
         </Col>
 
@@ -411,9 +478,9 @@ export default function PurchaseIndent() {
         <Col span={6}>
           <Form.Item label="Status" name="status">
             <Select disabled={disabled}>
-              {purchaseIndentJSON.statusOptions.map((opt) => (
-                <Option key={opt} value={opt}>
-                  {opt}
+              {STATUS_OPTIONS.map((opt) => (
+                <Option key={opt.value} value={opt.value}>
+                  {opt.label}
                 </Option>
               ))}
             </Select>
@@ -434,7 +501,7 @@ export default function PurchaseIndent() {
 
         <Col span={6}>
           <Form.Item label="Indent Date" name="indentDate">
-            <DatePicker className="w-full" disabled />
+            <DatePicker className="w-full" inputReadOnly />
           </Form.Item>
         </Col>
 
@@ -490,7 +557,7 @@ export default function PurchaseIndent() {
                     <Form.Item
                       {...field}
                       label="Item Name"
-                      name={[field.name, "item"]}
+                      name={[field.name, "productId"]}
                       rules={[
                         { required: true, message: "Please select item" },
                       ]}
@@ -504,17 +571,11 @@ export default function PurchaseIndent() {
                           setTimeout(() => recalcAll(formInstance), 50)
                         }
                       >
-                        {/* if souda selected, prefer those items */}
-                        {(() => {
-                          const soudaNo = formInstance.getFieldValue("soudaNo");
-                          const souda = soudaMaster[soudaNo];
-                          const opts = souda ? souda.items : [];
-                          return (opts.length ? opts : []).map((it) => (
-                            <Option key={it.itemCode} value={it.item}>
-                              {it.item}
-                            </Option>
-                          ));
-                        })()}
+                        {products.map((p) => (
+                          <Option key={p.id} value={p.id}>
+                            {p.name}
+                          </Option>
+                        ))}
                       </Select>
                     </Form.Item>
                   </Col>
@@ -567,14 +628,14 @@ export default function PurchaseIndent() {
                       <InputNumber className="w-full bg-gray-50" disabled />
                     </Form.Item>
                   </Col>
-                   <Col span={4}>
+                  <Col span={4}>
                     <Form.Item
                       {...field}
                       label="UOM"
                       name={[field.name, "uom"]}
                     >
                       <Select disabled={disabled}>
-                        {purchaseIndentJSON.uomOptions.map((opt) => (
+                        {UOM_OPTIONS.map((opt) => (
                           <Option key={opt} value={opt}>
                             {opt}
                           </Option>
@@ -632,7 +693,7 @@ export default function PurchaseIndent() {
                   </Col>
                 </Row>
 
-              
+
                 <Row gutter={12}>
                   <Col span={6}>
                     <Form.Item
@@ -771,7 +832,7 @@ export default function PurchaseIndent() {
             className="bg-amber-500! hover:bg-amber-600! border-none!"
             onClick={() => {
               addForm.resetFields();
-              addForm.setFieldsValue({ indentDate: dayjs(), items: [] });
+              addForm.setFieldsValue({ indentDate: dayjs(), status: "Fresh", items: [] });
               setIsAddModalOpen(true);
             }}
           >
@@ -788,11 +849,12 @@ export default function PurchaseIndent() {
         <p className="text-amber-600 mb-3">Manage your purchase souda data</p>
 
         <Table
+          loading={loading}
           columns={columns}
           dataSource={data}
           pagination={false}
           scroll={{ y: 260 }}
-          rowKey="key"
+          rowKey="id"
         />
       </div>
 
