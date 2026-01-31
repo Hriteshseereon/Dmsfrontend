@@ -30,6 +30,7 @@ import {
   getContractDetailsbyPerson,
   salesContractItems,
   createSalesOrder,
+  getSalesOrders,
 } from "../../../../../api/sales";
 /* ------------------ data (use your salesOrderJSON) ------------------ */
 const salesOrderJSON = {
@@ -352,6 +353,45 @@ export default function SaleOrdersInvoice() {
     });
     setIsAddModalOpen(true);
   };
+  useEffect(() => {
+    fetchSalesOrders();
+  }, []);
+
+  const fetchSalesOrders = async () => {
+    try {
+      const res = await getSalesOrders();
+
+      const mappedData = res.map((order, index) => ({
+        key: order.sales_order_id, // REQUIRED by antd table
+
+        orderNumber: order.order_number,
+        orderDate: order.order_date,
+        deliveryDate: order.expected_receiving_date,
+
+        customerName: order.customer_name,
+        customerId: order.customer_business_id,
+
+        status: order.status,
+        billMode: order.bill_mode,
+        purchaseType: order.purchase_type,
+
+        totalAmount: order.total_amount,
+        grandTotal: order.grand_total,
+
+        createdAt: order.created_at,
+
+        // optional placeholders (to avoid UI crash)
+        companyName: "-",
+        contracts: [],
+      }));
+
+      setData(mappedData);
+    } catch (error) {
+      console.error("Failed to fetch sales orders", error);
+      message.error("Failed to load sales orders");
+    }
+  };
+
   const buildSalesOrderPayload = (values) => {
     return {
       customer_id: values.customer_id,
@@ -388,7 +428,7 @@ export default function SaleOrdersInvoice() {
           total_amount: Number(item.amount || 0),
           line_total: Number(item.totalAmount || 0),
 
-          hsn_code: item.hsn_code || 2312,
+          hsn_code: item.hsn_code || 0,
         })),
       })),
     };
@@ -519,6 +559,11 @@ export default function SaleOrdersInvoice() {
   /* ---------- Columns ---------- */
   const columns = [
     {
+      title: <span className="text-amber-700 font-semibold">Order No</span>,
+      dataIndex: "orderNumber",
+      render: (t) => <span className="text-amber-800">{t}</span>,
+    },
+    {
       title: <span className="text-amber-700 font-semibold">Order Date</span>,
       dataIndex: "orderDate",
       render: (d) => (
@@ -538,25 +583,25 @@ export default function SaleOrdersInvoice() {
         </span>
       ),
     },
-    {
-      title: <span className="text-amber-700 font-semibold">Company</span>,
-      dataIndex: "companyName",
-      render: (t) => <span className="text-amber-800">{t}</span>,
-    },
+    // {
+    //   title: <span className="text-amber-700 font-semibold">Company</span>,
+    //   dataIndex: "companyName",
+    //   render: (t) => <span className="text-amber-800">{t}</span>,
+    // },
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
       dataIndex: "customerName",
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
-    {
-      title: <span className="text-amber-700 font-semibold">Contracts</span>,
-      dataIndex: "contracts",
-      render: (contracts = []) => (
-        <span className="text-amber-800">
-          {(contracts || []).map((c) => c.contractNo).join(", ")}
-        </span>
-      ),
-    },
+    // {
+    //   title: <span className="text-amber-700 font-semibold">Contracts</span>,
+    //   dataIndex: "contracts",
+    //   render: (contracts = []) => (
+    //     <span className="text-amber-800">
+    //       {(contracts || []).map((c) => c.contractNo).join(", ")}
+    //     </span>
+    //   ),
+    // },
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
@@ -676,6 +721,7 @@ export default function SaleOrdersInvoice() {
                           lineKey: Date.now() + Math.random(),
                           item: it.product_name,
                           itemCode: it.product_id,
+                          hsnCode: it.hsn_code,
                           uom: it.uom?.unit_name,
                           qty: Number(it.net_qty),
                           freeQty: Number(it.free_qty),
@@ -751,6 +797,7 @@ export default function SaleOrdersInvoice() {
                                       ...(items[ii] || {}),
                                       item: sel.product_name,
                                       itemCode: sel.product_id,
+                                      hsnCode: sel.hsn_code,
                                       uom: sel.uom?.unit_name,
                                       qty: Number(sel.net_qty),
                                       freeQty: Number(sel.free_qty),
@@ -786,7 +833,7 @@ export default function SaleOrdersInvoice() {
                             {/* CODE */}
                             <Col span={4}>
                               <Form.Item
-                                name={[itf.name, "itemCode"]}
+                                name={[itf.name, "hsnCode"]}
                                 label="Code"
                               >
                                 <Input disabled />

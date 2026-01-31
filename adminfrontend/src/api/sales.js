@@ -76,3 +76,11 @@ export const createSalesOrder = async (payload) => {
   });
   return res.data;
 }
+
+export const getSalesOrders = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/sales/orders/`, { 
+    params: { organisation: currentOrgId }
+  });
+  return res.data;
+}
