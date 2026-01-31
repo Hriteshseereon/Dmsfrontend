@@ -5,6 +5,7 @@ import { positiveNumberInputProps,
   blockNonNumericInput  } from "../../../helpers/numberInput";
 import { requiredPositiveNumber,optionalPositiveNumber,percentageValidation } from "../../../helpers/formValidation";
 import { updateItemComputedFields } from "../../../helpers/calculation";
+import { getPurchaseContract ,getAllCompany,getAllVendor,getAllProduct,addPurchaseContract} from "../../../../../api/purchase";
 import {
   Table,
   Input,
@@ -95,14 +96,39 @@ export default function PurchaseSouda() {
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
+  const [vendors, setVendors] = useState([]);
+const [companies, setCompanies] = useState([]);
+const [products, setProducts] = useState([]);
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
 
-  const [data, setData] = useState(purchaseSoudaJSON.records);
-  const [searchText, setSearchText] = useState("");
+ const [data, setData] = useState([]);
+const [loading, setLoading] = useState(false);
+ const [searchText, setSearchText] = useState("");
+
+
+ useEffect(() => {
+  fetchDropdownData();
+}, []);
+
+const fetchDropdownData = async () => {
+  try {
+    const [vendorRes, companyRes, productRes] = await Promise.all([
+      getAllVendor(),
+      getAllCompany(),
+      getAllProduct(),
+    ]);
+
+    setVendors(vendorRes);
+    setCompanies(companyRes);
+    setProducts(productRes);
+  } catch (err) {
+    console.error("Dropdown API failed", err);
+  }
+};
 
   // helper: map of itemOptions for quick lookup
   const itemMap = useMemo(() => {
@@ -123,12 +149,43 @@ export default function PurchaseSouda() {
     );
     setData(filtered);
   };
+useEffect(() => {
+  fetchPurchaseContracts();
+}, []);
 
+const fetchPurchaseContracts = async () => {
+  try {
+    setLoading(true);
+    const res = await getPurchaseContract();
+
+    /**
+     * Adjust mapping based on backend response structure
+     * Assuming API returns array of purchase contracts
+     */
+    const formattedData = res.map((item, index) => ({
+      key: item.id || index + 1,
+      plant: item.plant,
+      vendor: item.vendor,
+      startDate: item.startDate,
+      to_date: item.to_date,
+      from_date:item.from_date,
+      status: item.status,
+    }));
+
+    setData(formattedData);
+  } catch (error) {
+    console.error("Failed to fetch purchase contracts", error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  
   // ---------- Table columns ----------
   const columns = [
     {
       title: <span className="text-amber-700 font-semibold">Plant Name</span>,
-      dataIndex: "plantName",
+      dataIndex: "plant",
       width: 140,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
@@ -140,62 +197,23 @@ export default function PurchaseSouda() {
     // },
     {
       title: <span className="text-amber-700 font-semibold">Start Date</span>,
-      dataIndex: "startDate",
+      dataIndex: "from_date",
       width: 110,
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">End Date</span>,
-      dataIndex: "endDate",
+      dataIndex: "to_date",
       width: 110,
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Company</span>,
-      dataIndex: "companyName",
+      dataIndex: "vendor",
       width: 140,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
-    // {
-    //   title: <span className="text-amber-700 font-semibold">Item(s)</span>,
-    //   dataIndex: "items",
-    //   width: 300,
-    //   render: (items = []) => (
-    //     <div className="text-amber-800">
-    //       {items.map((it) => (
-    //         <div key={it.lineKey} className="text-sm">
-    //           <strong>{it.item}</strong> — {it.qty} {it.uom} @ ₹{it.rate} = ₹
-    //           {Number(it.grossAmount || 0).toLocaleString()}
-    //         </div>
-    //       ))}
-    //     </div>
-    //   ),
-    // },
-    // {
-    //   title: <span className="text-amber-700 font-semibold">Total Qty</span>,
-    //   dataIndex: "items",
-    //   width: 120,
-    //   render: (items = []) => {
-    //     const totalQty = items.reduce((s, it) => s + Number(it.totalQty || 0), 0);
-    //     const uom = items[0]?.uom || "";
-    //     return (
-    //       <span className="text-amber-800">
-    //         {totalQty} {uom}
-    //       </span>
-    //     );
-    //   },
-    // },
-    // {
-    //   title: (
-    //     <span className="text-amber-700 font-semibold">Total Amount (₹)</span>
-    //   ),
-    //   dataIndex: "items",
-    //   width: 140,
-    //   render: (items = []) => {
-    //     const total = items.reduce((s, it) => s + Number(it.totalAmt || 0), 0);
-    //     return <span className="text-amber-800">₹{total.toLocaleString()}</span>;
-    //   },
-    // },
+ 
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
@@ -310,241 +328,27 @@ export default function PurchaseSouda() {
   };
 
   // ---------- Form submit ----------
-  const handleFormSubmit = (formValues, mode) => {
-    // formValues will already have computed fields set by onValuesChange
-    const payload = {
-      ...formValues,
-      // format dates to string
-      soudaDate: formValues.soudaDate ? dayjs(formValues.soudaDate).format("YYYY-MM-DD") : undefined,
-      startDate: formValues.startDate ? dayjs(formValues.startDate).format("YYYY-MM-DD") : undefined,
-      endDate: formValues.endDate ? dayjs(formValues.endDate).format("YYYY-MM-DD") : undefined,
-    };
-
-    if (mode === "edit" && selectedRecord) {
-      setData((prev) => prev.map((r) => (r.key === selectedRecord.key ? { ...payload, key: r.key } : r)));
-      setIsEditModalOpen(false);
-      editForm.resetFields();
-      setSelectedRecord(null);
-    } else {
-      setData((prev) => [...prev, { ...payload, key: prev.length + 1 }]);
-      setIsAddModalOpen(false);
-      addForm.resetFields();
-    }
+const handleFormSubmit = async (values) => {
+  const payload = {
+    organisation: values.organisation,
+    plant: values.plant,
+    from_date: dayjs(values.startDate).format("YYYY-MM-DD"),
+    to_date: dayjs(values.endDate).format("YYYY-MM-DD"),
+    items: values.items.map(it => ({
+      product: it.item,
+      quantity: it.qty,
+      free_qty: it.freeQty,
+      rate: it.rate,
+      sgst_percent: it.sgstPercent,
+      cgst_percent: it.cgstPercent,
+      igst_percent: it.igstPercent,
+    })),
   };
 
-  // ---------- Render Form Sections ----------
-  // render item list (Form.List)
-  // const ItemsList = ({ form, disabled = false }) => (
-  //   <Form.List name="items">
-  //     {(fields, { add, remove }) => (
-  //       <>
-  //         <div className="mb-2 flex justify-between items-center">
-  //           <h6 className="text-amber-500">Items</h6>
-  //           {!disabled && (
-  //             <Button
-  //               type="dashed"
-  //               icon={<PlusOutlined />}
-  //               onClick={() =>
-  //                 add({
-  //                   lineKey: new Date().getTime(),
-  //                   item: undefined,
-  //                   itemCode: undefined,
-  //                   qty: 0,
-  //                   freeQty: 0,
-  //                   totalQty: 0,
-  //                   rate: 0,
-  //                   discountPercent: 0,
-  //                   discountAmt: 0,
-  //                   grossAmount: 0,
-  //                   uom: purchaseSoudaJSON.uomOptions[0],
-  //                 })
-  //               }
-  //             >
-  //               Add Item
-  //             </Button>
-  //           )}
-  //         </div>
+  await addPurchaseContract(values.organisation, payload);
+};
 
-  //         {fields.map((field, index) => (
-  //           <Card
-  //             key={field.key}
-  //             size="small"
-  //             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-  //             bodyStyle={{ padding: 12 }}
-  //             extra={
-  //               !disabled && (
-  //                 <Button
-  //                   type="text"
-  //                   danger
-  //                   icon={<DeleteOutlined />}
-  //                   onClick={() => remove(field.name)}
-  //                 />
-  //               )
-  //             }
-  //           >
-  //             <Row gutter={12} align="middle">
-  //               <Col span={6}>
-  //                 <Form.Item
-  //                   {...field}
-  //                   label="Item Name"
-  //                   name={[field.name, "item"]}
-  //                   fieldKey={[field.fieldKey, "item"]}
-  //                   rules={[{ required: true }]}
-  //                 >
-  //                   <Select
-  //                     placeholder="Select Item"
-  //                     disabled={disabled}
-  //                     onChange={(val) => {
-  //                       // autofill itemCode, rate and uom when item selected
-  //                       const selected = itemMap[val];
-  //                       const baseForm = form;
-  //                       baseForm.setFields([
-  //                         { name: ["items", field.name, "itemCode"], value: selected?.code || "" },
-  //                         { name: ["items", field.name, "rate"], value: selected?.rate ?? 0 },
-  //                         { name: ["items", field.name, "uom"], value: selected?.uom ?? purchaseSoudaJSON.uomOptions[0] },
-  //                       ]);
-  //                       // after setting values, recompute derived fields
-  //                       const all = baseForm.getFieldsValue();
-  //                       const computed = computeAllFromFormValues(all || {});
-  //                       baseForm.setFieldsValue({ items: computed.items });
-  //                     }}
-  //                   >
-  //                     {purchaseSoudaJSON.itemOptions.map((opt) => (
-  //                       <Option key={opt.name} value={opt.name}>
-  //                         {opt.name}
-  //                       </Option>
-  //                     ))}
-  //                   </Select>
-  //                 </Form.Item>
-  //               </Col>
-
-  //               <Col span={4}>
-  //                 <Form.Item {...field} label="Item Code" name={[field.name, "itemCode"]} fieldKey={[field.fieldKey, "itemCode"]}>
-  //                   <Input disabled />
-  //                 </Form.Item>
-  //               </Col>
-
-  //               <Col span={4}>
-  //                 <Form.Item {...field} label="Qty" name={[field.name, "qty"]} rules={requiredPositiveNumber("Quantity")}>
-  //                   <InputNumber {...positiveNumberInputProps}className="w-full" disabled={disabled} onChange={() => {
-  //                     // recompute when qty changes
-  //                     const all = form.getFieldsValue();
-  //                     const computed = computeAllFromFormValues(all || {});
-  //                     form.setFieldsValue({ items: computed.items });
-  //                   }} />
-  //                 </Form.Item>
-  //               </Col>
-
-  //               <Col span={4}>
-  //                 <Form.Item {...field} label="Free Qty" name={[field.name, "freeQty"]} fieldKey={[field.fieldKey, "freeQty"]}>
-  //                   <InputNumber min={0} className="w-full" disabled={disabled} onChange={() => {
-  //                     const all = form.getFieldsValue();
-  //                     const computed = computeAllFromFormValues(all || {});
-  //                     form.setFieldsValue({ items: computed.items });
-  //                   }} />
-  //                 </Form.Item>
-  //               </Col>
-
-  //               <Col span={4}>
-  //                 <Form.Item {...field} label="Total Qty" name={[field.name, "totalQty"]} fieldKey={[field.fieldKey, "totalQty"]}>
-  //                   <InputNumber className="w-full" disabled />
-  //                 </Form.Item>
-  //               </Col>
-
-  //               <Col span={4}>
-  //                 <Form.Item {...field} label="UOM" name={[field.name, "uom"]} fieldKey={[field.fieldKey, "uom"]}>
-  //                   <Select disabled={disabled}>
-  //                     {purchaseSoudaJSON.uomOptions.map((u) => (
-  //                       <Option key={u} value={u}>
-  //                         {u}
-  //                       </Option>
-  //                     ))}
-  //                   </Select>
-  //                 </Form.Item>
-  //               </Col>
-
-  //               <Col span={4}>
-  //                 <Form.Item {...field} label="Rate" name={[field.name, "rate"]} fieldKey={[field.fieldKey, "rate"]}>
-  //                   <InputNumber min={0} className="w-full" disabled={disabled} onChange={() => {
-  //                     const all = form.getFieldsValue();
-  //                     const computed = computeAllFromFormValues(all || {});
-  //                     form.setFieldsValue({ items: computed.items });
-  //                   }} />
-  //                 </Form.Item>
-  //               </Col>
-
-  //               <Col span={4}>
-  //                 <Form.Item {...field} label="Dis%" name={[field.name, "discountPercent"]} fieldKey={[field.fieldKey, "discountPercent"]}>
-  //                   <InputNumber min={0} max={100} className="w-full" disabled={disabled} onChange={() => {
-  //                     const all = form.getFieldsValue();
-  //                     const computed = computeAllFromFormValues(all || {});
-  //                     form.setFieldsValue({ items: computed.items });
-  //                   }} />
-  //                 </Form.Item>
-  //               </Col>
-
-  //               <Col span={4}>
-  //                 <Form.Item {...field} label="Gross Amount (₹)" name={[field.name, "grossAmount"]} fieldKey={[field.fieldKey, "grossAmount"]}>
-  //                   <InputNumber className="w-full" disabled />
-  //                 </Form.Item>
-  //               </Col>
-
-  //               <Col span={4}>
-  //                 <Form.Item {...field} label="Discount Amt (₹)" name={[field.name, "discountAmt"]} fieldKey={[field.fieldKey, "discountAmt"]}>
-  //                   <InputNumber className="w-full" disabled />
-  //                 </Form.Item>
-  //               </Col>
-
-  //               <Col span={4}>
-  //                 <Form.Item {...field} label="SGST %" name={[field.name, "sgstPercent"]} fieldKey={[field.fieldKey, "sgstPercent"]}>
-  //                   <InputNumber min={0} max={100} className="w-full" disabled={disabled} onChange={() => {
-  //                     const all = form.getFieldsValue();
-  //                     const computed = computeAllFromFormValues(all || {});
-  //                     form.setFieldsValue({ items: computed.items });
-  //                   }} />
-  //                 </Form.Item>
-  //               </Col>
-
-  //               <Col span={4}>
-  //                 <Form.Item {...field} label="CGST %" name={[field.name, "cgstPercent"]} fieldKey={[field.fieldKey, "cgstPercent"]}>
-  //                   <InputNumber min={0} max={100} className="w-full" disabled={disabled} onChange={() => {
-  //                     const all = form.getFieldsValue();
-  //                     const computed = computeAllFromFormValues(all || {});
-  //                     form.setFieldsValue({ items: computed.items });
-  //                   }} />
-  //                 </Form.Item>
-  //               </Col>
-
-  //               <Col span={4}>
-  //                 <Form.Item {...field} label="IGST %" name={[field.name, "igstPercent"]} fieldKey={[field.fieldKey, "igstPercent"]}>
-  //                   <InputNumber min={0} max={100} className="w-full" disabled={disabled} onChange={() => {
-  //                     const all = form.getFieldsValue();
-  //                     const computed = computeAllFromFormValues(all || {});
-  //                     form.setFieldsValue({ items: computed.items });
-  //                   }} />
-  //                 </Form.Item>
-  //               </Col>
-
-  //               <Col span={4}>
-  //                 <Form.Item {...field} label="Total GST (₹)" name={[field.name, "totalGST"]} fieldKey={[field.fieldKey, "totalGST"]}>
-  //                   <InputNumber className="w-full" disabled />
-  //                 </Form.Item>
-  //               </Col>
-
-  //               <Col span={6}>
-  //                 <Form.Item {...field} label="Total Amount (₹)" name={[field.name, "totalAmt"]} fieldKey={[field.fieldKey, "totalAmt"]}>
-  //                   <InputNumber className="w-full" disabled />
-  //                 </Form.Item>
-  //               </Col>
-  //             </Row>
-  //           </Card>
-  //         ))}
-  //       </>
-  //     )}
-  //   </Form.List>
-  // );
-// ItemsList component with proper validation
-const ItemsList = ({ form, disabled = false }) => (
+  const ItemsList = ({ form, disabled = false }) => (
   <Form.List name="items">
     {(fields, { add, remove }) => (
       <>
@@ -601,27 +405,28 @@ const ItemsList = ({ form, disabled = false }) => (
                   fieldKey={[field.fieldKey, "item"]}
                   rules={[{ required: true, message: "Item is required" }]}
                 >
-                  <Select
-                    placeholder="Select Item"
-                    disabled={disabled}
-                    onChange={(val) => {
-                      const selected = itemMap[val];
-                      const baseForm = form;
-                      baseForm.setFields([
-                        { name: ["items", field.name, "itemCode"], value: selected?.code || "" },
-                        { name: ["items", field.name, "rate"], value: selected?.rate ?? 0 },
-                        { name: ["items", field.name, "uom"], value: selected?.uom ?? purchaseSoudaJSON.uomOptions[0] },
-                      ]);
-                      const all = baseForm.getFieldsValue();
-                      const computed = computeAllFromFormValues(all || {});
-                      baseForm.setFieldsValue({ items: computed.items });
-                    }}
-                  >
-                    {purchaseSoudaJSON.itemOptions.map((opt) => (
-                      <Option key={opt.name} value={opt.name}>
-                        {opt.name}
-                      </Option>
-                    ))}
+                 <Select
+  placeholder="Select Item"
+  disabled={disabled}
+  onChange={(productId) => {
+    const selected = products.find(p => p.id === productId);
+
+    addForm.setFields([
+      { name: ["items", field.name, "rate"], value: selected?.rate || 0 },
+      { name: ["items", field.name, "uom"], value: selected?.uom || "Litre" },
+      { name: ["items", field.name, "sgstPercent"], value: selected?.sgst || 0 },
+      { name: ["items", field.name, "cgstPercent"], value: selected?.cgst || 0 },
+      { name: ["items", field.name, "igstPercent"], value: selected?.igst || 0 },
+    ]);
+  }}
+>
+
+                  {products.map((p) => (
+  <Select.Option key={p.id} value={p.id}>
+    {p.name}
+  </Select.Option>
+))}
+
                   </Select>
                 </Form.Item>
               </Col>
@@ -871,37 +676,36 @@ const ItemsList = ({ form, disabled = false }) => (
         <h6 className="text-amber-500">Basic Information</h6>
         <Row gutter={16}>
            <Col span={6}>
-          <Form.Item
-            label="Company Name"
-            name="companyName"
-            rules={[{ required: true }]}
-          >
-            <Select placeholder="Select Company" disabled={disabled}>
-              {companyOptions.map((c) => (
-                <Select.Option key={c} value={c}>
-                  {c}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
+       <Form.Item
+  label="Company Name"
+  name="organisation"
+  rules={[{ required: true }]}
+>
+  <Select placeholder="Select Company" disabled={disabled}>
+    {companies.map((c) => (
+      <Select.Option key={c.id} value={c.id}>
+        {c.name}
+      </Select.Option>
+    ))}
+  </Select>
+</Form.Item>
+
         </Col>
           <Col span={6}>
-            <Form.Item label="Plant Name" name="plantName" rules={[{ required: true }]}>
-              <Select
-                placeholder="Select Plant"
-                disabled={disabled}
-                onChange={(value) => {
-                  const selectedPlant = purchaseSoudaJSON.plantOptions.find((p) => p.name === value);
-                  form.setFieldsValue({ plantCode: selectedPlant ? selectedPlant.code : "" });
-                }}
-              >
-                {purchaseSoudaJSON.plantOptions.map((opt) => (
-                  <Option key={opt.name} value={opt.name}>
-                    {opt.name}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
+           <Form.Item
+  label="Plant Name"
+  name="plant"
+  rules={[{ required: true }]}
+>
+  <Select placeholder="Select Plant" disabled={disabled}>
+    {companies.map((p) => (
+      <Option key={p.id} value={p.id}>
+        {p.name}
+      </Option>
+    ))}
+  </Select>
+</Form.Item>
+
           </Col>
 
           {/* <Col span={4}>
@@ -913,17 +717,7 @@ const ItemsList = ({ form, disabled = false }) => (
          
 
 
-          {/* <Col span={6}>
-            <Form.Item label="Depo Name" name="depoName" rules={[{ required: true }]}>
-              <Select placeholder="Select Depot" disabled={disabled}>
-                {purchaseSoudaJSON.depoOptions.map((opt) => (
-                  <Option key={opt} value={opt}>
-                    {opt}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Col> */}
+       
 
           <Col span={6}>
             <Form.Item label="Souda Date" name="soudaDate" initialValue={dayjs()}>
@@ -1074,7 +868,7 @@ const ItemsList = ({ form, disabled = false }) => (
       {/* Table */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">Purchase Contract Records</h2>
-        <Table columns={columns} dataSource={data} pagination={false} rowKey="key" scroll={{ y: 300 }} />
+        <Table columns={columns} dataSource={data} loading={loading} pagination={false} rowKey="key" scroll={{ y: 300 }} />
       </div>
 
       {/* Add Modal */}

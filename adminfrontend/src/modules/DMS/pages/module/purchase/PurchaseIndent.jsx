@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 import { positiveNumberInputProps } from "../../../helpers/numberInput";
 import {
   requiredPositiveNumber,
   optionalPositiveNumber,
   percentageValidation,
 } from "../../../helpers/formValidation";
-
+import { getPurchaseOrder } from "../../../../../api/purchase";
 import {
   Table,
   Input,
@@ -103,30 +103,62 @@ export default function PurchaseIndent() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const [data, setData] = useState(purchaseIndentJSON.records);
+ 
+  const [data, setData] = useState([]);
+ const [loading, setLoading] = useState(false);
+ 
   const [searchText, setSearchText] = useState("");
 
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
+  useEffect(() => {
+  fetchPurchaseOrder();
+}, []);
 
-  const handleSearch = (value) => {
-    setSearchText(value);
-    if (!value) {
-      setData(purchaseIndentJSON.records);
-      return;
-    }
-    const filtered = purchaseIndentJSON.records.filter((item) =>
-      Object.values(item)
-        .flatMap((v) =>
-          Array.isArray(v) ? v.map((x) => JSON.stringify(x)) : v
-        )
-        .join(" ")
-        .toLowerCase()
-        .includes(value.toLowerCase())
-    );
-    setData(filtered);
-  };
+const fetchPurchaseOrder = async () => {
+  try {
+    setLoading(true);
+
+    const res = await getPurchaseOrder();
+
+    // adjust if API response is wrapped (res.data)
+    const list = res?.data || res;
+
+    const formattedData = list.map((item, index) => ({
+      key: item.id || index + 1,
+      contract: item.contract,
+      plant_name: item.plant_name,
+      company_name: item.company_name,
+      total_qty_all_items: item.total_qty_all_items || 0,
+      total_amount: item.total_amount || 0,
+      status: item.status || "Pending",
+    }));
+
+    setData(formattedData);
+  } catch (error) {
+    console.error("Failed to fetch purchase orders", error);
+    message.error("Failed to load purchase indents");
+  } finally {
+    setLoading(false);
+  }
+};
+
+const handleSearch = (value) => {
+  setSearchText(value);
+
+  if (!value) {
+    fetchPurchaseOrder();
+    return;
+  }
+
+  const filtered = data.filter((item) =>
+    JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
+  );
+
+  setData(filtered);
+};
+
 
   // when souda selected - populate basic info AND items list (user can add/remove items)
   const handleSoudaSelect = (soudaNo, formInstance) => {
@@ -222,6 +254,7 @@ export default function PurchaseIndent() {
     });
   };
 
+
   const handleFormSubmit = (values, type) => {
     const payloadBase = {
       ...values,
@@ -263,19 +296,19 @@ export default function PurchaseIndent() {
   const columns = [
     {
       title: <span className="text-amber-700 font-semibold">Souda No</span>,
-      dataIndex: "soudaNo",
+      dataIndex: "contract",
       width: 120,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Plant</span>,
-      dataIndex: "plantName",
+      dataIndex: "plant_name",
       width: 150,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Company</span>,
-      dataIndex: "companyName",
+      dataIndex: "company_name",
       width: 150,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
@@ -287,17 +320,19 @@ export default function PurchaseIndent() {
     // },
     {
       title: <span className="text-amber-700 font-semibold">Total Qty</span>,
-      dataIndex: "totalQty",
+      dataIndex: "total_qty_all_items",
       width: 120,
       render: (_, record) => (
-        <span className="text-amber-800">{record.totalQty} </span>
+        <span className="text-amber-800">{record.
+total_qty_all_items
+} </span>
       ),
     },
     {
       title: (
         <span className="text-amber-700 font-semibold">Total Amount (₹)</span>
       ),
-      dataIndex: "totalAmt",
+      dataIndex: "total_amount",
       width: 160,
       render: (t) => (
         <span className="text-amber-800">
@@ -790,6 +825,7 @@ export default function PurchaseIndent() {
         <Table
           columns={columns}
           dataSource={data}
+          loading={loading}
           pagination={false}
           scroll={{ y: 260 }}
           rowKey="key"
