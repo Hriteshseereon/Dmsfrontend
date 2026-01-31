@@ -13,6 +13,7 @@ import {
   Col,
   Divider,
   Space,
+  message,
 } from "antd";
 import {
   SearchOutlined,
@@ -28,6 +29,7 @@ import {
   getContractpersonName,
   getContractDetailsbyPerson,
   salesContractItems,
+  createSalesOrder,
 } from "../../../../../api/sales";
 /* ------------------ data (use your salesOrderJSON) ------------------ */
 const salesOrderJSON = {
@@ -350,53 +352,87 @@ export default function SaleOrdersInvoice() {
     });
     setIsAddModalOpen(true);
   };
+  const buildSalesOrderPayload = (values) => {
+    return {
+      customer_id: values.customer_id,
 
-  const handleAddFinish = (values) => {
-    // final compute to ensure consistency
-    const contracts = (values.contracts || []).map((c) => ({
-      ...c,
-      items: (c.items || []).map((it) => ({
-        ...it,
-        amount: Math.round(Number(it.qty || 0) * Number(it.rate || 0)),
-        discountAmt: Math.round(
-          (Number(it.qty || 0) *
-            Number(it.rate || 0) *
-            Number(it.discountPercent || 0)) /
-            100,
-        ),
-        totalAmount: Math.round(
-          Number(it.qty || 0) * Number(it.rate || 0) -
-            (Number(it.qty || 0) *
-              Number(it.rate || 0) *
-              Number(it.discountPercent || 0)) /
-              100,
-        ),
-        totalQty: Number(it.qty || 0) + Number(it.freeQty || 0),
+      order_date: values.orderDate
+        ? dayjs(values.orderDate).format("YYYY-MM-DD")
+        : null,
+
+      expected_receiving_date: values.deliveryDate
+        ? dayjs(values.deliveryDate).format("YYYY-MM-DD")
+        : null,
+
+      purchase_type: values.purchase_type || "Transit",
+      bill_mode: values.bill_mode || "Cash",
+
+      items: (values.contracts || []).map((contract) => ({
+        sale_contract_id: contract.contract_id,
+
+        products: (contract.items || []).map((item) => ({
+          product_id: item.itemCode,
+          product_name: item.item || "",
+          uom_id: null,
+
+          ordered_qty: Number(item.qty || 0),
+          net_qty: Number(item.qty || 0),
+          gross_qty: Number(item.totalQty || 0),
+          free_qty: Number(item.freeQty || 0),
+
+          rate: Number(item.rate || 0),
+          mrp_per_unit: Number(item.rate || 0),
+
+          discount_percent: Number(item.discountPercent || 0),
+
+          total_amount: Number(item.amount || 0),
+          line_total: Number(item.totalAmount || 0),
+
+          hsn_code: item.hsn_code || 2312,
+        })),
       })),
-    }));
-
-    const { orderTaxAndTotals, orderTotals } = computeOrderTotalsFromContracts(
-      contracts,
-      values.orderTaxAndTotals || {},
-    );
-
-    const payload = {
-      ...values,
-      contracts,
-      orderTaxAndTotals,
-      orderTotals,
-      key: data.length + 1,
-      orderDate: values.orderDate
-        ? values.orderDate.format("YYYY-MM-DD")
-        : undefined,
-      deliveryDate: values.deliveryDate
-        ? values.deliveryDate.format("YYYY-MM-DD")
-        : undefined,
     };
+  };
 
-    setData((prev) => [...prev, payload]);
-    setIsAddModalOpen(false);
-    addForm.resetFields();
+  const handleAddFinish = async (values) => {
+    try {
+      values.contracts.forEach((c, idx) => {
+        console.log(`🧾 Contract[${idx}] ID:`, c.contract_id);
+
+        (c.items || []).forEach((i, j) => {
+          console.log(`   📦 Product[${j}] ID:`, i.itemCode);
+        });
+      });
+      const payload = buildSalesOrderPayload(values);
+
+      console.log("FINAL SALES ORDER PAYLOAD 🔥", payload);
+
+      await createSalesOrder(payload);
+
+      message.success("Sales Order created successfully");
+
+      setIsAddModalOpen(false);
+      addForm.resetFields();
+    } catch (error) {
+      console.error("❌ Sales Order API Error");
+
+      if (error.response) {
+        // Backend responded with error status (400, 401, 500 etc.)
+        console.error("Status:", error.response.status);
+        console.error("Data:", error.response.data);
+        console.error("Headers:", error.response.headers);
+
+        message.error(error.response.data?.message || "Server error occurred");
+      } else if (error.request) {
+        // Request was sent but no response received
+        console.error("No response received:", error.request);
+        message.error("No response from server");
+      } else {
+        // Something else went wrong
+        console.error("Error message:", error.message);
+        message.error(error.message);
+      }
+    }
   };
 
   /* ---------- Edit handlers ---------- */
