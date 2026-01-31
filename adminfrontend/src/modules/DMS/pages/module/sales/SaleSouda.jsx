@@ -30,6 +30,7 @@ import {
   getproductbyVendor,
   getVendors,
   getSalescontractGroups,
+  approvedSalesContract,
 } from "../../../../../api/sales";
 /** trimmed/embedded seed data (same as you provided) */
 const salesSoudaJSONModified2 = {
@@ -374,6 +375,25 @@ export default function SalesSouda() {
     editForm.setFieldsValue(mapped);
     setIsEditModalOpen(true);
   };
+  // CONTRACT APPROVER
+  const handleApprove = async (record) => {
+    try {
+      // call API
+      const res = await approvedSalesContract(record.key);
+      // key = sale_contract_id (you already mapped this correctly)
+
+      // update UI status optimistically
+      setData((prev) =>
+        prev.map((row) =>
+          row.key === record.key
+            ? { ...row, status: res.status || "Approved" }
+            : row,
+        ),
+      );
+    } catch (err) {
+      console.error("Failed to approve contract", err);
+    }
+  };
 
   // table columns: replace deliveryDate / company with startDate / endDate
   const columns = [
@@ -452,6 +472,16 @@ export default function SalesSouda() {
         <div className="flex gap-3">
           <EyeOutlined onClick={() => openView(record)} />
           <EditOutlined onClick={() => openEdit(record)} />
+          {record.status === "Fresh" && (
+            <Button
+              size="small"
+              type="primary"
+              className="bg-green-500 hover:bg-green-600"
+              onClick={() => handleApprove(record)}
+            >
+              Approve
+            </Button>
+          )}
         </div>
       ),
     },

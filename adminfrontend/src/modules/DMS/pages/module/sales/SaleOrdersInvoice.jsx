@@ -24,7 +24,11 @@ import {
   DeleteOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-
+import {
+  getContractpersonName,
+  getContractDetailsbyPerson,
+  salesContractItems,
+} from "../../../../../api/sales";
 /* ------------------ data (use your salesOrderJSON) ------------------ */
 const salesOrderJSON = {
   initialData: [
@@ -167,7 +171,9 @@ const salesOrderJSON = {
       soudaNo: "SOUDA-002",
       companyName: "XYZ Oils Ltd",
       customerName: "Cuttack Market",
-      items: [{ item: "Sunflower Oil", itemCode: "ITM002", rate: 135, uom: "Ltrs" }],
+      items: [
+        { item: "Sunflower Oil", itemCode: "ITM002", rate: 135, uom: "Ltrs" },
+      ],
     },
   ],
 };
@@ -184,11 +190,30 @@ export default function SaleOrdersInvoice() {
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
+  const [contractPersonOptions, setContractPersonOptions] = useState([]);
+  const [contractOptions, setContractOptions] = useState([]);
+  // const [contractItems, setContractItems] = useState([]);
+  const [contractItemsMap, setContractItemsMap] = useState({});
+
+  /* ---------- search filter ---------- */
+  const fetchContractPersons = async () => {
+    try {
+      const res = await getContractpersonName();
+      console.log("Contract persons fetched:", res);
+      setContractPersonOptions(res);
+    } catch (error) {
+      console.error("Error fetching contract persons:", error);
+    }
+  };
+  useEffect(() => {
+    fetchContractPersons();
+  }, []);
 
   // filtering keys (customerName rather than customer)
   const filteredData = data.filter((d) =>
-    ["companyName", "customerName", "status"]
-      .some((k) => (d[k] || "").toString().toLowerCase().includes(searchText.toLowerCase()))
+    ["companyName", "customerName", "status"].some((k) =>
+      (d[k] || "").toString().toLowerCase().includes(searchText.toLowerCase()),
+    ),
   );
 
   /* ---------- utilities: compute item and order totals ---------- */
@@ -198,8 +223,14 @@ export default function SaleOrdersInvoice() {
       (c.items || []).forEach((it) => allItems.push(it));
     });
 
-    const grossAmountTotal = allItems.reduce((s, it) => s + Number(it.amount || 0), 0);
-    const discountTotal = allItems.reduce((s, it) => s + Number(it.discountAmt || 0), 0);
+    const grossAmountTotal = allItems.reduce(
+      (s, it) => s + Number(it.amount || 0),
+      0,
+    );
+    const discountTotal = allItems.reduce(
+      (s, it) => s + Number(it.discountAmt || 0),
+      0,
+    );
     const taxableAmount = grossAmountTotal - discountTotal;
 
     const sgstPercent = Number(orderTax.sgstPercent || 0);
@@ -214,7 +245,10 @@ export default function SaleOrdersInvoice() {
     const grandTotal = Math.round(taxableAmount + totalGST + tcsAmt);
 
     const qtyTotal = allItems.reduce((s, it) => s + Number(it.qty || 0), 0);
-    const freeQtyTotal = allItems.reduce((s, it) => s + Number(it.freeQty || 0), 0);
+    const freeQtyTotal = allItems.reduce(
+      (s, it) => s + Number(it.freeQty || 0),
+      0,
+    );
 
     return {
       orderTaxAndTotals: {
@@ -254,12 +288,22 @@ export default function SaleOrdersInvoice() {
         const totalAmount = Math.round(amount - discountAmt);
         const totalQty = qty + freeQty;
         const totalGrossWt = Number(it.grossWt || 0);
-        return { ...it, amount, discountAmt, totalAmount, totalQty, totalGrossWt };
+        return {
+          ...it,
+          amount,
+          discountAmt,
+          totalAmount,
+          totalQty,
+          totalGrossWt,
+        };
       });
       return { ...c, items };
     });
 
-    const { orderTaxAndTotals, orderTotals } = computeOrderTotalsFromContracts(contracts, allValues.orderTaxAndTotals || {});
+    const { orderTaxAndTotals, orderTotals } = computeOrderTotalsFromContracts(
+      contracts,
+      allValues.orderTaxAndTotals || {},
+    );
 
     // set computed fields back into the form
     form.setFieldsValue({
@@ -297,7 +341,12 @@ export default function SaleOrdersInvoice() {
           ],
         },
       ],
-      orderTaxAndTotals: { sgstPercent: 0, cgstPercent: 0, igstPercent: 0, tcsAmt: 0 },
+      orderTaxAndTotals: {
+        sgstPercent: 0,
+        cgstPercent: 0,
+        igstPercent: 0,
+        tcsAmt: 0,
+      },
     });
     setIsAddModalOpen(true);
   };
@@ -309,13 +358,27 @@ export default function SaleOrdersInvoice() {
       items: (c.items || []).map((it) => ({
         ...it,
         amount: Math.round(Number(it.qty || 0) * Number(it.rate || 0)),
-        discountAmt: Math.round(((Number(it.qty || 0) * Number(it.rate || 0)) * Number(it.discountPercent || 0)) / 100),
-        totalAmount: Math.round((Number(it.qty || 0) * Number(it.rate || 0)) - (((Number(it.qty || 0) * Number(it.rate || 0)) * Number(it.discountPercent || 0)) / 100)),
+        discountAmt: Math.round(
+          (Number(it.qty || 0) *
+            Number(it.rate || 0) *
+            Number(it.discountPercent || 0)) /
+            100,
+        ),
+        totalAmount: Math.round(
+          Number(it.qty || 0) * Number(it.rate || 0) -
+            (Number(it.qty || 0) *
+              Number(it.rate || 0) *
+              Number(it.discountPercent || 0)) /
+              100,
+        ),
         totalQty: Number(it.qty || 0) + Number(it.freeQty || 0),
       })),
     }));
 
-    const { orderTaxAndTotals, orderTotals } = computeOrderTotalsFromContracts(contracts, values.orderTaxAndTotals || {});
+    const { orderTaxAndTotals, orderTotals } = computeOrderTotalsFromContracts(
+      contracts,
+      values.orderTaxAndTotals || {},
+    );
 
     const payload = {
       ...values,
@@ -323,8 +386,12 @@ export default function SaleOrdersInvoice() {
       orderTaxAndTotals,
       orderTotals,
       key: data.length + 1,
-      orderDate: values.orderDate ? values.orderDate.format("YYYY-MM-DD") : undefined,
-      deliveryDate: values.deliveryDate ? values.deliveryDate.format("YYYY-MM-DD") : undefined,
+      orderDate: values.orderDate
+        ? values.orderDate.format("YYYY-MM-DD")
+        : undefined,
+      deliveryDate: values.deliveryDate
+        ? values.deliveryDate.format("YYYY-MM-DD")
+        : undefined,
     };
 
     setData((prev) => [...prev, payload]);
@@ -338,8 +405,12 @@ export default function SaleOrdersInvoice() {
       // prepare values with dayjs dates
       const pre = {
         ...selectedRecord,
-        orderDate: selectedRecord.orderDate ? dayjs(selectedRecord.orderDate) : undefined,
-        deliveryDate: selectedRecord.deliveryDate ? dayjs(selectedRecord.deliveryDate) : undefined,
+        orderDate: selectedRecord.orderDate
+          ? dayjs(selectedRecord.orderDate)
+          : undefined,
+        deliveryDate: selectedRecord.deliveryDate
+          ? dayjs(selectedRecord.deliveryDate)
+          : undefined,
       };
       editForm.setFieldsValue(pre);
     }
@@ -352,22 +423,44 @@ export default function SaleOrdersInvoice() {
       items: (c.items || []).map((it) => ({
         ...it,
         amount: Math.round(Number(it.qty || 0) * Number(it.rate || 0)),
-        discountAmt: Math.round(((Number(it.qty || 0) * Number(it.rate || 0)) * Number(it.discountPercent || 0)) / 100),
-        totalAmount: Math.round((Number(it.qty || 0) * Number(it.rate || 0)) - (((Number(it.qty || 0) * Number(it.rate || 0)) * Number(it.discountPercent || 0)) / 100)),
+        discountAmt: Math.round(
+          (Number(it.qty || 0) *
+            Number(it.rate || 0) *
+            Number(it.discountPercent || 0)) /
+            100,
+        ),
+        totalAmount: Math.round(
+          Number(it.qty || 0) * Number(it.rate || 0) -
+            (Number(it.qty || 0) *
+              Number(it.rate || 0) *
+              Number(it.discountPercent || 0)) /
+              100,
+        ),
         totalQty: Number(it.qty || 0) + Number(it.freeQty || 0),
       })),
     }));
-    const { orderTaxAndTotals, orderTotals } = computeOrderTotalsFromContracts(contracts, values.orderTaxAndTotals || {});
+    const { orderTaxAndTotals, orderTotals } = computeOrderTotalsFromContracts(
+      contracts,
+      values.orderTaxAndTotals || {},
+    );
     const payload = {
       ...values,
       contracts,
       orderTaxAndTotals,
       orderTotals,
-      orderDate: values.orderDate ? values.orderDate.format("YYYY-MM-DD") : undefined,
-      deliveryDate: values.deliveryDate ? values.deliveryDate.format("YYYY-MM-DD") : undefined,
+      orderDate: values.orderDate
+        ? values.orderDate.format("YYYY-MM-DD")
+        : undefined,
+      deliveryDate: values.deliveryDate
+        ? values.deliveryDate.format("YYYY-MM-DD")
+        : undefined,
     };
 
-    setData((prev) => prev.map((d) => (d.key === selectedRecord.key ? { ...payload, key: d.key } : d)));
+    setData((prev) =>
+      prev.map((d) =>
+        d.key === selectedRecord.key ? { ...payload, key: d.key } : d,
+      ),
+    );
     setIsEditModalOpen(false);
     editForm.resetFields();
     setSelectedRecord(null);
@@ -379,7 +472,9 @@ export default function SaleOrdersInvoice() {
     const pre = {
       ...record,
       orderDate: record.orderDate ? dayjs(record.orderDate) : undefined,
-      deliveryDate: record.deliveryDate ? dayjs(record.deliveryDate) : undefined,
+      deliveryDate: record.deliveryDate
+        ? dayjs(record.deliveryDate)
+        : undefined,
     };
     viewForm.setFieldsValue(pre);
     setIsViewModalOpen(true);
@@ -390,12 +485,22 @@ export default function SaleOrdersInvoice() {
     {
       title: <span className="text-amber-700 font-semibold">Order Date</span>,
       dataIndex: "orderDate",
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
+      render: (d) => (
+        <span className="text-amber-800">
+          {d ? dayjs(d).format("YYYY-MM-DD") : ""}
+        </span>
+      ),
     },
     {
-      title: <span className="text-amber-700 font-semibold">Delivery Date</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Delivery Date</span>
+      ),
       dataIndex: "deliveryDate",
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
+      render: (d) => (
+        <span className="text-amber-800">
+          {d ? dayjs(d).format("YYYY-MM-DD") : ""}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Company</span>,
@@ -410,24 +515,58 @@ export default function SaleOrdersInvoice() {
     {
       title: <span className="text-amber-700 font-semibold">Contracts</span>,
       dataIndex: "contracts",
-      render: (contracts = []) => <span className="text-amber-800">{(contracts || []).map((c) => c.contractNo).join(", ")}</span>,
+      render: (contracts = []) => (
+        <span className="text-amber-800">
+          {(contracts || []).map((c) => c.contractNo).join(", ")}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
       render: (status) => {
         const base = "px-3 py-1 rounded-full text-sm font-semibold";
-        if (status === "Approved") return <span className={`${base} bg-green-100 text-green-700`}>Approved</span>;
-        if (status === "Pending") return <span className={`${base} bg-yellow-100 text-yellow-700`}>Pending</span>;
-        return <span className={`${base} bg-red-100 text-red-700`}>{status}</span>;
+        if (status === "Approved")
+          return (
+            <span className={`${base} bg-green-100 text-green-700`}>
+              Approved
+            </span>
+          );
+        if (status === "Pending")
+          return (
+            <span className={`${base} bg-yellow-100 text-yellow-700`}>
+              Pending
+            </span>
+          );
+        return (
+          <span className={`${base} bg-red-100 text-red-700`}>{status}</span>
+        );
       },
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       render: (record) => (
         <div className="flex gap-3">
-          <EyeOutlined className="cursor-pointer! text-blue-500!" onClick={() => openView(record)} />
-          <EditOutlined className="cursor-pointer! text-red-500!" onClick={() => { setSelectedRecord(record); editForm.setFieldsValue({ ...record, orderDate: record.orderDate ? dayjs(record.orderDate) : undefined, deliveryDate: record.deliveryDate ? dayjs(record.deliveryDate) : undefined }); setIsEditModalOpen(true); }} />
+          <EyeOutlined
+            className="cursor-pointer! text-blue-500!"
+            onClick={() => openView(record)}
+          />
+          <EditOutlined
+            className="cursor-pointer! text-red-500!"
+            onClick={() => {
+              setSelectedRecord(record);
+              editForm.setFieldsValue({
+                ...record,
+                orderDate: record.orderDate
+                  ? dayjs(record.orderDate)
+                  : undefined,
+                deliveryDate: record.deliveryDate
+                  ? dayjs(record.deliveryDate)
+                  : undefined,
+              });
+              setIsEditModalOpen(true);
+            }}
+          />
         </div>
       ),
     },
@@ -438,193 +577,405 @@ export default function SaleOrdersInvoice() {
     <Form.List name="contracts">
       {(contractFields, { add: addContract, remove: removeContract }) => (
         <>
+          {/* HEADER */}
           <div className="mb-2 flex justify-between items-center">
             <h6 className="text-amber-500">Contracts</h6>
-            <Button   className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
-           type="dashed" icon={<PlusOutlined />} onClick={() => addContract({
-              contractNo: `CNT-${Date.now()}`,
-              items: [{
-                lineKey: Date.now(),
-                item: undefined, itemCode: undefined, uom: undefined, qty: 0, freeQty: 0, totalQty: 0, grossWt: 0, totalGrossWt: 0, rate: 0, amount: 0, discountPercent: 0, discountAmt: 0, totalAmount: 0
-              }]
-            })}> Add Contract </Button>
+            <Button
+              className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
+              type="dashed"
+              icon={<PlusOutlined />}
+              onClick={() =>
+                addContract({
+                  contractNo: `CNT-${Date.now()}`,
+                  items: [
+                    {
+                      lineKey: Date.now(),
+                      item: undefined,
+                      itemCode: undefined,
+                      uom: undefined,
+                      qty: 0,
+                      freeQty: 0,
+                      totalQty: 0,
+                      grossWt: 0,
+                      totalGrossWt: 0,
+                      rate: 0,
+                      amount: 0,
+                      discountPercent: 0,
+                      discountAmt: 0,
+                      totalAmount: 0,
+                    },
+                  ],
+                })
+              }
+            >
+              Add Contract
+            </Button>
           </div>
 
-          {contractFields.map((cf, ci) => (
-            <div key={cf.key} className="mb-4 p-4 border rounded-lg shadow-sm bg-white">
-              <div className="flex justify-between items-center mb-3">
-                <Space>
-                  {/* <div className="text-amber-700 font-semibold">Contract #{ci + 1}</div>
-                  <Form.Item name={[cf.name, "contractNo"]} fieldKey={[cf.fieldKey, "contractNo"]} rules={[{ required: true }]}>
-                    <Input placeholder="Contract No" />
-                  </Form.Item> */}
+          {contractFields.map((cf, ci) => {
+            const contractItems = contractItemsMap[ci] || [];
 
-                  {/* souda template select - auto-fill items if chosen */}
-                  <Form.Item label="Contract ID" name={[cf.name, "useSouda"]} fieldKey={[cf.fieldKey, "useSouda"]} style={{ marginBottom: 0 }}>
+            return (
+              <div
+                key={cf.key}
+                className="mb-4 p-4 border rounded-lg shadow-sm bg-white"
+              >
+                {/* CONTRACT HEADER */}
+                <div className="flex justify-between items-center mb-3">
+                  <Form.Item
+                    label="Contract ID"
+                    name={[cf.name, "contract_id"]}
+                  >
                     <Select
-                      placeholder="Select Souda"
-                      style={{ width: 220 }}
-                      onChange={(val) => {
-                        const souda = salesOrderJSON.soudaOptions.find((s) => s.soudaNo === val);
-                        if (!souda) return;
-                        // map souda items to contract items
-                        const mapped = (souda.items || []).map((si) => ({
-                          lineKey: Date.now() + Math.random(),
-                          item: si.item,
-                          itemCode: si.itemCode,
-                          uom: si.uom || "Ltrs",
-                          qty: 0,
-                          freeQty: 0,
-                          totalQty: 0,
-                          grossWt: 0,
-                          totalGrossWt: 0,
-                          rate: si.rate || 0,
-                          amount: 0,
-                          discountPercent: 0,
-                          discountAmt: 0,
-                          totalAmount: 0,
+                      placeholder="Select Contract"
+                      onChange={async (contractId) => {
+                        const items = await salesContractItems(contractId);
+
+                        setContractItemsMap((prev) => ({
+                          ...prev,
+                          [ci]: items,
                         }));
 
-                        // set company/customer if present
-                        form.setFieldsValue({
-                          companyName: souda.companyName || form.getFieldValue("companyName"),
-                          customerName: souda.customerName || form.getFieldValue("customerName"),
-                        });
+                        const mappedItems = items.map((it) => ({
+                          lineKey: Date.now() + Math.random(),
+                          item: it.product_name,
+                          itemCode: it.product_id,
+                          uom: it.uom?.unit_name,
+                          qty: Number(it.net_qty),
+                          freeQty: Number(it.free_qty),
+                          totalQty: Number(it.gross_qty),
+                          grossWt: 0,
+                          totalGrossWt: 0,
+                          rate: Number(it.mrp),
+                          amount: 0,
+                          discountPercent: Number(it.discount_percent),
+                          discountAmt: Number(it.discount_amount),
+                          totalAmount: Number(it.line_total),
+                        }));
 
-                        // set items for this contract
-                        const currentContracts = form.getFieldValue("contracts") || [];
-                        currentContracts[ci] = { ...(currentContracts[ci] || {}), contractNo: currentContracts[ci]?.contractNo || `CNT-${Date.now()}`, items: mapped };
-                        form.setFieldsValue({ contracts: currentContracts });
-                        // trigger calculation by calling onFormValuesChange
+                        const contracts = form.getFieldValue("contracts") || [];
+                        contracts[ci] = {
+                          ...(contracts[ci] || {}),
+                          contract_id: contractId,
+                          items: mappedItems,
+                        };
+
+                        form.setFieldsValue({ contracts });
                         onFormValuesChange(form, form.getFieldsValue());
                       }}
                     >
-                      {salesOrderJSON.soudaOptions.map((s) => (
-                        <Select.Option key={s.soudaNo} value={s.soudaNo}>
-                          {s.soudaNo} - {s.companyName}
+                      {contractOptions.map((c) => (
+                        <Select.Option
+                          key={c.sale_contract_id}
+                          value={c.sale_contract_id}
+                        >
+                          {c.sale_contract_number}
                         </Select.Option>
                       ))}
                     </Select>
                   </Form.Item>
-                </Space>
 
-                <Button danger icon={<DeleteOutlined />} onClick={() => removeContract(cf.name)} />
-              </div>
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => removeContract(cf.name)}
+                  />
+                </div>
 
-              {/* nested items list */}
-              <Form.List name={[cf.name, "items"]}>
-                {(itemFields, { add: addItem, remove: removeItem }) => (
-                  <>
-                    {itemFields.map((itf, ii) => (
-                      <div key={itf.key} className="mb-3 p-3 border rounded-md">
-                        <Col span={1} className="flex items-end">
-                            <Button danger icon={<DeleteOutlined />} onClick={() => { removeItem(itf.name); onFormValuesChange(form, form.getFieldsValue()); }} />
-                          </Col>
-                        <Row gutter={12}>
-                           
-                          <Col span={8}>
-                            <Form.Item name={[itf.name, "item"]} fieldKey={[itf.fieldKey, "item"]} label="Item" rules={[{ required: true }]}>
-                              <Select
-                                placeholder="Item"
-                                onChange={(val) => {
-                                  const sel = salesOrderJSON.itemOptions.find((o) => o.name === val);
-                                  if (sel) {
-                                    const curContracts = form.getFieldValue("contracts") || [];
-                                    const contract = curContracts[ci] || {};
-                                    const items = contract.items || [];
-                                    items[ii] = { ...(items[ii] || {}), itemCode: sel.code, uom: items[ii]?.uom || salesOrderJSON.uomOptions[0] };
-                                    curContracts[ci] = { ...contract, items };
-                                    form.setFieldsValue({ contracts: curContracts });
-                                    onFormValuesChange(form, form.getFieldsValue());
-                                  }
-                                }}
+                {/* ITEMS LIST */}
+                <Form.List name={[cf.name, "items"]}>
+                  {(itemFields, { add: addItem, remove: removeItem }) => (
+                    <>
+                      {itemFields.map((itf, ii) => (
+                        <div
+                          key={itf.key}
+                          className="mb-3 p-3 border rounded-md"
+                        >
+                          <Row gutter={12}>
+                            {/* ITEM */}
+                            <Col span={8}>
+                              <Form.Item
+                                name={[itf.name, "item"]}
+                                label="Item"
+                                rules={[{ required: true }]}
                               >
-                                {salesOrderJSON.itemOptions.map((it) => <Select.Option key={it.code} value={it.name}>{it.name}</Select.Option>)}
-                              </Select>
-                            </Form.Item>
-                          </Col>
+                                <Select
+                                  placeholder="Item"
+                                  onChange={(val) => {
+                                    const sel = contractItems.find(
+                                      (x) => x.product_name === val,
+                                    );
+                                    if (!sel) return;
 
-                          <Col span={4}>
-                            <Form.Item name={[itf.name, "itemCode"]} fieldKey={[itf.fieldKey, "itemCode"]} label="Code">
-                              <Input disabled />
-                            </Form.Item>
-                          </Col>
+                                    const contracts =
+                                      form.getFieldValue("contracts") || [];
+                                    const items = contracts[ci].items || [];
 
-                          <Col span={4}>
-                            <Form.Item name={[itf.name, "uom"]} fieldKey={[itf.fieldKey, "uom"]} label="UOM">
-                              <Select>
-                                {salesOrderJSON.uomOptions.map((u) => <Select.Option key={u} value={u}>{u}</Select.Option>)}
-                              </Select>
-                            </Form.Item>
-                          </Col>
+                                    items[ii] = {
+                                      ...(items[ii] || {}),
+                                      item: sel.product_name,
+                                      itemCode: sel.product_id,
+                                      uom: sel.uom?.unit_name,
+                                      qty: Number(sel.net_qty),
+                                      freeQty: Number(sel.free_qty),
+                                      totalQty: Number(sel.gross_qty),
+                                      rate: Number(sel.mrp),
+                                      discountPercent: Number(
+                                        sel.discount_percent,
+                                      ),
+                                      discountAmt: Number(sel.discount_amount),
+                                      totalAmount: Number(sel.line_total),
+                                    };
 
-                          <Col span={3}>
-                            <Form.Item name={[itf.name, "qty"]} fieldKey={[itf.fieldKey, "qty"]} label="Qty" rules={[{ required: true }]}>
-                              <InputNumber min={0} onChange={() => onFormValuesChange(form, form.getFieldsValue())} className="w-full" />
-                            </Form.Item>
-                          </Col>
+                                    contracts[ci].items = items;
+                                    form.setFieldsValue({ contracts });
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    );
+                                  }}
+                                >
+                                  {contractItems.map((it) => (
+                                    <Select.Option
+                                      key={it.product_id}
+                                      value={it.product_name}
+                                    >
+                                      {it.product_name}
+                                    </Select.Option>
+                                  ))}
+                                </Select>
+                              </Form.Item>
+                            </Col>
 
-                          <Col span={3}>
-                            <Form.Item name={[itf.name, "freeQty"]} fieldKey={[itf.fieldKey, "freeQty"]} label="Free" >
-                              <InputNumber min={0} onChange={() => onFormValuesChange(form, form.getFieldsValue())} className="w-full" />
-                            </Form.Item>
-                          </Col>
+                            {/* CODE */}
+                            <Col span={4}>
+                              <Form.Item
+                                name={[itf.name, "itemCode"]}
+                                label="Code"
+                              >
+                                <Input disabled />
+                              </Form.Item>
+                            </Col>
 
-                          <Col span={4}>
-                            <Form.Item name={[itf.name, "rate"]} fieldKey={[itf.fieldKey, "rate"]} label="Rate" rules={[{ required: true }]}>
-                              <InputNumber min={0} onChange={() => onFormValuesChange(form, form.getFieldsValue())} className="w-full" />
-                            </Form.Item>
-                          </Col>
+                            {/* UOM */}
+                            <Col span={4}>
+                              <Form.Item name={[itf.name, "uom"]} label="UOM">
+                                <Input disabled />
+                              </Form.Item>
+                            </Col>
 
-                          <Col span={3}>
-                            <Form.Item name={[itf.name, "discountPercent"]} fieldKey={[itf.fieldKey, "discountPercent"]} label="Disc %">
-                              <InputNumber min={0} max={100} onChange={() => onFormValuesChange(form, form.getFieldsValue())} className="w-full" />
-                            </Form.Item>
-                          </Col>
-                                 <Col span={3}>
-                                <Form.Item name={[itf.name, "amount"]} fieldKey={[itf.fieldKey, "amount"]} label="Amount">
-                                  <InputNumber className="w-full" disabled />
-                                </Form.Item>
-                              </Col>
-                         <Col span={3}>
-                                <Form.Item name={[itf.name, "discountAmt"]} fieldKey={[itf.fieldKey, "discountAmt"]} label="Disc Amt">
-                                  <InputNumber className="w-full" disabled />
-                                </Form.Item>
-                              </Col>
-                                <Col span={3}>
-                                <Form.Item name={[itf.name, "totalAmount"]} fieldKey={[itf.fieldKey, "totalAmount"]} label="Total Amount">
-                                  <InputNumber className="w-full" disabled />
-                                </Form.Item>
-                              </Col>
-                              <Col span={3}>
-                                <Form.Item name={[itf.name, "totalQty"]} fieldKey={[itf.fieldKey, "totalQty"]} label="Total Qty">
-                                  <InputNumber className="w-full" disabled />
-                                </Form.Item>
-                              </Col>
-                              <Col span={3}>
-                                <Form.Item name={[itf.name, "grossWt"]} fieldKey={[itf.fieldKey, "grossWt"]} label="Gross Wt">
-                                  <InputNumber className="w-full" onChange={() => onFormValuesChange(form, form.getFieldsValue())} />
-                                </Form.Item>
-                              </Col>
-                              <Col span={3}>
-                                <Form.Item name={[itf.name, "totalGrossWt"]} fieldKey={[itf.fieldKey, "totalGrossWt"]} label="Total Gross Wt">
-                                  <InputNumber className="w-full" disabled />
-                                </Form.Item>
-                              </Col>
-                          {/* computed/display-only */}
-                        </Row>
-                      </div>
-                    ))}
+                            {/* QTY */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "qty"]}
+                                label="Qty"
+                                rules={[{ required: true }]}
+                              >
+                                <InputNumber
+                                  min={0}
+                                  className="w-full"
+                                  disabled
+                                  onChange={() =>
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    )
+                                  }
+                                />
+                              </Form.Item>
+                            </Col>
 
-                    <Button   className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
-           type="dashed" icon={<PlusOutlined />} onClick={() => { addItem({ lineKey: Date.now(), item: undefined, itemCode: undefined, uom: salesOrderJSON.uomOptions[0], qty: 0, freeQty: 0, rate: 0, discountPercent: 0, amount: 0, discountAmt: 0, totalAmount: 0 }); }}>
-                      Add Item
-                    </Button>
-                  </>
-                )}
-              </Form.List>
-            </div>
-          ))}
+                            {/* FREE QTY */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "freeQty"]}
+                                label="Free"
+                              >
+                                <InputNumber
+                                  min={0}
+                                  disabled
+                                  className="w-full"
+                                  onChange={() =>
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    )
+                                  }
+                                />
+                              </Form.Item>
+                            </Col>
+
+                            {/* RATE */}
+                            <Col span={4}>
+                              <Form.Item
+                                name={[itf.name, "rate"]}
+                                label="Rate"
+                                rules={[{ required: true }]}
+                              >
+                                <InputNumber
+                                  min={0}
+                                  className="w-full"
+                                  disabled
+                                  onChange={() =>
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    )
+                                  }
+                                />
+                              </Form.Item>
+                            </Col>
+
+                            {/* DISCOUNT PERCENT */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "discountPercent"]}
+                                label="Disc %"
+                              >
+                                <InputNumber
+                                  min={0}
+                                  max={100}
+                                  className="w-full"
+                                  disabled
+                                  onChange={() =>
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    )
+                                  }
+                                />
+                              </Form.Item>
+                            </Col>
+
+                            {/* AMOUNT */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "amount"]}
+                                label="Amount"
+                              >
+                                <InputNumber className="w-full" disabled />
+                              </Form.Item>
+                            </Col>
+
+                            {/* DISCOUNT AMOUNT */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "discountAmt"]}
+                                label="Disc Amt"
+                              >
+                                <InputNumber className="w-full" disabled />
+                              </Form.Item>
+                            </Col>
+
+                            {/* TOTAL AMOUNT */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "totalAmount"]}
+                                label="Total Amount"
+                              >
+                                <InputNumber className="w-full" disabled />
+                              </Form.Item>
+                            </Col>
+
+                            {/* TOTAL QTY */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "totalQty"]}
+                                label="Total Qty"
+                              >
+                                <InputNumber className="w-full" disabled />
+                              </Form.Item>
+                            </Col>
+
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "orderQuantity"]}
+                                label="Order Qty"
+                              >
+                                <InputNumber
+                                  min={0}
+                                  className="w-full"
+                                  onChange={() =>
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    )
+                                  }
+                                />
+                              </Form.Item>
+                            </Col>
+                            {/* GROSS WT */}
+                            {/* <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "grossWt"]}
+                                label="Gross Wt"
+                              >
+                                <InputNumber
+                                  className="w-full"
+                                  onChange={() =>
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    )
+                                  }
+                                />
+                              </Form.Item>
+                            </Col> */}
+
+                            {/* TOTAL GROSS WT */}
+                            {/* <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "totalGrossWt"]}
+                                label="Total Gross Wt"
+                              >
+                                <InputNumber className="w-full" disabled />
+                              </Form.Item>
+                            </Col> */}
+
+                            {/* DELETE BUTTON */}
+                          </Row>
+                          <Button
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => {
+                              removeItem(itf.name);
+                              onFormValuesChange(form, form.getFieldsValue());
+                            }}
+                          />
+                        </div>
+                      ))}
+
+                      <Button
+                        className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
+                        type="dashed"
+                        icon={<PlusOutlined />}
+                        onClick={() =>
+                          addItem({
+                            lineKey: Date.now(),
+                            item: undefined,
+                            itemCode: undefined,
+                            uom: salesOrderJSON.uomOptions[0],
+                            qty: 0,
+                            freeQty: 0,
+                            totalQty: 0,
+                            grossWt: 0,
+                            totalGrossWt: 0,
+                            rate: 0,
+                            amount: 0,
+                            discountPercent: 0,
+                            discountAmt: 0,
+                            totalAmount: 0,
+                          })
+                        }
+                      >
+                        Add Item
+                      </Button>
+                    </>
+                  )}
+                </Form.List>
+              </div>
+            );
+          })}
         </>
       )}
     </Form.List>
@@ -636,48 +987,80 @@ export default function SaleOrdersInvoice() {
       <h6 className="text-amber-500">Header</h6>
       <Row gutter={16}>
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Souda No</span>} name="soudaNo">
-            <Select placeholder="Select Souda" disabled={disabled} onChange={(val) => {
-              const s = salesOrderJSON.soudaOptions.find((x) => x.soudaNo === val);
-              if (s) form.setFieldsValue({ companyName: s.companyName, customerName: s.customerName });
-            }}>
-              {salesOrderJSON.soudaOptions.map((s) => <Select.Option key={s.soudaNo} value={s.soudaNo}>{s.soudaNo}</Select.Option>)}
+          <Form.Item label="Customer Name" name="customer_id">
+            <Select
+              placeholder="Select Customer"
+              onChange={async (customerId) => {
+                const customer = contractPersonOptions.find(
+                  (c) => c.customer_id === customerId,
+                );
+
+                // set customer name if needed elsewhere
+                form.setFieldsValue({
+                  customerName: customer?.name,
+                });
+
+                // fetch contracts for this customer
+                const contracts = await getContractDetailsbyPerson(customerId);
+                setContractOptions(contracts);
+
+                // reset downstream data
+                setContractItems([]);
+                form.setFieldsValue({ contract_id: undefined });
+              }}
+            >
+              {contractPersonOptions.map((c) => (
+                <Select.Option key={c.customer_id} value={c.customer_id}>
+                  {c.name}
+                </Select.Option>
+              ))}
             </Select>
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Order Date</span>} name="orderDate" rules={[{ required: true }]} initialValue={dayjs()}>
+          <Form.Item
+            label={<span className="text-amber-700">Order Date</span>}
+            name="orderDate"
+            rules={[{ required: true }]}
+            initialValue={dayjs()}
+          >
             <DatePicker className="w-full" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Delivery Date</span>} name="deliveryDate">
+          <Form.Item
+            label={<span className="text-amber-700">Delivery Date</span>}
+            name="deliveryDate"
+          >
             <DatePicker className="w-full" disabled={disabled} />
           </Form.Item>
         </Col>
 
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Company</span>} name="companyName" rules={[{ required: true }]}>
+        {/* <Col span={6}>
+          <Form.Item
+            label={<span className="text-amber-700">Company</span>}
+            name="companyName"
+            rules={[{ required: true }]}
+          >
             <Input placeholder="Company" disabled={disabled} />
           </Form.Item>
-        </Col>
-
+        </Col> */}
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Customer Name</span>} name="customerName" rules={[{ required: true }]}>
-            <Input placeholder="Customer" disabled={disabled} />
-          </Form.Item>
-        </Col>
-
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Customer Email</span>} name="customerEmail">
+          <Form.Item
+            label={<span className="text-amber-700">Customer Email</span>}
+            name="customerEmail"
+          >
             <Input placeholder="Email" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Delivery Address</span>} name="deliveryAddress">
+          <Form.Item
+            label={<span className="text-amber-700">Delivery Address</span>}
+            name="deliveryAddress"
+          >
             <Input placeholder="Address" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -697,11 +1080,12 @@ export default function SaleOrdersInvoice() {
             </Select>
           </Form.Item>
         </Col> */}
-         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Status</span>} name="status">
-            <Select placeholder="pending" disabled={disabled}>
-              
-            </Select>
+        <Col span={6}>
+          <Form.Item
+            label={<span className="text-amber-700">Status</span>}
+            name="status"
+          >
+            <Select placeholder="pending" disabled={disabled}></Select>
           </Form.Item>
         </Col>
       </Row>
@@ -717,46 +1101,93 @@ export default function SaleOrdersInvoice() {
       <h6 className="text-amber-500">Tax & Totals</h6>
       <Row gutter={16}>
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">SGST %</span>} name={["orderTaxAndTotals", "sgstPercent"]}>
-            <InputNumber min={0} max={100} className="w-full" disabled={disabled} onChange={() => onFormValuesChange(form, form.getFieldsValue())} />
+          <Form.Item
+            label={<span className="text-amber-700">SGST %</span>}
+            name={["orderTaxAndTotals", "sgstPercent"]}
+          >
+            <InputNumber
+              min={0}
+              max={100}
+              className="w-full"
+              disabled={disabled}
+              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
+            />
           </Form.Item>
         </Col>
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">CGST %</span>} name={["orderTaxAndTotals", "cgstPercent"]}>
-            <InputNumber min={0} max={100} className="w-full" disabled={disabled} onChange={() => onFormValuesChange(form, form.getFieldsValue())} />
+          <Form.Item
+            label={<span className="text-amber-700">CGST %</span>}
+            name={["orderTaxAndTotals", "cgstPercent"]}
+          >
+            <InputNumber
+              min={0}
+              max={100}
+              className="w-full"
+              disabled={disabled}
+              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
+            />
           </Form.Item>
         </Col>
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">IGST %</span>} name={["orderTaxAndTotals", "igstPercent"]}>
-            <InputNumber min={0} max={100} className="w-full" disabled={disabled} onChange={() => onFormValuesChange(form, form.getFieldsValue())} />
+          <Form.Item
+            label={<span className="text-amber-700">IGST %</span>}
+            name={["orderTaxAndTotals", "igstPercent"]}
+          >
+            <InputNumber
+              min={0}
+              max={100}
+              className="w-full"
+              disabled={disabled}
+              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
+            />
           </Form.Item>
         </Col>
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">TCS Amt (₹)</span>} name={["orderTaxAndTotals", "tcsAmt"]}>
-            <InputNumber min={0} className="w-full" disabled={disabled} onChange={() => onFormValuesChange(form, form.getFieldsValue())} />
+          <Form.Item
+            label={<span className="text-amber-700">TCS Amt (₹)</span>}
+            name={["orderTaxAndTotals", "tcsAmt"]}
+          >
+            <InputNumber
+              min={0}
+              className="w-full"
+              disabled={disabled}
+              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
+            />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Gross Total (₹)</span>} name={["orderTaxAndTotals", "grossAmountTotal"]}>
+          <Form.Item
+            label={<span className="text-amber-700">Gross Total (₹)</span>}
+            name={["orderTaxAndTotals", "grossAmountTotal"]}
+          >
             <InputNumber className="w-full" disabled />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Discount Total (₹)</span>} name={["orderTaxAndTotals", "discountTotal"]}>
+          <Form.Item
+            label={<span className="text-amber-700">Discount Total (₹)</span>}
+            name={["orderTaxAndTotals", "discountTotal"]}
+          >
             <InputNumber className="w-full" disabled />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Total GST (₹)</span>} name={["orderTaxAndTotals", "totalGST"]}>
+          <Form.Item
+            label={<span className="text-amber-700">Total GST (₹)</span>}
+            name={["orderTaxAndTotals", "totalGST"]}
+          >
             <InputNumber className="w-full" disabled />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Grand Total (₹)</span>} name={["orderTaxAndTotals", "grandTotal"]}>
+          <Form.Item
+            label={<span className="text-amber-700">Grand Total (₹)</span>}
+            name={["orderTaxAndTotals", "grandTotal"]}
+          >
             <InputNumber className="w-full" disabled />
           </Form.Item>
         </Col>
@@ -834,45 +1265,156 @@ export default function SaleOrdersInvoice() {
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
           />
-          <Button icon={<FilterOutlined />} onClick={() => setSearchText("")} className="border-amber-400! text-amber-700! hover:bg-amber-100!">Reset</Button>
+          <Button
+            icon={<FilterOutlined />}
+            onClick={() => setSearchText("")}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
+            Reset
+          </Button>
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} className="border-amber-400! text-amber-700! hover:bg-amber-100!">Export</Button>
-          <Button type="primary" icon={<PlusOutlined />} className="bg-amber-500! hover:bg-amber-600! border-none!" onClick={openAddModal}>Add New</Button>
+          <Button
+            icon={<DownloadOutlined />}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
+            Export
+          </Button>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            className="bg-amber-500! hover:bg-amber-600! border-none!"
+            onClick={openAddModal}
+          >
+            Add New
+          </Button>
         </div>
       </div>
 
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
-        <h2 className="text-lg font-semibold text-amber-700 mb-0">Sales Order & Invoice Records</h2>
-        <p className="text-amber-600 mb-3">Manage your sales Order & Invoice data</p>
-        <Table columns={columns} dataSource={filteredData} pagination={false} scroll={{ y: 300 }} rowKey="key" />
+        <h2 className="text-lg font-semibold text-amber-700 mb-0">
+          Sales Order & Invoice Records
+        </h2>
+        <p className="text-amber-600 mb-3">
+          Manage your sales Order & Invoice data
+        </p>
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          pagination={false}
+          scroll={{ y: 300 }}
+          rowKey="key"
+        />
       </div>
 
       {/* Add Modal */}
-      <Modal title={<span className="text-amber-700 text-2xl font-semibold">Add New Sales Order & Invoice</span>} open={isAddModalOpen} onCancel={() => { setIsAddModalOpen(false); addForm.resetFields(); }} footer={null} width={1000}>
-        <Form layout="vertical" form={addForm} onFinish={handleAddFinish} onValuesChange={() => onFormValuesChange(addForm, addForm.getFieldsValue())}>
+      <Modal
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Add New Sales Order & Invoice
+          </span>
+        }
+        open={isAddModalOpen}
+        onCancel={() => {
+          setIsAddModalOpen(false);
+          addForm.resetFields();
+        }}
+        footer={null}
+        width={1000}
+      >
+        <Form
+          layout="vertical"
+          form={addForm}
+          onFinish={handleAddFinish}
+          onValuesChange={() =>
+            onFormValuesChange(addForm, addForm.getFieldsValue())
+          }
+        >
           {renderFormFields(addForm)}
           <div className="flex justify-end gap-2 mt-4">
-            <Button onClick={() => { setIsAddModalOpen(false); addForm.resetFields(); }}  className="border-amber-400! text-amber-700! hover:bg-amber-100!">Cancel</Button>
-            <Button type="primary" htmlType="submit" className="bg-amber-500! hover:bg-amber-600! border-none!">Add</Button>
+            <Button
+              onClick={() => {
+                setIsAddModalOpen(false);
+                addForm.resetFields();
+              }}
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+            >
+              Add
+            </Button>
           </div>
         </Form>
       </Modal>
 
       {/* Edit Modal */}
-      <Modal title={<span className="text-amber-700 text-2xl font-semibold">Edit Sales Order & Invoice</span>} open={isEditModalOpen} onCancel={() => { setIsEditModalOpen(false); editForm.resetFields(); setSelectedRecord(null); }} footer={null} width={1000}>
-        <Form layout="vertical" form={editForm} onFinish={handleEditFinish} onValuesChange={() => onFormValuesChange(editForm, editForm.getFieldsValue())}>
+      <Modal
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Edit Sales Order & Invoice
+          </span>
+        }
+        open={isEditModalOpen}
+        onCancel={() => {
+          setIsEditModalOpen(false);
+          editForm.resetFields();
+          setSelectedRecord(null);
+        }}
+        footer={null}
+        width={1000}
+      >
+        <Form
+          layout="vertical"
+          form={editForm}
+          onFinish={handleEditFinish}
+          onValuesChange={() =>
+            onFormValuesChange(editForm, editForm.getFieldsValue())
+          }
+        >
           {renderFormFields(editForm)}
           <div className="flex justify-end gap-2 mt-4">
-            <Button onClick={() => { setIsEditModalOpen(false); editForm.resetFields(); setSelectedRecord(null); }}>Cancel</Button>
-            <Button type="primary" htmlType="submit" className="bg-amber-500 hover:bg-amber-600 border-none">Update</Button>
+            <Button
+              onClick={() => {
+                setIsEditModalOpen(false);
+                editForm.resetFields();
+                setSelectedRecord(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              className="bg-amber-500 hover:bg-amber-600 border-none"
+            >
+              Update
+            </Button>
           </div>
         </Form>
       </Modal>
 
       {/* View Modal */}
-      <Modal title={<span className="text-amber-700 text-2xl font-semibold">View Sales Order & Invoice</span>} open={isViewModalOpen} onCancel={() => { setIsViewModalOpen(false); viewForm.resetFields(); setSelectedRecord(null); }} footer={null} width={1000}>
+      <Modal
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            View Sales Order & Invoice
+          </span>
+        }
+        open={isViewModalOpen}
+        onCancel={() => {
+          setIsViewModalOpen(false);
+          viewForm.resetFields();
+          setSelectedRecord(null);
+        }}
+        footer={null}
+        width={1000}
+      >
         <Form layout="vertical" form={viewForm}>
           {renderFormFields(viewForm, true)}
         </Form>

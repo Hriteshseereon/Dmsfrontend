@@ -37,3 +37,34 @@ export const getVendors = async () => {
   const res = await api.get("/vendors/vendors/", {params: {organisation: currentOrgId}});
   return res.data;
 }
+export const approvedSalesContract = async (contractId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.post(`/sales/contracts/${contractId}/approve/`, null, {
+    params: { organisation: currentOrgId }
+  });
+  return res.data;
+}
+// ------------------------------------------------ sales order api section ------------------------------------------------
+export const getContractpersonName = async (cu) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/sales/orders/customers/`, {
+    params: { organisation: currentOrgId }
+  });
+  return res.data;
+}
+
+export const getContractDetailsbyPerson = async (contractId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/sales/orders/contracts`, {
+    params: { organisation: currentOrgId, customer_id: contractId }
+  });
+  return res.data;
+}
+
+export const salesContractItems = async (contractId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/sales/orders/contracts/${contractId}/items/`, {
+    params: { organisation: currentOrgId }
+  });
+  return res.data;
+}
