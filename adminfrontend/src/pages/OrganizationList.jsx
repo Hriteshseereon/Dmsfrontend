@@ -43,12 +43,12 @@ export default function OrganizationList() {
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-3xl font-bold text-gray-800">Organizations</h2>
           <button
-          onClick={() => navigate("/organisation/add")}
-          className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg"
-        >
-          <Plus size={20} />
-          Add Company
-        </button>
+            onClick={() => navigate("/organisation/add")}
+            className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg"
+          >
+            <Plus size={20} />
+            Add Company
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -78,7 +78,7 @@ export default function OrganizationList() {
                     Active Modules
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {org.modules?.length ? (
+                    {/* {org.modules?.length ? (
                       org.modules.map((module) => (
                         <span
                           key={module}
@@ -87,6 +87,22 @@ export default function OrganizationList() {
                           {module}
                         </span>
                       ))
+                    ) : (
+                      <span className="text-sm text-gray-400 italic">
+                        No modules assigned
+                      </span>
+                    )} */}
+                    {org.modules_data?.length ? (
+                      org.modules_data
+                        .filter((m) => m.is_enabled)
+                        .map((m) => (
+                          <span
+                            key={m.module}
+                            className="px-3 py-1.5 bg-amber-50 text-amber-700 text-xs font-semibold rounded-full border border-amber-200"
+                          >
+                            {m.module}
+                          </span>
+                        ))
                     ) : (
                       <span className="text-sm text-gray-400 italic">
                         No modules assigned
