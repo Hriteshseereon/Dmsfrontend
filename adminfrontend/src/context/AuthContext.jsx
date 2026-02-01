@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }) => {
       setOrganisations(orgs);
     } else if (user.org) {
       const org = findOrgByIdOrName(user.org);
-      setOrgModules(org?.modules || []);
+      setOrgModules(org?.modules_data || []);
       setOrganisations([]);
     }
   }, [user]);
