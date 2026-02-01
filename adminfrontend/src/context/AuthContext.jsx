@@ -18,22 +18,8 @@ export const AuthProvider = ({ children }) => {
   const [organisations, setOrganisations] = useState([]);
   const [accessToken, setAccessToken] = useState(null);
 
-  const [currentOrgId, setCurrentOrgId] = useState(null);
-
-  useEffect(() => {
-    const storedOrg = localStorage.getItem("currentOrgId");
-    if (storedOrg) {
-      setCurrentOrgId(storedOrg);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (currentOrgId) {
-      localStorage.setItem("currentOrgId", currentOrgId);
-    } else {
-      localStorage.removeItem("currentOrgId");
-    }
-  }, [currentOrgId]);
+  const currentOrgId = useSessionStore((s) => s.currentOrgId);
+  const setCurrentOrgId = useSessionStore((s) => s.setCurrentOrgId);
 
 
 
