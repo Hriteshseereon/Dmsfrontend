@@ -32,7 +32,7 @@ const { Option } = Select;
 const { TextArea } = Input;
 
 const ORG_RULES = {
-  PRIVATE_LIMITED: {
+  PrivateLimited: {
     label: "Director",
     askCount: true,
     showPercent: true,
@@ -54,7 +54,7 @@ const ORG_RULES = {
   OPC: { label: "One Person Company", askCount: false, showPercent: false },
 };
 
-const SHOW_COMPANY_DETAILS_FOR = ["PRIVATE_LIMITED", "LLP", "Partnership"];
+const SHOW_COMPANY_DETAILS_FOR = ["PrivateLimited", "LLP", "Partnership"];
 
 const modulesList = [
   { id: "DMS", label: "DMS", description: "Distributed Management System" },
