@@ -26,7 +26,6 @@ export const useProductUnitConversions = (productId) => {
     },
   });
 
-  console.log("🧩 useProductUnitConversions - query data:", query.data);
 
   return {
     unitConversions: query.data ?? [],
