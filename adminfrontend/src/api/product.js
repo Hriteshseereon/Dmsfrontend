@@ -35,9 +35,7 @@ export const getProducts = async () => {
     params: { organisation: currentOrgId },
   });
 
-  return Array.isArray(res.data)
-    ? res.data
-    : res.data?.results || [];
+  return Array.isArray(res.data) ? res.data : res.data?.results || [];
 };
 
 export const getVendors = async () => {
@@ -58,10 +56,7 @@ export const getProductUnitConversions = async (productId) => {
     },
   });
 
-  // ✅ ALWAYS return an array
-  return Array.isArray(res.data)
-    ? res.data
-    : res.data?.results || [];
+  return res.data;
 };
 
 export const addProductUnitConversion = async (payload) => {
