@@ -94,7 +94,7 @@ export default function OrganizationList() {
                     )} */}
                     {org.modules_data?.length ? (
                       org.modules_data
-                        .filter((m) => m.is_enabled)
+                        .filter((m) => m.is_enabled && m.module !== "HRMS")
                         .map((m) => (
                           <span
                             key={m.module}
