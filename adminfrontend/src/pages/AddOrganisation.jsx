@@ -18,6 +18,7 @@ import {
   Steps,
   Progress,
   Alert,
+  Spin,
 } from "antd";
 import {
   PlusOutlined,
@@ -1724,7 +1725,16 @@ export default function AddOrganisation() {
             size="middle"
           >
             {/* Step Content */}
-            <div style={{ minHeight: "400px" }}>{renderStepContent()}</div>
+            
+
+            {
+              (isEdit && isLoading) ? (
+                // make it in centered container
+                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
+                  <Spin size="large" tip="Loading organisation data..." />
+                </div>
+              ) : <div style={{ minHeight: "400px" }}>{renderStepContent()}</div>
+            }
 
             {/* Navigation Buttons */}
             <Divider />
