@@ -17,6 +17,7 @@ import {
   DatePicker,
   Steps,
   Progress,
+  Alert,
 } from "antd";
 import {
   PlusOutlined,
@@ -32,7 +33,7 @@ const { Option } = Select;
 const { TextArea } = Input;
 
 const ORG_RULES = {
-  PrivateLimited: {
+  PRIVATE_LIMITED: {
     label: "Director",
     askCount: true,
     showPercent: true,
@@ -54,7 +55,7 @@ const ORG_RULES = {
   OPC: { label: "One Person Company", askCount: false, showPercent: false },
 };
 
-const SHOW_COMPANY_DETAILS_FOR = ["PrivateLimited", "LLP", "Partnership"];
+const SHOW_COMPANY_DETAILS_FOR = ["PRIVATE_LIMITED", "LLP", "Partnership"];
 
 const modulesList = [
   { id: "DMS", label: "DMS", description: "Distributed Management System" },
@@ -73,7 +74,7 @@ export default function AddOrganisation() {
   const [currentStep, setCurrentStep] = useState(0);
   const [orgType, setOrgType] = useState("");
   const [hasBranch, setHasBranch] = useState(false);
-
+  const [submitError, setSubmitError] = useState(null);
   const rule = ORG_RULES[orgType];
   const normFile = (e) => (Array.isArray(e) ? e : e?.fileList);
 
@@ -137,7 +138,7 @@ export default function AddOrganisation() {
       rms_org_id: values.rmsOrgId ?? null,
 
       organisation_type: values.organisationType ?? "",
-      legal_type: values.organisationType ?? "",
+      // legal_type: values.organisationType ?? "",
 
       phone_number_1: values.phone ?? "",
       phone_number_2: values.phone2 ?? null,
@@ -217,7 +218,7 @@ export default function AddOrganisation() {
             short_name: b?.shortName ?? "",
             phone_number_1: null,
             email: null,
-            type: "HQ",
+            // type: "HQ",
 
             address: {
               address_line_1: b?.address1 ?? "",
@@ -241,11 +242,52 @@ export default function AddOrganisation() {
     };
   };
 
+  // const handleSubmit = () => {
+  //   setSubmitError(null);
+  //   const values = form.getFieldsValue(true);
+  //   const payload = buildPayload(values);
+
+  //   // 🔍 FRONTEND DEBUG
+  //   console.group("🚀 Create Organisation Payload");
+  //   console.log("Form Values:", values);
+  //   console.log("Final Payload:", payload);
+  //   console.groupEnd();
+
+  //   mutate(payload, {
+  //     onSuccess: (response) => {
+  //       console.group("✅ Organisation Created");
+  //       console.log("Backend Response:", response);
+  //       console.groupEnd();
+
+  //       antMessage.success("Organisation created successfully!");
+  //     },
+
+  //     onError: (error) => {
+  //       console.group("❌ Organisation Creation Failed");
+  //       setSubmitError(errorMsg);
+  //       // Axios error (most likely)
+  //       if (error?.response) {
+  //         console.error("Status:", error.response.status);
+  //         console.error("Response Data:", error.response.data);
+  //         console.error("Headers:", error.response.headers);
+  //       }
+  //       // Fetch / generic error
+  //       else {
+  //         console.error("Error:", error);
+  //       }
+
+  //       console.groupEnd();
+
+  //       antMessage.error(errorMsg);
+  //     },
+  //   });
+  // };
   const handleSubmit = () => {
+    setSubmitError(null);
+
     const values = form.getFieldsValue(true);
     const payload = buildPayload(values);
 
-    // 🔍 FRONTEND DEBUG
     console.group("🚀 Create Organisation Payload");
     console.log("Form Values:", values);
     console.log("Final Payload:", payload);
@@ -263,22 +305,27 @@ export default function AddOrganisation() {
       onError: (error) => {
         console.group("❌ Organisation Creation Failed");
 
-        // Axios error (most likely)
+        const errorMsg =
+          error?.response?.data?.detail ||
+          error?.response?.data?.message ||
+          "Failed to create organisation. Please check the form.";
+
+        setSubmitError(errorMsg);
+
+        // ensure alert is visible
+        window.scrollTo({ top: 0, behavior: "smooth" });
+
         if (error?.response) {
           console.error("Status:", error.response.status);
           console.error("Response Data:", error.response.data);
           console.error("Headers:", error.response.headers);
-        }
-        // Fetch / generic error
-        else {
+        } else {
           console.error("Error:", error);
         }
 
         console.groupEnd();
 
-        antMessage.error(
-          error?.response?.data?.detail || "Failed to create organisation",
-        );
+        antMessage.error(errorMsg);
       },
     });
   };
@@ -315,7 +362,7 @@ export default function AddOrganisation() {
           <Form.Item
             label="Alternate Phone Number"
             name="phone2"
-            rules={[{ required: true, message: "Please enter phone number" }]}
+            rules={[{ message: "Please enter phone number" }]}
           >
             <Input placeholder="Enter phone number" />
           </Form.Item>
@@ -392,7 +439,7 @@ export default function AddOrganisation() {
           <Form.Item
             label="Head Office Location"
             name="businessLocation"
-            rules={[{ required: true, message: "Please select location" }]}
+            rules={[{ message: "Please select location" }]}
           >
             {/* <LocationPicker /> */}
             <Input placeholder="Enter location" maxLength={6} />
@@ -482,7 +529,7 @@ export default function AddOrganisation() {
                       {...restField}
                       label={`${rule.label} Name`}
                       name={[name, "name"]}
-                      rules={[{ required: true, message: "Please enter name" }]}
+                      rules={[{ message: "Please enter name" }]}
                     >
                       <Input placeholder="Enter name" />
                     </Form.Item>
@@ -554,7 +601,6 @@ export default function AddOrganisation() {
                       name={[name, "dob"]}
                       rules={[
                         {
-                          required: true,
                           message: "Please select date of birth",
                         },
                       ]}
@@ -901,7 +947,6 @@ export default function AddOrganisation() {
                         {...restField}
                         label={<span>Bank Name</span>}
                         name={[name, "bankName"]}
-                        required
                       >
                         <Input
                           placeholder="Enter bank name"
@@ -915,7 +960,6 @@ export default function AddOrganisation() {
                         {...restField}
                         label={<span>Account Number</span>}
                         name={[name, "accountNo"]}
-                        required
                       >
                         <Input
                           placeholder="Enter account number"
@@ -929,7 +973,6 @@ export default function AddOrganisation() {
                         {...restField}
                         label={<span>IFSC Code</span>}
                         name={[name, "ifsc"]}
-                        required
                       >
                         <Input
                           placeholder="SBIN0001234"
@@ -942,7 +985,6 @@ export default function AddOrganisation() {
                         {...restField}
                         label={<span>Branch Name</span>}
                         name={[name, "branchName"]}
-                        required
                       >
                         <Input
                           placeholder="Enter branch name"
@@ -1643,6 +1685,18 @@ export default function AddOrganisation() {
             borderRadius: "8px",
           }}
         >
+          {submitError && (
+            <Alert
+              message="Submission Failed"
+              description={submitError}
+              type="error"
+              showIcon
+              closable
+              onClose={() => setSubmitError(null)}
+              style={{ marginBottom: 16 }}
+            />
+          )}
+
           {/* Progress Bar */}
           <div style={{ marginBottom: 32 }}>
             <Progress
