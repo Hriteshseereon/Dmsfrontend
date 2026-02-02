@@ -316,6 +316,7 @@ export default function AddOrganisation() {
         {
           onSuccess: () => {
             antMessage.success("Organisation updated successfully");
+            navigate("/organizations");
           },
           onError: (error) => {
             antMessage.error("Failed to update organisation");
@@ -327,6 +328,7 @@ export default function AddOrganisation() {
       createOrg(payload, {
         onSuccess: () => {
           antMessage.success("Organisation created successfully");
+          navigate("/organizations");
         },
         onError: (error) => {
           antMessage.error("Failed to create organisation");
