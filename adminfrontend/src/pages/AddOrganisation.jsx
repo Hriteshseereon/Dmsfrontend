@@ -29,6 +29,7 @@ import {
 } from "@ant-design/icons";
 import LocationPicker from "../modules/DMS/helpers/LocationPicker.jsx";
 import { useCreateOrganization } from "../queries/useCreateOrganization.js";
+import { useNavigate } from "react-router-dom";
 const { Option } = Select;
 const { TextArea } = Input;
 
@@ -77,6 +78,7 @@ export default function AddOrganisation() {
   const [submitError, setSubmitError] = useState(null);
   const rule = ORG_RULES[orgType];
   const normFile = (e) => (Array.isArray(e) ? e : e?.fileList);
+  const navigate = useNavigate();
 
   const steps = [
     { title: "Organisation", description: "Basic Details" },
@@ -116,9 +118,9 @@ export default function AddOrganisation() {
     switch (step) {
       case 0:
         return ['registeredName', 'phone', 'phone2', 'email', 'secondaryEmail',
-                ['organisationAddress', 'address'], ['organisationAddress', 'city'],
-                ['organisationAddress', 'state'], ['organisationAddress', 'pin'],
-                'businessLocation', 'organisationType'];
+          ['organisationAddress', 'address'], ['organisationAddress', 'city'],
+          ['organisationAddress', 'state'], ['organisationAddress', 'pin'],
+          'businessLocation', 'organisationType'];
         return [];
       case 1:
         return orgType ? ["partners"] : [];
@@ -171,7 +173,7 @@ export default function AddOrganisation() {
           values.organisationType === "pvt"
             ? "DIRECTOR"
             : values.organisationType === "LLP" ||
-                values.organisationType === "partnership"
+              values.organisationType === "partnership"
               ? "PARTNER"
               : "PROPRIETOR",
 
@@ -202,34 +204,34 @@ export default function AddOrganisation() {
         // ---------- COMPANY ----------
         company_details: p?.companyDetails
           ? {
-              company_name: p.companyDetails.companyName ?? null,
-              registration_no: p.companyDetails.registrationNo ?? null,
-              gst_no: p.companyDetails.gstNo ?? null,
-              address: p.companyDetails.address?.city ?? null,
-              location: p.companyDetails.address?.state ?? null,
-            }
+            company_name: p.companyDetails.companyName ?? null,
+            registration_no: p.companyDetails.registrationNo ?? null,
+            gst_no: p.companyDetails.gstNo ?? null,
+            address: p.companyDetails.address?.city ?? null,
+            location: p.companyDetails.address?.state ?? null,
+          }
           : null,
       })),
 
       // ================= BRANCHES =================
       branches: values.hasBranch
         ? (values.branches ?? []).map((b) => ({
-            name: b?.branchName ?? "",
-            short_name: b?.shortName ?? "",
-            phone_number_1: null,
-            email: null,
-            // type: "HQ",
+          name: b?.branchName ?? "",
+          short_name: b?.shortName ?? "",
+          phone_number_1: null,
+          email: null,
+          // type: "HQ",
 
-            address: {
-              address_line_1: b?.address1 ?? "",
-              address_line_2: b?.address2 ?? "",
-              city: b?.city ?? "",
-              state: b?.state ?? "",
-              pin_code: b?.pinNo ?? "",
-              country: "India",
-              address_type: "RENTED",
-            },
-          }))
+          address: {
+            address_line_1: b?.address1 ?? "",
+            address_line_2: b?.address2 ?? "",
+            city: b?.city ?? "",
+            state: b?.state ?? "",
+            pin_code: b?.pinNo ?? "",
+            country: "India",
+            address_type: "RENTED",
+          },
+        }))
         : [],
 
       // ================= DEPOS =================
@@ -300,6 +302,7 @@ export default function AddOrganisation() {
         console.groupEnd();
 
         antMessage.success("Organisation created successfully!");
+        navigate("/organizations");
       },
 
       onError: (error) => {
@@ -353,9 +356,13 @@ export default function AddOrganisation() {
           <Form.Item
             label="Phone Number"
             name="phone"
-            rules={[{ required: true, message: "Please enter phone number" }]}
+            rules={[{ required: true, message: "Please enter phone number" }, 
+            {
+              pattern: /^[6-9]\d{9}$/,
+              message: "Enter a valid 10-digit mobile number",
+            }]}
           >
-            <Input placeholder="Enter phone number" />
+            <Input placeholder="Enter phone number" maxLength={10} />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12} md={6}>
