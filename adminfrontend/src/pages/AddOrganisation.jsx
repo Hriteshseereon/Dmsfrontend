@@ -1761,7 +1761,7 @@ export default function AddOrganisation() {
                     type="primary"
                     htmlType="submit"
                     size="large"
-                    disabled={isPending}
+                    disabled={isCreating || isUpdating}
                     onClick={handleSubmit}
                     icon={<CheckOutlined />}
                     loading={isCreating || isUpdating}
