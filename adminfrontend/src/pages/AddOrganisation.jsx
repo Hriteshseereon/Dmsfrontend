@@ -115,10 +115,10 @@ export default function AddOrganisation() {
   const getFieldsForStep = (step) => {
     switch (step) {
       case 0:
-        // return ['registeredName', 'phone', 'phone2', 'email', 'secondaryEmail',
-        //         ['organisationAddress', 'address'], ['organisationAddress', 'city'],
-        //         ['organisationAddress', 'state'], ['organisationAddress', 'pin'],
-        //         'businessLocation', 'organisationType'];
+        return ['registeredName', 'phone', 'phone2', 'email', 'secondaryEmail',
+                ['organisationAddress', 'address'], ['organisationAddress', 'city'],
+                ['organisationAddress', 'state'], ['organisationAddress', 'pin'],
+                'businessLocation', 'organisationType'];
         return [];
       case 1:
         return orgType ? ["partners"] : [];
