@@ -83,3 +83,19 @@ export const getProductReferenceUnits = async (productId) => {
 
   return res.data;
 };
+
+export const setDisplayUnit = async (conversionId) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.post(
+    `/product/product-unit-conversions/${conversionId}/set-display/`,
+    {},
+    {
+      params: {
+        organisation: currentOrgId,
+      },
+    },
+  );
+
+  return res.data;
+};

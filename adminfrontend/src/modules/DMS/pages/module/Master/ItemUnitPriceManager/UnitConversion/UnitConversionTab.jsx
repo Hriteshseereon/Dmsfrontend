@@ -18,6 +18,7 @@ import {
   addProductUnitConversion,
   getProductUnitConversions,
   getProductReferenceUnits,
+  setDisplayUnit,
 } from "@/api/product";
 import { useProductUnitConversions } from "@/queries/useProductUnitConversions";
 
@@ -25,7 +26,12 @@ const REFERENCE_TYPES = ["BASE", "UNIT"];
 
 export default function UnitConversionTab({ items }) {
   const [selectedItem, setSelectedItem] = useState(null);
-  const { unitConversions, isLoading: isUnitConversionsLoading, addUnitConversion, isAdding } = useProductUnitConversions(selectedItem?.id);
+  const {
+    unitConversions,
+    isLoading: isUnitConversionsLoading,
+    addUnitConversion,
+    isAdding,
+  } = useProductUnitConversions(selectedItem?.id);
   const [referenceUnits, setReferenceUnits] = useState([]);
 
   const [open, setOpen] = useState(false);
@@ -124,6 +130,21 @@ export default function UnitConversionTab({ items }) {
   //     message.error("Failed to create unit");
   //   }
   // };
+  // fuction to add display unit
+  const handleSetDisplay = async (reference_unit_id) => {
+    try {
+      await setDisplayUnit(reference_unit_id);
+      message.success("Display unit updated");
+
+      // refetch unit conversions
+      // since you're using the hook, this should be handled there
+      // assuming addUnitConversion already invalidates/refetches
+      // otherwise you may need an explicit refetch
+    } catch (error) {
+      console.error("❌ Error setting display unit:", error);
+      message.error("Failed to set display unit");
+    }
+  };
 
   const handleSave = async () => {
     if (!formData.unit_name || !formData.multiplier) {
@@ -141,9 +162,7 @@ export default function UnitConversionTab({ items }) {
       unit_name: formData.unit_name,
       reference_type: formData.reference_type,
       reference_unit_id:
-        formData.reference_type === "UNIT"
-          ? formData.reference_unit_id
-          : null,
+        formData.reference_type === "UNIT" ? formData.reference_unit_id : null,
       multiplier: formData.multiplier,
       set_as_display: formData.set_as_display || false,
     };
@@ -202,10 +221,26 @@ export default function UnitConversionTab({ items }) {
               { title: "Unit", dataIndex: "unit_name" },
               { title: "Reference", dataIndex: "reference" },
               { title: "Multiplier", dataIndex: "multiplier" },
+              // {
+              //   title: "Display",
+              //   dataIndex: "set_as_display",
+              //   render: (isDisplay, record) =>
+              //     isDisplay ? (
+              //       <strong>Yes</strong>
+              //     ) : (
+              //       <Button
+              //         size="small"
+              //         type="link"
+              //         onClick={() => handleSetDisplay(record.product)}
+              //       >
+              //         Set Display
+              //       </Button>
+              //     ),
+              // },
               {
                 title: "Display",
                 dataIndex: "set_as_display",
-                render: (v) => (v ? "Yes" : "No"),
+                render: () => <strong>No</strong>,
               },
             ]}
           />
