@@ -31,6 +31,7 @@ export default function UnitConversionTab({ items }) {
     isLoading: isUnitConversionsLoading,
     addUnitConversion,
     isAdding,
+    refreshData,
   } = useProductUnitConversions(selectedItem?.id);
   const [referenceUnits, setReferenceUnits] = useState([]);
 
@@ -135,7 +136,7 @@ export default function UnitConversionTab({ items }) {
     try {
       await setDisplayUnit(reference_unit_id);
       message.success("Display unit updated");
-
+      refreshData();
       // refetch unit conversions
       // since you're using the hook, this should be handled there
       // assuming addUnitConversion already invalidates/refetches

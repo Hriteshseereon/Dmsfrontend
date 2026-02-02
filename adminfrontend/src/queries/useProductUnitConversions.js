@@ -4,7 +4,7 @@ import {
   addProductUnitConversion,
 } from "@/api/product";
 
-const PRODUCT_UNIT_CONVERSIONS_QUERY_KEY = "product-unit-conversions";
+export const PRODUCT_UNIT_CONVERSIONS_QUERY_KEY = "product-unit-conversions";
 
 export const useProductUnitConversions = (productId) => {
   const queryClient = useQueryClient();
@@ -16,13 +16,17 @@ export const useProductUnitConversions = (productId) => {
     enabled: !!productId,
   });
 
+  const refreshData = () => {
+    queryClient.invalidateQueries({
+      queryKey: [PRODUCT_UNIT_CONVERSIONS_QUERY_KEY, productId],
+    });
+  }
+
   // mutation - to update/add
   const addMutation = useMutation({
     mutationFn: addProductUnitConversion,
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: [PRODUCT_UNIT_CONVERSIONS_QUERY_KEY, variables.product],
-      });
+      refreshData();
     },
   });
 
@@ -44,5 +48,6 @@ export const useProductUnitConversions = (productId) => {
 
     // helpers
     refetch: query.refetch,
+    refreshData,
   };
 };
