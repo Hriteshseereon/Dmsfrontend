@@ -10,12 +10,13 @@ import {
   Plus,
   X,
   ArrowRight,
+  Edit,
 } from "lucide-react";
 import { useOrganizations } from "../queries/useOrganizations";
 import useSessionStore from "../store/sessionStore";
 
 export default function OrganizationList() {
-  const { user } = useAuth();
+  const { user, setOrgModules } = useAuth();
   const navigate = useNavigate();
   const { data: organizations, isLoading } = useOrganizations();
   const { setCurrentOrgId } = useSessionStore();
@@ -43,12 +44,12 @@ export default function OrganizationList() {
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-3xl font-bold text-gray-800">Organizations</h2>
           <button
-          onClick={() => navigate("/organisation/add")}
-          className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg"
-        >
-          <Plus size={20} />
-          Add Company
-        </button>
+            onClick={() => navigate("/organisation/add")}
+            className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg"
+          >
+            <Plus size={20} />
+            Add Company
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -68,9 +69,12 @@ export default function OrganizationList() {
                       ID: {org.id}
                     </p>
                   </div>
-                  <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
-                    <Building2 className="text-amber-600" size={24} />
-                  </div>
+                  <button
+                    onClick={() => navigate(`/organisation/edit/${org.id}`)}
+                    className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center hover:bg-amber-200 transition-colors cursor-pointer"
+                  >
+                    <Edit className="text-amber-600" size={24} />
+                  </button>
                 </div>
 
                 <div className="mb-6">
@@ -78,15 +82,17 @@ export default function OrganizationList() {
                     Active Modules
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {org.modules?.length ? (
-                      org.modules.map((module) => (
-                        <span
-                          key={module}
-                          className="px-3 py-1.5 bg-amber-50 text-amber-700 text-xs font-semibold rounded-full border border-amber-200"
-                        >
-                          {module}
-                        </span>
-                      ))
+                    {org.modules_data?.length ? (
+                      org.modules_data
+                        .filter((m) => m.is_enabled && m.module !== "HRMS")
+                        .map((m) => (
+                          <span
+                            key={m.module}
+                            className="px-3 py-1.5 bg-amber-50 text-amber-700 text-xs font-semibold rounded-full border border-amber-200"
+                          >
+                            {m.module}
+                          </span>
+                        ))
                     ) : (
                       <span className="text-sm text-gray-400 italic">
                         No modules assigned
@@ -97,15 +103,14 @@ export default function OrganizationList() {
 
                 <button
                   onClick={() => {
-                    // const firstModule = org.modules?.[0];
-                    // setOrgModules(org.modules || []);
-                    // if (firstModule) {
-                    //   navigate(`/${firstModule.toLowerCase()}`);
-                    // } else {
-                    //   navigate(`/organization/${encodeURIComponent(org.id)}`);
-                    // }
                     setCurrentOrgId(org.id);
-                    navigate(`/dashboard`);
+                    setOrgModules(org.modules_data || []);
+                    const firstModule = org.modules_data.find(m => m.is_enabled)?.module;
+                    if (firstModule) {
+                      navigate(`/${firstModule.toLowerCase()}`);
+                    } else {
+                      navigate(`/organisation/${encodeURIComponent(org.id)}`);
+                    }
                   }}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-lg font-medium transition-all group-hover:shadow-md"
                 >
