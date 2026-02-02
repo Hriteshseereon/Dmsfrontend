@@ -1711,7 +1711,6 @@ export default function AddOrganisation() {
           <Form
             form={form}
             layout="vertical"
-            onFinish={handleSubmit}
             autoComplete="off"
             size="middle"
           >
@@ -1737,6 +1736,7 @@ export default function AddOrganisation() {
                   <Button
                     type="primary"
                     size="large"
+                    htmlType="button"
                     onClick={nextStep}
                     icon={<ArrowRightOutlined />}
                     iconPosition="end"
@@ -1753,6 +1753,7 @@ export default function AddOrganisation() {
                     htmlType="submit"
                     size="large"
                     disabled={isPending}
+                    onClick={handleSubmit}
                     icon={<CheckOutlined />}
                     style={{
                       background: "linear-gradient(to right, #10b981, #059669)",
