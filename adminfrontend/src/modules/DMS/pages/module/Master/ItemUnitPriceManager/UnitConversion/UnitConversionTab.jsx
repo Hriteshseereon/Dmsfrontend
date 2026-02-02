@@ -221,27 +221,27 @@ export default function UnitConversionTab({ items }) {
               { title: "Unit", dataIndex: "unit_name" },
               { title: "Reference", dataIndex: "reference" },
               { title: "Multiplier", dataIndex: "multiplier" },
+              {
+                title: "Display",
+                dataIndex: "is_display_unit",
+                render: (isDisplay, record) =>
+                  isDisplay ? (
+                    <strong>Yes</strong>
+                  ) : (
+                    <Button
+                      size="small"
+                      type="link"
+                      onClick={() => handleSetDisplay(record.conversion_id)}
+                    >
+                      Set Display
+                    </Button>
+                  ),
+              },
               // {
               //   title: "Display",
               //   dataIndex: "set_as_display",
-              //   render: (isDisplay, record) =>
-              //     isDisplay ? (
-              //       <strong>Yes</strong>
-              //     ) : (
-              //       <Button
-              //         size="small"
-              //         type="link"
-              //         onClick={() => handleSetDisplay(record.product)}
-              //       >
-              //         Set Display
-              //       </Button>
-              //     ),
+              //   render: () => <strong>No</strong>,
               // },
-              {
-                title: "Display",
-                dataIndex: "set_as_display",
-                render: () => <strong>No</strong>,
-              },
             ]}
           />
 
