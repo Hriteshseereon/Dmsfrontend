@@ -128,8 +128,8 @@ export default function AddOrganisation() {
       pinNo: b.address?.pin_code,
     })),
 
-    ...org.modules?.reduce((acc, m) => {
-      acc[`module_${m}`] = true;
+    ...org.modules_data?.reduce((acc, m) => {
+      acc[`module_${m.module}`] = m.is_enabled;
       return acc;
     }, {}),
   });
@@ -1567,40 +1567,40 @@ export default function AddOrganisation() {
       <Row gutter={[16, 8]}>
         {modulesList.map((module) => (
           <Col xs={24} sm={12} md={6} key={module.id}>
-            <Form.Item
-              name={`module_${module.id}`}
-              valuePropName="checked"
-              className="mb-0"
-            >
-              <Card
-                hoverable
-                className="
+            <Card
+              hoverable
+              className="
           relative h-full
           border-gray-200
           transition-all
           [&:has(input:checked)]:border-amber-500
           [&:has(input:checked)]:bg-amber-50
         "
-              >
-                {/* Checkbox – Top Right */}
-                <div className="absolute top-3 right-3">
+            >
+              {/* Checkbox – Top Right */}
+              <div className="absolute top-3 right-3">
+                <Form.Item
+                  name={`module_${module.id}`}
+                  valuePropName="checked"
+                  className="mb-0"
+                >
                   <Checkbox />
-                </div>
+                </Form.Item>
+              </div>
 
-                {/* Content */}
-                <div className="pt-4">
-                  <h4 className="text-sm font-semibold text-gray-800">
-                    {module.label}
-                  </h4>
+              {/* Content */}
+              <div className="pt-4">
+                <h4 className="text-sm font-semibold text-gray-800">
+                  {module.label}
+                </h4>
 
-                  {module.description && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      {module.description}
-                    </p>
-                  )}
-                </div>
-              </Card>
-            </Form.Item>
+                {module.description && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {module.description}
+                  </p>
+                )}
+              </div>
+            </Card>
           </Col>
         ))}
       </Row>
@@ -1725,7 +1725,7 @@ export default function AddOrganisation() {
             size="middle"
           >
             {/* Step Content */}
-            
+
 
             {
               (isEdit && isLoading) ? (
