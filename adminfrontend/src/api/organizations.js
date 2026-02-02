@@ -9,12 +9,13 @@ export const createOrganization = async (data) => {
   const res = await api.post("/organisation/organisations/", data);
   return res.data;
 };
+
 export const updateOrganization = async (id, data) => {
   const res = await api.put(`/organisation/organisations/${id}/`, data);
   return res.data;
 };
 
-export const getorganisationById = async (id) => {
+export const getOrganization = async (id) => {
   const res = await api.get(`/organisation/organisations/${id}/`);
   return res.data;
 };

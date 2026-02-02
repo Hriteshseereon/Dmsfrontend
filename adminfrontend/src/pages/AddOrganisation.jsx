@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Form,
   Input,
@@ -29,7 +29,9 @@ import {
 } from "@ant-design/icons";
 import LocationPicker from "../modules/DMS/helpers/LocationPicker.jsx";
 import { useCreateOrganization } from "../queries/useCreateOrganization.js";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { useGetOrganization } from "../queries/useGetOrganization.js";
+import { useUpdateOrganization } from "../queries/useUpdateOrganization.js";
 const { Option } = Select;
 const { TextArea } = Input;
 
@@ -70,7 +72,11 @@ const modulesList = [
 ];
 
 export default function AddOrganisation() {
-  const { mutate, isPending, error } = useCreateOrganization();
+  const { orgId } = useParams();
+  const isEdit = Boolean(orgId);
+  const { data: orgData, isLoading } = useGetOrganization(orgId);
+  const { mutate: updateOrg, isPending: isUpdating } = useUpdateOrganization();
+  const { mutate: createOrg, isPending: isCreating } = useCreateOrganization();
   const [form] = Form.useForm();
   const [currentStep, setCurrentStep] = useState(0);
   const [orgType, setOrgType] = useState("");
@@ -87,6 +93,59 @@ export default function AddOrganisation() {
     { title: "Branch", description: "Locations" },
     { title: "Finalize", description: "Modules & Review" },
   ];
+
+  const mapOrgToForm = (org) => ({
+    registeredName: org.registered_name,
+    organisationType: org.organisation_type,
+    phone: org.phone_number_1,
+    phone2: org.phone_number_2,
+    email: org.email,
+    secondaryEmail: org.secondary_email,
+
+    organisationAddress: {
+      address: org.addresses?.[0]?.address_line_1,
+      address2: org.addresses?.[0]?.address_line_2,
+      city: org.addresses?.[0]?.city,
+      state: org.addresses?.[0]?.state,
+      pin: org.addresses?.[0]?.pin_code,
+    },
+
+    partners: org.persons?.map((p) => ({
+      name: p.full_name,
+      email: p.email,
+      mobileNumber: p.phone_number_1,
+      whatsappNumber: p.whatsapp_number,
+      gender: p.gender,
+    })),
+
+    hasBranch: org.branches?.length > 0,
+    branches: org.branches?.map((b) => ({
+      branchName: b.name,
+      shortName: b.short_name,
+      city: b.address?.city,
+      state: b.address?.state,
+      pinNo: b.address?.pin_code,
+    })),
+
+    ...org.modules?.reduce((acc, m) => {
+      acc[`module_${m}`] = true;
+      return acc;
+    }, {}),
+  });
+
+  useEffect(() => {
+    if (orgData && isEdit) {
+      const values = mapOrgToForm(orgData);
+
+      form.setFieldsValue(values);
+
+      setOrgType(values.organisationType);
+      setHasBranch(values.hasBranch);
+      setCurrentStep(0);
+    }
+  }, [orgData, isEdit]);
+
+
 
   const handleOrgTypeChange = (value) => {
     setOrgType(value);
@@ -244,93 +303,36 @@ export default function AddOrganisation() {
     };
   };
 
-  // const handleSubmit = () => {
-  //   setSubmitError(null);
-  //   const values = form.getFieldsValue(true);
-  //   const payload = buildPayload(values);
-
-  //   // 🔍 FRONTEND DEBUG
-  //   console.group("🚀 Create Organisation Payload");
-  //   console.log("Form Values:", values);
-  //   console.log("Final Payload:", payload);
-  //   console.groupEnd();
-
-  //   mutate(payload, {
-  //     onSuccess: (response) => {
-  //       console.group("✅ Organisation Created");
-  //       console.log("Backend Response:", response);
-  //       console.groupEnd();
-
-  //       antMessage.success("Organisation created successfully!");
-  //     },
-
-  //     onError: (error) => {
-  //       console.group("❌ Organisation Creation Failed");
-  //       setSubmitError(errorMsg);
-  //       // Axios error (most likely)
-  //       if (error?.response) {
-  //         console.error("Status:", error.response.status);
-  //         console.error("Response Data:", error.response.data);
-  //         console.error("Headers:", error.response.headers);
-  //       }
-  //       // Fetch / generic error
-  //       else {
-  //         console.error("Error:", error);
-  //       }
-
-  //       console.groupEnd();
-
-  //       antMessage.error(errorMsg);
-  //     },
-  //   });
-  // };
   const handleSubmit = () => {
     setSubmitError(null);
 
     const values = form.getFieldsValue(true);
     const payload = buildPayload(values);
 
-    console.group("🚀 Create Organisation Payload");
-    console.log("Form Values:", values);
-    console.log("Final Payload:", payload);
-    console.groupEnd();
-
-    mutate(payload, {
-      onSuccess: (response) => {
-        console.group("✅ Organisation Created");
-        console.log("Backend Response:", response);
-        console.groupEnd();
-
-        antMessage.success("Organisation created successfully!");
-        navigate("/organizations");
-      },
-
-      onError: (error) => {
-        console.group("❌ Organisation Creation Failed");
-
-        const errorMsg =
-          error?.response?.data?.detail ||
-          error?.response?.data?.message ||
-          "Failed to create organisation. Please check the form.";
-
-        setSubmitError(errorMsg);
-
-        // ensure alert is visible
-        window.scrollTo({ top: 0, behavior: "smooth" });
-
-        if (error?.response) {
-          console.error("Status:", error.response.status);
-          console.error("Response Data:", error.response.data);
-          console.error("Headers:", error.response.headers);
-        } else {
-          console.error("Error:", error);
+    if (isEdit) {
+      updateOrg(
+        { id: orgId, data: payload },
+        {
+          onSuccess: () => {
+            antMessage.success("Organisation updated successfully");
+          },
+          onError: (error) => {
+            antMessage.error("Failed to update organisation");
+            console.error("Update Organization Error:", error);
+          },
+        },
+      );
+    } else {
+      createOrg(payload, {
+        onSuccess: () => {
+          antMessage.success("Organisation created successfully");
+        },
+        onError: (error) => {
+          antMessage.error("Failed to create organisation");
+          console.error("Create Organisation Error:", error);
         }
-
-        console.groupEnd();
-
-        antMessage.error(errorMsg);
-      },
-    });
+      });
+    }
   };
 
   const handleBack = () => {
@@ -356,7 +358,7 @@ export default function AddOrganisation() {
           <Form.Item
             label="Phone Number"
             name="phone"
-            rules={[{ required: true, message: "Please enter phone number" }, 
+            rules={[{ required: true, message: "Please enter phone number" },
             {
               pattern: /^[6-9]\d{9}$/,
               message: "Enter a valid 10-digit mobile number",
@@ -1762,12 +1764,13 @@ export default function AddOrganisation() {
                     disabled={isPending}
                     onClick={handleSubmit}
                     icon={<CheckOutlined />}
+                    loading={isCreating || isUpdating}
                     style={{
                       background: "linear-gradient(to right, #10b981, #059669)",
                       borderColor: "transparent",
                     }}
                   >
-                    {isPending ? "Creating..." : "Create Organisation"}
+                    {isEdit ? "Update Organisation" : "Create Organisation"}
                   </Button>
                 )}
               </Space>

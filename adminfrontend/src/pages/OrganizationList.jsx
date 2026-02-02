@@ -10,6 +10,7 @@ import {
   Plus,
   X,
   ArrowRight,
+  Edit,
 } from "lucide-react";
 import { useOrganizations } from "../queries/useOrganizations";
 import useSessionStore from "../store/sessionStore";
@@ -68,9 +69,12 @@ export default function OrganizationList() {
                       ID: {org.id}
                     </p>
                   </div>
-                  <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
-                    <Building2 className="text-amber-600" size={24} />
-                  </div>
+                  <button
+                    onClick={() => navigate(`/organisation/edit/${org.id}`)}
+                    className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center hover:bg-amber-200 transition-colors cursor-pointer"
+                  >
+                    <Edit className="text-amber-600" size={24} />
+                  </button>
                 </div>
 
                 <div className="mb-6">
@@ -105,7 +109,7 @@ export default function OrganizationList() {
                     if (firstModule) {
                       navigate(`/${firstModule.toLowerCase()}`);
                     } else {
-                      navigate(`/organization/${encodeURIComponent(org.id)}`);
+                      navigate(`/organisation/${encodeURIComponent(org.id)}`);
                     }
                   }}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-lg font-medium transition-all group-hover:shadow-md"
