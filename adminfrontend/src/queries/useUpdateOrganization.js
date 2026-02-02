@@ -5,7 +5,7 @@ export const useUpdateOrganization = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }) => updateOrganization({ id, data }),
+    mutationFn: ({ id, data }) => updateOrganization(id, data),
 
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries(["organization", variables.id]);
