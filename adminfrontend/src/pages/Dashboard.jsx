@@ -122,16 +122,6 @@ export default function Dashboard() {
               Access your organization's systems
             </p>
           </div>
-
-          {isAdmin && (
-            <button
-              onClick={() => setShowModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-lg transition-colors shadow-md"
-            >
-              <Plus className="w-5 h-5" />
-              Add Organization
-            </button>
-          )}
         </div>
 
         {/* Module Cards Grid */}

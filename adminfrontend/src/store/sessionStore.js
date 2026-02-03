@@ -8,6 +8,7 @@ const useSessionStore = create(
       refreshToken: null,
       user: null,
       currentOrgId: null,
+      orgModules: [],
 
       setSession: ({ accessToken, refreshToken, user, currentOrgId }) =>
         set({ accessToken, refreshToken, user, currentOrgId }),
@@ -16,6 +17,7 @@ const useSessionStore = create(
       setRefreshToken: (refreshToken) => set({ refreshToken }),
       setUser: (user) => set({ user }),
       setCurrentOrgId: (currentOrgId) => set({ currentOrgId }),
+      setOrgModules: (orgModules) => set({ orgModules }),
 
       clearSession: () =>
         set({
@@ -23,6 +25,7 @@ const useSessionStore = create(
           refreshToken: null,
           user: null,
           currentOrgId: null,
+          orgModules: [],
         }),
     }),
     {

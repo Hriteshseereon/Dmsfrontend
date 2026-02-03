@@ -14,49 +14,11 @@ export const AuthProvider = ({ children }) => {
   const setSession = useSessionStore((s) => s.setSession);
   const clearSession = useSessionStore((s) => s.clearSession);
 
-  const [orgModules, setOrgModules] = useState([]);
-  const [organisations, setOrganisations] = useState([]);
-  const [accessToken, setAccessToken] = useState(null);
+  const currentOrgId = useSessionStore((s) => s.currentOrgId);
+  const setCurrentOrgId = useSessionStore((s) => s.setCurrentOrgId);
+  const orgModules = useSessionStore((s) => s.orgModules);
+  const setOrgModules = useSessionStore((s) => s.setOrgModules);
 
-  const [currentOrgId, setCurrentOrgId] = useState(null);
-
-  useEffect(() => {
-    const storedOrg = localStorage.getItem("currentOrgId");
-    if (storedOrg) {
-      setCurrentOrgId(storedOrg);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (currentOrgId) {
-      localStorage.setItem("currentOrgId", currentOrgId);
-    } else {
-      localStorage.removeItem("currentOrgId");
-    }
-  }, [currentOrgId]);
-
-
-
-  // helper: normalize org lookup (org.id may be string)
-  const findOrgByIdOrName = (idOrName) =>
-    orgs.find(
-      (o) =>
-        String(o.id).toLowerCase() === String(idOrName).toLowerCase() ||
-        o.name.toLowerCase() === String(idOrName).toLowerCase(),
-    );
-
-  useEffect(() => {
-    if (!user) return;
-
-    if (user.is_super_admin || user.is_admin) {
-      setOrgModules(modules.map((m) => m.id));
-      setOrganisations(orgs);
-    } else if (user.org) {
-      const org = findOrgByIdOrName(user.org);
-      setOrgModules(org?.modules || []);
-      setOrganisations([]);
-    }
-  }, [user]);
 
   const login = async (username, password) => {
     try {
@@ -96,11 +58,7 @@ export const AuthProvider = ({ children }) => {
   const isAdmin = user?.role === "admin";
 
   const logout = () => {
-    // setUser(null);
-    // setOrgModules([]);
-    // setOrganisations([]);
     clearSession();
-    localStorage.removeItem("currentOrgId");
     window.location.reload();
   };
 
@@ -121,7 +79,6 @@ export const AuthProvider = ({ children }) => {
         logout,
         orgModules,
         isAdmin,
-        organisations,
         setOrgModules,
         currentOrgId,
         setCurrentOrgId,

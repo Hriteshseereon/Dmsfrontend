@@ -47,6 +47,7 @@ export default function AppRouter() {
           element={user ? <OrganizationList /> : <Navigate to="/" />}
         />
         <Route path="/organisation/add" element={<AddOrganisation />} />
+        <Route path="/organisation/edit/:orgId" element={<AddOrganisation />} />
 
         {/* Organization specific dashboard */}
         <Route

@@ -5,7 +5,7 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
   headers: {
     "Content-Type": "application/json",
-    "ngrok-skip-browser-warning": "true", // TODO: remove later, only use for ngrok backend tunneling
+    // "ngrok-skip-browser-warning": "true", // TODO: remove later, only use for ngrok backend tunneling
   },
 });
 
@@ -20,7 +20,6 @@ const api = axios.create({
 //   }
 //   return config;
 // });
-
 api.interceptors.request.use((config) => {
   // Skip token for login
   if (config.url.endsWith("/auth/login/")) {
