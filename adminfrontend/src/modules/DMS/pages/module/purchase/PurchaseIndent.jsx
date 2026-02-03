@@ -5,7 +5,7 @@ import {
   optionalPositiveNumber,
   percentageValidation,
 } from "../../../helpers/formValidation";
-import { getPurchaseOrder } from "../../../../../api/purchase";
+import { getPurchaseOrder,getPurchaseContract ,getSoudaByContractId} from "../../../../../api/purchase";
 import {
   Table,
   Input,
@@ -103,10 +103,11 @@ export default function PurchaseIndent() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
- 
+ const [soudaContracts, setSoudaContracts] = useState([]);
   const [data, setData] = useState([]);
  const [loading, setLoading] = useState(false);
- 
+ const [contractItems, setContractItems] = useState([]);
+
   const [searchText, setSearchText] = useState("");
 
   const [addForm] = Form.useForm();
@@ -114,6 +115,7 @@ export default function PurchaseIndent() {
   const [viewForm] = Form.useForm();
   useEffect(() => {
   fetchPurchaseOrder();
+  fetchSoudaNoOptions();
 }, []);
 
 const fetchPurchaseOrder = async () => {
@@ -144,6 +146,18 @@ const fetchPurchaseOrder = async () => {
   }
 };
 
+const fetchSoudaNoOptions = async () => {
+  try {
+    const res = await getPurchaseContract();
+    const list = res?.data || res;
+    setSoudaContracts(list);
+  } catch (err) {
+    message.error("Failed to load souda numbers");
+  }
+};
+
+
+
 const handleSearch = (value) => {
   setSearchText(value);
 
@@ -160,43 +174,53 @@ const handleSearch = (value) => {
 };
 
 
-  // when souda selected - populate basic info AND items list (user can add/remove items)
-  const handleSoudaSelect = (soudaNo, formInstance) => {
-    if (!soudaNo) return;
-    const souda = soudaMaster[soudaNo];
-    if (!souda) return;
+const handleSoudaSelect = async (contractId, formInstance) => {
+  if (!contractId) return;
 
-    // map items into form list entries (qty/free qty blank so user can fill)
-    const itemsForForm = souda.items.map((it) => ({
-      item: it.item,
-      itemCode: it.itemCode,
-      qty: undefined,
-      freeQty: 0,
-      totalQty: undefined,
-      uom: it.uom || purchaseIndentJSON.uomOptions[0],
-      rate: it.rate || 0,
-      discountPercent: 0,
+  try {
+    const res = await getSoudaByContractId(contractId);
+    const data = res?.data || res;
+
+    // 🔑 SAVE ITEMS FOR ITEM DROPDOWN
+    setContractItems(data.items || []);
+
+    const itemsForForm = (data.items || []).map((it) => ({
+      product: it.product,
+      hsn_code: it.hsn_code,
+      item: it.item_name,          // used for Select
+      itemCode: it.product,        // or actual item_code if you have it
+      qty: Number(it.qty || 0),
+      freeQty: Number(it.free_qty || 0),
+      totalQty: Number(it.qty || 0) + Number(it.free_qty || 0),
+      uom: it.uom_details?.unit_name,
+      rate: Number(it.rate || 0),
+      discountPercent: Number(it.discount_percent || 0),
       discountAmt: 0,
+      grossAmount: 0,
       grossWt: 0,
       totalGrossWt: 0,
-      grossAmount: 0,
+      sgstPercent: Number(it.sgst_percent || 0),
+      cgstPercent: Number(it.cgst_percent || 0),
+      igstPercent: Number(it.igst_percent || 0),
     }));
 
     formInstance.setFieldsValue({
-      soudaNo: souda.soudaNo,
-      plantName: souda.plantName,
-      plantCode: souda.plantCode,
-      companyName: souda.companyName,
-      depoName: souda.depoName,
-      deliveryAddress: souda.deliveryAddress || "",
+      vendor: data.vendor,
+      vendorName: data.vendor_name,
+      companyName: data.company_name,
+      plantName: data.plant_name,
+      deliveryAddress: data.delivery_address,
       items: itemsForForm,
     });
 
-    // recalc after a tick
-    setTimeout(() => recalcAll(formInstance), 50);
-  };
+    setTimeout(() => recalcAll(formInstance), 0);
+  } catch (err) {
+    message.error("Failed to load souda details");
+  }
+};
 
-  // recalc same as before, but for multi items
+
+
   const recalcAll = (formInstance) => {
     if (!formInstance) return;
     const values = formInstance.getFieldsValue(true);
@@ -255,51 +279,76 @@ const handleSearch = (value) => {
   };
 
 
-  const handleFormSubmit = (values, type) => {
-    const payloadBase = {
-      ...values,
-      indentDate: values.indentDate
-        ? values.indentDate.format("YYYY-MM-DD")
-        : null,
-      deliveryDate: values.deliveryDate
-        ? values.deliveryDate.format("YYYY-MM-DD")
-        : null,
-    };
+ const handleFormSubmit = (values, type) => {
+  // find selected souda number (display value)
+  const selectedContract = soudaContracts.find(
+    (c) => c.id === values.contract
+  );
 
-    const items = values.items || [];
+  const payload = {
+    // 🔑 IDs & basic info
+    contract: values.contract, // contract UUID
+    souda_no: selectedContract?.contract_number || null,
 
-    const payload = {
-      ...payloadBase,
-      items,
-      totalQty: values.totalQty,
-      totalAmt: values.totalAmt,
-      status: values.status || "Pending",
-    };
+    vendor: values.vendor,
+    plant_name: values.plantName,
+    company_name: values.companyName,
+    delivery_address: values.deliveryAddress,
 
-    if (type === "edit" && selectedRecord) {
-      setData((prev) =>
-        prev.map((i) =>
-          i.key === selectedRecord.key ? { ...payload, key: i.key } : i
-        )
-      );
-      setIsEditModalOpen(false);
-      editForm.resetFields();
-      message.success("Indent updated");
-    } else {
-      setData((prev) => [...prev, { ...payload, key: Date.now() }]);
-      setIsAddModalOpen(false);
-      addForm.resetFields();
-      message.success("Indent added");
-    }
+    // 📅 dates
+    indent_date: values.indentDate
+      ? values.indentDate.format("YYYY-MM-DD")
+      : null,
+    delivery_date: values.deliveryDate
+      ? values.deliveryDate.format("YYYY-MM-DD")
+      : null,
+
+    // 📦 raw item inputs only (NO calculations)
+    items: (values.items || []).map((it) => ({
+      product: it.product,
+      hsn_code: it.hsn_code,
+      qty: Number(it.qty || 0),
+      free_qty: Number(it.freeQty || 0),
+      rate: Number(it.rate || 0),
+      discount_percent: Number(it.discountPercent || 0),
+      sgst_percent: Number(it.sgstPercent || 0),
+      cgst_percent: Number(it.cgstPercent || 0),
+      igst_percent: Number(it.igstPercent || 0),
+    })),
+
+    status: values.status || "Pending",
   };
+
+  console.log("FINAL PAYLOAD 👉", payload);
+
+  // 🔁 UI handling only (no calculation here)
+  if (type === "edit" && selectedRecord) {
+    setData((prev) =>
+      prev.map((row) =>
+        row.key === selectedRecord.key ? { ...row, ...payload } : row
+      )
+    );
+    setIsEditModalOpen(false);
+    editForm.resetFields();
+    message.success("Indent updated successfully");
+  } else {
+    setData((prev) => [...prev, { ...payload, key: Date.now() }]);
+    setIsAddModalOpen(false);
+    addForm.resetFields();
+    message.success("Indent added successfully");
+  }
+};
+
 
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Souda No</span>,
-      dataIndex: "contract",
+      title: <span className="text-amber-700 font-semibold">Order No</span>,
+      dataIndex: "order_number",
       width: 120,
       render: (t) => <span className="text-amber-800">{t}</span>,
+     
     },
+   
     {
       title: <span className="text-amber-700 font-semibold">Plant</span>,
       dataIndex: "plant_name",
@@ -413,22 +462,25 @@ total_qty_all_items
       <h6 className=" text-amber-500 ">Basic Information</h6>
       <Row gutter={16}>
         <Col span={6}>
-          <Form.Item
-            label="Souda No"
-            name="soudaNo"
-            rules={[{ required: true }]}
-          >
-            <Select
-              disabled={disabled}
-              onChange={(v) => handleSoudaSelect(v, formInstance)}
-            >
-              {purchaseIndentJSON.soudaNoOptions.map((opt) => (
-                <Option key={opt} value={opt}>
-                  {opt}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
+         <Form.Item
+  label="Souda No"
+  name="contract"   // store CONTRACT ID
+  rules={[{ required: true }]}
+>
+  <Select
+    placeholder="Select Souda No"
+    onChange={(contractId) =>
+      handleSoudaSelect(contractId, addForm)
+    }
+  >
+    {soudaContracts.map((c) => (
+      <Option key={c.id} value={c.id}>
+        {c.contract_number}
+      </Option>
+    ))}
+  </Select>
+</Form.Item>
+
         </Col>
 
         <Col span={6}>
@@ -522,43 +574,60 @@ total_qty_all_items
 
                 <Row gutter={24}>
                   <Col span={6}>
-                    <Form.Item
-                      {...field}
-                      label="Item Name"
-                      name={[field.name, "item"]}
-                      rules={[
-                        { required: true, message: "Please select item" },
-                      ]}
-                    >
-                      {/* item selection is populated from the souda's item list if available */}
-                      <Select
-                        showSearch
-                        disabled={disabled}
-                        placeholder="Select item"
-                        onChange={() =>
-                          setTimeout(() => recalcAll(formInstance), 50)
-                        }
-                      >
-                        {/* if souda selected, prefer those items */}
-                        {(() => {
-                          const soudaNo = formInstance.getFieldValue("soudaNo");
-                          const souda = soudaMaster[soudaNo];
-                          const opts = souda ? souda.items : [];
-                          return (opts.length ? opts : []).map((it) => (
-                            <Option key={it.itemCode} value={it.item}>
-                              {it.item}
-                            </Option>
-                          ));
-                        })()}
-                      </Select>
-                    </Form.Item>
+                  <Form.Item
+  {...field}
+  label="Item Name"
+  name={[field.name, "product"]}
+  rules={[{ required: true, message: "Please select item" }]}
+>
+  <Select
+    showSearch
+    disabled={disabled}
+    placeholder="Select item"
+   onChange={(productId) => {
+  const item = contractItems.find((i) => i.product === productId);
+  if (!item) return;
+
+  formInstance.setFieldsValue({
+    items: formInstance.getFieldValue("items").map((row, i) =>
+      i === field.name
+        ? {
+            ...row,
+            product: item.product,
+            item: item.item_name,
+            hsn_code: item.hsn_code,
+            qty: Number(item.qty || 0),
+            freeQty: Number(item.free_qty || 0),
+            uom: item.uom_details?.unit_name,
+            rate: Number(item.rate || 0),
+            discountPercent: Number(item.discount_percent || 0),
+            sgstPercent: Number(item.sgst_percent || 0),
+            cgstPercent: Number(item.cgst_percent || 0),
+            igstPercent: Number(item.igst_percent || 0),
+          }
+        : row
+    ),
+  });
+
+  setTimeout(() => recalcAll(formInstance), 0);
+}}
+
+  >
+    {contractItems.map((it) => (
+      <Option key={it.product} value={it.product}>
+        {it.item_name}
+      </Option>
+    ))}
+  </Select>
+</Form.Item>
+
                   </Col>
 
                   <Col span={4}>
                     <Form.Item
                       {...field}
                       label="Item Code"
-                      name={[field.name, "itemCode"]}
+                      name={[field.name, "hsn_code"]}
                     >
                       <Input disabled />
                     </Form.Item>

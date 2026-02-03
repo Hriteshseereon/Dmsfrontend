@@ -1,11 +1,13 @@
 // PurchaseSouda.jsx
 import React, { useState, useEffect, useMemo } from "react";
-import { positiveNumberInputProps, 
+import {
+  positiveNumberInputProps,
   percentageInputProps,
-  blockNonNumericInput  } from "../../../helpers/numberInput";
-import { requiredPositiveNumber,optionalPositiveNumber,percentageValidation } from "../../../helpers/formValidation";
+  blockNonNumericInput
+} from "../../../helpers/numberInput";
+import { requiredPositiveNumber, optionalPositiveNumber, percentageValidation } from "../../../helpers/formValidation";
 import { updateItemComputedFields } from "../../../helpers/calculation";
-import { getPurchaseContract ,getAllCompany,getAllVendor,getAllProduct,addPurchaseContract} from "../../../../../api/purchase";
+import { getPurchaseContract, getAllVendor, addPurchaseContract, getproductbyVendor ,getPlantsByVendor} from "../../../../../api/purchase";
 import {
   Table,
   Input,
@@ -88,7 +90,6 @@ const purchaseSoudaJSON = {
   uomOptions: ["Litre", "Kg", "Packet", "Box"],
   statusOptions: ["Approved", "Pending", "Rejected"],
 };
-const companyOptions = ["Jay Traders", "Another Co", "RUCHI SOYA INDUSTRIES LIMITED"];
 
 
 export default function PurchaseSouda() {
@@ -97,98 +98,116 @@ export default function PurchaseSouda() {
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
   const [vendors, setVendors] = useState([]);
-const [companies, setCompanies] = useState([]);
-const [products, setProducts] = useState([]);
-
+  // vendors / companies
+  const [plants, setPlants] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [selectedVendor, setSelectedVendor] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
 
- const [data, setData] = useState([]);
-const [loading, setLoading] = useState(false);
- const [searchText, setSearchText] = useState("");
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
 
- useEffect(() => {
-  fetchDropdownData();
-}, []);
-
-const fetchDropdownData = async () => {
-  try {
-    const [vendorRes, companyRes, productRes] = await Promise.all([
-      getAllVendor(),
-      getAllCompany(),
-      getAllProduct(),
-    ]);
-
-    setVendors(vendorRes);
-    setCompanies(companyRes);
-    setProducts(productRes);
-  } catch (err) {
-    console.error("Dropdown API failed", err);
-  }
-};
-
-  // helper: map of itemOptions for quick lookup
-  const itemMap = useMemo(() => {
-    const m = {};
-    purchaseSoudaJSON.itemOptions.forEach((it) => (m[it.name] = it));
-    return m;
+  useEffect(() => {
+    fetchDropdownData();
+    fetchPurchaseContracts();
   }, []);
 
-  // search (simple)
-  const handleSearch = (value) => {
-    setSearchText(value);
-    if (!value) {
-      setData(purchaseSoudaJSON.records);
-      return;
+ 
+
+
+
+  const fetchDropdownData = async () => {
+    try {
+      const [vendorRes, plantRes] = await Promise.all([
+        getAllVendor(),   // vendor table
+         
+
+      ]);
+      console.log("PLANT API DATA:", plantRes);
+      setVendors(vendorRes);
+    } catch (err) {
+      console.error(err);
     }
-    const filtered = purchaseSoudaJSON.records.filter((item) =>
-      JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
-    );
-    setData(filtered);
   };
-useEffect(() => {
-  fetchPurchaseContracts();
-}, []);
 
-const fetchPurchaseContracts = async () => {
-  try {
-    setLoading(true);
-    const res = await getPurchaseContract();
 
-    /**
-     * Adjust mapping based on backend response structure
-     * Assuming API returns array of purchase contracts
-     */
-    const formattedData = res.map((item, index) => ({
-      key: item.id || index + 1,
-      plant: item.plant,
-      vendor: item.vendor,
-      startDate: item.startDate,
-      to_date: item.to_date,
-      from_date:item.from_date,
-      status: item.status,
-    }));
+ 
 
-    setData(formattedData);
-  } catch (error) {
-    console.error("Failed to fetch purchase contracts", error);
-  } finally {
-    setLoading(false);
+  // search (simple)
+const handleSearch = (value) => {
+  setSearchText(value);
+
+  if (!value) {
+    fetchPurchaseContracts();
+    return;
   }
-};
 
+  const filtered = data.filter((item) =>
+    JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
+  );
+
+  setData(filtered);
+};
   
+
+  const fetchPurchaseContracts = async () => {
+    try {
+      setLoading(true);
+      const res = await getPurchaseContract();
+
+      /**
+       * Adjust mapping based on backend response structure
+       * Assuming API returns array of purchase contracts
+       */
+      const formattedData = res.map((item, index) => ({
+        key: item.id || index + 1,
+        name: item.name,
+        souda_no: item.souda_no,
+        vendor_name: item.vendor_name,
+        plant_name: item.plant_name,
+        startDate: item.startDate,
+        to_date: item.to_date,
+        from_date: item.from_date,
+        status: item.status,
+      }));
+
+      setData(formattedData);
+    } catch (error) {
+      console.error("Failed to fetch purchase contracts", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   // ---------- Table columns ----------
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Plant Name</span>,
-      dataIndex: "plant",
-      width: 140,
-      render: (t) => <span className="text-amber-800">{t}</span>,
+      title: <span className="text-amber-700 font-semibold">Souda No</span>,
+      dataIndex: "souda_no",
+      
+      width: 100,
+      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
+    {
+      title: <span className="text-amber-700 font-semibold">Plant Name</span>,
+      dataIndex: "plant_name",
+       width: 100,
+      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Vendor Name</span>,
+      dataIndex: "vendor_name",
+       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+      width: 100,
+    },
+
+
     // {
     //   title: <span className="text-amber-700 font-semibold">Souda Date</span>,
     //   dataIndex: "soudaDate",
@@ -198,26 +217,22 @@ const fetchPurchaseContracts = async () => {
     {
       title: <span className="text-amber-700 font-semibold">Start Date</span>,
       dataIndex: "from_date",
-      width: 110,
+      width: 100,
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">End Date</span>,
       dataIndex: "to_date",
-      width: 110,
+       width: 100,
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
-    {
-      title: <span className="text-amber-700 font-semibold">Company</span>,
-      dataIndex: "vendor",
-      width: 140,
-      render: (t) => <span className="text-amber-800">{t}</span>,
-    },
- 
+
+
+
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
-      width: 120,
+      width: 100,
       render: (status) => {
         const base = "px-3 py-1 rounded-full text-sm font-semibold";
         if (status === "Approved")
@@ -229,7 +244,7 @@ const fetchPurchaseContracts = async () => {
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
-      width: 120,
+      width: 80,
       render: (record) => (
         <div className="flex gap-3">
           <EyeOutlined
@@ -329,414 +344,505 @@ const fetchPurchaseContracts = async () => {
 
   // ---------- Form submit ----------
 const handleFormSubmit = async (values) => {
+  const orderTotals = values.orderTotals || {};
+
   const payload = {
-    organisation: values.organisation,
+    vendor: values.vendor,
+    vendor_name: values.vendor_name,
     plant: values.plant,
-    from_date: dayjs(values.startDate).format("YYYY-MM-DD"),
-    to_date: dayjs(values.endDate).format("YYYY-MM-DD"),
-    items: values.items.map(it => ({
-      product: it.item,
-      quantity: it.qty,
-      free_qty: it.freeQty,
-      rate: it.rate,
-      sgst_percent: it.sgstPercent,
-      cgst_percent: it.cgstPercent,
-      igst_percent: it.igstPercent,
+    plant_name: values.plant_name,
+
+    from_date: dayjs(values.from_date).format("YYYY-MM-DD"),
+    to_date: dayjs(values.to_date).format("YYYY-MM-DD"),
+    total_qty: orderTotals.totalQty || 0,
+    gross_amount: orderTotals.totalGrossAmount || 0,
+    total_discount: orderTotals.totalDiscount || 0,
+    total_gst_amount: orderTotals.totalGST || 0,
+    total_amount: orderTotals.grandTotal || 0,
+    grand_total: orderTotals.grandTotal || 0,
+
+    items: values.items.map((it) => ({
+      product: it.product_id,
+      uom: it.base_unit || null,
+
+      qty: it.qty || 0,
+      free_qty: it.freeQty || 0,
+      total_qty: it.totalQty || 0,
+
+      rate: it.rate || 0,
+      item_name: it.item_name || "",
+      hsn_id: it.hsn_id || null,
+      hsn_code: it.hsn_code || "",
+
+      discount_percent: it.discountPercent || 0,
+      discount_amount: it.discountAmt || 0,
+
+      gross_amount: it.grossAmount || 0,
+
+      sgst_percent: it.sgstPercent || 0,
+      cgst_percent: it.cgstPercent || 0,
+      igst_percent: it.igstPercent || 0,
+
+      total_gst_amount: it.totalGST || 0,
+      total_amount: it.totalAmt || 0,
     })),
   };
 
-  await addPurchaseContract(values.organisation, payload);
+  console.log("FINAL PAYLOAD:", payload);
+  await addPurchaseContract(payload);
+  setIsAddModalOpen(false);
 };
 
+
+
+
+
+
+
+
   const ItemsList = ({ form, disabled = false }) => (
-  <Form.List name="items">
-    {(fields, { add, remove }) => (
-      <>
-        <div className="mb-2 flex justify-between items-center">
-          <h6 className="text-amber-500">Items</h6>
-          {!disabled && (
-            <Button
-              type="dashed"
-              icon={<PlusOutlined />}
-              onClick={() =>
-                add({
-                  lineKey: new Date().getTime(),
-                  item: undefined,
-                  itemCode: undefined,
-                  qty: 0,
-                  freeQty: 0,
-                  totalQty: 0,
-                  rate: 0,
-                  discountPercent: 0,
-                  discountAmt: 0,
-                  grossAmount: 0,
-                  uom: purchaseSoudaJSON.uomOptions[0],
-                })
+    <Form.List name="items">
+      {(fields, { add, remove }) => (
+        <>
+          <div className="mb-2 flex justify-between items-center">
+            <h6 className="text-amber-500">Items</h6>
+            {!disabled && (
+              <Button
+                type="dashed"
+                icon={<PlusOutlined />}
+                onClick={() =>
+                  add({
+                    lineKey: new Date().getTime(),
+                    item: undefined,
+
+                    qty: 0,
+                    freeQty: 0,
+                    totalQty: 0,
+                    rate: 0,
+                    discountPercent: 0,
+                    discountAmt: 0,
+                    grossAmount: 0,
+                    base_unit: null,
+                  })
+                }
+              >
+                Add Item
+              </Button>
+            )}
+          </div>
+
+          {fields.map((field, index) => (
+            <Card
+              key={field.key}
+              size="small"
+              style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
+              bodyStyle={{ padding: 12 }}
+              extra={
+                !disabled && (
+                  <Button
+                    type="text"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => remove(field.name)}
+                  />
+                )
               }
             >
-              Add Item
-            </Button>
-          )}
-        </div>
-
-        {fields.map((field, index) => (
-          <Card
-            key={field.key}
-            size="small"
-            style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
-            extra={
-              !disabled && (
-                <Button
-                  type="text"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={() => remove(field.name)}
-                />
-              )
-            }
-          >
-            <Row gutter={12} align="middle">
-              <Col span={6}>
-                <Form.Item
-                  {...field}
-                  label="Item Name"
-                  name={[field.name, "item"]}
-                  fieldKey={[field.fieldKey, "item"]}
-                  rules={[{ required: true, message: "Item is required" }]}
-                >
-                 <Select
-  placeholder="Select Item"
-  disabled={disabled}
-  onChange={(productId) => {
-    const selected = products.find(p => p.id === productId);
-
-    addForm.setFields([
-      { name: ["items", field.name, "rate"], value: selected?.rate || 0 },
-      { name: ["items", field.name, "uom"], value: selected?.uom || "Litre" },
-      { name: ["items", field.name, "sgstPercent"], value: selected?.sgst || 0 },
-      { name: ["items", field.name, "cgstPercent"], value: selected?.cgst || 0 },
-      { name: ["items", field.name, "igstPercent"], value: selected?.igst || 0 },
-    ]);
-  }}
+              <Row gutter={12} align="middle">
+                <Col span={4}>
+                 <Form.Item
+  {...field}
+  label="Item Name"
+  name={[field.name, "product_id"]}
+  rules={[{ required: true, message: "Item is required" }]}
 >
+  <Select
+    placeholder={!selectedVendor ? "Select vendor first" : "Select Item"}
+    disabled={!selectedVendor || products.length === 0}
+onChange={(productId) => {
+  const selected = products.find(p => p.id === productId);
 
-                  {products.map((p) => (
-  <Select.Option key={p.id} value={p.id}>
-    {p.name}
-  </Select.Option>
-))}
+  form.setFields([
+    { name: ["items", field.name, "product_id"], value: productId },
 
-                  </Select>
-                </Form.Item>
-              </Col>
+    // ✅ SHOW IN UI
+    { name: ["items", field.name, "hsn_code"], value: selected?.hsn_code_value || "" },
 
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="Item Code" 
-                  name={[field.name, "itemCode"]} 
-                  fieldKey={[field.fieldKey, "itemCode"]}
-                >
-                  <Input disabled />
-                </Form.Item>
-              </Col>
+    // ✅ SEND TO BACKEND (ID)
+    { name: ["items", field.name, "hsn_id"], value: selected?.hsn_code || null },
 
-              {/* FIX: Qty with proper validation */}
-               <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="Qty" 
-                  name={[field.name, "qty"]} 
-                  rules={requiredPositiveNumber("Quantity")}
-                >
-                  <InputNumber 
-                    {...positiveNumberInputProps}
-                    disabled={disabled} 
-                    onChange={() => {
-                      const all = form.getFieldsValue();
-                      const computed = computeAllFromFormValues(all || {});
-                      form.setFieldsValue({ items: computed.items });
-                    }} 
-                  />
-                </Form.Item>
-              </Col>
-              {/* FIX: Free Qty with proper validation */}
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="Free Qty" 
-                  name={[field.name, "freeQty"]} 
-                  fieldKey={[field.fieldKey, "freeQty"]}
-                  rules={optionalPositiveNumber("Free Qty")}
-                >
-                  <InputNumber 
-                    {...positiveNumberInputProps}
-                    disabled={disabled} 
-                    onChange={() => {
-                      const all = form.getFieldsValue();
-                      const computed = computeAllFromFormValues(all || {});
-                      form.setFieldsValue({ items: computed.items });
-                    }} 
-                  />
-                </Form.Item>
-              </Col>
+    { name: ["items", field.name, "item_name"], value: selected?.name || "" },
+    { name: ["items", field.name, "base_unit"], value: selected?.base_unit || "" },
+    { name: ["items", field.name, "rate"], value: selected?.rate || 0 },
+    { name: ["items", field.name, "sgstPercent"], value: selected?.sgst || 0 },
+    { name: ["items", field.name, "cgstPercent"], value: selected?.cgst || 0 },
+    { name: ["items", field.name, "igstPercent"], value: selected?.igst || 0 },
+  ]);
+}}
 
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="Total Qty" 
-                  name={[field.name, "totalQty"]} 
-                  fieldKey={[field.fieldKey, "totalQty"]}
-                >
-                  <InputNumber className="w-full" disabled />
-                </Form.Item>
-              </Col>
 
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="UOM" 
-                  name={[field.name, "uom"]} 
-                  fieldKey={[field.fieldKey, "uom"]}
-                >
-                  <Select disabled={disabled}>
-                    {purchaseSoudaJSON.uomOptions.map((u) => (
-                      <Option key={u} value={u}>
-                        {u}
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
+  >
+    {products.map((p) => (
+      <Select.Option key={p.id} value={p.id}>
+        {p.name}
+      </Select.Option>
+    ))}
+  </Select>
+</Form.Item>
 
-              {/* FIX: Rate with proper validation */}
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="Rate" 
-                  name={[field.name, "rate"]} 
-                  fieldKey={[field.fieldKey, "rate"]}
-                  rules={requiredPositiveNumber("Rate")}
-                >
-                  <InputNumber 
-                    {...positiveNumberInputProps}
-                    disabled={disabled} 
-                    onChange={() => {
-                      const all = form.getFieldsValue();
-                      const computed = computeAllFromFormValues(all || {});
-                      form.setFieldsValue({ items: computed.items });
-                    }} 
-                  />
-                </Form.Item>
-              </Col>
+                </Col>
 
-              {/* FIX: Discount% with proper validation */}
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="Dis%" 
-                  name={[field.name, "discountPercent"]} 
-                  fieldKey={[field.fieldKey, "discountPercent"]}
-                  rules={percentageValidation("Discount")}
-                >
-                  <InputNumber 
-                    {...positiveNumberInputProps}
-                    max={100}
-                    disabled={disabled} 
-                    onChange={() => {
-                      const all = form.getFieldsValue();
-                      const computed = computeAllFromFormValues(all || {});
-                      form.setFieldsValue({ items: computed.items });
-                    }} 
-                  />
-                </Form.Item>
-              </Col>
+                        <Col span={4}>
+<Form.Item label="Item Code" name={[field.name, "hsn_code"]}>
+  <Input disabled />
+</Form.Item>
 
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="Gross Amount (₹)" 
-                  name={[field.name, "grossAmount"]} 
-                  fieldKey={[field.fieldKey, "grossAmount"]}
-                >
-                  <InputNumber className="w-full" disabled />
-                </Form.Item>
-              </Col>
+</Col>
 
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="Discount Amt (₹)" 
-                  name={[field.name, "discountAmt"]} 
-                  fieldKey={[field.fieldKey, "discountAmt"]}
-                >
-                  <InputNumber className="w-full" disabled />
-                </Form.Item>
-              </Col>
 
-              {/* FIX: SGST% with proper validation */}
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="SGST %" 
-                  name={[field.name, "sgstPercent"]} 
-                  fieldKey={[field.fieldKey, "sgstPercent"]}
-                  rules={percentageValidation("SGST")}
-                >
-                  <InputNumber 
-                    {...positiveNumberInputProps}
-                    max={100}
-                    disabled={disabled} 
-                    onChange={() => {
-                      const all = form.getFieldsValue();
-                      const computed = computeAllFromFormValues(all || {});
-                      form.setFieldsValue({ items: computed.items });
-                    }} 
-                  />
-                </Form.Item>
-              </Col>
+                {/* FIX: Qty with proper validation */}
+                <Col span={4}>
+                  <Form.Item
+                    {...field}
+                    label="Qty"
+                    name={[field.name, "qty"]}
+                    rules={requiredPositiveNumber("Quantity")}
+                  >
+                    <InputNumber
+                   
+                      {...positiveNumberInputProps}
+                      disabled={disabled}
+                      onChange={() => {
+                        const all = form.getFieldsValue();
+                        const computed = computeAllFromFormValues(all || {});
+                        form.setFieldsValue({ items: computed.items });
+                      }}
+                        className="w-full!"
+                    />
+                  </Form.Item>
+                </Col>
+                {/* FIX: Free Qty with proper validation */}
+                <Col span={4}>
+                  <Form.Item
+                    {...field}
+                    label="Free Qty"
+                    name={[field.name, "freeQty"]}
+                    fieldKey={[field.fieldKey, "freeQty"]}
+                    rules={optionalPositiveNumber("Free Qty")}
+                  >
+                    <InputNumber
+                      {...positiveNumberInputProps}
+                      disabled={disabled}
+                      onChange={() => {
+                        const all = form.getFieldsValue();
+                        const computed = computeAllFromFormValues(all || {});
+                        form.setFieldsValue({ items: computed.items });
+                      }}
+                        className="w-full!"
+                    />
+                  </Form.Item>
+                </Col>
 
-              {/* FIX: CGST% with proper validation */}
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="CGST %" 
-                  name={[field.name, "cgstPercent"]} 
-                  fieldKey={[field.fieldKey, "cgstPercent"]}
-                  rules={percentageValidation("CGST")}
-                >
-                  <InputNumber 
-                    {...positiveNumberInputProps}
-                    max={100}
-                    disabled={disabled} 
-                    onChange={() => {
-                      const all = form.getFieldsValue();
-                      const computed = computeAllFromFormValues(all || {});
-                      form.setFieldsValue({ items: computed.items });
-                    }} 
-                  />
-                </Form.Item>
-              </Col>
+                <Col span={4}>
+                  <Form.Item
+                    {...field}
+                    label="Total Qty"
+                    name={[field.name, "totalQty"]}
+                    fieldKey={[field.fieldKey, "totalQty"]}
+                  >
+                    <InputNumber className="w-full!" disabled />
+                  </Form.Item>
+                </Col>
 
-              {/* FIX: IGST% with proper validation */}
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="IGST %" 
-                  name={[field.name, "igstPercent"]} 
-                  fieldKey={[field.fieldKey, "igstPercent"]}
-                  rules={percentageValidation("IGST")}
-                >
-                  <InputNumber 
-                    {...positiveNumberInputProps}
-                    max={100}
-                    disabled={disabled} 
-                    onChange={() => {
-                      const all = form.getFieldsValue();
-                      const computed = computeAllFromFormValues(all || {});
-                      form.setFieldsValue({ items: computed.items });
-                    }} 
-                  />
-                </Form.Item>
-              </Col>
+                <Col span={4}>
+                 <Form.Item {...field} label="UOM" name={[field.name, "base_unit"]}>
+  <Input disabled  />
+</Form.Item>
 
-              <Col span={4}>
-                <Form.Item 
-                  {...field} 
-                  label="Total GST (₹)" 
-                  name={[field.name, "totalGST"]} 
-                  fieldKey={[field.fieldKey, "totalGST"]}
-                >
-                  <InputNumber className="w-full" disabled />
-                </Form.Item>
-              </Col>
+                </Col>
 
-              <Col span={6}>
-                <Form.Item 
-                  {...field} 
-                  label="Total Amount (₹)" 
-                  name={[field.name, "totalAmt"]} 
-                  fieldKey={[field.fieldKey, "totalAmt"]}
-                >
-                  <InputNumber className="w-full" disabled />
-                </Form.Item>
-              </Col>
-            </Row>
-          </Card>
-        ))}
-      </>
-    )}
-  </Form.List>
-);
+
+
+                {/* FIX: Rate with proper validation */}
+                <Col span={4}>
+                  <Form.Item
+                    {...field}
+                    label="Rate"
+                    name={[field.name, "rate"]}
+                    fieldKey={[field.fieldKey, "rate"]}
+                    rules={requiredPositiveNumber("Rate")}
+                  >
+                    <InputNumber
+                      {...positiveNumberInputProps}
+                      disabled={disabled}
+                      onChange={() => {
+                        const all = form.getFieldsValue();
+                        const computed = computeAllFromFormValues(all || {});
+                        form.setFieldsValue({ items: computed.items });
+                      }}
+                        className="w-full!"
+                    />
+                  </Form.Item>
+                </Col>
+
+                {/* FIX: Discount% with proper validation */}
+                <Col span={4}>
+                  <Form.Item
+                    {...field}
+                    label="Dis%"
+                    name={[field.name, "discountPercent"]}
+                    fieldKey={[field.fieldKey, "discountPercent"]}
+                    rules={percentageValidation("Discount")}
+                  >
+                    <InputNumber
+                      {...positiveNumberInputProps}
+                      max={100}
+                      disabled={disabled}
+                      onChange={() => {
+                        const all = form.getFieldsValue();
+                        const computed = computeAllFromFormValues(all || {});
+                        form.setFieldsValue({ items: computed.items });
+                      }}
+                        className="w-full!"
+                    />
+                  </Form.Item>
+                </Col>
+
+                <Col span={4}>
+                  <Form.Item
+                    {...field}
+                    label="Gross Amount (₹)"
+                    name={[field.name, "grossAmount"]}
+                    fieldKey={[field.fieldKey, "grossAmount"]}
+                  >
+                    <InputNumber className="w-full!" disabled />
+                  </Form.Item>
+                </Col>
+
+                <Col span={4}>
+                  <Form.Item
+                    {...field}
+                    label="Discount Amt (₹)"
+                    name={[field.name, "discountAmt"]}
+                    fieldKey={[field.fieldKey, "discountAmt"]}
+                  >
+                    <InputNumber className="w-full!" disabled />
+                  </Form.Item>
+                </Col>
+
+                {/* FIX: SGST% with proper validation */}
+                <Col span={4}>
+                  <Form.Item
+                    {...field}
+                    label="SGST %"
+                    name={[field.name, "sgstPercent"]}
+                    fieldKey={[field.fieldKey, "sgstPercent"]}
+                    rules={percentageValidation("SGST")}
+                  >
+                    <InputNumber
+                      {...positiveNumberInputProps}
+                      max={100}
+                      disabled={disabled}
+                      onChange={() => {
+                        const all = form.getFieldsValue();
+                        const computed = computeAllFromFormValues(all || {});
+                        form.setFieldsValue({ items: computed.items });
+                      }}
+                        className="w-full!"
+                    />
+                  </Form.Item>
+                </Col>
+
+                {/* FIX: CGST% with proper validation */}
+                <Col span={4}>
+                  <Form.Item
+                    {...field}
+                    label="CGST %"
+                    name={[field.name, "cgstPercent"]}
+                    fieldKey={[field.fieldKey, "cgstPercent"]}
+                    rules={percentageValidation("CGST")}
+                  >
+                    <InputNumber
+                      {...positiveNumberInputProps}
+                      max={100}
+                      disabled={disabled}
+                      onChange={() => {
+                        const all = form.getFieldsValue();
+                        const computed = computeAllFromFormValues(all || {});
+                        form.setFieldsValue({ items: computed.items });
+                      }}
+                        className="w-full!"
+                    />
+                  </Form.Item>
+                </Col>
+
+                {/* FIX: IGST% with proper validation */}
+                <Col span={4}>
+                  <Form.Item
+                    {...field}
+                    label="IGST %"
+                    name={[field.name, "igstPercent"]}
+                    fieldKey={[field.fieldKey, "igstPercent"]}
+                    rules={percentageValidation("IGST")}
+                  >
+                    <InputNumber
+                      {...positiveNumberInputProps}
+                      max={100}
+                      disabled={disabled}
+                      onChange={() => {
+                        const all = form.getFieldsValue();
+                        const computed = computeAllFromFormValues(all || {});
+                        form.setFieldsValue({ items: computed.items });
+                      }}
+                        className="w-full!"
+                    />
+                  </Form.Item>
+                </Col>
+
+                <Col span={4}>
+                  <Form.Item
+                    {...field}
+                    label="Total GST (₹)"
+                    name={[field.name, "totalGST"]}
+                    fieldKey={[field.fieldKey, "totalGST"]}
+                  >
+                    <InputNumber className="w-full!" disabled />
+                  </Form.Item>
+                </Col>
+
+                <Col span={6}>
+                  <Form.Item
+                    {...field}
+                    label="Total Amount (₹)"
+                    name={[field.name, "totalAmt"]}
+                    fieldKey={[field.fieldKey, "totalAmt"]}
+                  >
+                    <InputNumber className="w-full!" disabled />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Card>
+          ))}
+        </>
+      )}
+    </Form.List>
+  );
   // ---------- Combined form content (Basic Info, Items, Tax) ----------
   const RenderFormBody = ({ form, disabled = false }) => (
     <>
       <Card size="small" style={{ marginBottom: 12, border: "1px solid #FDE68A" }} bodyStyle={{ padding: 12 }}>
         <h6 className="text-amber-500">Basic Information</h6>
         <Row gutter={16}>
-           <Col span={6}>
+          <Col span={4}>
        <Form.Item
-  label="Company Name"
-  name="organisation"
+  label="Vendor Name"
+  name="vendor"
   rules={[{ required: true }]}
 >
-  <Select placeholder="Select Company" disabled={disabled}>
-    {companies.map((c) => (
-      <Select.Option key={c.id} value={c.id}>
-        {c.name}
+  <Select
+    placeholder="Select Vendor"
+    showSearch
+    optionFilterProp="label"
+    onChange={async (vendorId) => {
+      const selectedVendorObj = vendors.find(v => v.id === vendorId);
+
+      setSelectedVendor(vendorId);
+
+      // ✅ STORE VENDOR NAME
+      addForm.setFieldsValue({
+        vendor_name: selectedVendorObj?.name || "",
+      });
+
+      // fetch products
+      const productRes = await getproductbyVendor(vendorId);
+      setProducts(productRes?.products || []);
+
+      // fetch plants
+      const plantRes = await getPlantsByVendor(vendorId);
+      setPlants(plantRes || []);
+
+      // reset plant
+      addForm.setFieldsValue({ plant: undefined });
+    }}
+  >
+    {vendors.map(v => (
+      <Select.Option key={v.id} value={v.id} label={v.name}>
+        {v.name}
       </Select.Option>
     ))}
   </Select>
 </Form.Item>
 
-        </Col>
-          <Col span={6}>
-           <Form.Item
+
+
+
+
+
+
+
+          </Col>
+          <Col span={4}>
+    <Form.Item
   label="Plant Name"
   name="plant"
   rules={[{ required: true }]}
 >
-  <Select placeholder="Select Plant" disabled={disabled}>
-    {companies.map((p) => (
-      <Option key={p.id} value={p.id}>
+  <Select
+    placeholder="Select Plant"
+    showSearch
+    optionFilterProp="label"
+    onChange={(plantId) => {
+      const selectedPlantObj = plants.find(p => p.id === plantId);
+
+      // ✅ STORE PLANT NAME
+      addForm.setFieldsValue({
+        plant_name: selectedPlantObj?.name || "",
+      });
+    }}
+  >
+    {plants.map(p => (
+      <Select.Option
+        key={p.id}
+        value={p.id}
+        label={p.name}
+      >
         {p.name}
-      </Option>
+      </Select.Option>
     ))}
   </Select>
 </Form.Item>
 
+
+
+
+
           </Col>
 
-          {/* <Col span={4}>
-            <Form.Item label="Plant Code" name="plantCode">
-              <Input disabled />
-            </Form.Item>
-          </Col> */}
-
-         
 
 
-       
 
-          <Col span={6}>
+
+
+
+
+          <Col span={4}>
             <Form.Item label="Souda Date" name="soudaDate" initialValue={dayjs()}>
               <DatePicker className="w-full" disabled />
             </Form.Item>
           </Col>
 
           {/* REMOVED Delivery Date; ADDED Start / End */}
-          <Col span={6}>
-            <Form.Item label="Start Date" name="startDate">
-              <DatePicker className="w-full" disabled={disabled} />
-            </Form.Item>
-          </Col>
+          <Col span={4}>
+          <Form.Item label="Start Date" name="from_date">
+            <DatePicker className="w-full" disabled={disabled} />
+          </Form.Item>
+</Col>
 
-          <Col span={6}>
-            <Form.Item label="End Date" name="endDate">
-              <DatePicker className="w-full" disabled={disabled} />
-            </Form.Item>
-          </Col>
+          <Col span={4}>
+          <Form.Item label="End Date" name="to_date">
+            <DatePicker className="w-full" disabled={disabled} />
+          </Form.Item>
+</Col>
         </Row>
       </Card>
 
@@ -748,34 +854,34 @@ const handleFormSubmit = async (values) => {
       <Card size="small" style={{ border: "1px solid #FDE68A" }} bodyStyle={{ padding: 12 }}>
         <h6 className="text-amber-500">Order Totals</h6>
         <Row gutter={12}>
-          <Col span={6}>
+          <Col span={4}>
             <Form.Item label="Total Qty" name={["orderTotals", "totalQty"]}>
-              <InputNumber className="w-full" disabled />
+              <InputNumber className="w-full!" disabled />
             </Form.Item>
           </Col>
-          <Col span={6}>
-            <Form.Item label="Total Gross Amount (₹)" name={["orderTotals", "totalGrossAmount"]}>
-              <InputNumber className="w-full" disabled />
+          <Col span={4}>
+            <Form.Item label="Total Gross Amount" name={["orderTotals", "totalGrossAmount"]}>
+              <InputNumber className="w-full!" disabled />
             </Form.Item>
           </Col>
-          <Col span={6}>
+          <Col span={4}>
             <Form.Item label="Total Discount (₹)" name={["orderTotals", "totalDiscount"]}>
-              <InputNumber className="w-full" disabled />
+              <InputNumber className="w-full!" disabled />
             </Form.Item>
           </Col>
-          <Col span={6}>
+          <Col span={4}>
             <Form.Item label="Total GST (₹)" name={["orderTotals", "totalGST"]}>
-              <InputNumber className="w-full" disabled />
+              <InputNumber   className="w-full!" disabled />
             </Form.Item>
           </Col>
 
-          <Col span={6}>
+          {/* <Col span={6}>
             <Form.Item label="Grand Total (₹)" name={["orderTotals", "grandTotal"]}>
               <InputNumber className="w-full" disabled />
             </Form.Item>
-          </Col>
+          </Col> */}
 
-          <Col span={6}>
+          <Col span={4}>
             <Form.Item label="Status" name="status" rules={[{ required: true }]}>
               <Select placeholder="Select Status" disabled={disabled}>
                 {purchaseSoudaJSON.statusOptions.map((opt) => (
@@ -840,14 +946,14 @@ const handleFormSubmit = async (values) => {
                   {
                     lineKey: new Date().getTime(),
                     item: undefined,
-                    itemCode: undefined,
+
                     qty: 0,
                     freeQty: 0,
                     totalQty: 0,
                     rate: 0,
                     discountPercent: 0,
                     grossAmount: 0,
-                    uom: purchaseSoudaJSON.uomOptions[0],
+                    base_unit: null,
                     sgstPercent: 0,
                     cgstPercent: 0,
                     igstPercent: 0,
