@@ -31,6 +31,7 @@ import {
   getVendors,
   addcustomer,
   getCustomers,
+  addvendor,
 } from "../../../../../api/bussinesspatnr";
 const { Option } = Select;
 
@@ -108,7 +109,8 @@ export default function Business() {
   const [form] = Form.useForm();
   const [viewForm] = Form.useForm();
   const [data, setData] = useState(businessDataJSON);
-
+  const [customers, setCustomers] = useState([]);
+  const [vendors, setVendors] = useState([]);
   const fetchVendors = async () => {
     try {
       const res = await getVendors();
@@ -122,7 +124,7 @@ export default function Business() {
         partnerType: "Vendor",
         name: v.name,
         email: v.email_address || "",
-        phoneNo: v.phone_number || "",
+        phoneNo: v.contact_person_no || "",
         status: v?.is_active ? "Active" : "Inactive",
       }));
 
@@ -165,64 +167,191 @@ export default function Business() {
     }
   };
 
+  // const handleSubmit = async (values) => {
+  //   try {
+  //     if (activeForm !== "Customer") return;
+
+  //     const payload = {
+  //       customer_name: values.name,
+  //       business_name: values.branchName,
+  //       phone_number: values.phoneNo,
+  //       mobile_number: values.mobileNo,
+  //       email_address: values.email,
+  //       customer_type: values.type,
+  //       status: values.status,
+
+  //       address: values.address,
+  //       country: values.country,
+  //       state: values.state,
+  //       city: values.city,
+  //       pin_code: values.pinCode,
+  //       location: values.location,
+
+  //       credit_facility: values.creditFacility,
+  //       security_for_credit: values.securityForCreditFacility,
+  //       advance_cheque_no: values.advCheque,
+  //       amount_limit: Number(values.amountLimit),
+  //       days_limit: Number(values.noDaysLimit),
+  //       invoice_limit: Number(values.noInvoiceLimit),
+  //       souda_limit_ton: Number(values.soudaLimit),
+
+  //       gst_number: values.gstNo,
+  //       tin_number: values.tinNo,
+  //       pan_number: values.panNo,
+  //       aadhaar_number: values.aadharNo,
+  //       fssai_number: values.fssaiNo,
+  //       license_number: values.licenseNo,
+
+  //       tds_applicable: values.tdsApplicable === "Yes",
+  //       billing_type: values.billingType?.toUpperCase(),
+  //     };
+
+  //     const res = await addcustomer(payload);
+
+  //     setData((prev) => [
+  //       ...prev,
+  //       {
+  //         key: res?.id || prev.length + 1,
+  //         partnerType: "Customer",
+  //         name: payload.customer_name,
+  //         email: payload.email_address,
+  //         phoneNo: payload.phone_number,
+  //         status: payload.status,
+  //       },
+  //     ]);
+
+  //     setIsEditModalOpen(false);
+  //     setShowForm(false);
+  //     form.resetFields();
+  //   } catch (error) {
+  //     console.error("Add Customer Error:", error);
+  //   }
+  // };
   const handleSubmit = async (values) => {
     try {
-      if (activeForm !== "Customer") return;
+      /* ================= CUSTOMER ================= */
+      if (activeForm === "Customer") {
+        const payload = {
+          customer_name: values.name,
+          business_name: values.branchName,
+          phone_number: values.phoneNo,
+          mobile_number: values.mobileNo,
+          email_address: values.email,
+          customer_type: values.type,
+          status: values.status,
 
-      const payload = {
-        customer_name: values.name,
-        business_name: values.branchName,
-        phone_number: values.phoneNo,
-        mobile_number: values.mobileNo,
-        email_address: values.email,
-        customer_type: values.type,
-        status: values.status,
+          address: values.address,
+          country: values.country,
+          state: values.state,
+          city: values.city,
+          pin_code: values.pinCode,
+          location: values.location,
 
-        address: values.address,
-        country: values.country,
-        state: values.state,
-        city: values.city,
-        pin_code: values.pinCode,
-        location: values.location,
+          credit_facility: values.creditFacility,
+          security_for_credit: values.securityForCreditFacility,
+          advance_cheque_no: values.advCheque,
+          amount_limit: Number(values.amountLimit),
+          days_limit: Number(values.noDaysLimit),
+          invoice_limit: Number(values.noInvoiceLimit),
+          souda_limit_ton: Number(values.soudaLimit),
 
-        credit_facility: values.creditFacility,
-        security_for_credit: values.securityForCreditFacility,
-        advance_cheque_no: values.advCheque,
-        amount_limit: Number(values.amountLimit),
-        days_limit: Number(values.noDaysLimit),
-        invoice_limit: Number(values.noInvoiceLimit),
-        souda_limit_ton: Number(values.soudaLimit),
+          gst_number: values.gstNo,
+          tin_number: values.tinNo,
+          pan_number: values.panNo,
+          aadhaar_number: values.aadharNo,
+          fssai_number: values.fssaiNo,
+          license_number: values.licenseNo,
 
-        gst_number: values.gstNo,
-        tin_number: values.tinNo,
-        pan_number: values.panNo,
-        aadhaar_number: values.aadharNo,
-        fssai_number: values.fssaiNo,
-        license_number: values.licenseNo,
+          tds_applicable: values.tdsApplicable === "Yes",
+          billing_type: values.billingType?.toUpperCase(),
+        };
 
-        tds_applicable: values.tdsApplicable === "Yes",
-        billing_type: values.billingType?.toUpperCase(),
-      };
+        const res = await addcustomer(payload);
 
-      const res = await addcustomer(payload);
+        setCustomers((prev) => [
+          ...prev,
+          {
+            key: res?.id || prev.length + 1,
+            partnerType: "Customer",
+            name: payload.customer_name,
+            email: payload.email_address,
+            phoneNo: payload.phone_number,
+            status: payload.status,
+          },
+        ]);
+      }
 
-      setData((prev) => [
-        ...prev,
-        {
-          key: res?.id || prev.length + 1,
-          partnerType: "Customer",
-          name: payload.customer_name,
-          email: payload.email_address,
-          phoneNo: payload.phone_number,
-          status: payload.status,
-        },
-      ]);
+      /* ================= VENDOR ================= */
+      if (activeForm === "Vendor") {
+        const payload = {
+          name: values?.name || "",
+          short_name: values?.shortName || "",
+          is_active: values?.status === "Active",
 
+          contact_person_input: {
+            name: values?.contactPerson || "",
+            contact_person_no: values?.contactMobile || "",
+            gender: values?.gender || "",
+            contact_person_whats_no: values?.contactWhatsapp || "",
+            contract_person_email: values?.contactEmail || "",
+            adhara_no: values?.aadharNo || "",
+            adhara_documents: [],
+          },
+
+          addresses: [
+            {
+              address_line1: values?.address1 || "",
+              state: values?.state || "",
+              district: values?.district || "",
+              city: values?.city || "",
+              location: values?.location || values?.city || "",
+              pin: values?.pinCode || "",
+            },
+          ],
+
+          plants: (values?.plants || []).map((p) => ({
+            name: p?.plantName || "",
+            address: p?.address || "",
+            phone_number: p?.phoneNo || "",
+            email_address: p?.email || "",
+            state: p?.state || "",
+            district: p?.district || "",
+            city: p?.city || "",
+            pin: p?.pin || "",
+          })),
+
+          tax: {
+            pan: values?.panNo || "",
+            gstin: values?.gstIn || "",
+            tin_no: values?.tinNo || "",
+            tin_date: values?.tinDate
+              ? dayjs(values.tinDate).format("YYYY-MM-DD")
+              : null,
+            igst_applicable: values?.igstApplicable === "Yes",
+          },
+        };
+
+        const res = await addvendor(payload);
+
+        setVendors((prev) => [
+          ...prev,
+          {
+            key: res?.id || prev.length + 1,
+            partnerType: "Vendor",
+            name: payload.name,
+            email: values?.contactEmail || "",
+            phoneNo: values?.contactMobile || "",
+            status: payload.is_active ? "Active" : "Inactive",
+          },
+        ]);
+      }
+
+      /* ================= COMMON ================= */
       setIsEditModalOpen(false);
       setShowForm(false);
       form.resetFields();
     } catch (error) {
-      console.error("Add Customer Error:", error);
+      console.error("Save Error:", error);
     }
   };
 
@@ -427,7 +556,7 @@ export default function Business() {
             icon={<PlusOutlined />}
             onClick={() => {
               setSelectedRecord(null);
-              setActiveForm(null); // ⬅ no form selected
+              setActiveForm("Customer"); // ⬅ no form selected
               setShowForm(false); // ⬅ show cards first
               form.resetFields();
               setIsEditModalOpen(true);
