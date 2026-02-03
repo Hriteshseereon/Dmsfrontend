@@ -316,7 +316,7 @@ export default function UnitConversionTab({ items }) {
                 />
               </Col>
 
-              <Col span={24} style={{ marginTop: 12 }}>
+              {/* <Col span={24} style={{ marginTop: 12 }}>
                 <Checkbox
                   checked={formData.set_as_display}
                   onChange={(e) =>
@@ -328,7 +328,7 @@ export default function UnitConversionTab({ items }) {
                 >
                   Set as display unit
                 </Checkbox>
-              </Col>
+              </Col> */}
             </Row>
           </Modal>
         </Card>
