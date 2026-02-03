@@ -27,8 +27,14 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useAuth } from "../../context/AuthContext";
-import { addAsset, getAssetCategories, getAssets, updateAsset } from "../../api/assets";
+import {
+  addAsset,
+  getAssetCategories,
+  getAssets,
+  updateAsset,
+} from "../../api/assets";
 
+import useSessionStore from "../../store/sessionStore";
 const { Option } = Select;
 const { TextArea } = Input;
 
@@ -43,19 +49,13 @@ const assetCategories = [
 
 const assetTypes = ["Movable", "Fixed"];
 
-const depreciationMethods = [
-  "Straight Line",
-  "Written Down Value",
-  "Double Declining Balance",
-  "Sum of Years Digits",
-];
+const depreciationMethods = ["StraightLine"];
 
 const statusOptions = ["Active", "Inactive", "Lost", "Damaged", "Under Repair"];
 
-
 export default function AssetManager() {
+  const currentOrgId = useSessionStore((state) => state.currentOrgId);
 
-  const { currentOrgId } = useAuth();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
@@ -81,7 +81,6 @@ export default function AssetManager() {
     }
   };
 
-
   useEffect(() => {
     if (!currentOrgId) return;
     fetchAssets();
@@ -99,8 +98,10 @@ export default function AssetManager() {
 
         assetName: item.asset_name,
         assetId: item.asset_code,
-        assetCategory: item.category?.category_name,
-        assetCategoryId: item.category?.id,
+
+        // since category is null OR uuid/int based on serializer
+        assetCategory: item.category?.category_name || "",
+        assetCategoryId: item.category?.id || null,
 
         assetType: item.asset_type,
         serialNumber: item.serial_number,
@@ -108,8 +109,6 @@ export default function AssetManager() {
         brand: item.brand,
 
         purchaseDate: item.purchase_date,
-        purchaseVendor: item.purchase_vendor?.vendor_name,
-        purchaseInvoice: item.purchase_invoice?.invoice_number,
 
         costPrice: item.cost_price,
         currentValue: item.current_value,
@@ -118,7 +117,6 @@ export default function AssetManager() {
         depreciationRate: item.depreciation_rate,
 
         assetLocation: item.location_description,
-        assignedTo: item.assigned_to_employee,
         status: item.status,
 
         warrantyExpiryDate: item.warranty_expiry_date,
@@ -134,7 +132,6 @@ export default function AssetManager() {
       setLoading(false);
     }
   };
-
 
   const uploadProps = {
     fileList,
@@ -153,18 +150,21 @@ export default function AssetManager() {
         (row[field] || "")
           .toString()
           .toLowerCase()
-          .includes(searchText.trim().toLowerCase())
-    )
+          .includes(searchText.trim().toLowerCase()),
+    ),
   );
 
   const handleAdd = async (values) => {
     try {
       setLoading(true);
 
-      await addAsset(currentOrgId, {
+      await addAsset({
+        organisation: currentOrgId, // UUID string
+
         asset_name: values.assetName,
         asset_code: values.assetId,
-        category: values.assetCategoryId,
+
+        category: values.assetCategoryId || null, // ✅ important
         asset_type: values.assetType,
 
         serial_number: values.serialNumber || null,
@@ -172,33 +172,46 @@ export default function AssetManager() {
         brand: values.brand || null,
 
         purchase_date: values.purchaseDate?.format("YYYY-MM-DD"),
-        cost_price: values.costPrice,
-        current_value: values.currentValue,
 
-        depreciation_method: values.depreciationMethod,
-        depreciation_rate: values.depreciationRate,
+        purchase_vendor: null, // ✅ keep null now
+        purchase_invoice: null, // ✅ keep null now
+        assigned_to_employee: null, // ✅ keep null now
 
-        location_description: values.assetLocation,
-        assigned_to_employee: values.assignedTo,
-        status: values.status,
+        cost_price: values.costPrice?.toString(),
+        current_value: values.currentValue
+          ? values.currentValue.toString()
+          : values.costPrice?.toString(),
 
-        warranty_expiry_date: values.warrantyExpiryDate?.format("YYYY-MM-DD"),
-        insurance_policy: values.insurancePolicy,
-        insurance_expiry_date: values.insuranceExpiryDate?.format("YYYY-MM-DD"),
-        barcode_number: values.barcodeNumber,
+        depreciation_method: values.depreciationMethod || "StraightLine",
+        depreciation_rate: values.depreciationRate?.toString() || "0.00",
+
+        warranty_expiry_date: values.warrantyExpiryDate
+          ? values.warrantyExpiryDate.format("YYYY-MM-DD")
+          : null,
+
+        insurance_policy: values.insurancePolicy || null,
+
+        insurance_expiry_date: values.insuranceExpiryDate
+          ? values.insuranceExpiryDate.format("YYYY-MM-DD")
+          : null,
+
+        barcode_number: values.barcodeNumber || null,
+        location_description: values.assetLocation || null,
+
+        status: values.status || "Active",
       });
 
       message.success("Asset created successfully");
       setIsAddModalOpen(false);
       addForm.resetFields();
       fetchAssets();
-    } catch {
+    } catch (err) {
+      console.log(err?.response?.data);
       message.error("Failed to create asset");
     } finally {
       setLoading(false);
     }
   };
-
 
   const handleEdit = async (values) => {
     try {
@@ -243,7 +256,6 @@ export default function AssetManager() {
     }
   };
 
-
   const columns = [
     {
       title: <span className="text-amber-700 font-semibold">Asset Name</span>,
@@ -258,19 +270,17 @@ export default function AssetManager() {
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
-      title: (
-        <span className="text-amber-700 font-semibold">Category</span>
-      ),
+      title: <span className="text-amber-700 font-semibold">Category</span>,
       dataIndex: "assetCategory",
       width: 160,
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
-    {
-      title: <span className="text-amber-700 font-semibold">Assigned To</span>,
-      dataIndex: "assignedTo",
-      width: 160,
-      render: (text) => <span className="text-amber-800">{text}</span>,
-    },
+    // {
+    //   title: <span className="text-amber-700 font-semibold">Assigned To</span>,
+    //   dataIndex: "assignedTo",
+    //   width: 160,
+    //   render: (text) => <span className="text-amber-800">{text}</span>,
+    // },
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
@@ -279,7 +289,9 @@ export default function AssetManager() {
         const base = "px-3 py-1 rounded-full text-sm font-semibold";
         if (status === "Active")
           return (
-            <span className={`${base} bg-green-100 text-green-700`}>Active</span>
+            <span className={`${base} bg-green-100 text-green-700`}>
+              Active
+            </span>
           );
         if (status === "Inactive")
           return (
@@ -287,7 +299,9 @@ export default function AssetManager() {
               Inactive
             </span>
           );
-        return <span className={`${base} bg-red-100 text-red-700`}>{status}</span>;
+        return (
+          <span className={`${base} bg-red-100 text-red-700`}>{status}</span>
+        );
       },
     },
     {
@@ -301,9 +315,15 @@ export default function AssetManager() {
               setSelectedRecord(record);
               viewForm.setFieldsValue({
                 ...record,
-                purchaseDate: record.purchaseDate ? dayjs(record.purchaseDate) : undefined,
-                warrantyExpiryDate: record.warrantyExpiryDate ? dayjs(record.warrantyExpiryDate) : undefined,
-                insuranceExpiryDate: record.insuranceExpiryDate ? dayjs(record.insuranceExpiryDate) : undefined,
+                purchaseDate: record.purchaseDate
+                  ? dayjs(record.purchaseDate)
+                  : undefined,
+                warrantyExpiryDate: record.warrantyExpiryDate
+                  ? dayjs(record.warrantyExpiryDate)
+                  : undefined,
+                insuranceExpiryDate: record.insuranceExpiryDate
+                  ? dayjs(record.insuranceExpiryDate)
+                  : undefined,
               });
               setIsViewModalOpen(true);
             }}
@@ -315,9 +335,15 @@ export default function AssetManager() {
               editForm.setFieldsValue({
                 ...record,
                 assetCategoryId: record.assetCategoryId,
-                purchaseDate: record.purchaseDate ? dayjs(record.purchaseDate) : undefined,
-                warrantyExpiryDate: record.warrantyExpiryDate ? dayjs(record.warrantyExpiryDate) : undefined,
-                insuranceExpiryDate: record.insuranceExpiryDate ? dayjs(record.insuranceExpiryDate) : undefined,
+                purchaseDate: record.purchaseDate
+                  ? dayjs(record.purchaseDate)
+                  : undefined,
+                warrantyExpiryDate: record.warrantyExpiryDate
+                  ? dayjs(record.warrantyExpiryDate)
+                  : undefined,
+                insuranceExpiryDate: record.insuranceExpiryDate
+                  ? dayjs(record.insuranceExpiryDate)
+                  : undefined,
               });
               setFileList(record.documents || []);
               setIsEditModalOpen(true);
@@ -335,7 +361,9 @@ export default function AssetManager() {
       <Row gutter={16}>
         <Col span={8}>
           <Form.Item
-            label={<span className="text-amber-700 font-medium">Asset Name</span>}
+            label={
+              <span className="text-amber-700 font-medium">Asset Name</span>
+            }
             name="assetName"
             rules={[{ required: true, message: "Please enter Asset Name" }]}
           >
@@ -353,7 +381,9 @@ export default function AssetManager() {
         </Col>
         <Col span={8}>
           <Form.Item
-            label={<span className="text-amber-700 font-medium">Asset Category</span>}
+            label={
+              <span className="text-amber-700 font-medium">Asset Category</span>
+            }
             name="assetCategoryId"
             rules={[{ required: true }]}
           >
@@ -371,24 +401,38 @@ export default function AssetManager() {
       <Row gutter={16}>
         <Col span={8}>
           <Form.Item
-            label={<span className="text-amber-700 font-medium">Asset Type</span>}
+            label={
+              <span className="text-amber-700 font-medium">Asset Type</span>
+            }
             name="assetType"
             rules={[{ required: true, message: "Please select Asset Type" }]}
           >
             <Select placeholder="Movable / Fixed" disabled={disabled}>
               {assetTypes.map((t) => (
-                <Option key={t} value={t}>{t}</Option>
+                <Option key={t} value={t}>
+                  {t}
+                </Option>
               ))}
             </Select>
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Serial Number</span>} name="serialNumber">
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">Serial Number</span>
+            }
+            name="serialNumber"
+          >
             <Input placeholder="Enter Serial Number" disabled={disabled} />
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Model Number</span>} name="modelNumber">
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">Model Number</span>
+            }
+            name="modelNumber"
+          >
             <Input placeholder="Enter Model Number" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -396,17 +440,32 @@ export default function AssetManager() {
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Brand</span>} name="brand">
+          <Form.Item
+            label={<span className="text-amber-700 font-medium">Brand</span>}
+            name="brand"
+          >
             <Input placeholder="Enter Brand" disabled={disabled} />
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Purchase Date</span>} name="purchaseDate">
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">Purchase Date</span>
+            }
+            name="purchaseDate"
+          >
             <DatePicker className="w-full" disabled={disabled} />
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Purchase Vendor</span>} name="purchaseVendor">
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Purchase Vendor
+              </span>
+            }
+            name="purchaseVendor"
+          >
             <Input placeholder="Enter Vendor Name" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -414,18 +473,46 @@ export default function AssetManager() {
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Purchase Invoice</span>} name="purchaseInvoice">
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Purchase Invoice
+              </span>
+            }
+            name="purchaseInvoice"
+          >
             <Input placeholder="Enter Invoice Number" disabled={disabled} />
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Cost Price</span>} name="costPrice" rules={[{ required: true, message: "Please enter Cost Price" }]}>
-            <InputNumber className="w-full" min={0} prefix="₹" disabled={disabled} />
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">Cost Price</span>
+            }
+            name="costPrice"
+            rules={[{ required: true, message: "Please enter Cost Price" }]}
+          >
+            <InputNumber
+              className="w-full"
+              min={0}
+              prefix="₹"
+              disabled={disabled}
+            />
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Current Value</span>} name="currentValue">
-            <InputNumber className="w-full" min={0} prefix="₹" disabled={disabled} />
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">Current Value</span>
+            }
+            name="currentValue"
+          >
+            <InputNumber
+              className="w-full"
+              min={0}
+              prefix="₹"
+              disabled={disabled}
+            />
           </Form.Item>
         </Col>
       </Row>
@@ -433,46 +520,110 @@ export default function AssetManager() {
       <h6 className="text-amber-500 mt-4">Depreciating Costs</h6>
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Depreciation Method</span>} name="depreciationMethod">
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Depreciation Method
+              </span>
+            }
+            name="depreciationMethod"
+          >
             <Select placeholder="Select Method" disabled={disabled}>
-              {depreciationMethods.map((m) => <Option key={m} value={m}>{m}</Option>)}
+              {depreciationMethods.map((m) => (
+                <Option key={m} value={m}>
+                  {m}
+                </Option>
+              ))}
             </Select>
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Depreciation Rate (%)</span>} name="depreciationRate">
-            <InputNumber className="w-full" min={0} max={100} disabled={disabled} />
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Depreciation Rate (%)
+              </span>
+            }
+            name="depreciationRate"
+          >
+            <InputNumber
+              className="w-full"
+              min={0}
+              max={100}
+              disabled={disabled}
+            />
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Depreciation Percent (%)</span>} name="depreciationPercent">
-            <InputNumber className="w-full" min={0} max={100} disabled={disabled} />
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Depreciation Percent (%)
+              </span>
+            }
+            name="depreciationPercent"
+          >
+            <InputNumber
+              className="w-full"
+              min={0}
+              max={100}
+              disabled={disabled}
+            />
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Depreciation Value</span>} name="depreciationValue">
-            <InputNumber className="w-full" min={0} max={100} disabled={disabled} />
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Depreciation Value
+              </span>
+            }
+            name="depreciationValue"
+          >
+            <InputNumber
+              className="w-full"
+              min={0}
+              max={100}
+              disabled={disabled}
+            />
           </Form.Item>
         </Col>
-
       </Row>
       {/* helo */}
       <h6 className="text-amber-500 mt-4">Additional Details</h6>
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Asset Location</span>} name="assetLocation">
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">Asset Location</span>
+            }
+            name="assetLocation"
+          >
             <Input placeholder="Branch/Floor/Dept" disabled={disabled} />
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Assigned To</span>} name="assignedTo">
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">Assigned To</span>
+            }
+            name="assignedTo"
+          >
             <Input placeholder="Employee/Department" disabled={disabled} />
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Status</span>} name="status" rules={[{ required: true }]}>
+          <Form.Item
+            label={<span className="text-amber-700 font-medium">Status</span>}
+            name="status"
+            rules={[{ required: true }]}
+          >
             <Select placeholder="Active/Inactive" disabled={disabled}>
-              {statusOptions.map((s) => <Option key={s} value={s}>{s}</Option>)}
+              {statusOptions.map((s) => (
+                <Option key={s} value={s}>
+                  {s}
+                </Option>
+              ))}
             </Select>
           </Form.Item>
         </Col>
@@ -480,17 +631,38 @@ export default function AssetManager() {
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Warranty Expiry Date</span>} name="warrantyExpiryDate">
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Warranty Expiry Date
+              </span>
+            }
+            name="warrantyExpiryDate"
+          >
             <DatePicker className="w-full" disabled={disabled} />
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Insurance Policy</span>} name="insurancePolicy">
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Insurance Policy
+              </span>
+            }
+            name="insurancePolicy"
+          >
             <Input placeholder="Enter Policy Number" disabled={disabled} />
           </Form.Item>
         </Col>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Insurance Expiry Date</span>} name="insuranceExpiryDate">
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Insurance Expiry Date
+              </span>
+            }
+            name="insuranceExpiryDate"
+          >
             <DatePicker className="w-full" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -498,13 +670,29 @@ export default function AssetManager() {
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Barcode Number</span>} name="barcodeNumber">
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">Barcode Number</span>
+            }
+            name="barcodeNumber"
+          >
             <Input placeholder="Enter Barcode Number" disabled={disabled} />
           </Form.Item>
         </Col>
         <Col span={16}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Additional Info</span>} name="additionalInfo">
-            <TextArea rows={3} placeholder="Enter additional information" disabled={disabled} />
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Additional Info
+              </span>
+            }
+            name="additionalInfo"
+          >
+            <TextArea
+              rows={3}
+              placeholder="Enter additional information"
+              disabled={disabled}
+            />
           </Form.Item>
         </Col>
       </Row>
@@ -512,9 +700,24 @@ export default function AssetManager() {
       <h6 className="text-amber-500 mt-4">Upload Document</h6>
       <Row gutter={16}>
         <Col span={24}>
-          <Form.Item label={<span className="text-amber-700 font-medium">Choose File</span>} name="documents" extra={<span className="text-amber-600 text-sm">Certificates, Invoices etc</span>}>
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">Choose File</span>
+            }
+            name="documents"
+            extra={
+              <span className="text-amber-600 text-sm">
+                Certificates, Invoices etc
+              </span>
+            }
+          >
             <Upload {...uploadProps} maxCount={5} disabled={disabled}>
-              <Button icon={<UploadOutlined />} className="border-amber-400 text-amber-700 hover:bg-amber-100">Click to Upload</Button>
+              <Button
+                icon={<UploadOutlined />}
+                className="border-amber-400 text-amber-700 hover:bg-amber-100"
+              >
+                Click to Upload
+              </Button>
             </Upload>
           </Form.Item>
         </Col>
@@ -544,8 +747,12 @@ export default function AssetManager() {
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          >Export</Button>
+          <Button
+            icon={<DownloadOutlined />}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
+            Export
+          </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -564,7 +771,9 @@ export default function AssetManager() {
       {/* Table */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">Assets</h2>
-        <p className="text-amber-600 mb-3">Manage your fixed & movable assets</p>
+        <p className="text-amber-600 mb-3">
+          Manage your fixed & movable assets
+        </p>
         <Table
           columns={columns}
           dataSource={filteredData}
@@ -575,7 +784,11 @@ export default function AssetManager() {
 
       {/* Add Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Add Asset</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Add Asset
+          </span>
+        }
         open={isAddModalOpen}
         onCancel={() => {
           setIsAddModalOpen(false);
@@ -589,22 +802,39 @@ export default function AssetManager() {
           form={addForm}
           layout="vertical"
           onFinish={handleAdd}
-          onValuesChange={() => { }}
+          onValuesChange={() => {}}
         >
           {renderFormFields(addForm, false)}
 
           <div className="flex justify-end gap-2 mt-4">
-            <Button className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-              onClick={() => { setIsAddModalOpen(false); addForm.resetFields(); setFileList([]); }}>Cancel</Button>
-            <Button type="primary" htmlType="submit" className="bg-amber-500! hover:bg-amber-600! border-none!"
-            >Add</Button>
+            <Button
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+              onClick={() => {
+                setIsAddModalOpen(false);
+                addForm.resetFields();
+                setFileList([]);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+            >
+              Add
+            </Button>
           </div>
         </Form>
       </Modal>
 
       {/* Edit Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Edit Asset</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Edit Asset
+          </span>
+        }
         open={isEditModalOpen}
         onCancel={() => {
           setIsEditModalOpen(false);
@@ -614,18 +844,27 @@ export default function AssetManager() {
         footer={null}
         width={920}
       >
-        <Form
-          form={editForm}
-          layout="vertical"
-          onFinish={handleEdit}
-        >
+        <Form form={editForm} layout="vertical" onFinish={handleEdit}>
           {renderFormFields(editForm, false)}
 
           <div className="flex justify-end gap-2 mt-4">
-            <Button className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-              onClick={() => { setIsEditModalOpen(false); editForm.resetFields(); setFileList([]); }}>Cancel</Button>
-            <Button type="primary" htmlType="submit" className="bg-amber-500! hover:bg-amber-600! border-none!"
-            >Save Changes</Button>
+            <Button
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+              onClick={() => {
+                setIsEditModalOpen(false);
+                editForm.resetFields();
+                setFileList([]);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+            >
+              Save Changes
+            </Button>
           </div>
         </Form>
       </Modal>
@@ -641,7 +880,9 @@ export default function AssetManager() {
         footer={null}
         width={920}
       >
-        <Form form={viewForm} layout="vertical">{renderFormFields(viewForm, true)}</Form>
+        <Form form={viewForm} layout="vertical">
+          {renderFormFields(viewForm, true)}
+        </Form>
       </Modal>
     </div>
   );

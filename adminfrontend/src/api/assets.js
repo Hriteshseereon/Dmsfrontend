@@ -18,13 +18,13 @@ export const getAssets = async (orgId) => {
   const res = await api.get(`/assets/assets/?organisation=${orgId}`);
   return res.data;
 };
-
+export const getAllAssets = async () => {
+  const res = await api.get(`/assets/assets/`);
+  return res.data;
+};
 // CREATE
-export const addAsset = async (orgId, payload) => {
-  const res = await api.post("/assets/", {
-    ...payload,
-    organisation: orgId,
-  });
+export const addAsset = async (payload) => {
+  const res = await api.post("/assets/assets/", payload);
   return res.data;
 };
 
@@ -42,21 +42,21 @@ export const deleteAsset = async (id) => {
 
 
 // Asset Allocations
-
+export const getAssetAllocationById = async (id) => {
+  const res = await api.get(`/assets/allocations/${id}/`);
+  return res.data;
+}
 // LIST
-export const getAssetAllocations = async (orgId) => {
+export const getAssetAllocations = async () => {
   const res = await api.get(
-    `/assets/allocations/?organisation=${orgId}`
+    `/assets/allocations/`
   );
   return res.data;
 };
 
 // CREATE
-export const addAssetAllocation = async (orgId, payload) => {
-  const res = await api.post("/assets/allocations/", {
-    ...payload,
-    organisation: orgId,
-  });
+export const addAssetAllocation = async ( payload) => {
+  const res = await api.post("/assets/allocations/", payload);
   return res.data;
 };
 
@@ -69,17 +69,19 @@ export const updateAssetAllocation = async (id, payload) => {
 // ASSET MAINTENANCE
 
 // LIST
-export const getAssetMaintenances = async (orgId) => {
-  const res = await api.get(`/assets/maintenance/?organisation=${orgId}`);
+export const getAssetMaintenances = async () => {
+  const res = await api.get(`/assets/maintenance/`);
   return res.data;
 };
 
+// get all asset maintenance by 
+export const getAssetMaintenanceById = async (id) => {
+  const res = await api.get(`/assets/maintenance/${id}/`);
+  return res.data;
+}
 // CREATE
-export const addAssetMaintenance = async (orgId, payload) => {
-  const res = await api.post("/assets/maintenance/", {
-    ...payload,
-    organisation: orgId,
-  });
+export const addAssetMaintenance = async (payload) => {
+  const res = await api.post("/assets/maintenance/", payload);
   return res.data;
 };
 
@@ -98,25 +100,20 @@ export const deleteAssetMaintenance = async (id) => {
 // ASSET DEPRECIATION
 
 // CREATE
-export const addAssetDepreciation = async (orgId, data) => {
-  const res = await api.post("/assets/depreciation/", {
-    organization: orgId,
-    ...data,
-  });
+export const addAssetDepreciation = async (payload) => {
+  const res = await api.post("/assets/depreciation/", payload);
   return res.data;
 };
 
 // LIST
-export const getAssetDepreciations = async (orgId) => {
-  const res = await api.get("/assets/depreciation/", {
-    params: { organization: orgId },
-  });
+export const getAssetDepreciations = async () => {
+  const res = await api.get("/assets/depreciation/");
   return res.data;
 };
 
 // UPDATE
-export const updateAssetDepreciation = async (id, data) => {
-  const res = await api.patch(`/assets/depreciation/${id}/`, data);
+export const updateAssetDepreciation = async (id, payload) => {
+  const res = await api.patch(`/assets/depreciation/${id}/`, payload);
   return res.data;
 };
 
@@ -130,8 +127,8 @@ export const deleteAssetDepreciation = async (id) => {
 // ASSET DISPOSAL
 
 // LIST
-export const getAssetDisposals = async (orgId) => {
-  const res = await api.get(`/assets/disposals/?organisation=${orgId}`);
+export const getAssetDisposals = async () => {
+  const res = await api.get(`/assets/disposals/`);
   return res.data;
 };
 
@@ -142,11 +139,8 @@ export const getAssetDisposalById = async (id) => {
 };
 
 // CREATE
-export const addAssetDisposal = async (orgId, payload) => {
-  const res = await api.post("/assets/disposals/", {
-    ...payload,
-    organisation: orgId,
-  });
+export const addAssetDisposal = async (payload) => {
+  const res = await api.post("/assets/disposals/", payload);
   return res.data;
 };
 

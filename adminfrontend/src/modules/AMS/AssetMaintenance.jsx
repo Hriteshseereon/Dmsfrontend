@@ -25,14 +25,19 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useAuth } from "../../context/AuthContext";
-import { addAssetMaintenance, getAssetMaintenances, getAssets, updateAssetMaintenance } from "../../api/assets";
-
+import {
+  addAssetMaintenance,
+  getAssetMaintenances,
+  getAssets,
+  updateAssetMaintenance,
+} from "../../api/assets";
+import useSessionStore from "../../store/sessionStore";
 const { Option } = Select;
 const { TextArea } = Input;
 
 export default function AssetMaintenance() {
-
-  const { currentOrgId } = useAuth();
+  // const { currentOrgId } = useAuth();
+  const currentOrgId = useSessionStore((state) => state.currentOrgId);
 
   const [assets, setAssets] = useState([]);
 
@@ -58,10 +63,12 @@ export default function AssetMaintenance() {
 
   const filteredData = data.filter((row) =>
     ["maintenanceId", "assetId", "serviceProvider", "status"].some((f) =>
-      (row[f] || "").toString().toLowerCase().includes(searchText.trim().toLowerCase())
-    )
+      (row[f] || "")
+        .toString()
+        .toLowerCase()
+        .includes(searchText.trim().toLowerCase()),
+    ),
   );
-
 
   const fetchMaintenances = async () => {
     setLoading(true);
@@ -107,13 +114,13 @@ export default function AssetMaintenance() {
     fetchAssets();
   }, [currentOrgId]);
 
-
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Maintenance ID</span>,
-      dataIndex: "maintenanceId",
-      width: 140,
-      render: (t) => <span className="text-amber-800">{t}</span>,
+      title: <span className="text-amber-700 font-semibold">SL No</span>,
+      width: 80,
+      render: (_, __, index) => (
+        <span className="text-amber-800">{index + 1}</span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Asset ID</span>,
@@ -128,7 +135,9 @@ export default function AssetMaintenance() {
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Service Provider</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Service Provider</span>
+      ),
       dataIndex: "serviceProvider",
       width: 180,
       render: (t) => <span className="text-amber-800">{t}</span>,
@@ -137,13 +146,21 @@ export default function AssetMaintenance() {
       title: <span className="text-amber-700 font-semibold">Service Date</span>,
       dataIndex: "serviceDate",
       width: 130,
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
+      render: (d) => (
+        <span className="text-amber-800">
+          {d ? dayjs(d).format("YYYY-MM-DD") : ""}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Next Due</span>,
       dataIndex: "nextServiceDue",
       width: 130,
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : "-"}</span>,
+      render: (d) => (
+        <span className="text-amber-800">
+          {d ? dayjs(d).format("YYYY-MM-DD") : "-"}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Cost (₹)</span>,
@@ -158,44 +175,71 @@ export default function AssetMaintenance() {
       render: (s) => {
         const base = "px-3 py-1 rounded-full text-sm font-semibold";
         if (s === "Completed")
-          return <span className={`${base} bg-green-100 text-green-700`}>Completed</span>;
+          return (
+            <span className={`${base} bg-green-100 text-green-700`}>
+              Completed
+            </span>
+          );
         if (s === "In Progress")
-          return <span className={`${base} bg-yellow-100 text-yellow-700`}>In Progress</span>;
+          return (
+            <span className={`${base} bg-yellow-100 text-yellow-700`}>
+              In Progress
+            </span>
+          );
         if (s === "Cancelled")
-          return <span className={`${base} bg-red-100 text-red-700`}>Cancelled</span>;
-        return <span className={`${base} bg-amber-100 text-amber-800`}>{s}</span>;
+          return (
+            <span className={`${base} bg-red-100 text-red-700`}>Cancelled</span>
+          );
+        return (
+          <span className={`${base} bg-amber-100 text-amber-800`}>{s}</span>
+        );
       },
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       width: 100,
-      render: (record) => (
+      render: (_, record) => (
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
             onClick={() => {
               setSelectedRecord(record);
               viewForm.setFieldsValue({
-                ...record,
                 assetId: record.assetPk,
-                serviceDate: record.serviceDate ? dayjs(record.serviceDate) : undefined,
-                nextServiceDue: record.nextServiceDue ? dayjs(record.nextServiceDue) : undefined,
+                serviceType: record.serviceType,
+                serviceProvider: record.serviceProvider,
+                serviceDate: record.serviceDate
+                  ? dayjs(record.serviceDate)
+                  : null,
+                nextServiceDue: record.nextServiceDue
+                  ? dayjs(record.nextServiceDue)
+                  : null,
+                cost: record.cost,
+                status: record.status,
+                remarks: record.remarks,
               });
               setIsViewModalOpen(true);
             }}
           />
+
           <EditOutlined
             className="cursor-pointer! text-red-500!"
             onClick={() => {
               setSelectedRecord(record);
               editForm.setFieldsValue({
-                ...record,
                 assetId: record.assetPk,
-                serviceDate: record.serviceDate ? dayjs(record.serviceDate) : undefined,
-                nextServiceDue: record.nextServiceDue ? dayjs(record.nextServiceDue) : undefined,
+                serviceType: record.serviceType,
+                serviceProvider: record.serviceProvider,
+                serviceDate: record.serviceDate
+                  ? dayjs(record.serviceDate)
+                  : null,
+                nextServiceDue: record.nextServiceDue
+                  ? dayjs(record.nextServiceDue)
+                  : null,
+                cost: record.cost,
+                status: record.status,
+                remarks: record.remarks,
               });
-              // populate edit file list if any
-              setEditFileList(record.files || []);
               setIsEditModalOpen(true);
             }}
           />
@@ -231,8 +275,11 @@ export default function AssetMaintenance() {
       r.status,
       (r.remarks || "").replace(/[\n\r]/g, " "),
     ]);
-    const csvContent =
-      [headers, ...rows].map((e) => e.map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`).join(",")).join("\n");
+    const csvContent = [headers, ...rows]
+      .map((e) =>
+        e.map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`).join(","),
+      )
+      .join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -269,17 +316,22 @@ export default function AssetMaintenance() {
     try {
       setLoading(true);
 
-      await addAssetMaintenance(currentOrgId, {
+      await addAssetMaintenance({
+        organisation: currentOrgId,
         asset: values.assetId,
+
         service_type: values.serviceType,
         service_provider: values.serviceProvider,
+
         service_date: values.serviceDate.format("YYYY-MM-DD"),
-        next_service_due: values.nextServiceDue
+        next_service_due_date: values.nextServiceDue
           ? values.nextServiceDue.format("YYYY-MM-DD")
           : null,
-        cost: values.cost || 0,
+
+        cost: values.cost ? values.cost.toString() : "0.00",
         status: values.status,
-        remarks: values.remarks || "",
+
+        remarks: values.remarks || null,
       });
 
       message.success("Maintenance record added");
@@ -287,29 +339,34 @@ export default function AssetMaintenance() {
       addForm.resetFields();
       setAddFileList([]);
       fetchMaintenances();
-    } catch {
+    } catch (err) {
+      console.log(err?.response?.data);
       message.error("Failed to add maintenance record");
     } finally {
       setLoading(false);
     }
   };
 
-
   const handleEdit = async (values) => {
     try {
       setLoading(true);
 
       await updateAssetMaintenance(selectedRecord.id, {
+        organisation: currentOrgId,
         asset: values.assetId,
+
         service_type: values.serviceType,
         service_provider: values.serviceProvider,
+
         service_date: values.serviceDate.format("YYYY-MM-DD"),
-        next_service_due: values.nextServiceDue
+        next_service_due_date: values.nextServiceDue
           ? values.nextServiceDue.format("YYYY-MM-DD")
           : null,
-        cost: values.cost || 0,
+
+        cost: values.cost ? values.cost.toString() : "0.00",
         status: values.status,
-        remarks: values.remarks || "",
+
+        remarks: values.remarks || null,
       });
 
       message.success("Maintenance updated");
@@ -318,13 +375,13 @@ export default function AssetMaintenance() {
       setSelectedRecord(null);
       setEditFileList([]);
       fetchMaintenances();
-    } catch {
+    } catch (err) {
+      console.log(err?.response?.data);
       message.error("Failed to update maintenance");
     } finally {
       setLoading(false);
     }
   };
-
 
   const renderFormFields = (form, disabled = false, mode = "add") => (
     <>
@@ -376,9 +433,13 @@ export default function AssetMaintenance() {
       <Row gutter={16}>
         <Col span={8}>
           <Form.Item
-            label={<span className="text-amber-700">Service Provider Name</span>}
+            label={
+              <span className="text-amber-700">Service Provider Name</span>
+            }
             name="serviceProvider"
-            rules={[{ required: true, message: "Please enter Service Provider" }]}
+            rules={[
+              { required: true, message: "Please enter Service Provider" },
+            ]}
           >
             <Input placeholder="Service Provider" disabled={disabled} />
           </Form.Item>
@@ -397,7 +458,9 @@ export default function AssetMaintenance() {
 
         <Col span={8}>
           <Form.Item
-            label={<span className="text-amber-700">Next Service Due Date</span>}
+            label={
+              <span className="text-amber-700">Next Service Due Date</span>
+            }
             name="nextServiceDue"
           >
             <DatePicker className="w-full" disabled={disabled} />
@@ -407,7 +470,10 @@ export default function AssetMaintenance() {
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Cost (₹)</span>} name="cost">
+          <Form.Item
+            label={<span className="text-amber-700">Cost (₹)</span>}
+            name="cost"
+          >
             <InputNumber className="w-full" min={0} disabled={disabled} />
           </Form.Item>
         </Col>
@@ -430,7 +496,10 @@ export default function AssetMaintenance() {
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Remarks</span>} name="remarks">
+          <Form.Item
+            label={<span className="text-amber-700">Remarks</span>}
+            name="remarks"
+          >
             <TextArea rows={1} placeholder="Any notes" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -440,19 +509,33 @@ export default function AssetMaintenance() {
       <Row gutter={16}>
         <Col span={24}>
           <Form.Item
-            label={<span className="text-amber-700">Choose File (Invoice, Report etc)</span>}
+            label={
+              <span className="text-amber-700">
+                Choose File (Invoice, Report etc)
+              </span>
+            }
             name="files"
-            extra={<span className="text-amber-600 text-sm">PDF, JPG, PNG, or other documents</span>}
+            extra={
+              <span className="text-amber-600 text-sm">
+                PDF, JPG, PNG, or other documents
+              </span>
+            }
           >
             {mode === "add" ? (
               <Upload {...addUploadProps} maxCount={5} multiple>
-                <Button icon={<UploadOutlined />} className="border-amber-400 text-amber-700 hover:bg-amber-100">
+                <Button
+                  icon={<UploadOutlined />}
+                  className="border-amber-400 text-amber-700 hover:bg-amber-100"
+                >
                   Click to Upload
                 </Button>
               </Upload>
             ) : (
               <Upload {...editUploadProps} maxCount={5} multiple>
-                <Button icon={<UploadOutlined />} className="border-amber-400 text-amber-700 hover:bg-amber-100">
+                <Button
+                  icon={<UploadOutlined />}
+                  className="border-amber-400 text-amber-700 hover:bg-amber-100"
+                >
                   Click to Upload
                 </Button>
               </Upload>
@@ -485,15 +568,17 @@ export default function AssetMaintenance() {
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} onClick={exportCSV}
-            className="border-amber-400! text-amber-700! hover:bg-amber-100!">
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={exportCSV}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
             Export
           </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
             className="bg-amber-500! hover:bg-amber-600! border-none!"
-
             onClick={() => {
               addForm.resetFields();
               setAddFileList([]);
@@ -507,18 +592,27 @@ export default function AssetMaintenance() {
 
       {/* Table */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
-        <h2 className="text-lg font-semibold text-amber-700 mb-0">Asset Maintenance</h2>
-        <p className="text-amber-600 mb-3">Manage maintenance, calibration & service records</p>
+        <h2 className="text-lg font-semibold text-amber-700 mb-0">
+          Asset Maintenance
+        </h2>
+        <p className="text-amber-600 mb-3">
+          Manage maintenance, calibration & service records
+        </p>
         <Table
           columns={columns}
           dataSource={filteredData}
           loading={loading}
-          pagination={{ pageSize: 6 }} />
+          pagination={{ pageSize: 6 }}
+        />
       </div>
 
       {/* Add Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Add Maintenance Record</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Add Maintenance Record
+          </span>
+        }
         open={isAddModalOpen}
         onCancel={() => {
           setIsAddModalOpen(false);
@@ -538,13 +632,15 @@ export default function AssetMaintenance() {
                 setAddFileList([]);
               }}
               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-
             >
               Cancel
             </Button>
-            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!"
+            <Button
+              type="primary"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
               htmlType="submit"
-              loading={loading}>
+              loading={loading}
+            >
               Add
             </Button>
           </div>
@@ -553,7 +649,11 @@ export default function AssetMaintenance() {
 
       {/* Edit Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Edit Maintenance Record</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Edit Maintenance Record
+          </span>
+        }
         open={isEditModalOpen}
         onCancel={() => {
           setIsEditModalOpen(false);
@@ -575,12 +675,14 @@ export default function AssetMaintenance() {
                 setEditFileList([]);
               }}
               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-
             >
               Cancel
             </Button>
-            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!"
-              htmlType="submit">
+            <Button
+              type="primary"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit"
+            >
               Save Changes
             </Button>
           </div>
