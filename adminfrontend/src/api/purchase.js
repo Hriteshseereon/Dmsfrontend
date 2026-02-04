@@ -52,6 +52,24 @@ export const getSoudaByContractId = async (contractId) => {
   return res.data;
 }
 
+//add purchase order
+export const addPurchaseOrder = async (payload) => {
+  const { currentOrgId } = useSessionStore.getState(); // ✅ destructure
+
+  const res = await api.post(
+    "/purchase/orders/",
+    payload,
+    {
+      params: {
+        organisation: currentOrgId, // ✅ real UUID
+      },
+    }
+  );
+
+  return res.data;
+};
+
+
 // PURCHASE INVOICES
 //fetch all purchase invoices
 export const getPurchaseInvoice = async () => {

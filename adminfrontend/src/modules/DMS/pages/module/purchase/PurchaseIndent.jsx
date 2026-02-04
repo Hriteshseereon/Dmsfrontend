@@ -5,7 +5,7 @@ import {
   optionalPositiveNumber,
   percentageValidation,
 } from "../../../helpers/formValidation";
-import { getPurchaseOrder,getPurchaseContract ,getSoudaByContractId} from "../../../../../api/purchase";
+import { getPurchaseOrder,getPurchaseContract ,getSoudaByContractId,addPurchaseOrder} from "../../../../../api/purchase";
 import {
   Table,
   Input,
@@ -107,6 +107,8 @@ export default function PurchaseIndent() {
   const [data, setData] = useState([]);
  const [loading, setLoading] = useState(false);
  const [contractItems, setContractItems] = useState([]);
+const [vendor, setVendor] = useState(null);
+const [selectedVendor, setSelectedVendor] = useState(null);
 
   const [searchText, setSearchText] = useState("");
 
@@ -127,15 +129,22 @@ const fetchPurchaseOrder = async () => {
     // adjust if API response is wrapped (res.data)
     const list = res?.data || res;
 
-    const formattedData = list.map((item, index) => ({
-      key: item.id || index + 1,
-      contract: item.contract,
-      plant_name: item.plant_name,
-      company_name: item.company_name,
-      total_qty_all_items: item.total_qty_all_items || 0,
-      total_amount: item.total_amount || 0,
-      status: item.status || "Pending",
-    }));
+  const formattedData = list.map((item, index) => ({
+  key: item.id || index + 1,
+  contract: item.contract,
+  plant_name: item.plant_name,
+
+  // ❌ remove
+  // company_name: item.company_name,
+
+  // ✅ add
+  vendor_name: item.vendor_name,
+
+  total_qty_all_items: item.total_qty_all_items || 0,
+  total_amount: item.total_amount || 0,
+  status: item.status || "Pending",
+}));
+
 
     setData(formattedData);
   } catch (error) {
@@ -204,19 +213,24 @@ const handleSoudaSelect = async (contractId, formInstance) => {
       igstPercent: Number(it.igst_percent || 0),
     }));
 
-    formInstance.setFieldsValue({
-      vendor: data.vendor,
-      vendorName: data.vendor_name,
-      companyName: data.company_name,
-      plantName: data.plant_name,
-      deliveryAddress: data.delivery_address,
-      items: itemsForForm,
-    });
+formInstance.setFieldsValue({
+  vendor: data.vendor,           // ID
+  vendorName: data.vendor_name,  // UI only
+
+  plantId: data.plant,
+  plantName: data.plant_name,
+
+  deliveryAddress: data.delivery_address,
+  items: itemsForForm,
+});
+
 
     setTimeout(() => recalcAll(formInstance), 0);
   } catch (err) {
     message.error("Failed to load souda details");
   }
+  setSelectedVendor(data.vendor);
+
 };
 
 
@@ -279,65 +293,51 @@ const handleSoudaSelect = async (contractId, formInstance) => {
   };
 
 
- const handleFormSubmit = (values, type) => {
-  // find selected souda number (display value)
-  const selectedContract = soudaContracts.find(
-    (c) => c.id === values.contract
-  );
-
-  const payload = {
-    // 🔑 IDs & basic info
-    contract: values.contract, // contract UUID
-    souda_no: selectedContract?.contract_number || null,
-
-    vendor: values.vendor,
-    plant_name: values.plantName,
-    company_name: values.companyName,
-    delivery_address: values.deliveryAddress,
-
-    // 📅 dates
-    indent_date: values.indentDate
-      ? values.indentDate.format("YYYY-MM-DD")
-      : null,
-    delivery_date: values.deliveryDate
-      ? values.deliveryDate.format("YYYY-MM-DD")
-      : null,
-
-    // 📦 raw item inputs only (NO calculations)
-    items: (values.items || []).map((it) => ({
-      product: it.product,
-      hsn_code: it.hsn_code,
-      qty: Number(it.qty || 0),
-      free_qty: Number(it.freeQty || 0),
-      rate: Number(it.rate || 0),
-      discount_percent: Number(it.discountPercent || 0),
-      sgst_percent: Number(it.sgstPercent || 0),
-      cgst_percent: Number(it.cgstPercent || 0),
-      igst_percent: Number(it.igstPercent || 0),
-    })),
-
-    status: values.status || "Pending",
-  };
-
-  console.log("FINAL PAYLOAD 👉", payload);
-
-  // 🔁 UI handling only (no calculation here)
-  if (type === "edit" && selectedRecord) {
-    setData((prev) =>
-      prev.map((row) =>
-        row.key === selectedRecord.key ? { ...row, ...payload } : row
-      )
+const handleFormSubmit = async (values, type) => {
+  try {
+    const selectedContract = soudaContracts.find(
+      (c) => c.id === values.contract
     );
-    setIsEditModalOpen(false);
-    editForm.resetFields();
-    message.success("Indent updated successfully");
-  } else {
-    setData((prev) => [...prev, { ...payload, key: Date.now() }]);
-    setIsAddModalOpen(false);
-    addForm.resetFields();
-    message.success("Indent added successfully");
+
+    const payload = {
+      contract: values.contract,
+       vendor: selectedVendor,
+      vendor: selectedContract?.vendor, // ✅ derived here
+      plant: selectedContract?.plant,
+
+      delivery_address: values.deliveryAddress,
+
+      order_date: values.indentDate
+        ? values.indentDate.format("YYYY-MM-DD")
+        : dayjs().format("YYYY-MM-DD"),
+
+      expected_receiving_date:
+        values.expected_receiving_date?.format("YYYY-MM-DD"),
+
+      items: values.items.map((it) => ({
+        product: it.product,
+        hsn_code: it.hsn_code,
+        qty: Number(it.qty || 0),
+        free_qty: Number(it.freeQty || 0),
+        rate: Number(it.rate || 0),
+        discount_percent: Number(it.discountPercent || 0),
+        sgst_percent: Number(it.sgstPercent || 0),
+        cgst_percent: Number(it.cgstPercent || 0),
+        igst_percent: Number(it.igstPercent || 0),
+      })),
+
+      status: values.status || "Fresh",
+    };
+
+    await addPurchaseOrder(payload);
+    message.success("Purchase order created successfully");
+  } catch (err) {
+    message.error("Failed to create purchase order");
   }
 };
+
+
+
 
 
   const columns = [
@@ -355,18 +355,13 @@ const handleSoudaSelect = async (contractId, formInstance) => {
       width: 150,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
-    {
-      title: <span className="text-amber-700 font-semibold">Company</span>,
-      dataIndex: "company_name",
-      width: 150,
-      render: (t) => <span className="text-amber-800">{t}</span>,
-    },
-    // {
-    //   title: <span className="text-amber-700 font-semibold">Delivery Date</span>,
-    //   dataIndex: "deliveryDate",
-    //   width: 120,
-    //   render: (t) => <span className="text-amber-800">{t}</span>,
-    // },
+   {
+  title: <span className="text-amber-700 font-semibold">Vendor</span>,
+  dataIndex: "vendor_name",
+  width: 150,
+  render: (t) => <span className="text-amber-800">{t}</span>,
+},
+
     {
       title: <span className="text-amber-700 font-semibold">Total Qty</span>,
       dataIndex: "total_qty_all_items",
@@ -436,8 +431,8 @@ total_qty_all_items
 
     viewForm.setFieldsValue({
       ...record,
-      indentDate: convert(record.indentDate),
-      deliveryDate: convert(record.deliveryDate),
+      order_date: convert(record.order_date),
+      expected_receiving_date: convert(record.expected_receiving_date),
     });
 
     setIsViewModalOpen(true);
@@ -449,8 +444,8 @@ total_qty_all_items
 
     editForm.setFieldsValue({
       ...record,
-      indentDate: convert(record.indentDate),
-      deliveryDate: convert(record.deliveryDate),
+      order_date: convert(record.order_date),
+      expected_receiving_date: convert(record.expected_receiving_date),
     });
 
     setIsEditModalOpen(true);
@@ -483,17 +478,14 @@ total_qty_all_items
 
         </Col>
 
-        <Col span={6}>
-          <Form.Item label="Plant Name" name="plantName">
-            <Input disabled />
-          </Form.Item>
-        </Col>
+       <Form.Item label="Plant Name" name="plantName">
+  <Input disabled />
+</Form.Item>
+<Form.Item label="Vendor Name" name="vendorName">
+  <Input disabled />
+</Form.Item>
 
-        <Col span={6}>
-          <Form.Item label="Company Name" name="companyName">
-            <Input disabled />
-          </Form.Item>
-        </Col>
+
 
         <Col span={6}>
           <Form.Item label="Status" name="status">
@@ -520,15 +512,15 @@ total_qty_all_items
         </Col>
 
         <Col span={6}>
-          <Form.Item label="Indent Date" name="indentDate">
+          <Form.Item label="Order Date" name="order_date">
             <DatePicker className="w-full" disabled />
           </Form.Item>
         </Col>
 
         <Col span={6}>
           <Form.Item
-            label="Delivery Date"
-            name="deliveryDate"
+            label="Expected Receiving Date"
+            name="expected_receiving_date"
             rules={[{ required: true }]}
           >
             <DatePicker
@@ -790,7 +782,7 @@ total_qty_all_items
           <Form.Item label="SGST %" name="sgstPercent">
             <InputNumber
               className="w-full"
-              disabled
+            
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
@@ -800,7 +792,7 @@ total_qty_all_items
           <Form.Item label="CGST %" name="cgstPercent">
             <InputNumber
               className="w-full"
-              disabled
+            
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
@@ -810,7 +802,7 @@ total_qty_all_items
           <Form.Item label="IGST %" name="igstPercent">
             <InputNumber
               className="w-full"
-              disabled
+             
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
@@ -826,7 +818,7 @@ total_qty_all_items
           <Form.Item label="TCS Amt (₹)" name="tcsAmt">
             <InputNumber
               className="w-full"
-              disabled
+             
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
@@ -875,7 +867,7 @@ total_qty_all_items
             className="bg-amber-500! hover:bg-amber-600! border-none!"
             onClick={() => {
               addForm.resetFields();
-              addForm.setFieldsValue({ indentDate: dayjs(), items: [] });
+              addForm.setFieldsValue({ order_date: dayjs(), items: [] });
               setIsAddModalOpen(true);
             }}
           >
