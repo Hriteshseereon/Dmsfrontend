@@ -1,4 +1,4 @@
-import React, { useState,useEffect } from "react";
+import React, { useState,useEffect } from "react"; 
 import { positiveNumberInputProps } from "../../../helpers/numberInput";
 import {
   requiredPositiveNumber,
@@ -133,13 +133,8 @@ const fetchPurchaseOrder = async () => {
   key: item.id || index + 1,
   contract: item.contract,
   plant_name: item.plant_name,
-
-  // ❌ remove
-  // company_name: item.company_name,
-
-  // ✅ add
+  order_number: item.order_number,
   vendor_name: item.vendor_name,
-
   total_qty_all_items: item.total_qty_all_items || 0,
   total_amount: item.total_amount || 0,
   status: item.status || "Pending",
@@ -293,48 +288,71 @@ formInstance.setFieldsValue({
   };
 
 
-const handleFormSubmit = async (values, type) => {
+const handleFormSubmit = async (values) => {
   try {
     const selectedContract = soudaContracts.find(
       (c) => c.id === values.contract
     );
 
-    const payload = {
-      contract: values.contract,
-       vendor: selectedVendor,
-      vendor: selectedContract?.vendor, // ✅ derived here
-      plant: selectedContract?.plant,
+   const payload = {
+  contract: values.contract,
+  vendor: selectedContract?.vendor,
+  souda_no: selectedContract?.contract_number,
 
-      delivery_address: values.deliveryAddress,
+  plant_name: values.plantName || "",
+  plant_display_name: values.plantName || "",
+  delivery_address: values.deliveryAddress || "",
 
-      order_date: values.indentDate
-        ? values.indentDate.format("YYYY-MM-DD")
-        : dayjs().format("YYYY-MM-DD"),
+  order_date: values.order_date?.format("YYYY-MM-DD"),
+  expected_receiving_date: values.expected_receiving_date?.format("YYYY-MM-DD"),
 
-      expected_receiving_date:
-        values.expected_receiving_date?.format("YYYY-MM-DD"),
+  status: values.status || "Fresh",
 
-      items: values.items.map((it) => ({
-        product: it.product,
-        hsn_code: it.hsn_code,
-        qty: Number(it.qty || 0),
-        free_qty: Number(it.freeQty || 0),
-        rate: Number(it.rate || 0),
-        discount_percent: Number(it.discountPercent || 0),
-        sgst_percent: Number(it.sgstPercent || 0),
-        cgst_percent: Number(it.cgstPercent || 0),
-        igst_percent: Number(it.igstPercent || 0),
-      })),
+  // 🔥 IMPORTANT — ADD THESE
+  total_qty_all_items: Number(values.totalQty || 0),
 
-      status: values.status || "Fresh",
-    };
+  sgst: Number(values.sgst || 0),
+  cgst: Number(values.cgst || 0),
+  igst: Number(values.igst || 0),
+
+  total_gst_amount: Number(values.totalGST || 0),
+  tcs_amount: Number(values.tcsAmt || 0),
+
+  total_amount: Number(values.totalAmt || 0),
+  grand_total: Number(values.totalAmt || 0),
+
+  items: values.items.map(it => ({
+    product: it.product,
+    item_name: it.item,
+    item_code: it.hsn_code,
+    rate: Number(it.rate),
+    qty: Number(it.qty),
+    free_qty: Number(it.freeQty),
+
+    discount_percent: Number(it.discountPercent),
+    discount_amount: Number(it.discountAmt),
+
+    gross_amount: Number(it.grossAmount),
+    gross_weight: Number(it.grossWt),
+    total_gross_weight: Number(it.totalGrossWt),
+
+    uom_details: {
+      type: "base",
+      unit_name: it.uom,
+      factor_to_base: "1",
+    }
+  }))
+};
+
 
     await addPurchaseOrder(payload);
     message.success("Purchase order created successfully");
   } catch (err) {
     message.error("Failed to create purchase order");
   }
+  setIsAddModalOpen(false);
 };
+
 
 
 
@@ -366,11 +384,8 @@ const handleFormSubmit = async (values, type) => {
       title: <span className="text-amber-700 font-semibold">Total Qty</span>,
       dataIndex: "total_qty_all_items",
       width: 120,
-      render: (_, record) => (
-        <span className="text-amber-800">{record.
-total_qty_all_items
-} </span>
-      ),
+     render: (t) => <span className="text-amber-800">{t}</span>
+      
     },
     {
       title: (
@@ -588,6 +603,7 @@ total_qty_all_items
             product: item.product,
             item: item.item_name,
             hsn_code: item.hsn_code,
+            rate: Number(item.rate || 0),
             qty: Number(item.qty || 0),
             freeQty: Number(item.free_qty || 0),
             uom: item.uom_details?.unit_name,
