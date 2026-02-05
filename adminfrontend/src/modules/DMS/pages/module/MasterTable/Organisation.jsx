@@ -13,6 +13,10 @@ import {
   Divider,
   DatePicker,
 } from "antd";
+import { useEffect } from "react";
+import { getOrganization } from "../../../../../api/organizations";
+import useSessionStore from "../../../../../../src/store/sessionStore";
+
 import {
   SearchOutlined,
   PlusOutlined,
@@ -31,73 +35,7 @@ const { Option } = Select;
 const DATE_FORMAT = "DD/MM/YYYY";
 
 // --- SAMPLE DATA (same shape as before) ---
-const initialData = [
-  {
-    key: 1,
-    orgName: "AUM AGRO ASSOCIATES PRIVATE LIMITED",
-    orgPhoneNo: "9876543210",
-    orgMobileNo: "9876543210",
-    orgAddress:
-      "BALAJI BHAWAN, 22/A, KALAPNA AREA, B.J.B NAGAR, BHUBANESWAR-751014",
-    contPerson: "KOUSHAL KISHORE AGRAWAL",
-    faxNo: "2314550",
-    tinNo: "04/06/1",
-    etDate: "16/08/2025",
-    cstDate: "16/08/2025",
-    tanNo: "21AAVC...",
-    panNo: "ABCDE1234F",
-    eolNo: "",
-    flNo: "",
-    email: "aumagro@example.com",
-    url: "www.aumagro.com",
-    tradeNo: "",
-    type: "Pvt Ltd",
-    status: "Active",
-    branches: [
-      {
-        branchKey: 101,
-        brShortName: "BBS",
-        branchName: "BHUBANESWAR",
-        address:
-          "2ND FLOOR, BALAJI BHAWAN, 22/A, KALAPANA AREA, B.J.B NAGAR, BHUBANESWAR-751014",
-        branchHead: "KOUSHAL KISHORE AGRAWAL",
-        branchMobileNo: "9861021371, 9337103561",
-        email: "hindustanbbsr@gmail.com",
-        state: "Odisha",
-        location: "BHUBANESWAR",
-        type: "main branch",
-      },
-      {
-        branchKey: 102,
-        brShortName: "CTC",
-        branchName: "CUTTACK",
-        address: "Link Road, Cuttack-753012",
-        branchHead: "RANJAN KUMAR",
-        branchMobileNo: "9437012345",
-        email: "cuttack@example.com",
-        state: "Odisha",
-        location: "CUTTACK",
-        type: "submain",
-      },
-    ],
-    depos: [
-      {
-        depoKey: 201,
-        cShortName: "RSI",
-        compName: "RUCHI SOYA INDUSTRIES LIMITED",
-        address: "201, MAHAKOSH HOUSE, INDORE-452001",
-        phoneNo: "0731-4056012",
-        faxNo: "4056019",
-        email: "ruchi@example.com",
-        transactionType: "Super Stockist",
-        tranStatus: "Inside",
-        igstApplicable: "No",
-        state: "Madhya Pradesh",
-        location: "Indore",
-      },
-    ],
-  },
-];
+
 
 const typeOptions = [
   { name: "Real Estate", code: "Real Estate" },
@@ -611,6 +549,7 @@ const RenderCompanyDepoMaster = ({ disabled = false }) => (
 
 export default function Organisation() {
   const navigate = useNavigate();
+  const { currentOrgId } = useSessionStore();
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedEditRecord, setSelectedEditRecord] = useState(null);
@@ -620,7 +559,8 @@ export default function Organisation() {
   const [selectedViewRecord, setSelectedViewRecord] = useState(null);
 
   const [searchText, setSearchText] = useState("");
-  const [data, setData] = useState(initialData);
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const tableData = useMemo(
     () =>
@@ -630,20 +570,79 @@ export default function Organisation() {
       })),
     [data]
   );
+  useEffect(() => {
+    if (!currentOrgId) return;
 
-  const filteredData = tableData.filter(
-    (item) =>
-      item.orgName.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.orgPhoneNo.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.orgEmail.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.orgAddress.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.branches.some((b) =>
-        b.branchName.toLowerCase().includes(searchText.toLowerCase())
-      ) ||
-      item.depos.some((d) =>
-        d.compName.toLowerCase().includes(searchText.toLowerCase())
-      )
+    const fetchOrganisation = async () => {
+      setLoading(true);
+      try {
+        const res = await getOrganization(currentOrgId);
+console.log("ORG API RESPONSE:", res);
+        const formattedData = {
+          key: res.id,
+          orgName: res.registered_name,
+          orgPhoneNo: res.phone_number_1?.toString() || "",
+          contPerson: res.contact_person,
+          orgAddress: res.address?.address_line_1 || "",
+          organisation_type: res.organisation_type,
+          email: res.email,
+          status: res.status || "Active",
+
+          branches: res.branches?.map((b) => ({
+            branchKey: b.id,
+            brShortName: b.short_name,
+            branchName: b.name,
+            address: b.address?.address_line_1 || "",
+            branchHead: b.branch_head_name,
+            branchMobileNo: b.phone_number_1 ? String(b.phone_number_1) : "",
+            email: b.email ? String(b.email) : "",
+
+            state: b.state,
+            location: b.location,
+            type: b.type,
+          })) || [],
+
+          depos: res.depos?.map((d) => ({
+            depoKey: d.id,
+            cShortName: d.short_name,
+            compName: d.company_name,
+            address: d.address?.address_line_1 || "",
+            phoneNo: d.phone_number,
+            email: d.email,
+            state: d.state,
+            location: d.location,
+          })) || [],
+        };
+
+        setData([formattedData]); // ✅ show only clicked org
+      } catch (err) {
+        console.error("Organisation fetch failed", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrganisation();
+  }, [currentOrgId]);
+
+const filteredData = tableData.filter((item) => {
+  const search = searchText.toLowerCase();
+
+  return (
+    item.orgName?.toLowerCase().includes(search) ||
+    item.orgPhoneNo?.toString().toLowerCase().includes(search) ||
+    item.orgEmail?.toLowerCase().includes(search) ||
+   
+
+    (item.branches || []).some((b) =>
+      b.branchName?.toLowerCase().includes(search)
+    ) ||
+
+    (item.depos || []).some((d) =>
+      d.compName?.toLowerCase().includes(search)
+    )
   );
+});
 
   // --- Handlers ---
 
@@ -698,17 +697,17 @@ export default function Organisation() {
         prev.map((item) =>
           item.key === selectedEditRecord.key
             ? {
-                ...newRecord,
-                key: item.key,
-                branches: newRecord.branches.map((b) => ({
-                  ...b,
-                  branchKey: b.branchKey || Date.now() + Math.random(),
-                })),
-                depos: newRecord.depos.map((d) => ({
-                  ...d,
-                  depoKey: d.depoKey || Date.now() + Math.random() * 2,
-                })),
-              }
+              ...newRecord,
+              key: item.key,
+              branches: newRecord.branches.map((b) => ({
+                ...b,
+                branchKey: b.branchKey || Date.now() + Math.random(),
+              })),
+              depos: newRecord.depos.map((d) => ({
+                ...d,
+                depoKey: d.depoKey || Date.now() + Math.random() * 2,
+              })),
+            }
             : item
         )
       );
@@ -747,15 +746,7 @@ export default function Organisation() {
           <span className="text-amber-800 font-medium">{text}</span>
         ),
       },
-      {
-        title: <span className="font-semibold text-amber-800">Type</span>,
-        dataIndex: "type",
-        key: "type",
-        width: 100,
-        render: (text) => (
-          <span className="text-amber-800 capitalize">{text}</span>
-        ),
-      },
+
       {
         title: <span className="font-semibold text-amber-800">Address</span>,
         dataIndex: "address",
@@ -764,37 +755,24 @@ export default function Organisation() {
         width: 150,
         render: (text) => <span className="text-amber-800">{text}</span>,
       },
-      {
-        title: (
-          <span className="font-semibold text-amber-800">Mobile No</span>
-        ),
-        dataIndex: "branchMobileNo",
-        key: "branchMobileNo",
-        width: 150,
-        render: (text) => <span className="text-amber-800">{text}</span>,
-      },
-      {
-        title: (
-          <span className="font-semibold text-amber-800">
-            Location/State
-          </span>
-        ),
-        dataIndex: "location",
-        key: "location",
-        width: 150,
-        render: (_, r) => (
-          <span className="text-amber-800">
-            {r.location}, {r.state}
-          </span>
-        ),
-      },
-      {
-        title: <span className="font-semibold text-amber-800">Head</span>,
-        dataIndex: "branchHead",
-        key: "branchHead",
-        width: 150,
-        render: (text) => <span className="text-amber-800">{text}</span>,
-      },
+      // {
+      //   title: (
+      //     <span className="font-semibold text-amber-800">Mobile No</span>
+      //   ),
+      //   dataIndex: "branchMobileNo",
+      //   key: "branchMobileNo",
+      //   width: 150,
+      //   render: (text) => <span className="text-amber-800">{text}</span>,
+      // },
+      // {
+      //   title: <span className="font-semibold text-amber-800">E-Mail</span>,
+      //   dataIndex: "email",
+      //   key: "email",
+      //   width: 200,
+      //   render: (text) => <span className="text-amber-800">{text}</span>,
+      // }
+
+
     ];
 
     const depoColumns = [
@@ -852,7 +830,7 @@ export default function Organisation() {
           size="small"
         />
 
-        <h2 className="text-lg font-semibold text-amber-700 mt-4 mb-2 border-b border-amber-300 pb-1">
+        {/* <h2 className="text-lg font-semibold text-amber-700 mt-4 mb-2 border-b border-amber-300 pb-1">
           Associated Company Depos ({deposWithKeys.length})
         </h2>
         <Table
@@ -863,7 +841,7 @@ export default function Organisation() {
           className="custom-scroll-table mb-0"
           rowClassName={() => "bg-amber-100/50 hover:bg-amber-100"}
           size="small"
-        />
+        /> */}
       </div>
     );
   };
@@ -885,24 +863,27 @@ export default function Organisation() {
     },
     {
       title: (
+        <span className="text-amber-700 font-semibold">Organisation Type</span>
+      ),
+      dataIndex: "organisation_type",
+      width: 120,
+      render: (text) => (
+        <span className="text-amber-800 font-medium">{text}</span>
+      ),
+    },
+    {
+      title: (
         <span className="text-amber-700 font-semibold">Phone No</span>
       ),
       dataIndex: "orgPhoneNo",
       width: 120,
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
-    {
-      title: (
-        <span className="text-amber-700 font-semibold">Cont. Person</span>
-      ),
-      dataIndex: "contPerson",
-      width: 160,
-      render: (text) => <span className="text-amber-800">{text}</span>,
-    },
+
     {
       title: (
         <span className="text-amber-700 font-semibold">
-          Branches / Depos
+          Branches 
         </span>
       ),
       dataIndex: "nestedCount",
@@ -913,9 +894,9 @@ export default function Organisation() {
           <span className="text-amber-700 font-medium">
             BR: {record.branches.length}
           </span>
-          <span className="text-amber-700 font-medium">
+          {/* <span className="text-amber-700 font-medium">
             DP: {record.depos.length}
-          </span>
+          </span> */}
         </div>
       ),
     },
@@ -1043,8 +1024,8 @@ export default function Organisation() {
                 prefix={<SearchOutlined />}
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                 className="w-64! placeholder-amber-400! text-amber-700! border-amber-300! "
-        
+                className="w-64! placeholder-amber-400! text-amber-700! border-amber-300! "
+
               />
               <Button
                 type="primary"
@@ -1059,14 +1040,15 @@ export default function Organisation() {
         }
       >
         <Table
+          loading={loading}
           columns={columns}
           dataSource={filteredData}
           expandable={{ expandedRowRender }}
           pagination={false}
           scroll={{ x: 800 }}
           rowKey="key"
-          className="custom-table"
         />
+
       </Card>
 
       <EditOrganisationModal />

@@ -336,7 +336,6 @@ export default function AddOrganisation() {
         }
       });
     }
-    
   };
 
   const handleBack = () => {
@@ -373,17 +372,17 @@ export default function AddOrganisation() {
         </Col>
         <Col xs={24} sm={12} md={6}>
           <Form.Item
-  label="Alternate Phone Number"
-  name="phone2"
-  rules={[
-    {
-      pattern: /^[0-9]*$/,
-      message: "Only numbers are allowed",
-    },
-  ]}
->
-  <Input placeholder="Enter phone number" />
-</Form.Item>
+            label="Alternate Phone Number"
+            name="phone2"
+            rules={[
+              {
+                pattern: /^[0-9]*$/,
+                message: "Only numbers are allowed",
+              },
+            ]}
+          >
+            <Input placeholder="Enter phone number" />
+          </Form.Item>
 
         </Col>
         <Col xs={24} sm={12} md={6}>
@@ -404,7 +403,7 @@ export default function AddOrganisation() {
             label="Secondary Email"
             name="secondaryEmail"
             rules={[
-              {  message: "Please enter email" },
+              { message: "Please enter email" },
               { type: "email", message: "Please enter valid email" },
             ]}
           >
@@ -447,23 +446,23 @@ export default function AddOrganisation() {
           </Form.Item>
         </Col>
         <Col xs={24} sm={12} md={4}>
-                <Form.Item
-  label="PIN Code"
-  name={["organisationAddress", "pin"]}
-  rules={[
-    { required: true, message: "Enter PIN" },
-    {
-      pattern: /^[0-9]{6}$/,
-      message: "Only numbers are allowed",
-    },
-  ]}
->
-  <Input
-    placeholder="PIN"
-    maxLength={6}
-    inputMode="numeric"
-  />
-</Form.Item>
+          <Form.Item
+            label="PIN Code"
+            name={["organisationAddress", "pin"]}
+            rules={[
+              { required: true, message: "Enter PIN" },
+              {
+                pattern: /^[0-9]{6}$/,
+                message: "Only numbers are allowed",
+              },
+            ]}
+          >
+            <Input
+              placeholder="PIN"
+              maxLength={6}
+              inputMode="numeric"
+            />
+          </Form.Item>
         </Col>
         <Col xs={24} sm={12} md={6}>
           <Form.Item
@@ -472,7 +471,7 @@ export default function AddOrganisation() {
             rules={[{ message: "Please select location" }]}
           >
             {/* <LocationPicker /> */}
-            <Input placeholder="Enter location"  />
+            <Input placeholder="Enter location" />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12} md={6}>
@@ -589,12 +588,12 @@ export default function AddOrganisation() {
                       {...restField}
                       label="Contact Number"
                       name={[name, "contactNumber"]}
-                       rules={[
-    {
-      pattern: /^[0-9]*$/,
-      message: "Only numbers are allowed",
-    },
-  ]}
+                      rules={[
+                        {
+                          pattern: /^[0-9]*$/,
+                          message: "Only numbers are allowed",
+                        },
+                      ]}
                     >
                       <Input placeholder="Enter contact number" />
                     </Form.Item>
@@ -604,12 +603,12 @@ export default function AddOrganisation() {
                       {...restField}
                       label="Mobile Number"
                       name={[name, "mobileNumber"]}
-                       rules={[
-      {
-        pattern: /^[0-9]*$/,
-        message: "Only numbers are allowed",
-      },
-    ]}
+                      rules={[
+                        {
+                          pattern: /^[0-9]*$/,
+                          message: "Only numbers are allowed",
+                        },
+                      ]}
                     >
                       <Input placeholder="Enter mobile number" />
                     </Form.Item>
@@ -619,12 +618,12 @@ export default function AddOrganisation() {
                       {...restField}
                       label="WhatsApp Number"
                       name={[name, "whatsappNumber"]}
-                       rules={[
-      {
-        pattern: /^[0-9]*$/,
-        message: "Only numbers are allowed",
-      },
-    ]}
+                      rules={[
+                        {
+                          pattern: /^[0-9]*$/,
+                          message: "Only numbers are allowed",
+                        },
+                      ]}
                     >
                       <Input placeholder="Enter WhatsApp number" />
                     </Form.Item>
@@ -647,7 +646,7 @@ export default function AddOrganisation() {
                       {...restField}
                       label="Date of Birth"
                       name={[name, "dob"]}
-                     
+
                     >
                       <DatePicker
                         style={{ width: "100%" }}
@@ -663,12 +662,12 @@ export default function AddOrganisation() {
                         {...restField}
                         label="% of Interest"
                         name={[name, "percentage"]}
-                         rules={[
-      {
-        pattern: /^[0-9]*$/,
-        message: "Only numbers are allowed",
-      },
-    ]}
+                        rules={[
+                          {
+                            pattern: /^[0-9]*$/,
+                            message: "Only numbers are allowed",
+                          },
+                        ]}
                       >
                         <Input
                           min={0}
@@ -684,12 +683,12 @@ export default function AddOrganisation() {
                       {...restField}
                       label="Father Name"
                       name={[name, "fatherName"]}
-                       rules={[
-    {
-      pattern: /^[A-Za-z\s]+$/,
-      message: "Only letters are allowed",
-    },
-  ]}
+                      rules={[
+                        {
+                          pattern: /^[A-Za-z\s]+$/,
+                          message: "Only letters are allowed",
+                        },
+                      ]}
                     >
                       <Input placeholder="Enter father name" />
                     </Form.Item>
@@ -699,12 +698,12 @@ export default function AddOrganisation() {
                       {...restField}
                       label="Spouse Name"
                       name={[name, "spouseName"]}
-                       rules={[
-    {
-      pattern: /^[A-Za-z\s]+$/,
-      message: "Only letters are allowed",
-    },
-  ]}
+                      rules={[
+                        {
+                          pattern: /^[A-Za-z\s]+$/,
+                          message: "Only letters are allowed",
+                        },
+                      ]}
                     >
                       <Input placeholder="Enter spouse name" />
                     </Form.Item>
@@ -714,10 +713,10 @@ export default function AddOrganisation() {
                       {...restField}
                       label="Number of Children"
                       name={[name, "childrenCount"]}
-                      rules={[ {
-        pattern: /^[0-9]*$/,
-        message: "Only numbers are allowed",
-      },]}
+                      rules={[{
+                        pattern: /^[0-9]*$/,
+                        message: "Only numbers are allowed",
+                      },]}
                     >
                       <Input
                         min={0}
@@ -765,12 +764,12 @@ export default function AddOrganisation() {
                       {...restField}
                       label="City"
                       name={[name, "currentAddress", "city"]}
-                       rules={[
-    {
-      pattern: /^[A-Za-z\s]+$/,
-      message: "Only letters are allowed",
-    },
-  ]}
+                      rules={[
+                        {
+                          pattern: /^[A-Za-z\s]+$/,
+                          message: "Only letters are allowed",
+                        },
+                      ]}
                     >
                       <Input placeholder="City" />
                     </Form.Item>
@@ -780,12 +779,12 @@ export default function AddOrganisation() {
                       {...restField}
                       label="State"
                       name={[name, "currentAddress", "state"]}
-                       rules={[
-    {
-      pattern: /^[A-Za-z\s]+$/,
-      message: "Only letters are allowed",
-    },
-  ]}
+                      rules={[
+                        {
+                          pattern: /^[A-Za-z\s]+$/,
+                          message: "Only letters are allowed",
+                        },
+                      ]}
                     >
                       <Input placeholder="State" />
                     </Form.Item>
@@ -795,12 +794,12 @@ export default function AddOrganisation() {
                       {...restField}
                       label="PIN"
                       name={[name, "currentAddress", "pin"]}
-                       rules={[
-    {
-      pattern: /^[0-9]*$/,
-      message: "Only numbers are allowed",
-    },
-  ]}
+                      rules={[
+                        {
+                          pattern: /^[0-9]*$/,
+                          message: "Only numbers are allowed",
+                        },
+                      ]}
                     >
                       <Input placeholder="PIN" maxLength={6} />
                     </Form.Item>
@@ -869,11 +868,12 @@ export default function AddOrganisation() {
                       {...restField}
                       label="City"
                       name={[name, "permanentAddress", "city"]}
-                        rules={[
-    {      pattern: /^[A-Za-z\s]+$/,
-      message: "Only letters are allowed",
-    },
-  ]}
+                      rules={[
+                        {
+                          pattern: /^[A-Za-z\s]+$/,
+                          message: "Only letters are allowed",
+                        },
+                      ]}
                     >
                       <Input placeholder="City" />
                     </Form.Item>
@@ -883,13 +883,13 @@ export default function AddOrganisation() {
                       {...restField}
                       label="State"
                       name={[name, "permanentAddress", "state"]}
-                   rules={[
-    {
-      pattern: /^[A-Za-z\s]+$/,
-      message: "Only letters are allowed",
-    },
-  ]}
-                   >
+                      rules={[
+                        {
+                          pattern: /^[A-Za-z\s]+$/,
+                          message: "Only letters are allowed",
+                        },
+                      ]}
+                    >
                       <Input placeholder="State" />
                     </Form.Item>
                   </Col>
@@ -898,12 +898,12 @@ export default function AddOrganisation() {
                       {...restField}
                       label="PIN"
                       name={[name, "permanentAddress", "pin"]}
-                       rules={[
-    {
-      pattern: /^[0-9]*$/,
-      message: "Only numbers are allowed",
-    },
-  ]}
+                      rules={[
+                        {
+                          pattern: /^[0-9]*$/,
+                          message: "Only numbers are allowed",
+                        },
+                      ]}
                     >
                       <Input placeholder="PIN" maxLength={6} />
                     </Form.Item>
@@ -945,11 +945,12 @@ export default function AddOrganisation() {
                         {...restField}
                         label={<span s>Aadhaar Number</span>}
                         name={[name, "adharNo"]}
-                          rules={[  
-    {      pattern: /^[0-9]{12}$/,
-      message: "Enter a valid 12-digit Aadhaar number",
-    },
-  ]}
+                        rules={[
+                          {
+                            pattern: /^[0-9]{12}$/,
+                            message: "Enter a valid 12-digit Aadhaar number",
+                          },
+                        ]}
                       >
                         <Input
                           placeholder="1234 5678 9012"
@@ -1072,11 +1073,12 @@ export default function AddOrganisation() {
                         {...restField}
                         label={<span>Account Number</span>}
                         name={[name, "accountNo"]}
-                          rules={[  
-    {     pattern: /^[0-9]*$/,
-      message: "Only numbers are allowed",
-    },
-  ]}
+                        rules={[
+                          {
+                            pattern: /^[0-9]*$/,
+                            message: "Only numbers are allowed",
+                          },
+                        ]}
                       >
                         <Input
                           placeholder="Enter account number"
@@ -1211,12 +1213,12 @@ export default function AddOrganisation() {
                             {...restField}
                             label={<span>City</span>}
                             name={[name, "companyDetails", "address", "city"]}
-                           rules={[
-    {
-      pattern: /^[A-Za-z\s]+$/,
-      message: "Only letters are allowed",
-    },
-  ]}
+                            rules={[
+                              {
+                                pattern: /^[A-Za-z\s]+$/,
+                                message: "Only letters are allowed",
+                              },
+                            ]}
                           >
                             <Input
                               placeholder="Enter city"
@@ -1230,12 +1232,12 @@ export default function AddOrganisation() {
                             {...restField}
                             label={<span>State</span>}
                             name={[name, "companyDetails", "address", "state"]}
-                           rules={[
-    {
-      pattern: /^[A-Za-z\s]+$/,
-      message: "Only letters are allowed",
-    },
-  ]}
+                            rules={[
+                              {
+                                pattern: /^[A-Za-z\s]+$/,
+                                message: "Only letters are allowed",
+                              },
+                            ]}
                           >
                             <Input
                               placeholder="Enter state"
@@ -1249,14 +1251,14 @@ export default function AddOrganisation() {
                             {...restField}
                             label={<span>PIN Code</span>}
                             name={[name, "companyDetails", "address", "pin"]}
-                         
-                         rules={[
-    {
-      pattern: /^[0-9]{6}$/,
-      message: "Enter a valid 6-digit PIN code",
-    },
-  ]}
-                            >
+
+                            rules={[
+                              {
+                                pattern: /^[0-9]{6}$/,
+                                message: "Enter a valid 6-digit PIN code",
+                              },
+                            ]}
+                          >
                             <Input
                               maxLength={6}
                               placeholder="123456"
@@ -1605,12 +1607,12 @@ export default function AddOrganisation() {
                                           {...cRestField}
                                           label="Contact Person"
                                           name={[cName, "person"]}
-                                           rules={[
-    {
-      pattern: /^[A-Za-z\s]+$/,
-      message: "Only letters are allowed",
-    },
-  ]}
+                                          rules={[
+                                            {
+                                              pattern: /^[A-Za-z\s]+$/,
+                                              message: "Only letters are allowed",
+                                            },
+                                          ]}
                                         >
                                           <Input
                                             placeholder="Contact person"
@@ -1623,13 +1625,13 @@ export default function AddOrganisation() {
                                           {...cRestField}
                                           label="Contact No"
                                           name={[cName, "number"]}
-                                            
-rules={[
-    {
-      pattern: /^[0-9]{10}$/,
-      message: "Enter a valid 10-digit phone number",
-    },
-  ]}
+
+                                          rules={[
+                                            {
+                                              pattern: /^[0-9]{10}$/,
+                                              message: "Enter a valid 10-digit phone number",
+                                            },
+                                          ]}
                                         >
                                           <Input
                                             placeholder="Contact no"
@@ -1642,7 +1644,7 @@ rules={[
                                           {...cRestField}
                                           label="Email"
                                           name={[cName, "email"]}
-                                         rules={[{ type: "email", message: "Invalid email" }]}
+                                          rules={[{ type: "email", message: "Invalid email" }]}
                                         >
                                           <Input
                                             placeholder="Email"
