@@ -1,5 +1,5 @@
 // Bank.jsx
-import React, { useState } from "react";
+import React, { useState,useEffect  } from "react";
 import {
   Table,
   Input,
@@ -22,32 +22,13 @@ import {
   FilterOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { createWms, getWms, updateWms } from "../../api/wms"; 
 
 const { Option } = Select;
 
 export default function Bank() {
-  const [data, setData] = useState([
-    {
-      key: 1,
-      transactionType: "Deposit",
-      bankName: "State Bank of India",
-      accountNo: "SBIN0001234",
-      date: "2025-08-01",
-      amount: 50000,
-      chequeRef: "CHQ001",
-      narration: "Customer refund",
-    },
-    {
-      key: 2,
-      transactionType: "Withdrawal",
-      bankName: "HDFC Bank",
-      accountNo: "HDFC0005678",
-      date: "2025-09-10",
-      amount: 120000,
-      chequeRef: "CHQ045",
-      narration: "Office rent",
-    },
-  ]);
+  const [data, setData] = useState([]);
+const [loading, setLoading] = useState(false);
 
   const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -59,7 +40,30 @@ export default function Bank() {
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
 
-  const txnTypes = ["Deposit", "Withdrawal", "OD"];
+  const txnTypes = ["Deposit", "WITHDRAWAL", "OD"];
+
+ const loadData = async () => {
+  try {
+    setLoading(true);
+    const res = await getWms();
+
+    const bankOnly = (res || []).filter(
+      (r) => r.asset_category === "BANK"
+    );
+
+    setData(bankOnly);
+  // eslint-disable-next-line no-unused-vars
+  } catch (e) {
+    message.error("Failed to load transactions");
+  } finally {
+    setLoading(false);
+  }
+};
+
+useEffect(() => {
+  loadData();
+}, []);
+
 
   const filteredData = data.filter((row) =>
     ["transactionType", "bankName", "accountNo", "chequeRef", "narration"].some(
@@ -74,25 +78,25 @@ export default function Bank() {
   const columns = [
     {
       title: <span className="text-amber-700 font-semibold">Txn Type</span>,
-      dataIndex: "transactionType",
+      dataIndex: "transaction_type",
       width: 120,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Date</span>,
-      dataIndex: "date",
+      dataIndex: "transaction_date",
       width: 120,
       render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Bank Name</span>,
-      dataIndex: "bankName",
+      dataIndex: "bank_name",
       width: 220,
       render: (b) => <span className="text-amber-800">{b}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Account No</span>,
-      dataIndex: "accountNo",
+      dataIndex: "bank_account_no",
       width: 160,
       render: (a) => <span className="text-amber-800">{a}</span>,
     },
@@ -104,7 +108,7 @@ export default function Bank() {
     },
     {
       title: <span className="text-amber-700 font-semibold">Cheque Ref</span>,
-      dataIndex: "chequeRef",
+      dataIndex: "cheque_ref",
       width: 140,
       render: (c) => <span className="text-amber-800">{c || "-"}</span>,
     },
@@ -132,14 +136,23 @@ export default function Bank() {
           />
           <EditOutlined
             className="cursor-pointer! text-red-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              editForm.setFieldsValue({
-                ...record,
-                date: record.date ? dayjs(record.date) : undefined,
-              });
-              setIsEditModalOpen(true);
-            }}
+           onClick={() => {
+    setSelectedRecord(record);
+
+    editForm.setFieldsValue({
+      transactionType: record.transaction_type,
+      date: record.transaction_date
+        ? dayjs(record.transaction_date)
+        : undefined,
+      bankName: record.bank_name,
+      accountNo: record.bank_account_no,
+      amount: record.amount,
+      chequeRef: record.cheque_ref,
+      narration: record.narration,
+    });
+
+    setIsEditModalOpen(true);
+  }}
           />
         </div>
       ),
@@ -296,7 +309,14 @@ export default function Bank() {
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">Bank Transactions Records </h2>
         <p className="text-amber-600 mb-3">Manage balances, deposits, and account transactions</p>
-        <Table columns={columns} dataSource={filteredData} pagination={{ pageSize: 10 }} scroll={{ y: 300 }} />
+<Table
+  rowKey="id"
+  columns={columns}
+  dataSource={filteredData}
+  loading={loading}
+  pagination={{ pageSize: 10 }}
+  scroll={{ y: 300 }}
+/>
       </div>
 
       {/* Add Modal */}
@@ -313,17 +333,33 @@ export default function Bank() {
         <Form
           form={addForm}
           layout="vertical"
-          onFinish={(values) => {
-            const payload = {
-              ...values,
-              key: data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1,
-              date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : undefined,
-            };
-            setData((prev) => [payload, ...prev]);
-            setIsAddModalOpen(false);
-            addForm.resetFields();
-            message.success("Transaction added.");
-          }}
+onFinish={async (values) => {
+  try {
+    const payload = {
+      asset_category: "BANK",
+      transaction_type: values.transactionType?.toUpperCase(), // Deposit → DEPOSIT
+      transaction_date: dayjs(values.date).format("YYYY-MM-DD"),
+      asset_name: values.bankName,
+      bank_name: values.bankName,
+      bank_account_no: values.accountNo,
+      amount: values.amount,
+      cheque_ref: values.chequeRef,
+      narration: values.narration,
+      remarks: values.narration || "Bank transaction",
+    };
+
+    await createWms(payload);
+
+    message.success("Transaction added.");
+    setIsAddModalOpen(false);
+    addForm.resetFields();
+    loadData();
+  // eslint-disable-next-line no-unused-vars
+  } catch (e) {
+    message.error("Failed to create transaction");
+  }
+}}
+
         >
           {renderFormFields(addForm, false)}
 
@@ -360,18 +396,35 @@ export default function Bank() {
         <Form
           form={editForm}
           layout="vertical"
-          onFinish={(values) => {
-            const payload = {
-              ...selectedRecord,
-              ...values,
-              date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : selectedRecord.date,
-            };
-            setData((prev) => prev.map((d) => (d.key === payload.key ? payload : d)));
-            setIsEditModalOpen(false);
-            editForm.resetFields();
-            setSelectedRecord(null);
-            message.success("Transaction updated.");
-          }}
+onFinish={async (values) => {
+  try {
+    const payload = {
+      asset_category: "BANK",
+      transaction_type: values.transactionType?.toUpperCase(),
+      transaction_date: dayjs(values.date).format("YYYY-MM-DD"),
+      asset_name: values.bankName,
+      bank_name: values.bankName,
+      bank_account_no: values.accountNo,
+      amount: values.amount,
+      cheque_ref: values.chequeRef,
+      narration: values.narration,
+      remarks: values.narration || "Bank transaction",
+    };
+
+    await updateWms(selectedRecord.id, payload);
+
+    message.success("Transaction updated.");
+    setIsEditModalOpen(false);
+    editForm.resetFields();
+    setSelectedRecord(null);
+    loadData();
+  // eslint-disable-next-line no-unused-vars
+  } catch (e) {
+    message.error("Failed to update transaction");
+  }
+}}
+
+
         >
           {renderFormFields(editForm, false)}
 

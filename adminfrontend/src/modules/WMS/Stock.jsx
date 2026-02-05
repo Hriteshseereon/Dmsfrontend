@@ -19,7 +19,7 @@ import {
   EditOutlined,
   FilterOutlined,
 } from "@ant-design/icons";
-import { createWmsStock,getWmsStocks,updateWmsStock } from "../../api/wms";
+import { createWms,getWms,updateWms } from "../../api/wms";
 
 
 export default function StockEtf() {
@@ -35,7 +35,7 @@ export default function StockEtf() {
   const [viewForm] = Form.useForm();
   const fetchStocks = async () => {
     try {
-      const stocks = await getWmsStocks();  
+      const stocks = await getWms();  
       // Transform stocks data if necessary
       setData(stocks);
       console.log("Fetched stocks:", stocks);
@@ -56,6 +56,8 @@ export default function StockEtf() {
     const calcs = computeAmounts(values);
 
     const payload = {
+       asset_category: "STOCK",
+       transaction_type: "PURCHASE",
       asset_name: values.asset_name,
       purchase_quantity: values.purchase_quantity,
       purchase_price: values.purchase_price,
@@ -72,7 +74,7 @@ export default function StockEtf() {
       remarks: values.remarks || "",
     };
 
-    await createWmsStock(payload);
+    await createWms(payload);
 
     message.success({ content: "Stock added successfully", key: "stockAdd" });
 
@@ -111,7 +113,7 @@ const handleUpdateStock = async (values) => {
     };
 
     // IMPORTANT: use backend ID
-    await updateWmsStock(selectedRecord.id, payload);
+    await updateWms(selectedRecord.id, payload);
 
     message.success({ content: "Stock updated successfully", key: "stockUpdate" });
 
@@ -157,11 +159,24 @@ const handleUpdateStock = async (values) => {
 };
 
 
-  const filteredData = data.filter((row) =>
-    ["asset_name", "remarks"]
-      .some((f) => (row[f] || "").toString().toLowerCase()
-        .includes(searchText.trim().toLowerCase()))
+  // const filteredData = data.filter((row) =>
+  //   ["asset_name", "remarks"]
+  //     .some((f) => (row[f] || "").toString().toLowerCase()
+  //       .includes(searchText.trim().toLowerCase()))
+  // );
+
+
+  const filteredData = data
+  .filter((row) => row.asset_category === "STOCK")
+  .filter((row) =>
+    ["asset_name", "remarks"].some((f) =>
+      (row[f] || "")
+        .toString()
+        .toLowerCase()
+        .includes(searchText.trim().toLowerCase())
+    )
   );
+
 
   const columns = [
     {

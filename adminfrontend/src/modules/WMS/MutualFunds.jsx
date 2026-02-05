@@ -22,6 +22,9 @@ import {
   FilterOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { createWms, getWms, updateWms } from "../../api/wms"; 
+import { useEffect } from "react";
+
 
 const { Option } = Select;
 const MF_OPTIONS = [
@@ -34,25 +37,8 @@ const MF_OPTIONS = [
 ];
 
 export default function MutualFunds() {
-  const [data, setData] = useState([
-    {
-      key: 1,
-      transactionType: "Purchase",
-      date: "2025-07-15",
-      mfName: "HDFC Top 100",
-      folioNo: "FOLIO-1001",
-      type: "Equity",
-      lockInDate: "2026-07-15",
-      agentName: "Agent A",
-      agentAddress: "123, MG Road, City",
-      quantity: 100,
-      nav: 250.5,
-      netAmount: 25050, // qty * nav
-      stampCharges: 5,
-      grossAmount: 25055, // net + stamp
-      remarks: "SIP lump-sum",
-    },
-  ]);
+ const [data, setData] = useState([]);
+
 
   const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -63,6 +49,34 @@ export default function MutualFunds() {
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
+
+
+  useEffect(() => {
+  fetchMutualFunds();
+}, []);
+
+const fetchMutualFunds = async () => {
+  try {
+    const res = await getWms();
+
+    const list = res.results ?? res;
+
+    const mfOnly = list.filter(
+      (item) => item.asset_category === "MUTUAL_FUND"
+    );
+
+    setData(
+      mfOnly.map((item) => ({
+        ...item,
+        key: item.id,
+      }))
+    );
+  // eslint-disable-next-line no-unused-vars
+  } catch (err) {
+    message.error("Failed to load mutual fund transactions");
+  }
+};
+
 
   const filteredData = data.filter((row) =>
     ["transactionType", "mfName", "folioNo", "agentName", "remarks"].some((f) =>
@@ -85,31 +99,31 @@ export default function MutualFunds() {
   const columns = [
     {
       title: <span className="text-amber-700 font-semibold">Txn Type</span>,
-      dataIndex: "transactionType",
+      dataIndex: "transaction_type",
       width: 120,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Date</span>,
-      dataIndex: "date",
+      dataIndex: "transaction_date",
       width: 110,
       render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">MF Name</span>,
-      dataIndex: "mfName",
+      dataIndex: "asset_name",
       width: 220,
       render: (m) => <span className="text-amber-800">{m}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Folio No</span>,
-      dataIndex: "folioNo",
+      dataIndex: "folio_no",
       width: 140,
       render: (f) => <span className="text-amber-800">{f}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Type</span>,
-      dataIndex: "type",
+      dataIndex: "mf_type",
       width: 100,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
@@ -127,13 +141,13 @@ export default function MutualFunds() {
     },
     {
       title: <span className="text-amber-700 font-semibold">Net Amount (₹)</span>,
-      dataIndex: "netAmount",
+      dataIndex: "net_amount",
       width: 140,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Gross Amount (₹)</span>,
-      dataIndex: "grossAmount",
+      dataIndex: "gross_amount",
       width: 150,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
     },
@@ -157,14 +171,32 @@ export default function MutualFunds() {
           <EditOutlined
             className="cursor-pointer! text-red-500!"
             onClick={() => {
-              setSelectedRecord(record);
-              editForm.setFieldsValue({
-                ...record,
-                date: record.date ? dayjs(record.date) : undefined,
-                lockInDate: record.lockInDate ? dayjs(record.lockInDate) : undefined,
-              });
-              setIsEditModalOpen(true);
-            }}
+  setSelectedRecord(record);
+
+  editForm.setFieldsValue({
+    transactionType: record.transaction_type,
+    date: record.transaction_date ? dayjs(record.transaction_date) : null,
+    mfName: record.asset_name,
+    folioNo: record.folio_no,
+    type: record.mf_type,
+    lockInDate: record.lock_in_date
+      ? dayjs(record.lock_in_date)
+      : null,
+
+    agentName: record.agent_name,
+    agentAddress: record.agent_address,
+
+    quantity: record.quantity,
+    nav: record.nav,
+    netAmount: record.net_amount,
+    stampCharges: record.stamp_charges,
+    grossAmount: record.gross_amount,
+    remarks: record.remarks,
+  });
+
+  setIsEditModalOpen(true);
+}}
+
           />
         </div>
       ),
@@ -235,7 +267,7 @@ export default function MutualFunds() {
             <Select disabled={disabled} placeholder="Purchase / Redemption">
               <Option value="Purchase">Purchase</Option>
               <Option value="Redemption">Redemption</Option>
-              <Option value="Switch">Switch</Option>
+              <Option value="Switch">SWITCH</Option>
             </Select>
           </Form.Item>
         </Col>
@@ -429,20 +461,59 @@ export default function MutualFunds() {
         <Form
           form={addForm}
           layout="vertical"
-          onFinish={(values) => {
-            const calcs = computeAmounts(values);
-            const payload = {
-              ...values,
-              ...calcs,
-              key: data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1,
-              date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : undefined,
-              lockInDate: values.lockInDate ? dayjs(values.lockInDate).format("YYYY-MM-DD") : undefined,
-            };
-            setData((prev) => [payload, ...prev]);
-            setIsAddModalOpen(false);
-            addForm.resetFields();
-            message.success("Transaction added.");
-          }}
+         onFinish={async (values) => {
+  try {
+    const calcs = computeAmounts(values);
+
+   const payload = {
+  asset_category: "MUTUAL_FUND",
+
+  transaction_type: values.transactionType?.toUpperCase(),
+
+  transaction_date: values.date
+    ? dayjs(values.date).format("YYYY-MM-DD")
+    : null,
+
+  asset_name: values.mfName,
+
+  folio_no: values.folioNo,
+
+  mf_type: values.type,
+
+  quantity: values.quantity,
+
+  nav: values.nav,
+
+  net_amount: calcs.netAmount,
+
+  gross_amount: calcs.grossAmount,
+
+  stamp_charges: values.stampCharges,
+
+  agent_name: values.agentName,
+
+  agent_address: values.agentAddress,
+
+  remarks: values.remarks,
+};
+
+
+    const created = await createWms(payload);
+
+    setData((prev) => [
+      { ...created, key: created.id },
+      ...prev,
+    ]);
+
+    setIsAddModalOpen(false);
+    addForm.resetFields();
+    message.success("Transaction added.");
+  // eslint-disable-next-line no-unused-vars
+  } catch (e) {
+    message.error("Failed to add transaction");
+  }
+}}
+
           onValuesChange={(changed, allValues) => {
             const calcs = computeAmounts(allValues);
             addForm.setFieldsValue(calcs);
@@ -483,25 +554,63 @@ export default function MutualFunds() {
         <Form
           form={editForm}
           layout="vertical"
-          onFinish={(values) => {
-            const calcs = computeAmounts(values);
-            const payload = {
-              ...selectedRecord,
-              ...values,
-              ...calcs,
-              date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : selectedRecord.date,
-              lockInDate: values.lockInDate ? dayjs(values.lockInDate).format("YYYY-MM-DD") : selectedRecord.lockInDate,
-            };
-            setData((prev) => prev.map((d) => (d.key === payload.key ? payload : d)));
-            setIsEditModalOpen(false);
-            editForm.resetFields();
-            setSelectedRecord(null);
-            message.success("Transaction updated.");
-          }}
-          onValuesChange={(changed, allValues) => {
-            const calcs = computeAmounts(allValues);
-            editForm.setFieldsValue(calcs);
-          }}
+         onFinish={async (values) => {
+  try {
+    const calcs = computeAmounts(values);
+
+   const payload = {
+  asset_category: "MUTUAL_FUND",
+
+  transaction_type: values.transactionType?.toUpperCase(),
+
+  transaction_date: values.date
+    ? dayjs(values.date).format("YYYY-MM-DD")
+    : null,
+
+  asset_name: values.mfName,
+
+  folio_no: values.folioNo,
+
+  mf_type: values.type,
+
+  quantity: values.quantity,
+
+  nav: values.nav,
+
+  net_amount: calcs.netAmount,
+
+  stamp_charges: values.stampCharges,
+
+  gross_amount: calcs.grossAmount,
+
+  agent_name: values.agentName,
+
+  agent_address: values.agentAddress,
+
+  remarks: values.remarks,
+};
+
+    const updated = await updateWms(selectedRecord.id, payload);
+
+    setData((prev) =>
+      prev.map((row) =>
+        row.id === updated.id
+          ? { ...updated, key: updated.id }
+          : row
+      )
+    );
+
+    setIsEditModalOpen(false);
+    editForm.resetFields();
+    setSelectedRecord(null);
+
+    message.success("Transaction updated.");
+  // eslint-disable-next-line no-unused-vars
+  } catch (e) {
+    message.error("Failed to update transaction");
+  }
+}}
+
         >
           {renderFormFields(editForm, false)}
 
