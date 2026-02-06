@@ -12,6 +12,7 @@ import {
   Space,
   Divider,
   InputNumber,
+  message,
 } from "antd";
 import {
   SearchOutlined,
@@ -23,6 +24,8 @@ import {
   MinusCircleOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { getContracts, createContract, getVendors, getProductsByVendor } from "../api/contract";
+import useSessionStore from "../store/sessionStore";
 
 // --- Mock Data/JSON Extended ---
 const contractJSON = {
@@ -200,6 +203,7 @@ const calculateItemAmount = (itemData) => {
 
 
 export default function Contract() {
+  const { user, currentOrgId } = useSessionStore();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -207,9 +211,40 @@ export default function Contract() {
   const [data, setData] = useState(contractJSON.initialData);
   const [searchText, setSearchText] = useState("");
   const [totalAmount, setTotalAmount] = useState(0); // This is the GRAND TOTAL
+  const [loading, setLoading] = useState(false);
+  const [vendors, setVendors] = useState([]);
+  const [vendorProducts, setVendorProducts] = useState({}); // { vendorId: [products] }
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
+
+  const fetchInitialData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [contractsRes, vendorsRes] = await Promise.all([
+        getContracts(),
+        getVendors()
+      ]);
+
+      if (Array.isArray(contractsRes)) {
+        setData(contractsRes);
+      } else if (contractsRes?.results) {
+        setData(contractsRes.results);
+      }
+
+      const vendorList = vendorsRes?.results || vendorsRes || [];
+      setVendors(vendorList);
+    } catch (error) {
+      console.error("Error fetching initial data:", error);
+      message.error("Failed to load initial data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchInitialData();
+  }, [fetchInitialData]);
 
   // 🌟 Main logic to update the Grand Total
   const updateTotalAmount = useCallback((formInstance) => {
@@ -262,7 +297,7 @@ export default function Contract() {
       title: <span className="text-amber-700 font-semibold">Contract No</span>,
       dataIndex: "key",
       width: 100,
-      render: (text) => <span className="text-amber-800 ">{text}</span>,
+      render: (text, record) => <span className="text-amber-800 ">{text || record.id || "N/A"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Vendor</span>,
@@ -404,27 +439,30 @@ export default function Contract() {
 
 
   // Logic to handle item selection change for auto-fill (Rate and Item Code)
-  const handleItemSelect = (form, companyName, itemName, rowIndex) => {
-    const itemData = itemDetailsByCompany[companyName]?.[itemName];
+  const handleItemSelect = (form, vendorId, productId, rowIndex) => {
+    const products = vendorProducts[vendorId] || [];
+    const product = products.find(p => p.id === productId);
 
-    if (!itemData) return;
+    if (!product) return;
 
     // Get current list
     const items = form.getFieldValue('items') || [];
 
     // Base rate is the rate in the smallest/base UOM (Ltrs/Kg)
-    const baseUom = itemData.uom;
-    const baseRate = itemData.rate;
+    const baseUom = product.uom?.name || "Ltrs";
+    const baseRate = product.mrp || 0;
 
     // Update only selected row
     items[rowIndex] = {
       ...items[rowIndex],
-      item: itemName,
-      itemCode: itemData.itemCode,
+      item: product.product_name,
+      product_id: product.id,
+      itemCode: product.product_code || product.id,
       uom: baseUom, // Reset to base UOM initially
       baseRate: baseRate,
       rate: baseRate, // Initial rate is the base rate
       qty: items[rowIndex].qty || 0,
+      uom_id: product.uom?.id || null,
     };
 
     // Push updated list back to form
@@ -433,13 +471,19 @@ export default function Contract() {
     updateItemCalculations(form, rowIndex);
   };
 
-  const handleCompanyChange = (form, companyName, fieldName, isEdit) => {
+  const handleCompanyChange = async (form, vendorId, fieldName) => {
+    const vendor = vendors.find(v => v.id === vendorId);
+    if (!vendor) return;
 
-    const newLocation = companyLocationMap[companyName];
-
-    // If first row → update location
-    if (fieldName === 0 && newLocation) {
-      form.setFieldsValue({ location: newLocation });
+    // Fetch products for this vendor if not already fetched
+    if (!vendorProducts[vendorId]) {
+      try {
+        const products = await getProductsByVendor(vendorId);
+        setVendorProducts(prev => ({ ...prev, [vendorId]: products }));
+      } catch (error) {
+        console.error("Error fetching products:", error);
+        message.error("Failed to load products for selected vendor");
+      }
     }
 
     // Reset item details when company changes
@@ -448,7 +492,10 @@ export default function Contract() {
       index === fieldName
         ? {
           ...item,
+          companyName: vendor.name,
+          vendor_id: vendor.id,
           item: undefined,
+          product_id: undefined,
           itemCode: undefined,
           rate: undefined,
           baseRate: undefined, // Clear base rate
@@ -466,7 +513,7 @@ export default function Contract() {
   };
 
 
-  const handleFormSubmit = (values, isEdit) => {
+  const handleFormSubmit = async (values, isEdit) => {
     const formInstance = isEdit ? editForm : addForm;
     const finalValues = values || formInstance.getFieldsValue();
     const items = finalValues.items && finalValues.items.length > 0 ? finalValues.items : [];
@@ -479,38 +526,70 @@ export default function Contract() {
     // Determine the next contract number
     const newContractNo = `C-${String(data.length + 1).padStart(4, '0')}`;
 
-    const payload = {
-      // Use existing key or generated one
-      key: isEdit ? selectedRecord.key : newContractNo,
-      ...finalValues,
-      items,
-      totalQty: totals.totalQty,
-      uom: totals.uom,
-      status: finalValues.status || "Pending",
-      contractDate: finalValues.contractDate
-        ? finalValues.contractDate.format("YYYY-MM-DD")
-        : undefined,
-      startDate: finalValues.startDate ? finalValues.startDate.format("YYYY-MM-DD") : undefined,
-      endDate: finalValues.endDate ? finalValues.endDate.format("YYYY-MM-DD") : undefined,
-      deliveryDate: finalValues.deliveryDate
-        ? finalValues.deliveryDate.format("YYYY-MM-DD")
-        : undefined,
-      totalAmount: grandTotal, // Use the calculated Grand Total
+    const apiPayload = {
+      from_date: finalValues.startDate ? finalValues.startDate.format("YYYY-MM-DD") : undefined,
+      to_date: finalValues.endDate ? finalValues.endDate.format("YYYY-MM-DD") : undefined,
+      location: finalValues.location || null,
+      customer_mobile: finalValues.customer_mobile,
+      customer_email: finalValues.customer_email,
+      cgst: finalValues.cgst || 0,
+      sgst: finalValues.sgst || 0,
+      igst: finalValues.igst || 0,
+      tcs_amount: finalValues.tcs_amount || 0,
+      cash_discount: finalValues.cash_discount || 0,
+      round_off_amount: finalValues.round_off_amount || 0,
+      narration: finalValues.narration || "Customer contract",
+      items: items.map(item => ({
+        vendor_id: item.vendor_id || "903ddfd1-3581-4495-a377-1e2cdd4fa605",
+        product_id: item.product_id || "d0af8e09-3eda-4fed-9d8c-a5e42549bf2f",
+        uom_id: item.uom_id || null,
+        net_qty: item.qty,
+        gross_qty: item.qty,
+        free_qty: item.freeQty || 0,
+        mrp: item.rate,
+        discount_percent: item.discount_percent || 0,
+        discount_amount: item.discount_amount || 0,
+        line_total: item.totalAmount
+      }))
     };
 
-    if (isEdit) {
-      setData((prev) =>
-        prev.map((item) =>
-          item.key === selectedRecord.key ? { ...item, ...payload } : item
-        )
-      );
-    } else {
-      setData((prev) => [...prev, payload]);
-    }
+    try {
+      if (isEdit) {
+        // Implement update API call if available
+        setData((prev) =>
+          prev.map((item) =>
+            item.key === selectedRecord.key ? { ...item, ...finalValues, totalAmount: grandTotal, status: finalValues.status || "Pending" } : item
+          )
+        );
+        message.success("Contract updated successfully locally");
+      } else {
+        await createContract(apiPayload);
+        message.success("Contract created successfully");
+        fetchContracts();
+      }
 
-    setIsAddModalOpen(false);
-    setIsEditModalOpen(false);
-    setSelectedRecord(null);
+      setIsAddModalOpen(false);
+      setIsEditModalOpen(false);
+      setSelectedRecord(null);
+    } catch (error) {
+      console.error("Error submitting contract:", error);
+      const errorData = error.response?.data;
+      let errorMessage = "Failed to submit contract";
+
+      if (errorData) {
+        if (Array.isArray(errorData)) {
+          errorMessage = errorData[0];
+        } else if (typeof errorData === "object") {
+          errorMessage = errorData.message || errorData.error || errorData.detail || JSON.stringify(errorData);
+        } else if (typeof errorData === "string") {
+          errorMessage = errorData;
+        }
+      } else {
+        errorMessage = error.message || errorMessage;
+      }
+
+      message.error(errorMessage);
+    }
   };
 
   const renderBasicFields = (formInstance, disabled = false) => (
@@ -600,6 +679,29 @@ export default function Contract() {
             </Select>
           </Form.Item>
         </Col>
+
+        <Col span={8}>
+          <Form.Item
+            label="Customer Mobile"
+            name="customer_mobile"
+            rules={[{ required: true, message: "Please enter customer mobile" }]}
+          >
+            <Input placeholder="9999999999" disabled={disabled} />
+          </Form.Item>
+        </Col>
+
+        <Col span={8}>
+          <Form.Item
+            label="Customer Email"
+            name="customer_email"
+            rules={[
+              { required: true, message: "Please enter customer email" },
+              { type: 'email', message: 'Please enter a valid email' }
+            ]}
+          >
+            <Input placeholder="customer@test.com" disabled={disabled} />
+          </Form.Item>
+        </Col>
       </Row>
     </div>
 
@@ -633,19 +735,19 @@ export default function Contract() {
           <label>Vendor</label>
           <Form.Item
             {...field}
-            name={[field.name, "companyName"]}
-            fieldKey={[field.fieldKey, "companyName"]}
+            name={[field.name, "vendor_id"]}
+            fieldKey={[field.fieldKey, "vendor_id"]}
             rules={[{ required: true, message: "Select vendor" }]}
           >
             <Select
               placeholder="Select Vendor"
               disabled={disabled}
-              onChange={(companyName) =>
-                handleCompanyChange(formInstance, companyName, field.name, isEditModalOpen)
+              onChange={(vendorId) =>
+                handleCompanyChange(formInstance, vendorId, field.name)
               }
             >
-              {contractJSON.companyOptions.map((c) => (
-                <Select.Option key={c} value={c}>{c}</Select.Option>
+              {(vendors || []).map((v) => (
+                <Select.Option key={v.id} value={v.id}>{v.name}</Select.Option>
               ))}
             </Select>
           </Form.Item>
@@ -656,25 +758,24 @@ export default function Contract() {
           <label>Item Name</label>
           <Form.Item
             {...field}
-            name={[field.name, "item"]}
-            fieldKey={[field.fieldKey, "item"]}
+            name={[field.name, "product_id"]}
+            fieldKey={[field.fieldKey, "product_id"]}
             rules={[{ required: true, message: "Select item" }]}
           >
             <Select
               placeholder="Select Item"
-              disabled={disabled || !selectedCompany}
+              disabled={disabled || !currentItem?.vendor_id}
               onChange={(value) =>
                 handleItemSelect(
                   formInstance,
-                  selectedCompany,
+                  currentItem?.vendor_id,
                   value,
-                  field.name,
-                  field.fieldKey
+                  field.name
                 )
               }
             >
-              {itemOptions.map((it) => (
-                <Select.Option key={it} value={it}>{it}</Select.Option>
+              {(vendorProducts[currentItem?.vendor_id] || []).map((p) => (
+                <Select.Option key={p.id} value={p.id}>{p.product_name}</Select.Option>
               ))}
             </Select>
           </Form.Item>
@@ -725,7 +826,7 @@ export default function Contract() {
 
           >
             <InputNumber
-             
+
               placeholder="Qty"
               disabled={disabled || !selectedItemName}
               onChange={() => updateItemCalculations(formInstance, field.name)}
@@ -770,7 +871,7 @@ export default function Contract() {
             <MinusCircleOutlined className="text-red-500!"
               onClick={() => {
                 remove(field.name);
-                setTimeout(() => updateTotalAmount(formInstance), 0); 
+                setTimeout(() => updateTotalAmount(formInstance), 0);
               }}
             />
           )}
@@ -1040,6 +1141,8 @@ export default function Contract() {
                 // Set initial item with empty company/item/code/rate
                 items: [{ companyName: undefined, item: undefined, itemCode: undefined, qty: undefined, uom: "Ltrs", rate: 0, baseRate: 0, totalAmount: 0 }],
                 location: undefined, // Reset location
+                customer_email: user?.email || user?.email_address,
+                customer_mobile: user?.mobile || user?.phone || user?.mobile_number || user?.phone_number,
               });
               setSelectedRecord(null);
               setIsAddModalOpen(true);
@@ -1051,7 +1154,7 @@ export default function Contract() {
       </div>
 
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
-        <Table columns={columns} dataSource={filteredData} pagination={10} scroll={{ y: 150 }} rowKey="key" />
+        <Table columns={columns} dataSource={filteredData} pagination={10} scroll={{ y: 250 }} rowKey="id" loading={loading} />
       </div>
 
       {/* Add Modal */}
@@ -1075,6 +1178,8 @@ export default function Contract() {
             endDate: dayjs().add(7, "day"),
             status: "Pending",
             items: [{ companyName: undefined, item: undefined, itemCode: undefined, qty: 0, uom: "Ltrs", rate: 0, baseRate: 0, totalAmount: 0 }],
+            customer_email: user?.email || user?.email_address,
+            customer_mobile: user?.mobile || user?.phone || user?.mobile_number || user?.phone_number,
           }}
         >
           {renderBasicFields(addForm, false)}

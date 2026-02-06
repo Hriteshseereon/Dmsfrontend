@@ -1,6 +1,6 @@
 // forms/CustomerForm.jsx
 import React from "react";
-import { Row, Col, Form, Input, Select, Card } from "antd";
+import { Row, Col, Form, Input, Select, Card, Button, Upload } from "antd";
 
 const { Option } = Select;
 const inputClass = "border-amber-400 h-8";
@@ -20,7 +20,9 @@ export default function CustomerForm({ disabled = false }) {
             <Form.Item
               label="Customer Name"
               name="name"
-              rules={[{ required: true }]}
+              rules={[
+                { required: true, message: "Please enter customer name" },
+              ]}
             >
               <Input
                 className={inputClass}
@@ -41,7 +43,16 @@ export default function CustomerForm({ disabled = false }) {
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Phone Number" name="phoneNo">
+            <Form.Item
+              label="Phone Number"
+              name="phoneNo"
+              rules={[
+                {
+                  pattern: /^[0-9]\d{9,10}$/,
+                  message: "Enter a valid phone number",
+                },
+              ]}
+            >
               <Input
                 className={inputClass}
                 disabled={disabled}
@@ -51,17 +62,35 @@ export default function CustomerForm({ disabled = false }) {
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Mobile Number" name="mobileNo">
+            <Form.Item
+              label="Mobile Number"
+              name="mobileNo"
+              rules={[
+                { required: true, message: "Please enter mobile number" },
+                {
+                  pattern: /^[6-9]\d{9}$/,
+                  message: "Enter a valid 10-digit mobile number",
+                },
+              ]}
+            >
               <Input
                 className={inputClass}
                 disabled={disabled}
                 placeholder="Enter mobile number"
+                maxLength={10}
               />
             </Form.Item>
           </Col>
 
           <Col span={6}>
-            <Form.Item label="Email Address" name="email">
+            <Form.Item
+              label="Email Address"
+              name="email"
+              rules={[
+                { required: true, message: "Please enter email" },
+                { type: "email", message: "Please enter valid email" },
+              ]}
+            >
               <Input
                 className={inputClass}
                 disabled={disabled}
@@ -71,7 +100,11 @@ export default function CustomerForm({ disabled = false }) {
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Customer Type" name="type">
+            <Form.Item
+              label="Customer Type"
+              name="type"
+              rules={[{ required: true, message: "Please select type" }]}
+            >
               <Select
                 className={selectClass}
                 disabled={disabled}
@@ -85,7 +118,11 @@ export default function CustomerForm({ disabled = false }) {
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Status" name="status">
+            <Form.Item
+              label="Status"
+              name="status"
+              rules={[{ required: true, message: "Please select status" }]}
+            >
               <Select
                 className={selectClass}
                 disabled={disabled}
@@ -167,11 +204,19 @@ export default function CustomerForm({ disabled = false }) {
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Pin Code" name="pinCode">
+            <Form.Item
+              label="Pin Code"
+              name="pinCode"
+              rules={[
+                { required: true, message: "Please enter pin code" },
+                { pattern: /^\d{6}$/, message: "PIN code must be 6 digits" },
+              ]}
+            >
               <Input
                 className={inputClass}
                 disabled={disabled}
                 placeholder="Enter pin code"
+                maxLength={6}
               />
             </Form.Item>
           </Col>
@@ -289,7 +334,16 @@ export default function CustomerForm({ disabled = false }) {
 
         <Row gutter={24}>
           <Col span={4}>
-            <Form.Item label="GST Number" name="gstNo">
+            <Form.Item
+              label="GST Number"
+              name="gstNo"
+              rules={[
+                {
+                  pattern: /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
+                  message: "Enter a valid GST number",
+                },
+              ]}
+            >
               <Input
                 className={inputClass}
                 disabled={disabled}
@@ -299,8 +353,16 @@ export default function CustomerForm({ disabled = false }) {
           </Col>
 
           <Col span={4}>
-            <Form.Item label="GST Document" name="gstDoc">
-              <Input type="file" disabled={disabled} />
+            <Form.Item
+              label="GST Document"
+              name="gstDoc"
+              getValueFromEvent={(e) => (Array.isArray(e) ? e : e?.fileList)}
+            >
+              <Upload beforeUpload={() => false} maxCount={1}>
+                <Button className="w-full text-left bg-white border-amber-400">
+                  Select GST Doc
+                </Button>
+              </Upload>
             </Form.Item>
           </Col>
 
@@ -315,7 +377,16 @@ export default function CustomerForm({ disabled = false }) {
           </Col>
 
           <Col span={4}>
-            <Form.Item label="PAN Number" name="panNo">
+            <Form.Item
+              label="PAN Number"
+              name="panNo"
+              rules={[
+                {
+                  pattern: /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/,
+                  message: "Enter a valid PAN number",
+                },
+              ]}
+            >
               <Input
                 className={inputClass}
                 disabled={disabled}
@@ -325,8 +396,16 @@ export default function CustomerForm({ disabled = false }) {
           </Col>
 
           <Col span={4}>
-            <Form.Item label="PAN Document" name="panDoc">
-              <Input type="file" disabled={disabled} />
+            <Form.Item
+              label="PAN Document"
+              name="panDoc"
+              getValueFromEvent={(e) => (Array.isArray(e) ? e : e?.fileList)}
+            >
+              <Upload beforeUpload={() => false} maxCount={1}>
+                <Button className="w-full text-left bg-white border-amber-400">
+                  Select PAN Doc
+                </Button>
+              </Upload>
             </Form.Item>
           </Col>
 
@@ -341,8 +420,16 @@ export default function CustomerForm({ disabled = false }) {
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Aadhar Document" name="aadharDoc">
-              <Input type="file" disabled={disabled} />
+            <Form.Item
+              label="Aadhar Document"
+              name="aadharDoc"
+              getValueFromEvent={(e) => (Array.isArray(e) ? e : e?.fileList)}
+            >
+              <Upload beforeUpload={() => false} maxCount={1}>
+                <Button className="w-full text-left bg-white border-amber-400">
+                  Select Aadhar Doc
+                </Button>
+              </Upload>
             </Form.Item>
           </Col>
 

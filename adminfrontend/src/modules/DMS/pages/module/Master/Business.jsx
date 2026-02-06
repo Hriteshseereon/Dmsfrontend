@@ -11,6 +11,7 @@ import {
   Col,
   Card,
   DatePicker,
+  message,
 } from "antd";
 import {
   SearchOutlined,
@@ -29,10 +30,9 @@ import BrokerForm from "./BrokerForm";
 import InventoryForm from "./InventoryForm";
 import {
   getVendors,
-  addcustomer,
-  getCustomers,
   addvendor,
 } from "../../../../../api/bussinesspatnr";
+import { addAdminCustomer, getAdminCustomers } from "../../../../../api/customer";
 const { Option } = Select;
 
 // helper to parse date strings into dayjs objects
@@ -136,9 +136,9 @@ export default function Business() {
   // fetch customers function
   const fetchCustomers = async () => {
     try {
-      const res = await getCustomers();
+      const res = await getAdminCustomers();
 
-      // API may return array OR { results: [] }
+      // API returns an array directly based on the provided sample
       const list = Array.isArray(res) ? res : res?.results || [];
 
       const mappedCustomers = list.map((c, index) => ({
@@ -147,18 +147,20 @@ export default function Business() {
         partnerType: "Customer",
 
         // table columns
-        name: c.name,
-        email: c.email_id,
-        phoneNo: c.phone_number,
-        status: "Active", // backend does not send status yet
+        name: c.customer_name,
+        email: c.email_address || "N/A",
+        phoneNo: c.phone_number || "N/A",
+        status: c.status || "Active",
 
         // optional (for view/edit later)
-        address: `${c.address_line1 || ""} ${c.address_line2 || ""}`,
-        city: c.city,
-        state: c.state,
-        pinCode: c.pin,
+        address: c.address || "",
+        city: c.city || "",
+        state: c.state || "",
+        pinCode: c.pin_code || "",
         billingType: c.billing_type,
         customerCode: c.customer_code,
+        businessName: c.business_name,
+        contactPerson: c.contact_person,
       }));
 
       setData(mappedCustomers);
@@ -239,10 +241,12 @@ export default function Business() {
           email_address: values.email,
           customer_type: values.type,
           status: values.status,
+          contact_person: values.contactPerson,
 
           address: values.address,
           country: values.country,
           state: values.state,
+          district: values.district,
           city: values.city,
           pin_code: values.pinCode,
           location: values.location,
@@ -250,35 +254,29 @@ export default function Business() {
           credit_facility: values.creditFacility,
           security_for_credit: values.securityForCreditFacility,
           advance_cheque_no: values.advCheque,
-          amount_limit: Number(values.amountLimit),
-          days_limit: Number(values.noDaysLimit),
-          invoice_limit: Number(values.noInvoiceLimit),
-          souda_limit_ton: Number(values.soudaLimit),
+          amount_limit: Number(values.amountLimit) || 0,
+          days_limit: Number(values.noDaysLimit) || 0,
+          invoice_limit: Number(values.noInvoiceLimit) || 0,
+          souda_limit_ton: Number(values.soudaLimit) || 0,
 
           gst_number: values.gstNo,
+          gst_document: values.gstDoc?.[0]?.originFileObj,
           tin_number: values.tinNo,
           pan_number: values.panNo,
+          pan_document: values.panDoc?.[0]?.originFileObj,
           aadhaar_number: values.aadharNo,
+          aadhaar_document: values.aadharDoc?.[0]?.originFileObj,
           fssai_number: values.fssaiNo,
           license_number: values.licenseNo,
 
-          tds_applicable: values.tdsApplicable === "Yes",
-          billing_type: values.billingType?.toUpperCase(),
+          tds_applicable: values.tdsApplicable === "Yes" ? 1 : 0,
+          billing_type: values.billingType,
         };
 
-        const res = await addcustomer(payload);
-
-        setCustomers((prev) => [
-          ...prev,
-          {
-            key: res?.id || prev.length + 1,
-            partnerType: "Customer",
-            name: payload.customer_name,
-            email: payload.email_address,
-            phoneNo: payload.phone_number,
-            status: payload.status,
-          },
-        ]);
+        console.log("Submitting Customer Payload:", payload);
+        const res = await addAdminCustomer(payload);
+        message.success("Customer added successfully!");
+        fetchCustomers(); // Refresh the list
       }
 
       /* ================= VENDOR ================= */
@@ -352,6 +350,7 @@ export default function Business() {
       form.resetFields();
     } catch (error) {
       console.error("Save Error:", error);
+      message.error(error.response?.data?.detail || "Failed to save partner");
     }
   };
 

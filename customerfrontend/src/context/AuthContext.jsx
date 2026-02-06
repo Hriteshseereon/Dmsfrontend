@@ -24,11 +24,13 @@ export const AuthProvider = ({ children }) => {
       const userData = response.user || { email: response.email || email, ...response };
       const accessToken = response.access || response.token || response.accessToken;
       const refreshToken = response.refresh || response.refreshToken;
+      const orgId = response.organisation_id || response.org_id || response.currentOrgId;
 
       setSession({
         accessToken: accessToken,
         refreshToken: refreshToken,
         user: userData,
+        currentOrgId: orgId,
       });
 
       setCurrentUser(userData);
