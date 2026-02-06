@@ -164,13 +164,13 @@ const handleApprove = (id) => {
       ),
     },
     {
-      title: <span className="text-amber-600 font-bold">View</span>,
+      title: <span className="text-amber-600 font-bold">Company</span>,
       render: (_, record) => (
         <Button
           className="bg-amber-500! text-white! hover:bg-amber-600!"
           onClick={() => handleViewDetails(record)}
         >
-          View Details
+          Company Details
         </Button>
       ),
     },

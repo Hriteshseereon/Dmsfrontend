@@ -32,10 +32,10 @@ const OrgTabs = ({ user }) => {
       {/* Header */}
       <nav className="bg-white p-6 rounded-xl shadow-sm mb-6 border border-gray-100">
         <div className="flex flex-col">
-          <h1 className="font-bold text-3xl text-gray-800">
+          <h1 className="font-bold text-3xl text-amber-800">
             Admin Dashboard
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-amber-500 mt-1">
             Welcome back, {user.email}
           </p>
         </div>

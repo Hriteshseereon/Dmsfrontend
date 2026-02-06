@@ -132,7 +132,69 @@ const handleApprove = (id) => {
           <span className="text-amber-700 font-medium">{text}</span>
         ),  
     },
-   
+    {
+      title: <span className="text-amber-600 font-bold">Address</span>,   
+        dataIndex: "address_1",
+        render: (text) => (
+          <span className="text-amber-700 font-medium">{text}</span>
+        ),  
+    },
+     {
+      title: <span className="text-amber-600 font-bold">Address</span>,   
+        dataIndex: "address_2",
+        render: (text) => (
+          <span className="text-amber-700 font-medium">{text}</span>
+        ),  
+    },
+      {
+        title: <span className="text-amber-600 font-bold">Fax No</span>,
+        dataIndex: "fax_no",
+        render: (text) => (
+          <span className="text-amber-700 font-medium">{text}</span>
+        ),
+      },
+      { 
+        title: <span className="text-amber-600 font-bold">PAN No</span>,  
+        dataIndex: "pan_no",
+        render: (text) => (
+          <span className="text-amber-700 font-medium">{text}</span>
+        ),
+      },
+      {
+        title: <span className="text-amber-600 font-bold">GST No</span>,
+        dataIndex: "gst_no",
+        render: (text) => ( 
+          <span className="text-amber-700 font-medium">{text}</span>
+        ),
+      },
+      {
+        title: <span className="text-amber-600 font-bold">State</span>,
+        dataIndex: "state",
+        render: (text) => (
+          <span className="text-amber-700 font-medium">{text}</span>
+        ),  
+      },
+      {
+        title: <span className="text-amber-600 font-bold">City</span>,
+        dataIndex: "city",
+        render: (text) => (
+          <span className="text-amber-700 font-medium">{text}</span>
+        ),  
+      },
+      {
+        title: <span className="text-amber-600 font-bold">District</span>,
+        dataIndex: "district",
+        render: (text) => (
+          <span className="text-amber-700 font-medium">{text}</span>
+        ),  
+      },
+      {
+        title: <span className="text-amber-600 font-bold">Pin Code</span>,
+        dataIndex: "pin_code",
+        render: (text) => (
+          <span className="text-amber-700 font-medium">{text}</span>
+        ),  
+      },
   
 {
   title: <span className="text-amber-600 font-bold">Link Organization</span>,
@@ -186,6 +248,7 @@ const handleApprove = (id) => {
         dataSource={customers}
         rowKey="id"
         pagination={false}
+        scroll={{ x: 200 }}
       />
 
    
