@@ -13,7 +13,7 @@ import AddOrganisation from "../pages/AddOrganisation";
 import AppLayout from "../pages/AppLayout";
 import AssetModule from "../modules/AMS/AssetModule";
 import WealthModule from "../modules/WMS/WealthModule";
-
+import OrgTabs from "../pages/OrgTabs";
 const LIBRARIES = ["places"];
 export default function AppRouter() {
   const { user } = useAuth();
@@ -42,10 +42,10 @@ export default function AppRouter() {
           element={user ? <Dashboard /> : <Navigate to="/" />}
         />
         {/* Admin gets list of organizations */}
-        <Route
-          path="/organizations"
-          element={user ? <OrganizationList /> : <Navigate to="/" />}
-        />
+       <Route path="/organizations/*" element={user ? <OrgTabs user={user} /> : <Navigate to="/" />} />
+        <Route path="/organizations/customer" element={user ? <OrgTabs user={user} /> : <Navigate to="/" />} />
+        <Route path="/organizations/transport" element={user ? <OrgTabs user={user} /> : <Navigate to="/" />} />
+
         <Route path="/organisation/add" element={<AddOrganisation />} />
         <Route path="/organisation/edit/:orgId" element={<AddOrganisation />} />
 
