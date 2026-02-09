@@ -13,7 +13,7 @@ import AddOrganisation from "../pages/AddOrganisation";
 import AppLayout from "../pages/AppLayout";
 import AssetModule from "../modules/AMS/AssetModule";
 import WealthModule from "../modules/WMS/WealthModule";
-
+import OrgTabs from "../pages/OrgTabs";
 const LIBRARIES = ["places"];
 export default function AppRouter() {
   const { user } = useAuth();

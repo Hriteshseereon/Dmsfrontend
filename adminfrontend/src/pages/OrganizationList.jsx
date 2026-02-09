@@ -26,26 +26,14 @@ export default function OrganizationList() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
-      <nav className="bg-white p-6 rounded-xl shadow-sm mb-8 border border-gray-100">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="font-bold text-2xl text-gray-800">
-              Admin Dashboard
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Welcome back, {user.email}
-            </p>
-          </div>
-        </div>
-      </nav>
-
+    <div className="min-h-screen mb-0 pb-0 ">
+     
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-3xl font-bold text-gray-800">Organizations</h2>
+        <div className="flex justify-between items-center mb-2 ">
+          <h2 className="text-3xl font-bold text-gray-800"></h2>
           <button
             onClick={() => navigate("/organisation/add")}
-            className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg"
+            className="flex  items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium transition-all shadow-md hover:shadow-lg"
           >
             <Plus size={20} />
             Add Company
