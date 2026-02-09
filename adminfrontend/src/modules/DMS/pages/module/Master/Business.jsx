@@ -32,7 +32,7 @@ import {
   getVendors,
   addvendor,
 } from "../../../../../api/bussinesspatnr";
-import { addAdminCustomer, getAdminCustomers } from "../../../../../api/customer";
+import { addAdminCustomer, getAdminCustomers, updateAdminCustomer, getAdminCustomerDetails } from "../../../../../api/customer";
 const { Option } = Select;
 
 // helper to parse date strings into dayjs objects
@@ -133,36 +133,49 @@ export default function Business() {
       console.log("Fetch Vendors Error:", err);
     }
   };
+  const mapCustomerToForm = (c) => ({
+    key: c.id || c.customer_id,
+    partnerType: "Customer",
+    name: c.customer_name,
+    branchName: c.business_name,
+    phoneNo: c.phone_number,
+    mobileNo: c.mobile_number,
+    email: c.email_address || "N/A",
+    status: c.status || "Active",
+    type: c.customer_type,
+    contactPerson: c.contact_person,
+    address: c.address || "",
+    country: c.country || "",
+    state: c.state || "",
+    district: c.district || "",
+    city: c.city || "",
+    pinCode: c.pin_code || "",
+    location: c.location || "",
+    creditFacility: c.credit_facility,
+    securityForCreditFacility: c.security_for_credit,
+    advCheque: c.advance_cheque_no,
+    amountLimit: c.amount_limit,
+    noDaysLimit: c.days_limit,
+    noInvoiceLimit: c.invoice_limit,
+    soudaLimit: c.souda_limit_ton,
+    gstNo: c.gst_number,
+    tinNo: c.tin_number,
+    panNo: c.pan_number,
+    aadharNo: c.aadhaar_number,
+    fssaiNo: c.fssai_number,
+    licenseNo: c.license_number,
+    tdsApplicable: c.tds_applicable ? "Yes" : "No",
+    billingType: c.billing_type,
+    customerCode: c.customer_code,
+    id: c.customer_id || c.id,
+  });
+
   // fetch customers function
   const fetchCustomers = async () => {
     try {
       const res = await getAdminCustomers();
-
-      // API returns an array directly based on the provided sample
       const list = Array.isArray(res) ? res : res?.results || [];
-
-      const mappedCustomers = list.map((c, index) => ({
-        key: c.id || index + 1,
-        id: c.id,
-        partnerType: "Customer",
-
-        // table columns
-        name: c.customer_name,
-        email: c.email_address || "N/A",
-        phoneNo: c.phone_number || "N/A",
-        status: c.status || "Active",
-
-        // optional (for view/edit later)
-        address: c.address || "",
-        city: c.city || "",
-        state: c.state || "",
-        pinCode: c.pin_code || "",
-        billingType: c.billing_type,
-        customerCode: c.customer_code,
-        businessName: c.business_name,
-        contactPerson: c.contact_person,
-      }));
-
+      const mappedCustomers = list.map((c) => mapCustomerToForm(c));
       setData(mappedCustomers);
     } catch (error) {
       console.error("Fetch Customers Error:", error);
@@ -268,14 +281,20 @@ export default function Business() {
           aadhaar_document: values.aadharDoc?.[0]?.originFileObj,
           fssai_number: values.fssaiNo,
           license_number: values.licenseNo,
-
-          tds_applicable: values.tdsApplicable === "Yes" ? 1 : 0,
+          tds_applicable: values.tdsApplicable === "Yes",
           billing_type: values.billingType,
         };
 
         console.log("Submitting Customer Payload:", payload);
-        const res = await addAdminCustomer(payload);
-        message.success("Customer added successfully!");
+
+        if (selectedRecord) {
+          await updateAdminCustomer(selectedRecord.id, payload);
+          message.success("Customer updated successfully!");
+        } else {
+          await addAdminCustomer(payload);
+          message.success("Customer added successfully!");
+        }
+
         fetchCustomers(); // Refresh the list
       }
 
@@ -437,17 +456,39 @@ export default function Business() {
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
-            onClick={() => {
-              setSelectedRecord(record);
+            onClick={async () => {
               setActiveForm(record.partnerType);
+              if (record.partnerType === "Customer") {
+                try {
+                  const details = await getAdminCustomerDetails(record.id);
+                  const mapped = mapCustomerToForm(details);
+                  setSelectedRecord(mapped);
+                } catch (err) {
+                  message.error("Failed to fetch customer details");
+                  setSelectedRecord(record);
+                }
+              } else {
+                setSelectedRecord(record);
+              }
               setIsViewModalOpen(true);
             }}
           />
           <EditOutlined
             className="cursor-pointer! text-red-500!"
-            onClick={() => {
-              setSelectedRecord(record);
+            onClick={async () => {
               setActiveForm(record.partnerType);
+              if (record.partnerType === "Customer") {
+                try {
+                  const details = await getAdminCustomerDetails(record.id);
+                  const mapped = mapCustomerToForm(details);
+                  setSelectedRecord(mapped);
+                } catch (err) {
+                  message.error("Failed to fetch customer details");
+                  setSelectedRecord(record);
+                }
+              } else {
+                setSelectedRecord(record);
+              }
               setIsEditModalOpen(true);
             }}
           />

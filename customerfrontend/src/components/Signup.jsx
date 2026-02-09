@@ -1,13 +1,13 @@
 // src/pages/Signup.jsx
 import { useState } from "react";
 import { Form, Input, Button, Alert, Row, Col, Tag, Space } from "antd";
-import { useAuth } from "../context/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
 import { UserOutlined, PlusOutlined } from "@ant-design/icons";
 import CompanyInfoModal from "../components/CompanyInfo";
 
+import { signup as customerSignup } from "../api/customer";
+
 export default function Signup() {
-  const { signup } = useAuth();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
@@ -19,20 +19,36 @@ export default function Signup() {
 
   const onFinish = async (values) => {
     setLoading(true);
+    setAlert(null);
 
     const finalValues = {
       name: values.name,
       email: values.email,
       password: values.password,
+      phone: values.phone,
+      address: values.address,
       companies: companies,
     };
 
-    const res = await signup(finalValues);
-    setLoading(false);
-    setAlert({ type: res.success ? "success" : "error", message: res.message });
+    try {
+      const res = await customerSignup(finalValues);
+      setAlert({
+        type: "success",
+        message: "Signup successful! Your account has been created and is pending admin approval."
+      });
 
-    if (res.success) {
-      navigate("/login", { state: { signupMessage: res.message } });
+      // Navigate after a delay to show success message
+      setTimeout(() => {
+        navigate("/login", { state: { signupMessage: "Signup successful! Please wait for admin approval." } });
+      }, 2000);
+    } catch (error) {
+      console.error("Signup error:", error);
+      const errorMessage = error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Signup failed. Please check your information and try again.";
+      setAlert({ type: "error", message: errorMessage });
+    } finally {
+      setLoading(false);
     }
   };
 

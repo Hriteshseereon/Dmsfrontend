@@ -17,6 +17,16 @@ export default function CustomerForm({ disabled = false }) {
 
         <Row gutter={24}>
           <Col span={6}>
+            <Form.Item label="Customer Code" name="customerCode">
+              <Input
+                className={inputClass}
+                disabled
+                placeholder="Auto-generated"
+              />
+            </Form.Item>
+          </Col>
+
+          <Col span={6}>
             <Form.Item
               label="Customer Name"
               name="name"
