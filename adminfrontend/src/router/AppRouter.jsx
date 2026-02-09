@@ -19,72 +19,57 @@ export default function AppRouter() {
   const { user } = useAuth();
 
   return (
-    <LoadScript
+     <LoadScript 
       googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY}
       libraries={LIBRARIES}
     >
-      <BrowserRouter>
-        <Routes>
-          <Route
-            path="/"
-            element={
-              !user ? (
-                <Login />
-              ) : (
-                <Navigate
-                  to={user.is_admin ? "/organizations" : "/dashboard"}
-                />
-              )
-            }
-          />
-          <Route
-            path="/dashboard"
-            element={user ? <Dashboard /> : <Navigate to="/" />}
-          />
-          {/* Admin gets list of organizations */}
-          <Route
-            path="/organizations"
-            element={user ? <OrganizationList /> : <Navigate to="/" />}
-          />
-          <Route path="/organisation/add" element={<AddOrganisation />} />
-          <Route
-            path="/organisation/edit/:orgId"
-            element={<AddOrganisation />}
-          />
-          <Route
-            path="/organisation/view/:orgId"
-            element={<AddOrganisation />}
-          />
-          {/* Organization specific dashboard */}
-          <Route
-            path="/organization/:orgId"
-            element={user ? <OrganizationDashboard /> : <Navigate to="/" />}
-          />
-          <Route path="/organization" element={<OrganizationDashboard />} />
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            !user ? (
+              <Login />
+            ) : (
+              <Navigate
+                to={user.is_admin ? "/organizations" : "/dashboard"}
+              />
+            )
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={user ? <Dashboard /> : <Navigate to="/" />}
+        />
+        {/* Admin gets list of organizations */}
+       <Route path="/organizations/*" element={user ? <OrgTabs user={user} /> : <Navigate to="/" />} />
+        <Route path="/organizations/customer" element={user ? <OrgTabs user={user} /> : <Navigate to="/" />} />
+        <Route path="/organizations/transport" element={user ? <OrgTabs user={user} /> : <Navigate to="/" />} />
 
-          {/* DMS (protected) */}
+        <Route path="/organisation/add" element={<AddOrganisation />} />
+        <Route path="/organisation/edit/:orgId" element={<AddOrganisation />} />
 
-          <Route path="/" element={<AppLayout />}>
-            <Route
-              path="/dms/*"
-              element={user ? <DMS /> : <Navigate to="/" />}
-            />
-            {/* ams module - currently imported assetmodule,
+        {/* Organization specific dashboard */}
+        <Route
+          path="/organization/:orgId"
+          element={user ? <OrganizationDashboard /> : <Navigate to="/" />}
+        />
+        <Route path="/organization" element={<OrganizationDashboard />} />
+
+        {/* DMS (protected) */}
+
+        <Route path="/" element={<AppLayout />}>
+          <Route path="/dms/*" element={user ? <DMS /> : <Navigate to="/" />} />
+          {/* ams module - currently imported assetmodule,
            AMS/index.jsx is path based but we are using tab based
           for using path based use <AMS /> */}
-            <Route
-              path="/ams/*"
-              element={user ? <AssetModule /> : <Navigate to="/" />}
-            />
-            <Route
-              path="/wms/*"
-              element={user ? <WealthModule /> : <Navigate to="/" />}
-            />
-          </Route>
+          <Route path="/ams/*" element={user ? <AssetModule /> : <Navigate to="/" />} />
+          <Route path="/wms/*" element={user ? <WealthModule /> : <Navigate to="/" />} />
+        </Route>
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
     </LoadScript>
   );
 }
