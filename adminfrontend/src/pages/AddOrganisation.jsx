@@ -33,6 +33,8 @@ import { useCreateOrganization } from "../queries/useCreateOrganization.js";
 import { useNavigate, useParams } from "react-router-dom";
 import { useGetOrganization } from "../queries/useGetOrganization.js";
 import { useUpdateOrganization } from "../queries/useUpdateOrganization.js";
+import dayjs from "dayjs";
+
 const { Option } = Select;
 const { TextArea } = Input;
 
@@ -95,45 +97,133 @@ export default function AddOrganisation() {
     { title: "Finalize", description: "Modules & Review" },
   ];
 
-  const mapOrgToForm = (org) => ({
-    registeredName: org.registered_name,
-    organisationType: org.organisation_type,
-    phone: org.phone_number_1,
-    phone2: org.phone_number_2,
-    email: org.email,
-    secondaryEmail: org.secondary_email,
+  // const mapOrgToForm = (org) => ({
+  //   registeredName: org.registered_name,
+  //   organisationType: org.organisation_type,
+  //   phone: org.phone_number_1,
+  //   phone2: org.phone_number_2,
+  //   email: org.email,
+  //   secondaryEmail: org.secondary_email,
 
-    organisationAddress: {
-      address: org.addresses?.[0]?.address_line_1,
-      address2: org.addresses?.[0]?.address_line_2,
-      city: org.addresses?.[0]?.city,
-      state: org.addresses?.[0]?.state,
-      pin: org.addresses?.[0]?.pin_code,
-    },
+  //   organisationAddress: {
+  //     address: org.addresses?.[0]?.address_line_1,
+  //     address2: org.addresses?.[0]?.address_line_2,
+  //     city: org.addresses?.[0]?.city,
+  //     state: org.addresses?.[0]?.state,
+  //     pin: org.addresses?.[0]?.pin_code,
+  //   },
 
-    partners: org.persons?.map((p) => ({
-      name: p.full_name,
-      email: p.email,
-      mobileNumber: p.phone_number_1,
-      whatsappNumber: p.whatsapp_number,
-      gender: p.gender,
-    })),
+  //   partners: org.persons?.map((p) => ({
+  //     name: p.full_name,
+  //     email: p.email,
+  //     mobileNumber: p.phone_number_1,
+  //     whatsappNumber: p.whatsapp_number,
+  //     gender: p.gender,
+  //   })),
 
-    hasBranch: org.branches?.length > 0,
-    branches: org.branches?.map((b) => ({
-      branchName: b.name,
-      shortName: b.short_name,
-      city: b.address?.city,
-      state: b.address?.state,
-      pinNo: b.address?.pin_code,
-    })),
+  //   hasBranch: org.branches?.length > 0,
+  //   branches: org.branches?.map((b) => ({
+  //     branchName: b.name,
+  //     shortName: b.short_name,
+  //     city: b.address?.city,
+  //     state: b.address?.state,
+  //     pinNo: b.address?.pin_code,
+  //   })),
 
-    ...org.modules_data?.reduce((acc, m) => {
-      acc[`module_${m.module}`] = m.is_enabled;
-      return acc;
-    }, {}),
-  });
+  //   ...org.modules_data?.reduce((acc, m) => {
+  //     acc[`module_${m.module}`] = m.is_enabled;
+  //     return acc;
+  //   }, {}),
+  // });
 
+  // updated mapping function to handle new fields and nested structures
+  const mapOrgToForm = (org) => {
+    // ================= HQ ADDRESS =================
+    const hqAddress = org.addresses?.find((a) => a.address_category === "HQ");
+
+    return {
+      // ================= ORG CORE =================
+      registeredName: org.registered_name,
+      organisationType: org.organisation_type,
+      phone: org.phone_number_1,
+      phone2: org.phone_number_2,
+      email: org.email,
+      secondaryEmail: org.secondary_email,
+      businessLocation: org.head_office_location,
+
+      // ================= HQ ADDRESS =================
+      organisationAddress: {
+        address: hqAddress?.address_line_1,
+        address2: hqAddress?.address_line_2,
+        city: hqAddress?.city,
+        state: hqAddress?.state,
+        pin: hqAddress?.pin_code,
+      },
+
+      // ================= PERSONS =================
+      partners: org.persons?.map((p) => ({
+        name: p.full_name,
+        email: p.email,
+        email2: p.secondary_email,
+
+        mobileNumber: p.phone_number_1,
+        whatsappNumber: p.whatsapp_number,
+
+        gender: p.gender,
+        dob: p.date_of_birth ? dayjs(p.date_of_birth) : null,
+        percentage: p.interest_percentage
+          ? Number(p.interest_percentage)
+          : null,
+
+        fatherName: p.family_details?.parents_details,
+        spouseName: p.family_details?.spouse_name,
+        childrenCount: p.family_details?.children_details,
+
+        // 🔴 backend gives STRING, form needs nested object
+        currentAddress: {
+          address1: p.present_address,
+        },
+        permanentAddress: {
+          address1: p.permanent_address,
+        },
+
+        bankName: p.bank_details?.bank_name,
+        accountNo: p.bank_details?.account_number,
+        ifsc: p.bank_details?.ifsc_code,
+        branchName: p.bank_details?.branch_name,
+
+        companyDetails: p.company_details
+          ? {
+              companyName: p.company_details.company_name,
+              registrationNo: p.company_details.registration_no,
+              gstNo: p.company_details.gst_no,
+              address: {
+                city: p.company_details.address,
+                state: p.company_details.location,
+              },
+            }
+          : undefined,
+      })),
+
+      // ================= BRANCHES =================
+      hasBranch: org.branches?.length > 0,
+      branches: org.branches?.map((b) => ({
+        branchName: b.name,
+        shortName: b.short_name,
+        city: b.address?.city,
+        state: b.address?.state,
+        pinNo: b.address?.pin_code,
+        address1: b.address?.address_line_1,
+        address2: b.address?.address_line_2,
+      })),
+
+      // ================= MODULES =================
+      ...(org.modules_data ?? []).reduce((acc, m) => {
+        acc[`module_${m.module}`] = m.is_enabled;
+        return acc;
+      }, {}),
+    };
+  };
   useEffect(() => {
     if (orgData && isEdit) {
       const values = mapOrgToForm(orgData);
@@ -145,8 +235,6 @@ export default function AddOrganisation() {
       setCurrentStep(0);
     }
   }, [orgData, isEdit]);
-
-
 
   const handleOrgTypeChange = (value) => {
     setOrgType(value);
@@ -177,10 +265,19 @@ export default function AddOrganisation() {
   const getFieldsForStep = (step) => {
     switch (step) {
       case 0:
-        return ['registeredName', 'phone', 'phone2', 'email', 'secondaryEmail',
-          ['organisationAddress', 'address'], ['organisationAddress', 'city'],
-          ['organisationAddress', 'state'], ['organisationAddress', 'pin'],
-          'businessLocation', 'organisationType'];
+        return [
+          "registeredName",
+          "phone",
+          "phone2",
+          "email",
+          "secondaryEmail",
+          ["organisationAddress", "address"],
+          ["organisationAddress", "city"],
+          ["organisationAddress", "state"],
+          ["organisationAddress", "pin"],
+          "businessLocation",
+          "organisationType",
+        ];
         return [];
       case 1:
         return orgType ? ["partners"] : [];
@@ -193,14 +290,127 @@ export default function AddOrganisation() {
     }
   };
   // add a payload builder to handle file uploads and nested structures
+  // const buildPayload = (values) => {
+  //   return {
+  //     // ================= ORG CORE =================
+  //     registered_name: values.registeredName ?? "",
+  //     rms_org_id: values.rmsOrgId ?? null,
+
+  //     organisation_type: values.organisationType ?? "",
+  //     // legal_type: values.organisationType ?? "",
+
+  //     phone_number_1: values.phone ?? "",
+  //     phone_number_2: values.phone2 ?? null,
+
+  //     email: values.email ?? "",
+  //     secondary_email: values.secondaryEmail ?? null,
+
+  //     is_active: true,
+
+  //     // ================= HQ ADDRESS =================
+  //     addresses: [
+  //       {
+  //         address_line_1: values?.organisationAddress?.address ?? "",
+  //         address_line_2: values?.organisationAddress?.address2 ?? "",
+  //         city: values?.organisationAddress?.city ?? "",
+  //         state: values?.organisationAddress?.state ?? "",
+  //         pin_code: values?.organisationAddress?.pin ?? "",
+  //         country: "India",
+
+  //         address_type: "OWN",
+  //         address_category: "HQ",
+  //         is_branch: false,
+  //       },
+  //     ],
+
+  //     // ================= PERSONS =================
+  //     persons: (values.partners ?? []).map((p) => ({
+  //       full_name: p?.name ?? "",
+  //       role:
+  //         values.organisationType === "pvt"
+  //           ? "DIRECTOR"
+  //           : values.organisationType === "LLP" ||
+  //             values.organisationType === "partnership"
+  //             ? "PARTNER"
+  //             : "PROPRIETOR",
+
+  //       phone_number_1: p?.mobileNumber || p?.contactNumber || null,
+  //       phone_number_2: null,
+  //       whatsapp_number: p?.whatsappNumber ?? null,
+
+  //       email: p?.email ?? null,
+  //       gender: p?.gender ?? null,
+
+  //       // ---------- FAMILY ----------
+  //       family_details: {
+  //         spouse_name: p?.spouseName ?? null,
+  //         children_details:
+  //           p?.childrenCount !== undefined ? String(p.childrenCount) : null,
+  //         parents_details: p?.fatherName ?? null,
+  //       },
+
+  //       // ---------- BANK ----------
+  //       bank_details: {
+  //         bank_name: p?.bankName ?? null,
+  //         account_holder_name: p?.name ?? null,
+  //         account_number: p?.accountNo ?? null,
+  //         ifsc_code: p?.ifsc ?? null,
+  //         branch_name: p?.bankBranch ?? null,
+  //       },
+
+  //       // ---------- COMPANY ----------
+  //       company_details: p?.companyDetails
+  //         ? {
+  //           company_name: p.companyDetails.companyName ?? null,
+  //           registration_no: p.companyDetails.registrationNo ?? null,
+  //           gst_no: p.companyDetails.gstNo ?? null,
+  //           address: p.companyDetails.address?.city ?? null,
+  //           location: p.companyDetails.address?.state ?? null,
+  //         }
+  //         : null,
+  //     })),
+
+  //     // ================= BRANCHES =================
+  //     branches: values.hasBranch
+  //       ? (values.branches ?? []).map((b) => ({
+  //         name: b?.branchName ?? "",
+  //         short_name: b?.shortName ?? "",
+  //         phone_number_1: null,
+  //         email: null,
+  //         // type: "HQ",
+
+  //         address: {
+  //           address_line_1: b?.address1 ?? "",
+  //           address_line_2: b?.address2 ?? "",
+  //           city: b?.city ?? "",
+  //           state: b?.state ?? "",
+  //           pin_code: b?.pinNo ?? "",
+  //           country: "India",
+  //           address_type: "RENTED",
+  //         },
+  //       }))
+  //       : [],
+
+  //     // ================= DEPOS =================
+  //     depos: [],
+
+  //     // ================= MODULES =================
+  //     modules_input: modulesList
+  //       .filter((m) => values[`module_${m.id}`])
+  //       .map((m) => m.id),
+  //   };
+  // };
+
+  // updated latest payload builder with nested structures
   const buildPayload = (values) => {
     return {
       // ================= ORG CORE =================
       registered_name: values.registeredName ?? "",
-      rms_org_id: values.rmsOrgId ?? null,
-
       organisation_type: values.organisationType ?? "",
-      // legal_type: values.organisationType ?? "",
+      legal_type: values.organisationType ?? "",
+
+      rms_org_id: values.rmsOrgId ?? null,
+      head_office_location: values.businessLocation ?? null,
 
       phone_number_1: values.phone ?? "",
       phone_number_2: values.phone2 ?? null,
@@ -208,90 +418,121 @@ export default function AddOrganisation() {
       email: values.email ?? "",
       secondary_email: values.secondaryEmail ?? null,
 
+      number_of_partners: values.partners?.length ?? 0,
       is_active: true,
 
       // ================= HQ ADDRESS =================
       addresses: [
         {
-          address_line_1: values?.organisationAddress?.address ?? "",
-          address_line_2: values?.organisationAddress?.address2 ?? "",
-          city: values?.organisationAddress?.city ?? "",
-          state: values?.organisationAddress?.state ?? "",
-          pin_code: values?.organisationAddress?.pin ?? "",
+          address_line_1: values.organisationAddress?.address ?? "",
+          address_line_2: values.organisationAddress?.address2 ?? "",
+          city: values.organisationAddress?.city ?? "",
+          state: values.organisationAddress?.state ?? "",
           country: "India",
+          pin_code: values.organisationAddress?.pin ?? "",
+
+          latitude: null,
+          longitude: null,
 
           address_type: "OWN",
           address_category: "HQ",
-          is_branch: false,
         },
       ],
 
       // ================= PERSONS =================
       persons: (values.partners ?? []).map((p) => ({
-        full_name: p?.name ?? "",
+        full_name: p.name ?? "",
+
         role:
-          values.organisationType === "pvt"
+          values.organisationType === "PRIVATE_LIMITED"
             ? "DIRECTOR"
             : values.organisationType === "LLP" ||
-              values.organisationType === "partnership"
+                values.organisationType === "Partnership"
               ? "PARTNER"
               : "PROPRIETOR",
 
-        phone_number_1: p?.mobileNumber || p?.contactNumber || null,
-        phone_number_2: null,
-        whatsapp_number: p?.whatsappNumber ?? null,
+        director_type: "EXECUTIVE",
+        gender: p.gender ?? null,
 
-        email: p?.email ?? null,
-        gender: p?.gender ?? null,
+        date_of_birth: p.dob ? dayjs(p.dob).format("YYYY-MM-DD") : null,
+        interest_percentage: p.percentage ?? null,
+
+        phone_number_1: p.mobileNumber ?? null,
+        phone_number_2: null,
+        whatsapp_number: p.whatsappNumber ?? null,
+
+        email: p.email ?? null,
+        secondary_email: p.email2 ?? null,
+
+        present_address: p.currentAddress
+          ? `${p.currentAddress.address1 ?? ""}, ${p.currentAddress.city ?? ""}`
+          : null,
+
+        permanent_address: p.permanentAddress
+          ? `${p.permanentAddress.address1 ?? ""}, ${p.permanentAddress.city ?? ""}`
+          : null,
 
         // ---------- FAMILY ----------
         family_details: {
-          spouse_name: p?.spouseName ?? null,
+          spouse_name: p.spouseName ?? null,
           children_details:
-            p?.childrenCount !== undefined ? String(p.childrenCount) : null,
-          parents_details: p?.fatherName ?? null,
+            p.childrenCount !== undefined ? String(p.childrenCount) : null,
+          parents_details: p.fatherName ?? null,
         },
 
         // ---------- BANK ----------
         bank_details: {
-          bank_name: p?.bankName ?? null,
-          account_holder_name: p?.name ?? null,
-          account_number: p?.accountNo ?? null,
-          ifsc_code: p?.ifsc ?? null,
-          branch_name: p?.bankBranch ?? null,
+          bank_name: p.bankName ?? null,
+          account_holder_name: p.name ?? null,
+          account_number: p.accountNo ?? null,
+          ifsc_code: p.ifsc ?? null,
+          branch_name: p.branchName ?? null,
         },
 
         // ---------- COMPANY ----------
-        company_details: p?.companyDetails
+        company_details: p.companyDetails
           ? {
-            company_name: p.companyDetails.companyName ?? null,
-            registration_no: p.companyDetails.registrationNo ?? null,
-            gst_no: p.companyDetails.gstNo ?? null,
-            address: p.companyDetails.address?.city ?? null,
-            location: p.companyDetails.address?.state ?? null,
-          }
+              company_name: p.companyDetails.companyName ?? null,
+              registration_no: p.companyDetails.registrationNo ?? null,
+              gst_no: p.companyDetails.gstNo ?? null,
+              address: p.companyDetails.address?.city ?? null,
+              location: p.companyDetails.address?.state ?? null,
+            }
           : null,
       })),
+
+      // ================= LEGAL DETAILS =================
+      legal_details: {
+        pan_no: values.panNo ?? null,
+        gstin: values.gstin ?? null,
+        tin_no: values.tinNo ?? null,
+        cst_no: values.cstNo ?? null,
+        et_no: values.etNo ?? null,
+        udyog_aadhaar_no: values.udyamNo ?? null,
+        trade_license_no: values.tradeNo ?? null,
+      },
 
       // ================= BRANCHES =================
       branches: values.hasBranch
         ? (values.branches ?? []).map((b) => ({
-          name: b?.branchName ?? "",
-          short_name: b?.shortName ?? "",
-          phone_number_1: null,
-          email: null,
-          // type: "HQ",
+            name: b.branchName ?? "",
+            short_name: b.shortName ?? "",
+            branch_head_name: null,
+            phone_number_1: null,
+            phone_number_2: null,
+            email: null,
+            type: "Main",
 
-          address: {
-            address_line_1: b?.address1 ?? "",
-            address_line_2: b?.address2 ?? "",
-            city: b?.city ?? "",
-            state: b?.state ?? "",
-            pin_code: b?.pinNo ?? "",
-            country: "India",
-            address_type: "RENTED",
-          },
-        }))
+            address: {
+              address_line_1: b.address1 ?? "",
+              address_line_2: b.address2 ?? "",
+              city: b.city ?? "",
+              state: b.state ?? "",
+              country: "India",
+              pin_code: b.pinNo ?? "",
+              address_type: "RENTED",
+            },
+          }))
         : [],
 
       // ================= DEPOS =================
@@ -303,7 +544,6 @@ export default function AddOrganisation() {
         .map((m) => m.id),
     };
   };
-
   const handleSubmit = () => {
     setSubmitError(null);
 
@@ -333,7 +573,7 @@ export default function AddOrganisation() {
         onError: (error) => {
           antMessage.error("Failed to create organisation");
           console.error("Create Organisation Error:", error);
-        }
+        },
       });
     }
   };
@@ -361,11 +601,13 @@ export default function AddOrganisation() {
           <Form.Item
             label="Phone Number"
             name="phone"
-            rules={[{ required: true, message: "Please enter phone number" },
-            {
-              pattern: /^[6-9]\d{9}$/,
-              message: "Enter a valid 10-digit mobile number",
-            }]}
+            rules={[
+              { required: true, message: "Please enter phone number" },
+              {
+                pattern: /^[6-9]\d{9}$/,
+                message: "Enter a valid 10-digit mobile number",
+              },
+            ]}
           >
             <Input placeholder="Enter phone number" maxLength={10} />
           </Form.Item>
@@ -383,7 +625,6 @@ export default function AddOrganisation() {
           >
             <Input placeholder="Enter phone number" />
           </Form.Item>
-
         </Col>
         <Col xs={24} sm={12} md={6}>
           <Form.Item
@@ -392,7 +633,6 @@ export default function AddOrganisation() {
             rules={[
               { required: true, message: "Please enter email" },
               { type: "email", message: "Please enter valid email" },
-
             ]}
           >
             <Input placeholder="Enter email address" />
@@ -457,11 +697,7 @@ export default function AddOrganisation() {
               },
             ]}
           >
-            <Input
-              placeholder="PIN"
-              maxLength={6}
-              inputMode="numeric"
-            />
+            <Input placeholder="PIN" maxLength={6} inputMode="numeric" />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12} md={6}>
@@ -646,7 +882,6 @@ export default function AddOrganisation() {
                       {...restField}
                       label="Date of Birth"
                       name={[name, "dob"]}
-
                     >
                       <DatePicker
                         style={{ width: "100%" }}
@@ -713,10 +948,12 @@ export default function AddOrganisation() {
                       {...restField}
                       label="Number of Children"
                       name={[name, "childrenCount"]}
-                      rules={[{
-                        pattern: /^[0-9]*$/,
-                        message: "Only numbers are allowed",
-                      },]}
+                      rules={[
+                        {
+                          pattern: /^[0-9]*$/,
+                          message: "Only numbers are allowed",
+                        },
+                      ]}
                     >
                       <Input
                         min={0}
@@ -1251,7 +1488,6 @@ export default function AddOrganisation() {
                             {...restField}
                             label={<span>PIN Code</span>}
                             name={[name, "companyDetails", "address", "pin"]}
-
                             rules={[
                               {
                                 pattern: /^[0-9]{6}$/,
@@ -1610,7 +1846,8 @@ export default function AddOrganisation() {
                                           rules={[
                                             {
                                               pattern: /^[A-Za-z\s]+$/,
-                                              message: "Only letters are allowed",
+                                              message:
+                                                "Only letters are allowed",
                                             },
                                           ]}
                                         >
@@ -1625,11 +1862,11 @@ export default function AddOrganisation() {
                                           {...cRestField}
                                           label="Contact No"
                                           name={[cName, "number"]}
-
                                           rules={[
                                             {
                                               pattern: /^[0-9]{10}$/,
-                                              message: "Enter a valid 10-digit phone number",
+                                              message:
+                                                "Enter a valid 10-digit phone number",
                                             },
                                           ]}
                                         >
@@ -1644,7 +1881,12 @@ export default function AddOrganisation() {
                                           {...cRestField}
                                           label="Email"
                                           name={[cName, "email"]}
-                                          rules={[{ type: "email", message: "Invalid email" }]}
+                                          rules={[
+                                            {
+                                              type: "email",
+                                              message: "Invalid email",
+                                            },
+                                          ]}
                                         >
                                           <Input
                                             placeholder="Email"
@@ -1860,23 +2102,24 @@ export default function AddOrganisation() {
             <Steps current={currentStep} size="small" items={steps} />
           </div>
 
-          <Form
-            form={form}
-            layout="vertical"
-            autoComplete="off"
-            size="middle"
-          >
+          <Form form={form} layout="vertical" autoComplete="off" size="middle">
             {/* Step Content */}
 
-
-            {
-              (isEdit && isLoading) ? (
-                // make it in centered container
-                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "400px" }}>
-                  <Spin size="large" tip="Loading organisation data..." />
-                </div>
-              ) : <div style={{ minHeight: "400px" }}>{renderStepContent()}</div>
-            }
+            {isEdit && isLoading ? (
+              // make it in centered container
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  minHeight: "400px",
+                }}
+              >
+                <Spin size="large" tip="Loading organisation data..." />
+              </div>
+            ) : (
+              <div style={{ minHeight: "400px" }}>{renderStepContent()}</div>
+            )}
 
             {/* Navigation Buttons */}
             <Divider />
