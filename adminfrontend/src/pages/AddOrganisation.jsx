@@ -97,6 +97,70 @@ export default function AddOrganisation() {
     { title: "Finalize", description: "Modules & Review" },
   ];
 
+  // legal documents section
+  const LEGAL_DOCUMENTS = [
+    {
+      key: "cin",
+      label: "CIN",
+      validityRequired: false,
+    },
+    {
+      key: "pan",
+      label: "PAN",
+      validityRequired: false,
+    },
+    {
+      key: "tan",
+      label: "TAN",
+      validityRequired: false,
+    },
+    {
+      key: "gst",
+      label: "GST",
+      validityRequired: false,
+    },
+    {
+      key: "msme",
+      label: "MSME",
+      validityRequired: false,
+    },
+    {
+      key: "esi",
+      label: "ESI",
+      validityRequired: false,
+    },
+    {
+      key: "epf",
+      label: "EPF",
+      validityRequired: false,
+    },
+    {
+      key: "professionalTax",
+      label: "Professional Tax",
+      validityRequired: true,
+    },
+    {
+      key: "tradeLicense",
+      label: "Trade License",
+      validityRequired: true,
+    },
+    {
+      key: "fssai",
+      label: "FSSAI",
+      validityRequired: true,
+    },
+    {
+      key: "startup",
+      label: "Startup India",
+      validityRequired: true,
+    },
+    {
+      key: "lei",
+      label: "LEI",
+      validityRequired: true,
+    },
+  ];
+
   // const mapOrgToForm = (org) => ({
   //   registeredName: org.registered_name,
   //   organisationType: org.organisation_type,
@@ -137,9 +201,99 @@ export default function AddOrganisation() {
   // });
 
   // updated mapping function to handle new fields and nested structures
+  // const mapOrgToForm = (org) => {
+  //   // ================= HQ ADDRESS =================
+  //   const hqAddress = org.addresses?.find((a) => a.address_category === "HQ");
+
+  //   return {
+  //     // ================= ORG CORE =================
+  //     registeredName: org.registered_name,
+  //     organisationType: org.organisation_type,
+  //     phone: org.phone_number_1,
+  //     phone2: org.phone_number_2,
+  //     email: org.email,
+  //     secondaryEmail: org.secondary_email,
+  //     businessLocation: org.head_office_location,
+
+  //     // ================= HQ ADDRESS =================
+  //     organisationAddress: {
+  //       address: hqAddress?.address_line_1,
+  //       address2: hqAddress?.address_line_2,
+  //       city: hqAddress?.city,
+  //       state: hqAddress?.state,
+  //       pin: hqAddress?.pin_code,
+  //     },
+
+  //     // ================= PERSONS =================
+  //     partners: org.persons?.map((p) => ({
+  //       name: p.full_name,
+  //       email: p.email,
+  //       email2: p.secondary_email,
+
+  //       mobileNumber: p.phone_number_1,
+  //       whatsappNumber: p.whatsapp_number,
+
+  //       gender: p.gender,
+  //       dob: p.date_of_birth ? dayjs(p.date_of_birth) : null,
+  //       percentage: p.interest_percentage
+  //         ? Number(p.interest_percentage)
+  //         : null,
+
+  //       fatherName: p.family_details?.parents_details,
+  //       spouseName: p.family_details?.spouse_name,
+  //       childrenCount: p.family_details?.children_details,
+
+  //       // 🔴 backend gives STRING, form needs nested object
+  //       currentAddress: {
+  //         address1: p.present_address,
+  //       },
+  //       permanentAddress: {
+  //         address1: p.permanent_address,
+  //       },
+
+  //       bankName: p.bank_details?.bank_name,
+  //       accountNo: p.bank_details?.account_number,
+  //       ifsc: p.bank_details?.ifsc_code,
+  //       branchName: p.bank_details?.branch_name,
+
+  //       companyDetails: p.company_details
+  //         ? {
+  //             companyName: p.company_details.company_name,
+  //             registrationNo: p.company_details.registration_no,
+  //             gstNo: p.company_details.gst_no,
+  //             address: {
+  //               city: p.company_details.address,
+  //               state: p.company_details.location,
+  //             },
+  //           }
+  //         : undefined,
+  //     })),
+
+  //     // ================= BRANCHES =================
+  //     hasBranch: org.branches?.length > 0,
+  //     branches: org.branches?.map((b) => ({
+  //       branchName: b.name,
+  //       shortName: b.short_name,
+  //       city: b.address?.city,
+  //       state: b.address?.state,
+  //       pinNo: b.address?.pin_code,
+  //       address1: b.address?.address_line_1,
+  //       address2: b.address?.address_line_2,
+  //     })),
+
+  //     // ================= MODULES =================
+  //     ...(org.modules_data ?? []).reduce((acc, m) => {
+  //       acc[`module_${m.module}`] = m.is_enabled;
+  //       return acc;
+  //     }, {}),
+  //   };
+  // };
+
+  // third payload to check with fields mapping while edit
   const mapOrgToForm = (org) => {
-    // ================= HQ ADDRESS =================
     const hqAddress = org.addresses?.find((a) => a.address_category === "HQ");
+
+    const legal = org.legal_details ?? {};
 
     return {
       // ================= ORG CORE =================
@@ -179,12 +333,20 @@ export default function AddOrganisation() {
         spouseName: p.family_details?.spouse_name,
         childrenCount: p.family_details?.children_details,
 
-        // 🔴 backend gives STRING, form needs nested object
         currentAddress: {
-          address1: p.present_address,
+          address1: "",
+          address2: "",
+          city: "",
+          state: "",
+          pin: "",
         },
+
         permanentAddress: {
-          address1: p.permanent_address,
+          address1: "",
+          address2: "",
+          city: "",
+          state: "",
+          pin: "",
         },
 
         bankName: p.bank_details?.bank_name,
@@ -205,8 +367,66 @@ export default function AddOrganisation() {
           : undefined,
       })),
 
+      // ================= LEGAL DETAILS =================
+      legalDetails: {
+        cin: { number: legal.cin_no },
+        pan: { number: legal.pan_no },
+        tan: { number: legal.tan_no },
+        gst: { number: legal.gst_no },
+        msme: { number: legal.msme_udyam_no },
+        esi: { number: legal.esi_no },
+        epf: { number: legal.epf_no },
+
+        professionalTax: {
+          number: legal.professional_tax_no,
+          validity:
+            legal.professional_tax_valid_from && legal.professional_tax_valid_to
+              ? [
+                  dayjs(legal.professional_tax_valid_from),
+                  dayjs(legal.professional_tax_valid_to),
+                ]
+              : null,
+        },
+
+        tradeLicense: {
+          number: legal.trade_license_no,
+          validity:
+            legal.trade_license_valid_from && legal.trade_license_valid_to
+              ? [
+                  dayjs(legal.trade_license_valid_from),
+                  dayjs(legal.trade_license_valid_to),
+                ]
+              : null,
+        },
+
+        fssai: {
+          number: legal.fssai_no,
+          validity:
+            legal.fssai_valid_from && legal.fssai_valid_to
+              ? [dayjs(legal.fssai_valid_from), dayjs(legal.fssai_valid_to)]
+              : null,
+        },
+
+        startup: {
+          number: legal.startup_no,
+          validity:
+            legal.startup_valid_from && legal.startup_valid_to
+              ? [dayjs(legal.startup_valid_from), dayjs(legal.startup_valid_to)]
+              : null,
+        },
+
+        lei: {
+          number: legal.lei_no,
+          validity:
+            legal.lei_valid_from && legal.lei_valid_to
+              ? [dayjs(legal.lei_valid_from), dayjs(legal.lei_valid_to)]
+              : null,
+        },
+      },
+
       // ================= BRANCHES =================
       hasBranch: org.branches?.length > 0,
+
       branches: org.branches?.map((b) => ({
         branchName: b.name,
         shortName: b.short_name,
@@ -224,6 +444,7 @@ export default function AddOrganisation() {
       }, {}),
     };
   };
+
   useEffect(() => {
     if (orgData && isEdit) {
       const values = mapOrgToForm(orgData);
@@ -402,15 +623,159 @@ export default function AddOrganisation() {
   // };
 
   // updated latest payload builder with nested structures
+  // const buildPayload = (values) => {
+  //   return {
+  //     // ================= ORG CORE =================
+  //     registered_name: values.registeredName ?? "",
+  //     organisation_type: values.organisationType ?? "",
+  //     legal_type: values.organisationType ?? "",
+
+  //     rms_org_id: values.rmsOrgId ?? null,
+  //     head_office_location: values.businessLocation ?? null,
+
+  //     phone_number_1: values.phone ?? "",
+  //     phone_number_2: values.phone2 ?? null,
+
+  //     email: values.email ?? "",
+  //     secondary_email: values.secondaryEmail ?? null,
+
+  //     number_of_partners: values.partners?.length ?? 0,
+  //     is_active: true,
+
+  //     // ================= HQ ADDRESS =================
+  //     addresses: [
+  //       {
+  //         address_line_1: values.organisationAddress?.address ?? "",
+  //         address_line_2: values.organisationAddress?.address2 ?? "",
+  //         city: values.organisationAddress?.city ?? "",
+  //         state: values.organisationAddress?.state ?? "",
+  //         country: "India",
+  //         pin_code: values.organisationAddress?.pin ?? "",
+
+  //         latitude: null,
+  //         longitude: null,
+
+  //         address_type: "OWN",
+  //         address_category: "HQ",
+  //       },
+  //     ],
+
+  //     // ================= PERSONS =================
+  //     persons: (values.partners ?? []).map((p) => ({
+  //       full_name: p.name ?? "",
+
+  //       role:
+  //         values.organisationType === "PRIVATE_LIMITED"
+  //           ? "DIRECTOR"
+  //           : values.organisationType === "LLP" ||
+  //               values.organisationType === "Partnership"
+  //             ? "PARTNER"
+  //             : "PROPRIETOR",
+
+  //       director_type: "EXECUTIVE",
+  //       gender: p.gender ?? null,
+
+  //       date_of_birth: p.dob ? dayjs(p.dob).format("YYYY-MM-DD") : null,
+  //       interest_percentage: p.percentage ?? null,
+
+  //       phone_number_1: p.mobileNumber ?? null,
+  //       phone_number_2: null,
+  //       whatsapp_number: p.whatsappNumber ?? null,
+
+  //       email: p.email ?? null,
+  //       secondary_email: p.email2 ?? null,
+
+  //       present_address: p.currentAddress
+  //         ? `${p.currentAddress.address1 ?? ""}, ${p.currentAddress.city ?? ""}`
+  //         : null,
+
+  //       permanent_address: p.permanentAddress
+  //         ? `${p.permanentAddress.address1 ?? ""}, ${p.permanentAddress.city ?? ""}`
+  //         : null,
+
+  //       // ---------- FAMILY ----------
+  //       family_details: {
+  //         spouse_name: p.spouseName ?? null,
+  //         children_details:
+  //           p.childrenCount !== undefined ? String(p.childrenCount) : null,
+  //         parents_details: p.fatherName ?? null,
+  //       },
+
+  //       // ---------- BANK ----------
+  //       bank_details: {
+  //         bank_name: p.bankName ?? null,
+  //         account_holder_name: p.name ?? null,
+  //         account_number: p.accountNo ?? null,
+  //         ifsc_code: p.ifsc ?? null,
+  //         branch_name: p.branchName ?? null,
+  //       },
+
+  //       // ---------- COMPANY ----------
+  //       company_details: p.companyDetails
+  //         ? {
+  //             company_name: p.companyDetails.companyName ?? null,
+  //             registration_no: p.companyDetails.registrationNo ?? null,
+  //             gst_no: p.companyDetails.gstNo ?? null,
+  //             address: p.companyDetails.address?.city ?? null,
+  //             location: p.companyDetails.address?.state ?? null,
+  //           }
+  //         : null,
+  //     })),
+
+  //     // ================= LEGAL DETAILS =================
+  //     legal_details: {
+  //       pan_no: values.panNo ?? null,
+  //       gstin: values.gstin ?? null,
+  //       tin_no: values.tinNo ?? null,
+  //       cst_no: values.cstNo ?? null,
+  //       et_no: values.etNo ?? null,
+  //       udyog_aadhaar_no: values.udyamNo ?? null,
+  //       trade_license_no: values.tradeNo ?? null,
+  //     },
+
+  //     // ================= BRANCHES =================
+  //     branches: values.hasBranch
+  //       ? (values.branches ?? []).map((b) => ({
+  //           name: b.branchName ?? "",
+  //           short_name: b.shortName ?? "",
+  //           branch_head_name: null,
+  //           phone_number_1: null,
+  //           phone_number_2: null,
+  //           email: null,
+  //           type: "Main",
+
+  //           address: {
+  //             address_line_1: b.address1 ?? "",
+  //             address_line_2: b.address2 ?? "",
+  //             city: b.city ?? "",
+  //             state: b.state ?? "",
+  //             country: "India",
+  //             pin_code: b.pinNo ?? "",
+  //             address_type: "RENTED",
+  //             address_category: "BRANCH",
+  //           },
+  //         }))
+  //       : [],
+
+  //     // ================= DEPOS =================
+  //     depos: [],
+
+  //     // ================= MODULES =================
+  //     modules_input: modulesList
+  //       .filter((m) => values[`module_${m.id}`])
+  //       .map((m) => m.id),
+  //   };
+  // };
+
+  // third build payload
   const buildPayload = (values) => {
     return {
       // ================= ORG CORE =================
       registered_name: values.registeredName ?? "",
-      organisation_type: values.organisationType ?? "",
-      legal_type: values.organisationType ?? "",
-
       rms_org_id: values.rmsOrgId ?? null,
-      head_office_location: values.businessLocation ?? null,
+
+      organisation_type: values.organisationType ?? "",
+      legal_type: null,
 
       phone_number_1: values.phone ?? "",
       phone_number_2: values.phone2 ?? null,
@@ -419,6 +784,9 @@ export default function AddOrganisation() {
       secondary_email: values.secondaryEmail ?? null,
 
       number_of_partners: values.partners?.length ?? 0,
+      head_office_location: values.businessLocation ?? null,
+
+      owner: null,
       is_active: true,
 
       // ================= HQ ADDRESS =================
@@ -426,6 +794,7 @@ export default function AddOrganisation() {
         {
           address_line_1: values.organisationAddress?.address ?? "",
           address_line_2: values.organisationAddress?.address2 ?? "",
+          landmark: null,
           city: values.organisationAddress?.city ?? "",
           state: values.organisationAddress?.state ?? "",
           country: "India",
@@ -436,13 +805,14 @@ export default function AddOrganisation() {
 
           address_type: "OWN",
           address_category: "HQ",
+          is_branch: false,
+          agreement_document: null,
         },
       ],
 
       // ================= PERSONS =================
       persons: (values.partners ?? []).map((p) => ({
         full_name: p.name ?? "",
-
         role:
           values.organisationType === "PRIVATE_LIMITED"
             ? "DIRECTOR"
@@ -451,12 +821,6 @@ export default function AddOrganisation() {
               ? "PARTNER"
               : "PROPRIETOR",
 
-        director_type: "EXECUTIVE",
-        gender: p.gender ?? null,
-
-        date_of_birth: p.dob ? dayjs(p.dob).format("YYYY-MM-DD") : null,
-        interest_percentage: p.percentage ?? null,
-
         phone_number_1: p.mobileNumber ?? null,
         phone_number_2: null,
         whatsapp_number: p.whatsappNumber ?? null,
@@ -464,15 +828,18 @@ export default function AddOrganisation() {
         email: p.email ?? null,
         secondary_email: p.email2 ?? null,
 
+        gender: p.gender ?? null,
+        date_of_birth: p.dob ? dayjs(p.dob).format("YYYY-MM-DD") : null,
+        interest_percentage: p.percentage ?? null,
+
         present_address: p.currentAddress
-          ? `${p.currentAddress.address1 ?? ""}, ${p.currentAddress.city ?? ""}`
+          ? JSON.stringify(p.currentAddress)
           : null,
 
         permanent_address: p.permanentAddress
-          ? `${p.permanentAddress.address1 ?? ""}, ${p.permanentAddress.city ?? ""}`
+          ? JSON.stringify(p.permanentAddress)
           : null,
 
-        // ---------- FAMILY ----------
         family_details: {
           spouse_name: p.spouseName ?? null,
           children_details:
@@ -480,7 +847,6 @@ export default function AddOrganisation() {
           parents_details: p.fatherName ?? null,
         },
 
-        // ---------- BANK ----------
         bank_details: {
           bank_name: p.bankName ?? null,
           account_holder_name: p.name ?? null,
@@ -489,7 +855,6 @@ export default function AddOrganisation() {
           branch_name: p.branchName ?? null,
         },
 
-        // ---------- COMPANY ----------
         company_details: p.companyDetails
           ? {
               company_name: p.companyDetails.companyName ?? null,
@@ -503,13 +868,71 @@ export default function AddOrganisation() {
 
       // ================= LEGAL DETAILS =================
       legal_details: {
+        cin_no: values.cinNo ?? null,
+        cin_document: null,
+
+        gst_no: values.gstNo ?? null,
+        gst_document: null,
+
         pan_no: values.panNo ?? null,
-        gstin: values.gstin ?? null,
-        tin_no: values.tinNo ?? null,
-        cst_no: values.cstNo ?? null,
-        et_no: values.etNo ?? null,
-        udyog_aadhaar_no: values.udyamNo ?? null,
-        trade_license_no: values.tradeNo ?? null,
+        pan_document: null,
+
+        tan_no: values.tanNo ?? null,
+        tan_document: null,
+
+        msme_udyam_no: values.msmeNo ?? null,
+        msme_udyam_document: null,
+
+        esi_no: values.esiNo ?? null,
+        esi_document: null,
+
+        epf_no: values.epfNo ?? null,
+        epf_document: null,
+
+        professional_tax_no: values.professionalTaxNo ?? null,
+        professional_tax_document: null,
+        professional_tax_valid_from: values.professionalTaxValidity?.[0]
+          ? dayjs(values.professionalTaxValidity[0]).format("YYYY-MM-DD")
+          : null,
+        professional_tax_valid_to: values.professionalTaxValidity?.[1]
+          ? dayjs(values.professionalTaxValidity[1]).format("YYYY-MM-DD")
+          : null,
+
+        trade_license_no: values.tradeLicenseNo ?? null,
+        trade_license_document: null,
+        trade_license_valid_from: values.tradeLicenseValidity?.[0]
+          ? dayjs(values.tradeLicenseValidity[0]).format("YYYY-MM-DD")
+          : null,
+        trade_license_valid_to: values.tradeLicenseValidity?.[1]
+          ? dayjs(values.tradeLicenseValidity[1]).format("YYYY-MM-DD")
+          : null,
+
+        fssai_no: values.fssaiNo ?? null,
+        fssai_document: null,
+        fssai_valid_from: values.fssaiValidity?.[0]
+          ? dayjs(values.fssaiValidity[0]).format("YYYY-MM-DD")
+          : null,
+        fssai_valid_to: values.fssaiValidity?.[1]
+          ? dayjs(values.fssaiValidity[1]).format("YYYY-MM-DD")
+          : null,
+
+        startup_no: values.startupNo ?? null,
+        startup_document: null,
+        startup_valid_from: values.startupValidity?.[0]
+          ? dayjs(values.startupValidity[0]).format("YYYY-MM-DD")
+          : null,
+        startup_valid_to: values.startupValidity?.[1]
+          ? dayjs(values.startupValidity[1]).format("YYYY-MM-DD")
+          : null,
+
+        lei_no: values.leiNo ?? null,
+        lei_document: null,
+        lei_valid_from: values.leiValidity?.[0]
+          ? dayjs(values.leiValidity[0]).format("YYYY-MM-DD")
+          : null,
+        lei_valid_to: values.leiValidity?.[1]
+          ? dayjs(values.leiValidity[1]).format("YYYY-MM-DD")
+          : null,
       },
 
       // ================= BRANCHES =================
@@ -526,11 +949,19 @@ export default function AddOrganisation() {
             address: {
               address_line_1: b.address1 ?? "",
               address_line_2: b.address2 ?? "",
+              landmark: null,
               city: b.city ?? "",
               state: b.state ?? "",
               country: "India",
               pin_code: b.pinNo ?? "",
+
+              latitude: null,
+              longitude: null,
+
               address_type: "RENTED",
+              address_category: "BRANCH",
+              is_branch: true,
+              agreement_document: null,
             },
           }))
         : [],
@@ -544,6 +975,7 @@ export default function AddOrganisation() {
         .map((m) => m.id),
     };
   };
+
   const handleSubmit = () => {
     setSubmitError(null);
 
@@ -1526,174 +1958,334 @@ export default function AddOrganisation() {
 
   // Step 2: Legal Details
   const renderLegalDetails = () => (
-    <Row gutter={[16, 8]}>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item label="TIN No" name="tinNo">
-          <Input placeholder="Enter TIN" />
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item
-          label="TIN Document"
-          name="tinDocument"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false}>
-            <Button icon={<UploadOutlined />} size="small">
-              Upload
+    <>
+      <Form.Item label="Select Legal Documents" name="selectedLegalDocs">
+        <Checkbox.Group style={{ width: "100%" }}>
+          <Row gutter={[16, 8]}>
+            {LEGAL_DOCUMENTS.map((doc) => (
+              <Col xs={24} sm={12} md={4} key={doc.key}>
+                <Checkbox value={doc.key}>{doc.label}</Checkbox>
+              </Col>
+            ))}
+          </Row>
+        </Checkbox.Group>
+      </Form.Item>
+      {/* add more document section add */}
+      <Divider orientation="left">Other / Custom Documents</Divider>
+
+      <Form.List name="customLegalDocs">
+        {(fields, { add, remove }) => (
+          <>
+            {fields.map(({ key, name, ...restField }) => (
+              <Card
+                key={key}
+                size="small"
+                style={{ marginBottom: 16, background: "#fffbeb" }}
+                title={`Custom Document ${name + 1}`}
+                extra={
+                  <MinusCircleOutlined
+                    onClick={() => remove(name)}
+                    style={{ color: "#ef4444", cursor: "pointer" }}
+                  />
+                }
+              >
+                <Row gutter={[16, 8]}>
+                  {/* Document Name */}
+                  <Col xs={24} sm={12} md={6}>
+                    <Form.Item
+                      {...restField}
+                      label="Document Name"
+                      name={[name, "name"]}
+                      rules={[{ message: "Enter document name" }]}
+                    >
+                      <Input placeholder="e.g. Fire Safety Certificate" />
+                    </Form.Item>
+                  </Col>
+
+                  {/* Document Number */}
+                  <Col xs={24} sm={12} md={6}>
+                    <Form.Item
+                      {...restField}
+                      label="Document Number"
+                      name={[name, "number"]}
+                    >
+                      <Input placeholder="Enter document number" />
+                    </Form.Item>
+                  </Col>
+
+                  {/* Upload */}
+                  <Col xs={24} sm={12} md={6}>
+                    <Form.Item
+                      {...restField}
+                      label="Upload Document"
+                      name={[name, "document"]}
+                      valuePropName="fileList"
+                      getValueFromEvent={normFile}
+                    >
+                      <Upload beforeUpload={() => false}>
+                        <Button icon={<UploadOutlined />}>Upload</Button>
+                      </Upload>
+                    </Form.Item>
+                  </Col>
+
+                  {/* Validity */}
+                  <Col xs={24} sm={12} md={6}>
+                    <Form.Item
+                      {...restField}
+                      label="Validity Period"
+                      name={[name, "validity"]}
+                    >
+                      <DatePicker.RangePicker style={{ width: "100%" }} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </Card>
+            ))}
+
+            {/* ➕ ADD MORE BUTTON */}
+            <Button
+              type="dashed"
+              onClick={() => add({})}
+              icon={<PlusOutlined />}
+              block
+            >
+              Add More Document
             </Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item label="PAN No" name="panNo">
-          <Input placeholder="Enter PAN" />
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item
-          label="PAN Document"
-          name="panDocument"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false}>
-            <Button icon={<UploadOutlined />} size="small">
-              Upload
-            </Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item label="GSTIN" name="gstin">
-          <Input placeholder="Enter GSTIN" />
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item
-          label="GSTIN Document"
-          name="gstinDocument"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false}>
-            <Button icon={<UploadOutlined />} size="small">
-              Upload
-            </Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item label="ET No" name="etNo">
-          <Input placeholder="Enter ET No" />
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item
-          label="ET Document"
-          name="etDocument"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false}>
-            <Button icon={<UploadOutlined />} size="small">
-              Upload
-            </Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item label="CST No" name="cstNo">
-          <Input placeholder="Enter CST" />
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item
-          label="CST Document"
-          name="cstDocument"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false}>
-            <Button icon={<UploadOutlined />} size="small">
-              Upload
-            </Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item label="Udyam Certificate No" name="udyamNo">
-          <Input placeholder="Udyam No" />
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item
-          label="Udyam Document"
-          name="udyamDocument"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false}>
-            <Button icon={<UploadOutlined />} size="small">
-              Upload
-            </Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item label="MSME Certificate No" name="msmeNo">
-          <Input placeholder="MSME No" />
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item
-          label="MSME Document"
-          name="msmeDocument"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false}>
-            <Button icon={<UploadOutlined />} size="small">
-              Upload
-            </Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item label="Trade License No" name="tradeNo">
-          <Input placeholder="Trade No" />
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item
-          label="Edible Certificate"
-          name="edibleCertificate"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false}>
-            <Button icon={<UploadOutlined />} size="small">
-              Upload Document
-            </Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item
-          label="Startup India Certificate"
-          name="startupIndiaCertificate"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false}>
-            <Button icon={<UploadOutlined />} size="small">
-              Upload Document
-            </Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-    </Row>
+          </>
+        )}
+      </Form.List>
+
+      <Form.Item
+        noStyle
+        shouldUpdate={(prev, curr) =>
+          prev.selectedLegalDocs !== curr.selectedLegalDocs
+        }
+      >
+        {({ getFieldValue }) => {
+          const selected = getFieldValue("selectedLegalDocs") || [];
+
+          return selected.map((docKey) => {
+            const doc = LEGAL_DOCUMENTS.find((d) => d.key === docKey);
+            if (!doc) return null;
+
+            return (
+              <Card
+                key={doc.key}
+                size="small"
+                style={{ marginBottom: 16, background: "#fffbeb" }}
+                title={doc.label}
+              >
+                <Row gutter={[16, 8]}>
+                  {/* Document Number */}
+                  <Col xs={24} sm={12} md={6}>
+                    <Form.Item
+                      label={`${doc.label} Number`}
+                      name={["legalDetails", doc.key, "number"]}
+                    >
+                      <Input placeholder={`Enter ${doc.label} number`} />
+                    </Form.Item>
+                  </Col>
+
+                  {/* Upload */}
+                  <Col xs={24} sm={12} md={6}>
+                    <Form.Item
+                      label={`${doc.label} Document`}
+                      name={["legalDetails", doc.key, "document"]}
+                      valuePropName="fileList"
+                      getValueFromEvent={normFile}
+                    >
+                      <Upload beforeUpload={() => false}>
+                        <Button icon={<UploadOutlined />}>Upload</Button>
+                      </Upload>
+                    </Form.Item>
+                  </Col>
+
+                  {/* Validity – ONLY if Excel says Y */}
+                  {doc.validityRequired && (
+                    <Col xs={24} sm={12} md={8}>
+                      <Form.Item
+                        label="Validity Period"
+                        name={["legalDetails", doc.key, "validity"]}
+                      >
+                        <DatePicker.RangePicker style={{ width: "100%" }} />
+                      </Form.Item>
+                    </Col>
+                  )}
+                </Row>
+              </Card>
+            );
+          });
+        }}
+      </Form.Item>
+    </>
+    // <Row gutter={[16, 8]}>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item label="TIN No" name="tinNo">
+    //       <Input placeholder="Enter TIN" />
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item
+    //       label="TIN Document"
+    //       name="tinDocument"
+    //       valuePropName="fileList"
+    //       getValueFromEvent={normFile}
+    //     >
+    //       <Upload beforeUpload={() => false}>
+    //         <Button icon={<UploadOutlined />} size="small">
+    //           Upload
+    //         </Button>
+    //       </Upload>
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item label="PAN No" name="panNo">
+    //       <Input placeholder="Enter PAN" />
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item
+    //       label="PAN Document"
+    //       name="panDocument"
+    //       valuePropName="fileList"
+    //       getValueFromEvent={normFile}
+    //     >
+    //       <Upload beforeUpload={() => false}>
+    //         <Button icon={<UploadOutlined />} size="small">
+    //           Upload
+    //         </Button>
+    //       </Upload>
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item label="GSTIN" name="gstin">
+    //       <Input placeholder="Enter GSTIN" />
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item
+    //       label="GSTIN Document"
+    //       name="gstinDocument"
+    //       valuePropName="fileList"
+    //       getValueFromEvent={normFile}
+    //     >
+    //       <Upload beforeUpload={() => false}>
+    //         <Button icon={<UploadOutlined />} size="small">
+    //           Upload
+    //         </Button>
+    //       </Upload>
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item label="ET No" name="etNo">
+    //       <Input placeholder="Enter ET No" />
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item
+    //       label="ET Document"
+    //       name="etDocument"
+    //       valuePropName="fileList"
+    //       getValueFromEvent={normFile}
+    //     >
+    //       <Upload beforeUpload={() => false}>
+    //         <Button icon={<UploadOutlined />} size="small">
+    //           Upload
+    //         </Button>
+    //       </Upload>
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item label="CST No" name="cstNo">
+    //       <Input placeholder="Enter CST" />
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item
+    //       label="CST Document"
+    //       name="cstDocument"
+    //       valuePropName="fileList"
+    //       getValueFromEvent={normFile}
+    //     >
+    //       <Upload beforeUpload={() => false}>
+    //         <Button icon={<UploadOutlined />} size="small">
+    //           Upload
+    //         </Button>
+    //       </Upload>
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item label="Udyam Certificate No" name="udyamNo">
+    //       <Input placeholder="Udyam No" />
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item
+    //       label="Udyam Document"
+    //       name="udyamDocument"
+    //       valuePropName="fileList"
+    //       getValueFromEvent={normFile}
+    //     >
+    //       <Upload beforeUpload={() => false}>
+    //         <Button icon={<UploadOutlined />} size="small">
+    //           Upload
+    //         </Button>
+    //       </Upload>
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item label="MSME Certificate No" name="msmeNo">
+    //       <Input placeholder="MSME No" />
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item
+    //       label="MSME Document"
+    //       name="msmeDocument"
+    //       valuePropName="fileList"
+    //       getValueFromEvent={normFile}
+    //     >
+    //       <Upload beforeUpload={() => false}>
+    //         <Button icon={<UploadOutlined />} size="small">
+    //           Upload
+    //         </Button>
+    //       </Upload>
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item label="Trade License No" name="tradeNo">
+    //       <Input placeholder="Trade No" />
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item
+    //       label="Edible Certificate"
+    //       name="edibleCertificate"
+    //       valuePropName="fileList"
+    //       getValueFromEvent={normFile}
+    //     >
+    //       <Upload beforeUpload={() => false}>
+    //         <Button icon={<UploadOutlined />} size="small">
+    //           Upload Document
+    //         </Button>
+    //       </Upload>
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item
+    //       label="Startup India Certificate"
+    //       name="startupIndiaCertificate"
+    //       valuePropName="fileList"
+    //       getValueFromEvent={normFile}
+    //     >
+    //       <Upload beforeUpload={() => false}>
+    //         <Button icon={<UploadOutlined />} size="small">
+    //           Upload Document
+    //         </Button>
+    //       </Upload>
+    //     </Form.Item>
+    //   </Col>
+    // </Row>
   );
 
   // Step 3: Branch Details
