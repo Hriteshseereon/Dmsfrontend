@@ -88,6 +88,11 @@ export default function AddOrganisation() {
   const rule = ORG_RULES[orgType];
   const normFile = (e) => (Array.isArray(e) ? e : e?.fileList);
   const navigate = useNavigate();
+  // validation for mobile number: starts with 6-9 and has total 10 digits
+  const handleTenDigitNumber = (fieldPath) => (e) => {
+    const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+    form.setFieldValue(fieldPath, value);
+  };
 
   const steps = [
     { title: "Organisation", description: "Basic Details" },
@@ -97,50 +102,112 @@ export default function AddOrganisation() {
     { title: "Finalize", description: "Modules & Review" },
   ];
 
-  // const mapOrgToForm = (org) => ({
-  //   registeredName: org.registered_name,
-  //   organisationType: org.organisation_type,
-  //   phone: org.phone_number_1,
-  //   phone2: org.phone_number_2,
-  //   email: org.email,
-  //   secondaryEmail: org.secondary_email,
+  // legal documents section
+  const LEGAL_DOCUMENTS = [
+    {
+      key: "cin",
+      label: "CIN",
+      validityRequired: false,
+    },
+    {
+      key: "pan",
+      label: "PAN",
+      validityRequired: false,
+    },
+    {
+      key: "tan",
+      label: "TAN",
+      validityRequired: false,
+    },
+    {
+      key: "gst",
+      label: "GST",
+      validityRequired: false,
+    },
+    {
+      key: "msme",
+      label: "MSME",
+      validityRequired: false,
+    },
+    {
+      key: "esi",
+      label: "ESI",
+      validityRequired: false,
+    },
+    {
+      key: "epf",
+      label: "EPF",
+      validityRequired: false,
+    },
+    {
+      key: "professionalTax",
+      label: "Professional Tax",
+      validityRequired: true,
+    },
+    {
+      key: "tradeLicense",
+      label: "Trade License",
+      validityRequired: true,
+    },
+    {
+      key: "fssai",
+      label: "FSSAI",
+      validityRequired: true,
+    },
+    {
+      key: "startup",
+      label: "Startup India",
+      validityRequired: true,
+    },
+    {
+      key: "lei",
+      label: "LEI",
+      validityRequired: true,
+    },
+  ];
 
-  //   organisationAddress: {
-  //     address: org.addresses?.[0]?.address_line_1,
-  //     address2: org.addresses?.[0]?.address_line_2,
-  //     city: org.addresses?.[0]?.city,
-  //     state: org.addresses?.[0]?.state,
-  //     pin: org.addresses?.[0]?.pin_code,
-  //   },
+  const LEGAL_KEY_MAP = {
+    cin: "cin_no",
+    pan: "pan_no",
+    tan: "tan_no",
+    gst: "gst_no",
+    msme: "msme_udyam_no",
+    esi: "esi_no",
+    epf: "epf_no",
+    professionalTax: "professional_tax_no",
+    tradeLicense: "trade_license_no",
+    fssai: "fssai_no",
+    startup: "startup_no",
+    lei: "lei_no",
+  };
 
-  //   partners: org.persons?.map((p) => ({
-  //     name: p.full_name,
-  //     email: p.email,
-  //     mobileNumber: p.phone_number_1,
-  //     whatsappNumber: p.whatsapp_number,
-  //     gender: p.gender,
-  //   })),
-
-  //   hasBranch: org.branches?.length > 0,
-  //   branches: org.branches?.map((b) => ({
-  //     branchName: b.name,
-  //     shortName: b.short_name,
-  //     city: b.address?.city,
-  //     state: b.address?.state,
-  //     pinNo: b.address?.pin_code,
-  //   })),
-
-  //   ...org.modules_data?.reduce((acc, m) => {
-  //     acc[`module_${m.module}`] = m.is_enabled;
-  //     return acc;
-  //   }, {}),
-  // });
-
-  // updated mapping function to handle new fields and nested structures
+  // third payload to check with fields mapping while edit
   const mapOrgToForm = (org) => {
-    // ================= HQ ADDRESS =================
     const hqAddress = org.addresses?.find((a) => a.address_category === "HQ");
 
+    const legal = org.legal_details ?? {};
+    const selectedLegalDocs = Object.entries(LEGAL_KEY_MAP)
+      .filter(([formKey, apiKey]) => legal?.[apiKey])
+      .map(([formKey]) => formKey);
+
+    const legalDetails = Object.entries(LEGAL_KEY_MAP).reduce(
+      (acc, [formKey, apiKey]) => {
+        acc[formKey] = {
+          number: legal?.[apiKey] ?? null,
+        };
+
+        // Handle validity dynamically
+        const fromKey = apiKey.replace("_no", "_valid_from");
+        const toKey = apiKey.replace("_no", "_valid_to");
+
+        if (legal?.[fromKey] && legal?.[toKey]) {
+          acc[formKey].validity = [dayjs(legal[fromKey]), dayjs(legal[toKey])];
+        }
+
+        return acc;
+      },
+      {},
+    );
     return {
       // ================= ORG CORE =================
       registeredName: org.registered_name,
@@ -150,6 +217,7 @@ export default function AddOrganisation() {
       email: org.email,
       secondaryEmail: org.secondary_email,
       businessLocation: org.head_office_location,
+      partnersCount: org.number_of_partners ?? org.persons?.length ?? 0,
 
       // ================= HQ ADDRESS =================
       organisationAddress: {
@@ -162,29 +230,47 @@ export default function AddOrganisation() {
 
       // ================= PERSONS =================
       partners: org.persons?.map((p) => ({
+        id: p.id, // include ID for existing persons to handle updates
+        familyId: p.family_details?.id,
+        bankId: p.bank_details?.id,
+        companyId: p.company_details?.id,
         name: p.full_name,
         email: p.email,
         email2: p.secondary_email,
-
+        adharNo: p.aadhaar_no,
+        panNo: p.pan_no,
+        gstNo: p.gst_no,
+        adharDocument: null,
+        panDocument: null,
+        gstDocument: null,
         mobileNumber: p.phone_number_1,
+        contactNumber: p.phone_number_2,
         whatsappNumber: p.whatsapp_number,
 
         gender: p.gender,
         dob: p.date_of_birth ? dayjs(p.date_of_birth) : null,
-        percentage: p.interest_percentage
-          ? Number(p.interest_percentage)
+        percentage: p.percentage_of_interest
+          ? Number(p.percentage_of_interest)
           : null,
 
         fatherName: p.family_details?.parents_details,
         spouseName: p.family_details?.spouse_name,
         childrenCount: p.family_details?.children_details,
 
-        // 🔴 backend gives STRING, form needs nested object
         currentAddress: {
-          address1: p.present_address,
+          address1: p.current_address_line_1,
+          address2: p.current_address_line_2,
+          city: p.current_city,
+          state: p.current_state,
+          pin: p.current_pin_code,
         },
+
         permanentAddress: {
-          address1: p.permanent_address,
+          address1: p.permanent_address_line_1,
+          address2: p.permanent_address_line_2,
+          city: p.permanent_city,
+          state: p.permanent_state,
+          pin: p.permanent_pin_code,
         },
 
         bankName: p.bank_details?.bank_name,
@@ -195,6 +281,8 @@ export default function AddOrganisation() {
         companyDetails: p.company_details
           ? {
               companyName: p.company_details.company_name,
+              companyWebsite: p.company_details.website,
+              pin: p.company_details.pin_code,
               registrationNo: p.company_details.registration_no,
               gstNo: p.company_details.gst_no,
               address: {
@@ -205,16 +293,30 @@ export default function AddOrganisation() {
           : undefined,
       })),
 
+      // ================= LEGAL DETAILS =================
+
+      selectedLegalDocs,
+      legalDetails,
+
       // ================= BRANCHES =================
       hasBranch: org.branches?.length > 0,
+
       branches: org.branches?.map((b) => ({
+        id: b.id, // include ID for existing branches to handle updates
         branchName: b.name,
         shortName: b.short_name,
         city: b.address?.city,
+        gstin: b.gstin,
         state: b.address?.state,
         pinNo: b.address?.pin_code,
         address1: b.address?.address_line_1,
         address2: b.address?.address_line_2,
+        contacts: b.contacts?.map((c) => ({
+          id: c.id,
+          person: c.contact_person,
+          number: c.contact_number,
+          email: c.email,
+        })) ?? [{}],
       })),
 
       // ================= MODULES =================
@@ -224,6 +326,7 @@ export default function AddOrganisation() {
       }, {}),
     };
   };
+
   useEffect(() => {
     if (orgData && isEdit) {
       const values = mapOrgToForm(orgData);
@@ -289,128 +392,16 @@ export default function AddOrganisation() {
         return [];
     }
   };
-  // add a payload builder to handle file uploads and nested structures
-  // const buildPayload = (values) => {
-  //   return {
-  //     // ================= ORG CORE =================
-  //     registered_name: values.registeredName ?? "",
-  //     rms_org_id: values.rmsOrgId ?? null,
 
-  //     organisation_type: values.organisationType ?? "",
-  //     // legal_type: values.organisationType ?? "",
-
-  //     phone_number_1: values.phone ?? "",
-  //     phone_number_2: values.phone2 ?? null,
-
-  //     email: values.email ?? "",
-  //     secondary_email: values.secondaryEmail ?? null,
-
-  //     is_active: true,
-
-  //     // ================= HQ ADDRESS =================
-  //     addresses: [
-  //       {
-  //         address_line_1: values?.organisationAddress?.address ?? "",
-  //         address_line_2: values?.organisationAddress?.address2 ?? "",
-  //         city: values?.organisationAddress?.city ?? "",
-  //         state: values?.organisationAddress?.state ?? "",
-  //         pin_code: values?.organisationAddress?.pin ?? "",
-  //         country: "India",
-
-  //         address_type: "OWN",
-  //         address_category: "HQ",
-  //         is_branch: false,
-  //       },
-  //     ],
-
-  //     // ================= PERSONS =================
-  //     persons: (values.partners ?? []).map((p) => ({
-  //       full_name: p?.name ?? "",
-  //       role:
-  //         values.organisationType === "pvt"
-  //           ? "DIRECTOR"
-  //           : values.organisationType === "LLP" ||
-  //             values.organisationType === "partnership"
-  //             ? "PARTNER"
-  //             : "PROPRIETOR",
-
-  //       phone_number_1: p?.mobileNumber || p?.contactNumber || null,
-  //       phone_number_2: null,
-  //       whatsapp_number: p?.whatsappNumber ?? null,
-
-  //       email: p?.email ?? null,
-  //       gender: p?.gender ?? null,
-
-  //       // ---------- FAMILY ----------
-  //       family_details: {
-  //         spouse_name: p?.spouseName ?? null,
-  //         children_details:
-  //           p?.childrenCount !== undefined ? String(p.childrenCount) : null,
-  //         parents_details: p?.fatherName ?? null,
-  //       },
-
-  //       // ---------- BANK ----------
-  //       bank_details: {
-  //         bank_name: p?.bankName ?? null,
-  //         account_holder_name: p?.name ?? null,
-  //         account_number: p?.accountNo ?? null,
-  //         ifsc_code: p?.ifsc ?? null,
-  //         branch_name: p?.bankBranch ?? null,
-  //       },
-
-  //       // ---------- COMPANY ----------
-  //       company_details: p?.companyDetails
-  //         ? {
-  //           company_name: p.companyDetails.companyName ?? null,
-  //           registration_no: p.companyDetails.registrationNo ?? null,
-  //           gst_no: p.companyDetails.gstNo ?? null,
-  //           address: p.companyDetails.address?.city ?? null,
-  //           location: p.companyDetails.address?.state ?? null,
-  //         }
-  //         : null,
-  //     })),
-
-  //     // ================= BRANCHES =================
-  //     branches: values.hasBranch
-  //       ? (values.branches ?? []).map((b) => ({
-  //         name: b?.branchName ?? "",
-  //         short_name: b?.shortName ?? "",
-  //         phone_number_1: null,
-  //         email: null,
-  //         // type: "HQ",
-
-  //         address: {
-  //           address_line_1: b?.address1 ?? "",
-  //           address_line_2: b?.address2 ?? "",
-  //           city: b?.city ?? "",
-  //           state: b?.state ?? "",
-  //           pin_code: b?.pinNo ?? "",
-  //           country: "India",
-  //           address_type: "RENTED",
-  //         },
-  //       }))
-  //       : [],
-
-  //     // ================= DEPOS =================
-  //     depos: [],
-
-  //     // ================= MODULES =================
-  //     modules_input: modulesList
-  //       .filter((m) => values[`module_${m.id}`])
-  //       .map((m) => m.id),
-  //   };
-  // };
-
-  // updated latest payload builder with nested structures
+  // third build payload
   const buildPayload = (values) => {
     return {
       // ================= ORG CORE =================
       registered_name: values.registeredName ?? "",
-      organisation_type: values.organisationType ?? "",
-      legal_type: values.organisationType ?? "",
-
       rms_org_id: values.rmsOrgId ?? null,
-      head_office_location: values.businessLocation ?? null,
+
+      organisation_type: values.organisationType ?? "",
+      legal_type: null,
 
       phone_number_1: values.phone ?? "",
       phone_number_2: values.phone2 ?? null,
@@ -418,7 +409,11 @@ export default function AddOrganisation() {
       email: values.email ?? "",
       secondary_email: values.secondaryEmail ?? null,
 
-      number_of_partners: values.partners?.length ?? 0,
+      number_of_partners: values.partnersCount ?? values.partners?.length ?? 0,
+
+      head_office_location: values.businessLocation ?? null,
+
+      owner: null,
       is_active: true,
 
       // ================= HQ ADDRESS =================
@@ -426,6 +421,7 @@ export default function AddOrganisation() {
         {
           address_line_1: values.organisationAddress?.address ?? "",
           address_line_2: values.organisationAddress?.address2 ?? "",
+          landmark: null,
           city: values.organisationAddress?.city ?? "",
           state: values.organisationAddress?.state ?? "",
           country: "India",
@@ -436,13 +432,15 @@ export default function AddOrganisation() {
 
           address_type: "OWN",
           address_category: "HQ",
+          is_branch: false,
+          agreement_document: null,
         },
       ],
 
       // ================= PERSONS =================
       persons: (values.partners ?? []).map((p) => ({
+        id: p.id ?? undefined,
         full_name: p.name ?? "",
-
         role:
           values.organisationType === "PRIVATE_LIMITED"
             ? "DIRECTOR"
@@ -451,28 +449,34 @@ export default function AddOrganisation() {
               ? "PARTNER"
               : "PROPRIETOR",
 
-        director_type: "EXECUTIVE",
-        gender: p.gender ?? null,
-
-        date_of_birth: p.dob ? dayjs(p.dob).format("YYYY-MM-DD") : null,
-        interest_percentage: p.percentage ?? null,
-
         phone_number_1: p.mobileNumber ?? null,
-        phone_number_2: null,
+        phone_number_2: p.contactNumber ?? null,
         whatsapp_number: p.whatsappNumber ?? null,
 
         email: p.email ?? null,
         secondary_email: p.email2 ?? null,
+        aadhaar_no: p.adharNo ?? null,
+        aadhaar_document: p.adharDocument ?? null,
+        pan_no: p.panNo ?? null,
+        pan_document: p.panDocument ?? null,
+        gst_no: p.gstNo ?? null,
+        gst_document: p.gstDocument ?? null,
+        gender: p.gender ?? null,
+        date_of_birth: p.dob ? dayjs(p.dob).format("YYYY-MM-DD") : null,
+        percentage_of_interest: p.percentage ?? null,
 
-        present_address: p.currentAddress
-          ? `${p.currentAddress.address1 ?? ""}, ${p.currentAddress.city ?? ""}`
-          : null,
+        current_address_line_1: p.currentAddress?.address1 ?? null,
+        current_address_line_2: p.currentAddress?.address2 ?? null,
+        current_city: p.currentAddress?.city ?? null,
+        current_state: p.currentAddress?.state ?? null,
+        current_pin_code: p.currentAddress?.pin ?? null,
 
-        permanent_address: p.permanentAddress
-          ? `${p.permanentAddress.address1 ?? ""}, ${p.permanentAddress.city ?? ""}`
-          : null,
+        permanent_address_line_1: p.permanentAddress?.address1 ?? null,
+        permanent_address_line_2: p.permanentAddress?.address2 ?? null,
+        permanent_city: p.permanentAddress?.city ?? null,
+        permanent_state: p.permanentAddress?.state ?? null,
+        permanent_pin_code: p.permanentAddress?.pin ?? null,
 
-        // ---------- FAMILY ----------
         family_details: {
           spouse_name: p.spouseName ?? null,
           children_details:
@@ -480,7 +484,6 @@ export default function AddOrganisation() {
           parents_details: p.fatherName ?? null,
         },
 
-        // ---------- BANK ----------
         bank_details: {
           bank_name: p.bankName ?? null,
           account_holder_name: p.name ?? null,
@@ -489,48 +492,78 @@ export default function AddOrganisation() {
           branch_name: p.branchName ?? null,
         },
 
-        // ---------- COMPANY ----------
         company_details: p.companyDetails
           ? {
               company_name: p.companyDetails.companyName ?? null,
+              website: p.companyDetails.companyWebsite ?? null,
               registration_no: p.companyDetails.registrationNo ?? null,
               gst_no: p.companyDetails.gstNo ?? null,
               address: p.companyDetails.address?.city ?? null,
               location: p.companyDetails.address?.state ?? null,
+              pin_code: p.companyDetails.address?.pin ?? null,
             }
           : null,
       })),
 
       // ================= LEGAL DETAILS =================
-      legal_details: {
-        pan_no: values.panNo ?? null,
-        gstin: values.gstin ?? null,
-        tin_no: values.tinNo ?? null,
-        cst_no: values.cstNo ?? null,
-        et_no: values.etNo ?? null,
-        udyog_aadhaar_no: values.udyamNo ?? null,
-        trade_license_no: values.tradeNo ?? null,
-      },
+      legal_details: Object.entries(LEGAL_KEY_MAP).reduce(
+        (acc, [formKey, apiKey]) => {
+          const doc = values.legalDetails?.[formKey];
+
+          acc[apiKey] = doc?.number ?? null;
+          acc[apiKey.replace("_no", "_document")] = null;
+
+          if (doc?.validity?.[0]) {
+            acc[apiKey.replace("_no", "_valid_from")] = dayjs(
+              doc.validity[0],
+            ).format("YYYY-MM-DD");
+          }
+
+          if (doc?.validity?.[1]) {
+            acc[apiKey.replace("_no", "_valid_to")] = dayjs(
+              doc.validity[1],
+            ).format("YYYY-MM-DD");
+          }
+
+          return acc;
+        },
+        {},
+      ),
 
       // ================= BRANCHES =================
       branches: values.hasBranch
         ? (values.branches ?? []).map((b) => ({
+            id: b.id ?? undefined,
             name: b.branchName ?? "",
             short_name: b.shortName ?? "",
             branch_head_name: null,
             phone_number_1: null,
             phone_number_2: null,
             email: null,
+            gstin: b.gstin ?? null,
             type: "Main",
-
+            contacts: (b.contacts ?? []).map((c) => ({
+              id: c.id ?? undefined,
+              contact_person: c.person ?? "",
+              contact_number: c.number ?? "",
+              email: c.email ?? null,
+            })),
             address: {
               address_line_1: b.address1 ?? "",
               address_line_2: b.address2 ?? "",
+              landmark: null,
               city: b.city ?? "",
               state: b.state ?? "",
               country: "India",
               pin_code: b.pinNo ?? "",
+
+              latitude: null,
+              longitude: null,
+
               address_type: "RENTED",
+              address_category: "BRANCH",
+              is_branch: true,
+              agreement_document: null,
             },
           }))
         : [],
@@ -544,6 +577,7 @@ export default function AddOrganisation() {
         .map((m) => m.id),
     };
   };
+
   const handleSubmit = () => {
     setSubmitError(null);
 
@@ -618,12 +652,17 @@ export default function AddOrganisation() {
             name="phone2"
             rules={[
               {
-                pattern: /^[0-9]*$/,
-                message: "Only numbers are allowed",
+                pattern: /^[6-9]\d{9}$/,
+                message: "Enter a valid 10-digit mobile number",
               },
             ]}
           >
-            <Input placeholder="Enter phone number" />
+            <Input
+              placeholder="Enter phone number"
+              maxLength={10}
+              inputMode="numeric"
+              onChange={handleTenDigitNumber("phone2")}
+            />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12} md={6}>
@@ -680,9 +719,26 @@ export default function AddOrganisation() {
           <Form.Item
             label="State"
             name={["organisationAddress", "state"]}
-            rules={[{ required: true, message: "Enter state" }]}
+            rules={[
+              { required: true, message: "Enter state" },
+              {
+                pattern: /^[A-Za-z\s]+$/,
+                message: "Only alphabets are allowed",
+              },
+            ]}
           >
-            <Input placeholder="State" />
+            <Input
+              placeholder="State"
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^A-Za-z\s]/g, "");
+                form.setFieldsValue({
+                  organisationAddress: {
+                    ...form.getFieldValue("organisationAddress"),
+                    state: value,
+                  },
+                });
+              }}
+            />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12} md={4}>
@@ -826,12 +882,21 @@ export default function AddOrganisation() {
                       name={[name, "contactNumber"]}
                       rules={[
                         {
-                          pattern: /^[0-9]*$/,
-                          message: "Only numbers are allowed",
+                          pattern: /^[6-9]\d{9}$/,
+                          message: "Enter a valid 10-digit mobile number",
                         },
                       ]}
                     >
-                      <Input placeholder="Enter contact number" />
+                      <Input
+                        placeholder="Enter contact number"
+                        maxLength={10}
+                        inputMode="numeric"
+                        onChange={handleTenDigitNumber([
+                          "partners",
+                          name,
+                          "contactNumber",
+                        ])}
+                      />
                     </Form.Item>
                   </Col>
                   <Col xs={24} sm={12} md={6}>
@@ -841,12 +906,26 @@ export default function AddOrganisation() {
                       name={[name, "mobileNumber"]}
                       rules={[
                         {
-                          pattern: /^[0-9]*$/,
-                          message: "Only numbers are allowed",
+                          required: true,
+                          message: "Please enter mobile number",
+                        },
+
+                        {
+                          pattern: /^[6-9]\d{9}$/,
+                          message: "Enter a valid 10-digit mobile number",
                         },
                       ]}
                     >
-                      <Input placeholder="Enter mobile number" />
+                      <Input
+                        placeholder="Enter mobile number"
+                        maxLength={10}
+                        inputMode="numeric"
+                        onChange={handleTenDigitNumber([
+                          "partners",
+                          name,
+                          "mobileNumber",
+                        ])}
+                      />
                     </Form.Item>
                   </Col>
                   <Col xs={24} sm={12} md={6}>
@@ -856,12 +935,21 @@ export default function AddOrganisation() {
                       name={[name, "whatsappNumber"]}
                       rules={[
                         {
-                          pattern: /^[0-9]*$/,
-                          message: "Only numbers are allowed",
+                          pattern: /^[6-9]\d{9}$/,
+                          message: "Enter a valid 10-digit WhatsApp number",
                         },
                       ]}
                     >
-                      <Input placeholder="Enter WhatsApp number" />
+                      <Input
+                        placeholder="Enter WhatsApp number"
+                        maxLength={10}
+                        inputMode="numeric"
+                        onChange={handleTenDigitNumber([
+                          "partners",
+                          name,
+                          "whatsappNumber",
+                        ])}
+                      />
                     </Form.Item>
                   </Col>
                   <Col xs={24} sm={12} md={6}>
@@ -1377,7 +1465,7 @@ export default function AddOrganisation() {
                                   Company Website
                                 </span>
                               }
-                              name={[name, "companyWebsite"]}
+                              name={[name, "companyDetails", "companyWebsite"]}
                             >
                               <Input
                                 placeholder="https://www.example.com"
@@ -1451,15 +1539,22 @@ export default function AddOrganisation() {
                             label={<span>City</span>}
                             name={[name, "companyDetails", "address", "city"]}
                             rules={[
+                              { required: true, message: "Please enter city" },
                               {
                                 pattern: /^[A-Za-z\s]+$/,
-                                message: "Only letters are allowed",
+                                message: "Only alphabets are allowed",
                               },
                             ]}
                           >
                             <Input
                               placeholder="Enter city"
                               style={{ borderRadius: "6px" }}
+                              onChange={(e) => {
+                                e.target.value = e.target.value.replace(
+                                  /[^A-Za-z\s]/g,
+                                  "",
+                                );
+                              }}
                             />
                           </Form.Item>
                         </Col>
@@ -1479,11 +1574,39 @@ export default function AddOrganisation() {
                             <Input
                               placeholder="Enter state"
                               style={{ borderRadius: "6px" }}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(
+                                  /[^A-Za-z\s]/g,
+                                  "",
+                                );
+                                form.setFieldsValue({
+                                  partners: {
+                                    [name]: {
+                                      companyDetails: {
+                                        ...form.getFieldValue([
+                                          "partners",
+                                          name,
+                                          "companyDetails",
+                                        ]),
+                                        address: {
+                                          ...form.getFieldValue([
+                                            "partners",
+                                            name,
+                                            "companyDetails",
+                                            "address",
+                                          ]),
+                                          state: value,
+                                        },
+                                      },
+                                    },
+                                  },
+                                });
+                              }}
                             />
                           </Form.Item>
                         </Col>
 
-                        <Col xs={24} sm={12} md={4}>
+                        {/* <Col xs={24} sm={12} md={4}>
                           <Form.Item
                             {...restField}
                             label={<span>PIN Code</span>}
@@ -1501,7 +1624,7 @@ export default function AddOrganisation() {
                               style={{ borderRadius: "6px" }}
                             />
                           </Form.Item>
-                        </Col>
+                        </Col> */}
                       </Row>
                     </>
                   )}
@@ -1526,174 +1649,334 @@ export default function AddOrganisation() {
 
   // Step 2: Legal Details
   const renderLegalDetails = () => (
-    <Row gutter={[16, 8]}>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item label="TIN No" name="tinNo">
-          <Input placeholder="Enter TIN" />
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item
-          label="TIN Document"
-          name="tinDocument"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false}>
-            <Button icon={<UploadOutlined />} size="small">
-              Upload
+    <>
+      <Form.Item label="Select Legal Documents" name="selectedLegalDocs">
+        <Checkbox.Group style={{ width: "100%" }}>
+          <Row gutter={[16, 8]}>
+            {LEGAL_DOCUMENTS.map((doc) => (
+              <Col xs={24} sm={12} md={4} key={doc.key}>
+                <Checkbox value={doc.key}>{doc.label}</Checkbox>
+              </Col>
+            ))}
+          </Row>
+        </Checkbox.Group>
+      </Form.Item>
+      {/* add more document section add */}
+      <Divider orientation="left">Other / Custom Documents</Divider>
+
+      <Form.List name="customLegalDocs">
+        {(fields, { add, remove }) => (
+          <>
+            {fields.map(({ key, name, ...restField }) => (
+              <Card
+                key={key}
+                size="small"
+                style={{ marginBottom: 16, background: "#fffbeb" }}
+                title={`Custom Document ${name + 1}`}
+                extra={
+                  <MinusCircleOutlined
+                    onClick={() => remove(name)}
+                    style={{ color: "#ef4444", cursor: "pointer" }}
+                  />
+                }
+              >
+                <Row gutter={[16, 8]}>
+                  {/* Document Name */}
+                  <Col xs={24} sm={12} md={6}>
+                    <Form.Item
+                      {...restField}
+                      label="Document Name"
+                      name={[name, "name"]}
+                      rules={[{ message: "Enter document name" }]}
+                    >
+                      <Input placeholder="e.g. Fire Safety Certificate" />
+                    </Form.Item>
+                  </Col>
+
+                  {/* Document Number */}
+                  <Col xs={24} sm={12} md={6}>
+                    <Form.Item
+                      {...restField}
+                      label="Document Number"
+                      name={[name, "number"]}
+                    >
+                      <Input placeholder="Enter document number" />
+                    </Form.Item>
+                  </Col>
+
+                  {/* Upload */}
+                  <Col xs={24} sm={12} md={6}>
+                    <Form.Item
+                      {...restField}
+                      label="Upload Document"
+                      name={[name, "document"]}
+                      valuePropName="fileList"
+                      getValueFromEvent={normFile}
+                    >
+                      <Upload beforeUpload={() => false}>
+                        <Button icon={<UploadOutlined />}>Upload</Button>
+                      </Upload>
+                    </Form.Item>
+                  </Col>
+
+                  {/* Validity */}
+                  <Col xs={24} sm={12} md={6}>
+                    <Form.Item
+                      {...restField}
+                      label="Validity Period"
+                      name={[name, "validity"]}
+                    >
+                      <DatePicker.RangePicker style={{ width: "100%" }} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </Card>
+            ))}
+
+            {/* ➕ ADD MORE BUTTON */}
+            <Button
+              type="dashed"
+              onClick={() => add({})}
+              icon={<PlusOutlined />}
+              block
+            >
+              Add More Document
             </Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item label="PAN No" name="panNo">
-          <Input placeholder="Enter PAN" />
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item
-          label="PAN Document"
-          name="panDocument"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false}>
-            <Button icon={<UploadOutlined />} size="small">
-              Upload
-            </Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item label="GSTIN" name="gstin">
-          <Input placeholder="Enter GSTIN" />
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item
-          label="GSTIN Document"
-          name="gstinDocument"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false}>
-            <Button icon={<UploadOutlined />} size="small">
-              Upload
-            </Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item label="ET No" name="etNo">
-          <Input placeholder="Enter ET No" />
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item
-          label="ET Document"
-          name="etDocument"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false}>
-            <Button icon={<UploadOutlined />} size="small">
-              Upload
-            </Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item label="CST No" name="cstNo">
-          <Input placeholder="Enter CST" />
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item
-          label="CST Document"
-          name="cstDocument"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false}>
-            <Button icon={<UploadOutlined />} size="small">
-              Upload
-            </Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item label="Udyam Certificate No" name="udyamNo">
-          <Input placeholder="Udyam No" />
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item
-          label="Udyam Document"
-          name="udyamDocument"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false}>
-            <Button icon={<UploadOutlined />} size="small">
-              Upload
-            </Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item label="MSME Certificate No" name="msmeNo">
-          <Input placeholder="MSME No" />
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item
-          label="MSME Document"
-          name="msmeDocument"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false}>
-            <Button icon={<UploadOutlined />} size="small">
-              Upload
-            </Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item label="Trade License No" name="tradeNo">
-          <Input placeholder="Trade No" />
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item
-          label="Edible Certificate"
-          name="edibleCertificate"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false}>
-            <Button icon={<UploadOutlined />} size="small">
-              Upload Document
-            </Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-      <Col xs={24} sm={12} md={6}>
-        <Form.Item
-          label="Startup India Certificate"
-          name="startupIndiaCertificate"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false}>
-            <Button icon={<UploadOutlined />} size="small">
-              Upload Document
-            </Button>
-          </Upload>
-        </Form.Item>
-      </Col>
-    </Row>
+          </>
+        )}
+      </Form.List>
+
+      <Form.Item
+        noStyle
+        shouldUpdate={(prev, curr) =>
+          prev.selectedLegalDocs !== curr.selectedLegalDocs
+        }
+      >
+        {({ getFieldValue }) => {
+          const selected = getFieldValue("selectedLegalDocs") || [];
+
+          return selected.map((docKey) => {
+            const doc = LEGAL_DOCUMENTS.find((d) => d.key === docKey);
+            if (!doc) return null;
+
+            return (
+              <Card
+                key={doc.key}
+                size="small"
+                style={{ marginBottom: 16, background: "#fffbeb" }}
+                title={doc.label}
+              >
+                <Row gutter={[16, 8]}>
+                  {/* Document Number */}
+                  <Col xs={24} sm={12} md={6}>
+                    <Form.Item
+                      label={`${doc.label} Number`}
+                      name={["legalDetails", doc.key, "number"]}
+                    >
+                      <Input placeholder={`Enter ${doc.label} number`} />
+                    </Form.Item>
+                  </Col>
+
+                  {/* Upload */}
+                  <Col xs={24} sm={12} md={6}>
+                    <Form.Item
+                      label={`${doc.label} Document`}
+                      name={["legalDetails", doc.key, "document"]}
+                      valuePropName="fileList"
+                      getValueFromEvent={normFile}
+                    >
+                      <Upload beforeUpload={() => false}>
+                        <Button icon={<UploadOutlined />}>Upload</Button>
+                      </Upload>
+                    </Form.Item>
+                  </Col>
+
+                  {/* Validity – ONLY if Excel says Y */}
+                  {doc.validityRequired && (
+                    <Col xs={24} sm={12} md={8}>
+                      <Form.Item
+                        label="Validity Period"
+                        name={["legalDetails", doc.key, "validity"]}
+                      >
+                        <DatePicker.RangePicker style={{ width: "100%" }} />
+                      </Form.Item>
+                    </Col>
+                  )}
+                </Row>
+              </Card>
+            );
+          });
+        }}
+      </Form.Item>
+    </>
+    // <Row gutter={[16, 8]}>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item label="TIN No" name="tinNo">
+    //       <Input placeholder="Enter TIN" />
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item
+    //       label="TIN Document"
+    //       name="tinDocument"
+    //       valuePropName="fileList"
+    //       getValueFromEvent={normFile}
+    //     >
+    //       <Upload beforeUpload={() => false}>
+    //         <Button icon={<UploadOutlined />} size="small">
+    //           Upload
+    //         </Button>
+    //       </Upload>
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item label="PAN No" name="panNo">
+    //       <Input placeholder="Enter PAN" />
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item
+    //       label="PAN Document"
+    //       name="panDocument"
+    //       valuePropName="fileList"
+    //       getValueFromEvent={normFile}
+    //     >
+    //       <Upload beforeUpload={() => false}>
+    //         <Button icon={<UploadOutlined />} size="small">
+    //           Upload
+    //         </Button>
+    //       </Upload>
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item label="GSTIN" name="gstin">
+    //       <Input placeholder="Enter GSTIN" />
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item
+    //       label="GSTIN Document"
+    //       name="gstinDocument"
+    //       valuePropName="fileList"
+    //       getValueFromEvent={normFile}
+    //     >
+    //       <Upload beforeUpload={() => false}>
+    //         <Button icon={<UploadOutlined />} size="small">
+    //           Upload
+    //         </Button>
+    //       </Upload>
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item label="ET No" name="etNo">
+    //       <Input placeholder="Enter ET No" />
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item
+    //       label="ET Document"
+    //       name="etDocument"
+    //       valuePropName="fileList"
+    //       getValueFromEvent={normFile}
+    //     >
+    //       <Upload beforeUpload={() => false}>
+    //         <Button icon={<UploadOutlined />} size="small">
+    //           Upload
+    //         </Button>
+    //       </Upload>
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item label="CST No" name="cstNo">
+    //       <Input placeholder="Enter CST" />
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item
+    //       label="CST Document"
+    //       name="cstDocument"
+    //       valuePropName="fileList"
+    //       getValueFromEvent={normFile}
+    //     >
+    //       <Upload beforeUpload={() => false}>
+    //         <Button icon={<UploadOutlined />} size="small">
+    //           Upload
+    //         </Button>
+    //       </Upload>
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item label="Udyam Certificate No" name="udyamNo">
+    //       <Input placeholder="Udyam No" />
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item
+    //       label="Udyam Document"
+    //       name="udyamDocument"
+    //       valuePropName="fileList"
+    //       getValueFromEvent={normFile}
+    //     >
+    //       <Upload beforeUpload={() => false}>
+    //         <Button icon={<UploadOutlined />} size="small">
+    //           Upload
+    //         </Button>
+    //       </Upload>
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item label="MSME Certificate No" name="msmeNo">
+    //       <Input placeholder="MSME No" />
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item
+    //       label="MSME Document"
+    //       name="msmeDocument"
+    //       valuePropName="fileList"
+    //       getValueFromEvent={normFile}
+    //     >
+    //       <Upload beforeUpload={() => false}>
+    //         <Button icon={<UploadOutlined />} size="small">
+    //           Upload
+    //         </Button>
+    //       </Upload>
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item label="Trade License No" name="tradeNo">
+    //       <Input placeholder="Trade No" />
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item
+    //       label="Edible Certificate"
+    //       name="edibleCertificate"
+    //       valuePropName="fileList"
+    //       getValueFromEvent={normFile}
+    //     >
+    //       <Upload beforeUpload={() => false}>
+    //         <Button icon={<UploadOutlined />} size="small">
+    //           Upload Document
+    //         </Button>
+    //       </Upload>
+    //     </Form.Item>
+    //   </Col>
+    //   <Col xs={24} sm={12} md={6}>
+    //     <Form.Item
+    //       label="Startup India Certificate"
+    //       name="startupIndiaCertificate"
+    //       valuePropName="fileList"
+    //       getValueFromEvent={normFile}
+    //     >
+    //       <Upload beforeUpload={() => false}>
+    //         <Button icon={<UploadOutlined />} size="small">
+    //           Upload Document
+    //         </Button>
+    //       </Upload>
+    //     </Form.Item>
+    //   </Col>
+    // </Row>
   );
 
   // Step 3: Branch Details
@@ -1989,7 +2272,7 @@ export default function AddOrganisation() {
         ))}
       </Row>
 
-      <Divider
+      {/* <Divider
         orientation="left"
         style={{ color: "#d97706", fontWeight: 600, marginTop: 24 }}
       >
@@ -2001,7 +2284,7 @@ export default function AddOrganisation() {
             <TextArea rows={4} placeholder="Optional notes or remarks" />
           </Form.Item>
         </Col>
-      </Row>
+      </Row> */}
     </>
   );
 
