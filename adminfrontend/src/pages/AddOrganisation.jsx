@@ -356,17 +356,27 @@ export default function AddOrganisation() {
 
       // ================= PERSONS =================
       partners: org.persons?.map((p) => ({
+        id: p.id, // include ID for existing persons to handle updates
+        familyId: p.family_details?.id,
+        bankId: p.bank_details?.id,
+        companyId: p.company_details?.id,
         name: p.full_name,
         email: p.email,
         email2: p.secondary_email,
-
+        adharNo: p.aadhaar_no,
+        panNo: p.pan_no,
+        gstNo: p.gst_no,
+        adharDocument: null,
+        panDocument: null,
+        gstDocument: null,
         mobileNumber: p.phone_number_1,
+        contactNumber: p.phone_number_2,
         whatsappNumber: p.whatsapp_number,
 
         gender: p.gender,
         dob: p.date_of_birth ? dayjs(p.date_of_birth) : null,
-        percentage: p.interest_percentage
-          ? Number(p.interest_percentage)
+        percentage: p.percentage_of_interest
+          ? Number(p.percentage_of_interest)
           : null,
 
         fatherName: p.family_details?.parents_details,
@@ -374,19 +384,19 @@ export default function AddOrganisation() {
         childrenCount: p.family_details?.children_details,
 
         currentAddress: {
-          address1: "",
-          address2: "",
-          city: "",
-          state: "",
-          pin: "",
+          address1: p.current_address_line_1,
+          address2: p.current_address_line_2,
+          city: p.current_city,
+          state: p.current_state,
+          pin: p.current_pin_code,
         },
 
         permanentAddress: {
-          address1: "",
-          address2: "",
-          city: "",
-          state: "",
-          pin: "",
+          address1: p.permanent_address_line_1,
+          address2: p.permanent_address_line_2,
+          city: p.permanent_city,
+          state: p.permanent_state,
+          pin: p.permanent_pin_code,
         },
 
         bankName: p.bank_details?.bank_name,
@@ -397,6 +407,8 @@ export default function AddOrganisation() {
         companyDetails: p.company_details
           ? {
               companyName: p.company_details.company_name,
+              companyWebsite: p.company_details.website,
+              pin: p.company_details.pin_code,
               registrationNo: p.company_details.registration_no,
               gstNo: p.company_details.gst_no,
               address: {
@@ -416,6 +428,7 @@ export default function AddOrganisation() {
       hasBranch: org.branches?.length > 0,
 
       branches: org.branches?.map((b) => ({
+        id: b.id, // include ID for existing branches to handle updates
         branchName: b.name,
         shortName: b.short_name,
         city: b.address?.city,
@@ -800,6 +813,7 @@ export default function AddOrganisation() {
 
       // ================= PERSONS =================
       persons: (values.partners ?? []).map((p) => ({
+        id: p.id ?? undefined,
         full_name: p.name ?? "",
         role:
           values.organisationType === "PRIVATE_LIMITED"
@@ -810,23 +824,32 @@ export default function AddOrganisation() {
               : "PROPRIETOR",
 
         phone_number_1: p.mobileNumber ?? null,
-        phone_number_2: null,
+        phone_number_2: p.contactNumber ?? null,
         whatsapp_number: p.whatsappNumber ?? null,
 
         email: p.email ?? null,
         secondary_email: p.email2 ?? null,
-
+        aadhaar_no: p.adharNo ?? null,
+        aadhaar_document: p.adharDocument ?? null,
+        pan_no: p.panNo ?? null,
+        pan_document: p.panDocument ?? null,
+        gst_no: p.gstNo ?? null,
+        gst_document: p.gstDocument ?? null,
         gender: p.gender ?? null,
         date_of_birth: p.dob ? dayjs(p.dob).format("YYYY-MM-DD") : null,
-        interest_percentage: p.percentage ?? null,
+        percentage_of_interest: p.percentage ?? null,
 
-        present_address: p.currentAddress
-          ? JSON.stringify(p.currentAddress)
-          : null,
+        current_address_line_1: p.currentAddress?.address1 ?? null,
+        current_address_line_2: p.currentAddress?.address2 ?? null,
+        current_city: p.currentAddress?.city ?? null,
+        current_state: p.currentAddress?.state ?? null,
+        current_pin_code: p.currentAddress?.pin ?? null,
 
-        permanent_address: p.permanentAddress
-          ? JSON.stringify(p.permanentAddress)
-          : null,
+        permanent_address_line_1: p.permanentAddress?.address1 ?? null,
+        permanent_address_line_2: p.permanentAddress?.address2 ?? null,
+        permanent_city: p.permanentAddress?.city ?? null,
+        permanent_state: p.permanentAddress?.state ?? null,
+        permanent_pin_code: p.permanentAddress?.pin ?? null,
 
         family_details: {
           spouse_name: p.spouseName ?? null,
@@ -846,10 +869,12 @@ export default function AddOrganisation() {
         company_details: p.companyDetails
           ? {
               company_name: p.companyDetails.companyName ?? null,
+              website: p.companyDetails.companyWebsite ?? null,
               registration_no: p.companyDetails.registrationNo ?? null,
               gst_no: p.companyDetails.gstNo ?? null,
               address: p.companyDetails.address?.city ?? null,
               location: p.companyDetails.address?.state ?? null,
+              pin_code: p.companyDetails.address?.pin ?? null,
             }
           : null,
       })),
@@ -882,14 +907,21 @@ export default function AddOrganisation() {
       // ================= BRANCHES =================
       branches: values.hasBranch
         ? (values.branches ?? []).map((b) => ({
+            id: b.id ?? undefined,
             name: b.branchName ?? "",
             short_name: b.shortName ?? "",
             branch_head_name: null,
             phone_number_1: null,
             phone_number_2: null,
             email: null,
+            gstin: b.gstin ?? null,
             type: "Main",
-
+            contacts: (b.contacts ?? []).map((c) => ({
+              id: c.id ?? undefined,
+              contact_person: c.person ?? "",
+              contact_number: c.number ?? "",
+              email: c.email ?? null,
+            })),
             address: {
               address_line_1: b.address1 ?? "",
               address_line_2: b.address2 ?? "",
@@ -1913,7 +1945,7 @@ export default function AddOrganisation() {
                           </Form.Item>
                         </Col>
 
-                        <Col xs={24} sm={12} md={4}>
+                        {/* <Col xs={24} sm={12} md={4}>
                           <Form.Item
                             {...restField}
                             label={<span>PIN Code</span>}
@@ -1931,7 +1963,7 @@ export default function AddOrganisation() {
                               style={{ borderRadius: "6px" }}
                             />
                           </Form.Item>
-                        </Col>
+                        </Col> */}
                       </Row>
                     </>
                   )}
