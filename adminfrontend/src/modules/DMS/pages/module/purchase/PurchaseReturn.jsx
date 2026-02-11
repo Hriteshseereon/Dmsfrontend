@@ -21,7 +21,7 @@ import {
   FilterOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-
+import { getPurchaseReturn } from "../../../../../api/purchase";
 // 🔹 JSON Data
 const purchaseReturnJSON = {
   records: [
@@ -93,8 +93,7 @@ const purchaseReturnJSON = {
 };
 
 export default function PurchaseReturn() {
-  const [data, setData] = useState(purchaseReturnJSON.records);
-  const [searchText, setSearchText] = useState("");
+   const [searchText, setSearchText] = useState("");
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -104,20 +103,51 @@ export default function PurchaseReturn() {
   const [viewForm] = Form.useForm();
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
+const [data, setData] = useState([]);
+const [loading, setLoading] = useState(false);
+
+useEffect(() => {
+  fetchPurchaseReturns();
+}, []);
+
+const fetchPurchaseReturns = async () => {
+  try {
+    setLoading(true);
+    const res = await getPurchaseReturn();
+
+    // if API returns { data: [...] }
+    const records = res.data || res;
+
+    setData(
+      records.map((item, index) => ({
+        key: item.id || index + 1,
+        ...item,
+      }))
+    );
+  } catch (error) {
+    console.error("Failed to fetch purchase returns", error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleSearch = (value) => {
-    setSearchText(value);
-    if (!value) {
-      setData(purchaseReturnJSON.records);
-    } else {
-      const filtered = purchaseReturnJSON.records.filter((item) =>
-        Object.values(item).some((field) =>
-          String(field).toLowerCase().includes(value.toLowerCase())
-        )
-      );
-      setData(filtered);
-    }
-  };
+  setSearchText(value);
+
+  if (!value) {
+    fetchPurchaseReturns();
+    return;
+  }
+
+  const filtered = data.filter((item) =>
+    Object.values(item).some((field) =>
+      String(field).toLowerCase().includes(value.toLowerCase())
+    )
+  );
+
+  setData(filtered);
+};
+
 
   const calculateTotals = (values) => {
     const qty = parseFloat(values.quantity || 0);
@@ -604,8 +634,14 @@ export default function PurchaseReturn() {
           Manage your purchase Return easily
         </p>
 
-        <Table columns={columns} dataSource={data} pagination={false} />
-      </div>
+       <Table
+  columns={columns}
+  dataSource={data}
+  loading={loading}
+  rowKey="key"
+  pagination={false}
+/>
+ </div>
       {/* Edit Modal */}
       <Modal
         title={

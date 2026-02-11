@@ -21,7 +21,7 @@ import {
   EditOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-
+import { getPurchaseInvoice } from "../../../../../api/purchase";
 const { Option } = Select;
 
 // ------------------------------
@@ -198,8 +198,9 @@ const purchaseInvoiceJSON = {
 };
 
 export default function PurchaseInvoice() {
-  const [data, setData] = useState(purchaseInvoiceJSON.records);
-  const [searchText, setSearchText] = useState("");
+  const [data, setData] = useState([]);
+const [loading, setLoading] = useState(false);
+ const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -229,6 +230,30 @@ export default function PurchaseInvoice() {
     }
   };
 
+  useEffect(() => {
+  fetchPurchaseInvoices();
+}, []);
+
+const fetchPurchaseInvoices = async () => {
+  try {
+    setLoading(true);
+    const res = await getPurchaseInvoice();
+
+    // map backend response to table format if needed
+    const formatted = res.map((item, index) => ({
+      key: index + 1,
+      ...item,
+    }));
+
+    setData(formatted);
+  } catch (err) {
+    message.error("Failed to load purchase invoices");
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+};
+
   const columns = [
     {
       title: <span className="text-amber-700 font-semibold">Indent No</span>,
@@ -254,17 +279,17 @@ export default function PurchaseInvoice() {
     // },
     {
       title: <span className="text-amber-700 font-semibold">Total Qty</span>,
-      dataIndex: "totalQty",
+      dataIndex: "total_qty",
       width: 100,
       render: (text, record) => (
         <span className="text-amber-800">
-          {record.totalQty} {record.uom}
+          {record.total_qty} {record.uom}
         </span>
       ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Total Amount</span>,
-      dataIndex: "totalAmount",
+      dataIndex: "total_amount",
       width: 140,
       render: (text) => <span className="text-amber-800 ">{text}</span>,
     },
@@ -289,7 +314,7 @@ export default function PurchaseInvoice() {
     // },
     {
       title: <span className="text-amber-700 font-semibold">Transporter</span>,
-      dataIndex: "transporterName",
+      dataIndex: "transport",
       width: 160,
       render: (transporter, record) => (
         <span className="text-amber-800">{transporter || "-"}</span>
@@ -948,8 +973,14 @@ export default function PurchaseInvoice() {
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">Purchase Invoice Records</h2>
         <p className="text-amber-600 mb-3">Manage your purchase invoice data</p>
-        <Table columns={columns} dataSource={data} pagination={false} scroll={{ y: 240 }} />
-      </div>
+       <Table
+  columns={columns}
+  dataSource={data}
+  loading={loading}
+  pagination={false}
+  scroll={{ y: 240 }}
+/>
+  </div>
 
       {/* ➤ Add Modal */}
       <Modal

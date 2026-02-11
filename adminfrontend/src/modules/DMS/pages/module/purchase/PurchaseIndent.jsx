@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react"; 
 import { positiveNumberInputProps } from "../../../helpers/numberInput";
 import {
   requiredPositiveNumber,
   optionalPositiveNumber,
   percentageValidation,
 } from "../../../helpers/formValidation";
-
+import { getPurchaseOrder,getPurchaseContract ,getSoudaByContractId,addPurchaseOrder} from "../../../../../api/purchase";
 import {
   Table,
   Input,
@@ -103,201 +103,319 @@ export default function PurchaseIndent() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const [data, setData] = useState(purchaseIndentJSON.records);
+ const [soudaContracts, setSoudaContracts] = useState([]);
+  const [data, setData] = useState([]);
+ const [loading, setLoading] = useState(false);
+ const [contractItems, setContractItems] = useState([]);
+const [vendor, setVendor] = useState(null);
+const [selectedVendor, setSelectedVendor] = useState(null);
+
   const [searchText, setSearchText] = useState("");
 
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
+  useEffect(() => {
+  fetchPurchaseOrder();
+  fetchSoudaNoOptions();
+}, []);
 
-  const handleSearch = (value) => {
-    setSearchText(value);
-    if (!value) {
-      setData(purchaseIndentJSON.records);
-      return;
-    }
-    const filtered = purchaseIndentJSON.records.filter((item) =>
-      Object.values(item)
-        .flatMap((v) =>
-          Array.isArray(v) ? v.map((x) => JSON.stringify(x)) : v
-        )
-        .join(" ")
-        .toLowerCase()
-        .includes(value.toLowerCase())
-    );
-    setData(filtered);
-  };
+const fetchPurchaseOrder = async () => {
+  try {
+    setLoading(true);
 
-  // when souda selected - populate basic info AND items list (user can add/remove items)
-  const handleSoudaSelect = (soudaNo, formInstance) => {
-    if (!soudaNo) return;
-    const souda = soudaMaster[soudaNo];
-    if (!souda) return;
+    const res = await getPurchaseOrder();
 
-    // map items into form list entries (qty/free qty blank so user can fill)
-    const itemsForForm = souda.items.map((it) => ({
-      item: it.item,
-      itemCode: it.itemCode,
-      qty: undefined,
-      freeQty: 0,
-      totalQty: undefined,
-      uom: it.uom || purchaseIndentJSON.uomOptions[0],
-      rate: it.rate || 0,
-      discountPercent: 0,
+    // adjust if API response is wrapped (res.data)
+    const list = res?.data || res;
+
+const formattedData = list.map((item, index) => ({
+  key: item.id || index + 1,
+  contract: item.contract,
+  plant_name: item.plant_name,
+  order_number: item.order_number,
+  vendor_name: item.vendor_name,
+  total_qty_all_items: item.total_qty_all_items || 0,
+  grand_total: item.grand_total || item.total_amount || 0,  // 🔥 ADD THIS
+  status: item.status || "Pending",
+}));
+
+
+
+    setData(formattedData);
+  } catch (error) {
+    console.error("Failed to fetch purchase orders", error);
+    message.error("Failed to load purchase indents");
+  } finally {
+    setLoading(false);
+  }
+};
+const round2 = (num) => Number((num || 0).toFixed(2));
+
+const fetchSoudaNoOptions = async () => {
+  try {
+    const res = await getPurchaseContract();
+    const list = res?.data || res;
+    setSoudaContracts(list);
+  } catch (err) {
+    message.error("Failed to load souda numbers");
+  }
+};
+
+
+
+const handleSearch = (value) => {
+  setSearchText(value);
+
+  if (!value) {
+    fetchPurchaseOrder();
+    return;
+  }
+
+  const filtered = data.filter((item) =>
+    JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
+  );
+
+  setData(filtered);
+};
+
+
+const handleSoudaSelect = async (contractId, formInstance) => {
+  if (!contractId) return;
+
+  try {
+    const res = await getSoudaByContractId(contractId);
+    const data = res?.data || res;
+
+    // 🔑 SAVE ITEMS FOR ITEM DROPDOWN
+    setContractItems(data.items || []);
+
+    const itemsForForm = (data.items || []).map((it) => ({
+      product: it.product,
+      hsn_code: it.hsn_code,
+      item: it.item_name,          // used for Select
+      itemCode: it.product,        // or a
+      totalQty: Number(it.qty || 0) + Number(it.free_qty || 0),
+      uom: it.uom_details?.unit_name,
+      rate: Number(it.rate || 0),
+      discountPercent: Number(it.discount_percent || 0),
       discountAmt: 0,
-      grossWt: 0,
-      totalGrossWt: 0,
-      grossAmount: 0,
+  
+   
+    
     }));
 
-    formInstance.setFieldsValue({
-      soudaNo: souda.soudaNo,
-      plantName: souda.plantName,
-      plantCode: souda.plantCode,
-      companyName: souda.companyName,
-      depoName: souda.depoName,
-      deliveryAddress: souda.deliveryAddress || "",
-      items: itemsForForm,
-    });
+formInstance.setFieldsValue({
+  vendor: data.vendor,           // ID
+  vendorName: data.vendor_name,  // UI only
 
-    // recalc after a tick
-    setTimeout(() => recalcAll(formInstance), 50);
-  };
+  plantId: data.plant,
+  plantName: data.plant_name,
 
-  // recalc same as before, but for multi items
-  const recalcAll = (formInstance) => {
-    if (!formInstance) return;
-    const values = formInstance.getFieldsValue(true);
-    const items = values.items || [];
+  deliveryAddress: data.delivery_address,
+  items: itemsForForm,
+});
 
-    let totalIndentQty = 0;
-    let taxableAmount = 0;
 
-    const updatedItems = items.map((item) => {
-      const qty = Number(item?.qty || 0);
-      const freeQty = Number(item?.freeQty || 0);
-      const rate = Number(item?.rate || 0);
-      const discountPercent = Number(item?.discountPercent || 0);
-      const grossWt = Number(item?.grossWt || 0);
+    setTimeout(() => recalcAll(formInstance), 0);
+  } catch (err) {
+    message.error("Failed to load souda details");
+  }
+  setSelectedVendor(data.vendor);
 
-      const totalQty = qty + freeQty;
-      const grossAmount = qty * rate;
-      const discountAmt = (grossAmount * discountPercent) / 100;
-      const itemTaxable = grossAmount - discountAmt;
-      const totalGrossWt = grossWt;
+};
 
-      totalIndentQty += totalQty;
-      taxableAmount += itemTaxable;
 
-      return {
-        ...item,
-        totalQty,
-        grossAmount,
-        discountAmt,
-        totalGrossWt,
-      };
-    });
 
-    // taxes (kept simple; you can adjust to compute correctly per indent)
-    const sgstPercent = Number(values.sgstPercent || 0);
-    const cgstPercent = Number(values.cgstPercent || 0);
-    const igstPercent = Number(values.igstPercent || 0);
-    const tcsAmt = Number(values.tcsAmt || 0);
+ const recalcAll = (formInstance) => {
+  if (!formInstance) return;
 
-    const sgst = (taxableAmount * sgstPercent) / 100;
-    const cgst = (taxableAmount * cgstPercent) / 100;
-    const igst = (taxableAmount * igstPercent) / 100;
-    const totalGST = sgst + cgst + igst;
-    const totalAmt = taxableAmount + totalGST + tcsAmt;
+  const values = formInstance.getFieldsValue(true);
+  const items = values.items || [];
 
-    formInstance.setFieldsValue({
-      items: updatedItems,
-      totalQty: totalIndentQty,
-      sgst,
-      cgst,
-      igst,
-      totalGST,
-      tcsAmt,
-      totalAmt,
-    });
-  };
+  let totalIndentQty = 0;
+  let taxableAmount = 0;
 
-  const handleFormSubmit = (values, type) => {
-    const payloadBase = {
-      ...values,
-      indentDate: values.indentDate
-        ? values.indentDate.format("YYYY-MM-DD")
-        : null,
-      deliveryDate: values.deliveryDate
-        ? values.deliveryDate.format("YYYY-MM-DD")
-        : null,
+  const updatedItems = items.map((item) => {
+    const qty = Number(item?.qty || 0);
+    const freeQty = Number(item?.freeQty || 0);
+    const rate = Number(item?.rate || 0);
+    const discountPercent = Number(item?.discountPercent || 0);
+
+    const totalQty = qty + freeQty;
+    const grossAmount = round2(qty * rate);
+    const discountAmt = round2((grossAmount * discountPercent) / 100);
+    const itemTaxable = round2(grossAmount - discountAmt);
+
+    totalIndentQty += totalQty;
+    taxableAmount += itemTaxable;
+
+    return {
+      ...item,
+      totalQty,
+      grossAmount,
+      discountAmt,
     };
+  });
 
-    const items = values.items || [];
+  taxableAmount = round2(taxableAmount);
 
-    const payload = {
-      ...payloadBase,
-      items,
-      totalQty: values.totalQty,
-      totalAmt: values.totalAmt,
-      status: values.status || "Pending",
-    };
+  const sgstPercent = Number(values.sgstPercent || 0);
+  const cgstPercent = Number(values.cgstPercent || 0);
+  const igstPercent = Number(values.igstPercent || 0);
+  const tcsAmt = Number(values.tcsAmt || 0);
 
-    if (type === "edit" && selectedRecord) {
-      setData((prev) =>
-        prev.map((i) =>
-          i.key === selectedRecord.key ? { ...payload, key: i.key } : i
-        )
-      );
-      setIsEditModalOpen(false);
-      editForm.resetFields();
-      message.success("Indent updated");
-    } else {
-      setData((prev) => [...prev, { ...payload, key: Date.now() }]);
-      setIsAddModalOpen(false);
-      addForm.resetFields();
-      message.success("Indent added");
+  const sgst = round2((taxableAmount * sgstPercent) / 100);
+  const cgst = round2((taxableAmount * cgstPercent) / 100);
+  const igst = round2((taxableAmount * igstPercent) / 100);
+
+  const totalGST = round2(sgst + cgst + igst);
+  const totalAmt = round2(taxableAmount + totalGST + tcsAmt);
+
+  formInstance.setFieldsValue({
+    items: updatedItems,
+    totalQty: totalIndentQty,
+    sgst,
+    cgst,
+    igst,
+    totalGST,
+    tcsAmt: round2(tcsAmt),
+    totalAmt,
+  });
+};
+
+
+
+const handleFormSubmit = async (values) => {
+  const taxableAmount =
+  values.items?.reduce((sum, item) => {
+    const gross = Number(item.grossAmount || 0);
+    const discount = Number(item.discountAmt || 0);
+    return sum + (gross - discount);
+  }, 0) || 0;
+
+const sgst = round2(
+  (taxableAmount * Number(values.sgstPercent || 0)) / 100
+);
+
+const cgst = round2(
+  (taxableAmount * Number(values.cgstPercent || 0)) / 100
+);
+
+const igst = round2(
+  (taxableAmount * Number(values.igstPercent || 0)) / 100
+);
+
+const totalGST = round2(sgst + cgst + igst);
+const totalAmt = round2(taxableAmount + totalGST + Number(values.tcsAmt || 0));
+  try {
+    const selectedContract = soudaContracts.find(
+      (c) => c.id === values.contract
+    );
+
+   const payload = {
+  contract: values.contract,
+  vendor: selectedContract?.vendor,
+  souda_no: selectedContract?.contract_number,
+
+  plant_name: values.plantName || "",
+  plant_display_name: values.plantName || "",
+  delivery_address: values.deliveryAddress || "",
+
+  order_date: values.order_date?.format("YYYY-MM-DD"),
+  expected_receiving_date: values.expected_receiving_date?.format("YYYY-MM-DD"),
+
+  status: values.status || "Fresh",
+
+  // 🔥 IMPORTANT — ADD THESE
+  total_qty_all_items: Number(values.totalQty || 0),
+sgst: Number(values.sgstPercent || 0),   // percentage
+cgst: Number(values.cgstPercent || 0),   // percentage
+igst: Number(values.igstPercent || 0),   // percentage
+
+total_gst_amount: values.totalGST
+,              // amount
+
+
+total_amount: round2(values.totalAmt),
+grand_total: round2(values.totalAmt),
+
+  tcs_amount: Number(values.tcsAmt || 0),
+
+  
+
+  items: values.items.map(it => ({
+    product: it.product,
+    item_name: it.item,
+    item_code: it.hsn_code,
+    rate: Number(it.rate),
+    qty: Number(it.qty),
+    free_qty: Number(it.freeQty),
+
+    discount_percent: Number(it.discountPercent),
+    discount_amount: Number(it.discountAmt),
+
+    gross_amount: Number(it.grossAmount),
+    gross_weight: Number(it.grossWt),
+
+
+    uom_details: {
+      type: "base",
+      unit_name: it.uom,
+      factor_to_base: "1",
     }
-  };
+  }))
+};
+
+
+    await addPurchaseOrder(payload);
+    message.success("Purchase order created successfully");
+  } catch (err) {
+    message.error("Failed to create purchase order");
+  }
+  setIsAddModalOpen(false);
+};
+
+
+
+
+
 
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Souda No</span>,
-      dataIndex: "soudaNo",
+      title: <span className="text-amber-700 font-semibold">Order No</span>,
+      dataIndex: "order_number",
       width: 120,
       render: (t) => <span className="text-amber-800">{t}</span>,
+     
     },
+   
     {
       title: <span className="text-amber-700 font-semibold">Plant</span>,
-      dataIndex: "plantName",
+      dataIndex: "plant_name",
       width: 150,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
-    {
-      title: <span className="text-amber-700 font-semibold">Company</span>,
-      dataIndex: "companyName",
-      width: 150,
-      render: (t) => <span className="text-amber-800">{t}</span>,
-    },
-    // {
-    //   title: <span className="text-amber-700 font-semibold">Delivery Date</span>,
-    //   dataIndex: "deliveryDate",
-    //   width: 120,
-    //   render: (t) => <span className="text-amber-800">{t}</span>,
-    // },
+   {
+  title: <span className="text-amber-700 font-semibold">Vendor</span>,
+  dataIndex: "vendor_name",
+  width: 150,
+  render: (t) => <span className="text-amber-800">{t}</span>,
+},
+
     {
       title: <span className="text-amber-700 font-semibold">Total Qty</span>,
-      dataIndex: "totalQty",
+      dataIndex: "total_qty_all_items",
       width: 120,
-      render: (_, record) => (
-        <span className="text-amber-800">{record.totalQty} </span>
-      ),
+     render: (t) => <span className="text-amber-800">{t}</span>
+      
     },
     {
       title: (
         <span className="text-amber-700 font-semibold">Total Amount (₹)</span>
       ),
-      dataIndex: "totalAmt",
+    dataIndex: "grand_total",
+
       width: 160,
       render: (t) => (
         <span className="text-amber-800">
@@ -352,8 +470,8 @@ export default function PurchaseIndent() {
 
     viewForm.setFieldsValue({
       ...record,
-      indentDate: convert(record.indentDate),
-      deliveryDate: convert(record.deliveryDate),
+      order_date: convert(record.order_date),
+      expected_receiving_date: convert(record.expected_receiving_date),
     });
 
     setIsViewModalOpen(true);
@@ -365,8 +483,8 @@ export default function PurchaseIndent() {
 
     editForm.setFieldsValue({
       ...record,
-      indentDate: convert(record.indentDate),
-      deliveryDate: convert(record.deliveryDate),
+      order_date: convert(record.order_date),
+      expected_receiving_date: convert(record.expected_receiving_date),
     });
 
     setIsEditModalOpen(true);
@@ -378,35 +496,35 @@ export default function PurchaseIndent() {
       <h6 className=" text-amber-500 ">Basic Information</h6>
       <Row gutter={16}>
         <Col span={6}>
-          <Form.Item
-            label="Souda No"
-            name="soudaNo"
-            rules={[{ required: true }]}
-          >
-            <Select
-              disabled={disabled}
-              onChange={(v) => handleSoudaSelect(v, formInstance)}
-            >
-              {purchaseIndentJSON.soudaNoOptions.map((opt) => (
-                <Option key={opt} value={opt}>
-                  {opt}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
+         <Form.Item
+  label="Souda No"
+  name="contract"   // store CONTRACT ID
+  rules={[{ required: true }]}
+>
+  <Select
+    placeholder="Select Souda No"
+    onChange={(contractId) =>
+      handleSoudaSelect(contractId, addForm)
+    }
+  >
+    {soudaContracts.map((c) => (
+      <Option key={c.id} value={c.id}>
+        {c.contract_number}
+      </Option>
+    ))}
+  </Select>
+</Form.Item>
+
         </Col>
 
-        <Col span={6}>
-          <Form.Item label="Plant Name" name="plantName">
-            <Input disabled />
-          </Form.Item>
-        </Col>
+       <Form.Item label="Plant Name" name="plantName">
+  <Input disabled />
+</Form.Item>
+<Form.Item label="Vendor Name" name="vendorName">
+  <Input disabled />
+</Form.Item>
 
-        <Col span={6}>
-          <Form.Item label="Company Name" name="companyName">
-            <Input disabled />
-          </Form.Item>
-        </Col>
+
 
         <Col span={6}>
           <Form.Item label="Status" name="status">
@@ -433,15 +551,15 @@ export default function PurchaseIndent() {
         </Col>
 
         <Col span={6}>
-          <Form.Item label="Indent Date" name="indentDate">
+          <Form.Item label="Order Date" name="order_date">
             <DatePicker className="w-full" disabled />
           </Form.Item>
         </Col>
 
         <Col span={6}>
           <Form.Item
-            label="Delivery Date"
-            name="deliveryDate"
+            label="Expected Receiving Date"
+            name="expected_receiving_date"
             rules={[{ required: true }]}
           >
             <DatePicker
@@ -487,43 +605,61 @@ export default function PurchaseIndent() {
 
                 <Row gutter={24}>
                   <Col span={6}>
-                    <Form.Item
-                      {...field}
-                      label="Item Name"
-                      name={[field.name, "item"]}
-                      rules={[
-                        { required: true, message: "Please select item" },
-                      ]}
-                    >
-                      {/* item selection is populated from the souda's item list if available */}
-                      <Select
-                        showSearch
-                        disabled={disabled}
-                        placeholder="Select item"
-                        onChange={() =>
-                          setTimeout(() => recalcAll(formInstance), 50)
-                        }
-                      >
-                        {/* if souda selected, prefer those items */}
-                        {(() => {
-                          const soudaNo = formInstance.getFieldValue("soudaNo");
-                          const souda = soudaMaster[soudaNo];
-                          const opts = souda ? souda.items : [];
-                          return (opts.length ? opts : []).map((it) => (
-                            <Option key={it.itemCode} value={it.item}>
-                              {it.item}
-                            </Option>
-                          ));
-                        })()}
-                      </Select>
-                    </Form.Item>
+                  <Form.Item
+  {...field}
+  label="Item Name"
+  name={[field.name, "product"]}
+  rules={[{ required: true, message: "Please select item" }]}
+>
+  <Select
+    showSearch
+    disabled={disabled}
+    placeholder="Select item"
+   onChange={(productId) => {
+  const item = contractItems.find((i) => i.product === productId);
+  if (!item) return;
+
+  formInstance.setFieldsValue({
+    items: formInstance.getFieldValue("items").map((row, i) =>
+      i === field.name
+        ? {
+            ...row,
+            product: item.product,
+            item: item.item_name,
+            hsn_code: item.hsn_code,
+            rate: Number(item.rate || 0),
+            qty: Number(item.qty || 0),
+            freeQty: Number(item.free_qty || 0),
+            uom: item.uom_details?.unit_name,
+            rate: Number(item.rate || 0),
+            discountPercent: Number(item.discount_percent || 0),
+            sgstPercent: Number(item.sgst_percent || 0),
+            cgstPercent: Number(item.cgst_percent || 0),
+            igstPercent: Number(item.igst_percent || 0),
+          }
+        : row
+    ),
+  });
+
+  setTimeout(() => recalcAll(formInstance), 0);
+}}
+
+  >
+    {contractItems.map((it) => (
+      <Option key={it.product} value={it.product}>
+        {it.item_name}
+      </Option>
+    ))}
+  </Select>
+</Form.Item>
+
                   </Col>
 
                   <Col span={4}>
                     <Form.Item
                       {...field}
                       label="Item Code"
-                      name={[field.name, "itemCode"]}
+                      name={[field.name, "hsn_code"]}
                     >
                       <Input disabled />
                     </Form.Item>
@@ -644,15 +780,7 @@ export default function PurchaseIndent() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={6}>
-                    <Form.Item
-                      {...field}
-                      label="Total Gross Weight"
-                      name={[field.name, "totalGrossWt"]}
-                    >
-                      <InputNumber className="w-full bg-gray-50" disabled />
-                    </Form.Item>
-                  </Col>
+                 
                 </Row>
               </div>
             ))}
@@ -686,7 +814,7 @@ export default function PurchaseIndent() {
           <Form.Item label="SGST %" name="sgstPercent">
             <InputNumber
               className="w-full"
-              disabled
+            
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
@@ -696,7 +824,7 @@ export default function PurchaseIndent() {
           <Form.Item label="CGST %" name="cgstPercent">
             <InputNumber
               className="w-full"
-              disabled
+            
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
@@ -706,7 +834,7 @@ export default function PurchaseIndent() {
           <Form.Item label="IGST %" name="igstPercent">
             <InputNumber
               className="w-full"
-              disabled
+             
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
@@ -722,7 +850,7 @@ export default function PurchaseIndent() {
           <Form.Item label="TCS Amt (₹)" name="tcsAmt">
             <InputNumber
               className="w-full"
-              disabled
+             
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
@@ -771,7 +899,7 @@ export default function PurchaseIndent() {
             className="bg-amber-500! hover:bg-amber-600! border-none!"
             onClick={() => {
               addForm.resetFields();
-              addForm.setFieldsValue({ indentDate: dayjs(), items: [] });
+              addForm.setFieldsValue({ order_date: dayjs(), items: [] });
               setIsAddModalOpen(true);
             }}
           >
@@ -790,6 +918,7 @@ export default function PurchaseIndent() {
         <Table
           columns={columns}
           dataSource={data}
+          loading={loading}
           pagination={false}
           scroll={{ y: 260 }}
           rowKey="key"
