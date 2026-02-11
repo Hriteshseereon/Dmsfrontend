@@ -24,7 +24,13 @@ export const AuthProvider = ({ children }) => {
       const userData = response.user || { email: response.email || email, ...response };
       const accessToken = response.access || response.token || response.accessToken;
       const refreshToken = response.refresh || response.refreshToken;
-      const orgId = response.organisation_id || response.org_id || response.currentOrgId;
+
+      // Extract organisation_id from response
+      const orgId = response.organisation_id ||
+        (response.organisation_ids && response.organisation_ids.length > 0 ? response.organisation_ids[0] : null) ||
+        (response.customer_org_map && response.customer_org_map.length > 0 ? response.customer_org_map[0].organisation_id : null) ||
+        response.org_id ||
+        response.currentOrgId;
 
       setSession({
         accessToken: accessToken,

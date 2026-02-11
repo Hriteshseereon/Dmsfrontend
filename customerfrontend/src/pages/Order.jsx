@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import {
   Table,
   Input,
@@ -28,6 +28,8 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import Wallet from "./Wallet";
+import { getOrders, getContracts, getContractById, createOrder } from "../api/order";
+import useSessionStore from "../store/sessionStore";
 
 const API_CONFIG = {
   fetchData: () => contractJSON.initialData,
@@ -58,7 +60,7 @@ const contractJSON = {
       uom: "Ltrs",
       itemcode: "MO-001",
       deliveryDate: "2025-10-15",
-      deliveryAddress:"BBSR",
+      deliveryAddress: "BBSR",
       status: "Approved",
       totalAmt: 250000,
       rate: 125,
@@ -83,7 +85,7 @@ const contractJSON = {
       uom: "Ltrs",
       itemcode: "SO-002",
       deliveryDate: "2025-10-15",
-      deliveryAddress:"BBSR",
+      deliveryAddress: "BBSR",
       status: "InTransit",
       totalAmt: 110000,
       rate: 110,
@@ -108,7 +110,7 @@ const contractJSON = {
       uom: "Ltrs",
       itemcode: "CO-002",
       deliveryDate: "2025-10-20",
-      deliveryAddress:"BBSR",
+      deliveryAddress: "BBSR",
       status: "Pending",
       totalAmt: 65000,
       rate: 130,
@@ -133,7 +135,7 @@ const contractJSON = {
       uom: "Ltrs",
       itemcode: "PO-003",
       deliveryDate: "2025-10-20",
-      deliveryAddress:"BBSR",
+      deliveryAddress: "BBSR",
       status: "Pending",
       totalAmt: 39000,
       rate: 130,
@@ -158,7 +160,7 @@ const contractJSON = {
       uom: "Ltrs",
       itemcode: "MO-001",
       deliveryDate: "2025-10-25",
-      deliveryAddress:"BBSR",
+      deliveryAddress: "BBSR",
       status: "Delivered",
       totalAmt: 62500,
       rate: 125,
@@ -184,7 +186,7 @@ const contractJSON = {
       uom: "Ltrs",
       itemcode: "SO-002",
       deliveryDate: "2025-10-27",
-      deliveryAddress:"BBSR",
+      deliveryAddress: "BBSR",
       status: "OutForDelivery",
       totalAmt: 44000,
       rate: 110,
@@ -359,7 +361,7 @@ const groupDataByOrderGroup = (flatData) => {
         key: orderGroupId,
         orderDate: rest.orderDate,
         deliveryDate: rest.deliveryDate,
-         deliveryAddress: rest.deliveryAddress,
+        deliveryAddress: rest.deliveryAddress,
         status: rest.status,
         grandTotal: 0,
         contracts: {},
@@ -406,13 +408,13 @@ const groupDataByOrderGroup = (flatData) => {
 };
 
 // UOM handlers for conversion
-const useUOMHandlers = (form) => {
+// UOM handlers for conversion
+const useUOMHandlers = (form, contractItemsMap) => {
   const handleUOMChange = useCallback((uom, contractIndex, itemIndex) => {
     const contracts = form.getFieldValue("contracts") || [];
-    const allItems = contractJSON.contractOptions.flatMap(c => c.items);
-    const selectedItem = allItems.find(item =>
-      item.item === contracts[contractIndex]?.items[itemIndex]?.item
-    );
+    const items = contractItemsMap[contractIndex] || [];
+    const currentItemName = contracts[contractIndex]?.items[itemIndex]?.item;
+    const selectedItem = items.find(item => item.item === currentItemName);
 
     if (selectedItem?.conversion?.[uom]) {
       const baseRate = selectedItem.rate;
@@ -435,9 +437,7 @@ const useUOMHandlers = (form) => {
       });
       form.setFieldsValue({ contracts: updatedContracts });
     }
-  }, [form]);
-
-
+  }, [form, contractItemsMap]);
 
   const handleQtyChange = useCallback((qty, contractIndex, itemIndex) => {
     const contracts = form.getFieldValue("contracts") || [];
@@ -460,14 +460,36 @@ const useUOMHandlers = (form) => {
   return { handleUOMChange, handleQtyChange };
 };
 
-const useFormHandlers = (form, setContractItemsMap, setSelectedItemMaxMap, isEdit = false) => {
-  const handleSelectContract = useCallback((contractNo, contractIndex) => {
-    const c = contractJSON.contractOptions.find((x) => x.contractNo === contractNo);
+const useFormHandlers = (form, contractItemsMap, setContractItemsMap, setSelectedItemMaxMap, contracts, isEdit = false) => {
+  const handleSelectContract = useCallback(async (contractNo, contractIndex) => {
+    const c = contracts.find((x) => x.contractNo === contractNo);
     if (!c) return;
-    setContractItemsMap((prev) => ({
-      ...prev,
-      [contractIndex]: c.items,
-    }));
+
+    try {
+      const contractDetails = await getContractById(c.sale_contract_id);
+      const mappedItems = (contractDetails.items || []).map(item => ({
+        item: item.product?.product_name || item.product_name || "Unknown",
+        uomOptions: item.uom ? [item.uom.unit_name] : ["Ltrs"], // Fallback
+        rate: Number(item.mrp || 0),
+        itemcode: item.product?.product_code || item.product_code,
+        restQty: Number(item.net_qty || 0),
+        uom: item.uom?.unit_name,
+        conversion: {} // Can try to map conversion if needed
+      }));
+
+      setContractItemsMap((prev) => ({
+        ...prev,
+        [contractIndex]: mappedItems,
+      }));
+    } catch (err) {
+      console.error("Error fetching contract details:", err);
+      message.error("Failed to fetch contract items");
+      setContractItemsMap((prev) => ({
+        ...prev,
+        [contractIndex]: [],
+      }));
+    }
+
     const orders = form.getFieldValue("contracts") || [];
     const updated = orders.map((entry, idx) =>
       idx === contractIndex
@@ -487,10 +509,10 @@ const useFormHandlers = (form, setContractItemsMap, setSelectedItemMaxMap, isEdi
       });
       return copy;
     });
-  }, [form, setContractItemsMap, setSelectedItemMaxMap]);
+  }, [form, setContractItemsMap, setSelectedItemMaxMap, contracts]);
 
   const handleSelectItem = useCallback((itemName, contractIndex, itemIndex) => {
-    const items = contractJSON.contractOptions.flatMap((c) => c.items);
+    const items = contractItemsMap[contractIndex] || [];
     const sel = items.find((it) => it.item === itemName);
     if (!sel) {
       setSelectedItemMaxMap((p) => ({
@@ -499,8 +521,8 @@ const useFormHandlers = (form, setContractItemsMap, setSelectedItemMaxMap, isEdi
       }));
       return;
     }
-    const contracts = form.getFieldValue("contracts") || [];
-    const updatedContracts = contracts.map((c, ci) => {
+    const contractsVals = form.getFieldValue("contracts") || [];
+    const updatedContracts = contractsVals.map((c, ci) => {
       if (ci !== contractIndex) return c;
       const updatedItems = (c.items || []).map((it, ii) =>
         ii === itemIndex
@@ -522,28 +544,58 @@ const useFormHandlers = (form, setContractItemsMap, setSelectedItemMaxMap, isEdi
       ...prev,
       [`${contractIndex}-${itemIndex}`]: sel.restQty || 0,
     }));
-  }, [form, setSelectedItemMaxMap]);
+  }, [form, setSelectedItemMaxMap, contractItemsMap]);
 
   return { handleSelectContract, handleSelectItem };
 };
 
 export default function Order() {
+  const { currentOrgId } = useSessionStore();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedOrderGroup, setSelectedOrderGroup] = useState(null);
-  const [data, setData] = useState(API_CONFIG.fetchData());
+  const [data, setData] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("All");
   const [contractItemsMap, setContractItemsMap] = useState({});
   const [selectedItemMaxMap, setSelectedItemMaxMap] = useState({});
   const [walletOpen, setWalletOpen] = useState(false);
+  const [contracts, setContracts] = useState([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!currentOrgId) return;
+      try {
+        const [ordersRes, contractsRes] = await Promise.all([
+          getOrders(),
+          getContracts()
+        ]);
+
+        const orders = Array.isArray(ordersRes) ? ordersRes : ordersRes.results || [];
+        setData(orders);
+
+        const contractsData = Array.isArray(contractsRes) ? contractsRes : contractsRes.results || [];
+        const mappedContracts = contractsData.map(c => ({
+          contractNo: c.sale_contract_number,
+          sale_contract_id: c.sale_contract_id,
+          companyName: c.vendor_names ? c.vendor_names.join(", ") : (c.vendor_name || ""),
+          items: []
+        }));
+        setContracts(mappedContracts);
+      } catch (error) {
+        console.error("Failed to fetch data:", error);
+        message.error("Failed to fetch initial data");
+      }
+    };
+    fetchData();
+  }, [currentOrgId]);
 
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
 
-  const addUOMHandlers = useUOMHandlers(addForm);
-  const editUOMHandlers = useUOMHandlers(editForm);
+  const addUOMHandlers = useUOMHandlers(addForm, contractItemsMap);
+  const editUOMHandlers = useUOMHandlers(editForm, contractItemsMap);
 
   const disablePastDates = (current) =>
     current && current < dayjs().startOf("day");
@@ -660,42 +712,42 @@ export default function Order() {
         return <span className={className}>{status}</span>;
       },
     },
-   {
-  title: <span className="text-amber-700 font-semibold">Actions</span>,
-  key: "actions",
-  width: 120,
-  render: (record) => (
-    <div className="flex gap-3">
-      <EyeOutlined
-        className="cursor-pointer! text-blue-500!"
-        onClick={() => {
-          setSelectedOrderGroup(record);
-          setIsViewModalOpen(true);
-        }}
-      />
+    {
+      title: <span className="text-amber-700 font-semibold">Actions</span>,
+      key: "actions",
+      width: 120,
+      render: (record) => (
+        <div className="flex gap-3">
+          <EyeOutlined
+            className="cursor-pointer! text-blue-500!"
+            onClick={() => {
+              setSelectedOrderGroup(record);
+              setIsViewModalOpen(true);
+            }}
+          />
 
-      {record.status === "Pending" && (
-        <EditOutlined
-          className="cursor-pointer! text-red-500!"
-          onClick={() => openEditModal(record)}
-        />
-      )}
+          {record.status === "Pending" && (
+            <EditOutlined
+              className="cursor-pointer! text-red-500!"
+              onClick={() => openEditModal(record)}
+            />
+          )}
 
-      {record.status === "Delivered" && (
-        <Button
-  size="small"
-  className="bg-amber-500!  text-white! hover:bg-amber-600! border-none!"
-                
-  icon={<DownloadOutlined />}
-  onClick={() => downloadInvoiceExcel(record)}
->
-  Invoice
-</Button>
+          {record.status === "Delivered" && (
+            <Button
+              size="small"
+              className="bg-amber-500!  text-white! hover:bg-amber-600! border-none!"
 
-      )}
-    </div>
-  ),
-}
+              icon={<DownloadOutlined />}
+              onClick={() => downloadInvoiceExcel(record)}
+            >
+              Invoice
+            </Button>
+
+          )}
+        </div>
+      ),
+    }
 
   ];
 
@@ -737,7 +789,7 @@ export default function Order() {
         deliveryDate: fullGroup.deliveryDate
           ? dayjs(fullGroup.deliveryDate)
           : null,
-           deliveryAddress: fullGroup.deliveryAddress,
+        deliveryAddress: fullGroup.deliveryAddress,
         orderGroupId: fullGroup.orderGroupId,
         orderDate: fullGroup.orderDate ? dayjs(fullGroup.orderDate) : null,
         contracts: fullGroup.contracts.map((contract) => ({
@@ -754,57 +806,61 @@ export default function Order() {
   );
 
   const handleAddSubmit = useCallback(
-    (values) => {
-      const deliveryDate = values.deliveryDate?.format("YYYY-MM-DD");
-      const deliveryAddress = values.deliveryAddress;
-      const orderGroupId = `ORD-${dayjs().format(
-        "YYYYMMDD"
-      )}-${String(Date.now()).slice(-5)}`;
-      const newRows = [];
-      let baseKey = data.length ? Math.max(...data.map((d) => d.key)) : 0;
-      let idx = 1;
-
-      (values.contracts || []).forEach((contract) => {
-        const contractNo = contract.contractNo;
-        const contractDetails = contractJSON.contractOptions.find(
-          (c) => c.contractNo === contractNo
-        );
-        const companyName = contractDetails?.companyName;
-        (contract.items || []).forEach((it) => {
-          if (!it?.item || !it.qty || Number(it.qty) <= 0) return;
-          newRows.push({
-            key: baseKey + idx++,
-            orderGroupId,
-            contractNo,
-            companyName,
-            item: it.item,
-            qty: Number(it.qty),
-            uom: it.uom,
-            itemcode: it.itemcode,
-            rate: it.rate,
-            orderDate: dayjs().format("YYYY-MM-DD"),
-            deliveryDate,
-              deliveryAddress,
-            status: "Pending",
-            totalAmt: it.totalAmt || (it.rate || 0) * Number(it.qty),
+    async (values) => {
+      try {
+        const deliveryDate = values.deliveryDate?.format("YYYY-MM-DD");
+        const deliveryAddress = values.deliveryAddress;
+        
+        // Construct API Payload
+        const orderItems = [];
+        (values.contracts || []).forEach((contract) => {
+          const contractObj = contracts.find(c => c.contractNo === contract.contractNo);
+          (contract.items || []).forEach((it) => {
+              if (!it?.item || !it.qty || Number(it.qty) <= 0) return;
+              orderItems.push({
+                  sale_contract_id: contractObj?.sale_contract_id,
+                  item_code: it.itemcode,
+                  item_name: it.item,
+                  qty: Number(it.qty),
+                  uom: it.uom,
+                  rate: Number(it.rate),
+                  total_amount: Number(it.totalAmt)
+              });
           });
         });
-      });
 
-      if (newRows.length) {
-        setData((prev) => [...prev, ...newRows]);
+        const payload = {
+            delivery_date: deliveryDate,
+            delivery_address: deliveryAddress,
+            items: orderItems
+        };
+
+        // Call API
+        await createOrder(payload);
+        message.success("Order created successfully");
+
+        // Refresh List
+        const response = await getOrders();
+        const orders = Array.isArray(response) ? response : response.results || [];
+        setData(orders);
+
+        // Reset and Close
+        addForm.resetFields();
+        setContractItemsMap({});
+        setSelectedItemMaxMap({});
+        setIsAddModalOpen(false);
+
+      } catch (error) {
+        console.error("Error creating order:", error);
+        message.error("Failed to create order");
       }
-      addForm.resetFields();
-      setContractItemsMap({});
-      setSelectedItemMaxMap({});
-      setIsAddModalOpen(false);
     },
-    [data, addForm]
+    [contracts, addForm]
   );
 
   const handleEditSubmit = useCallback(
     (values) => {
-      const { deliveryDate, deliveryAddress,orderGroupId, contracts } = values;
+      const { deliveryDate, deliveryAddress, orderGroupId, contracts } = values;
       const updatedDeliveryDate = deliveryDate?.format("YYYY-MM-DD");
 
       const otherFlatRows = data.filter(
@@ -837,7 +893,7 @@ export default function Order() {
               selectedOrderGroup?.orderDate ||
               dayjs().format("YYYY-MM-DD"),
             deliveryDate: updatedDeliveryDate,
-             deliveryAddress,
+            deliveryAddress,
             status: "Pending",
             totalAmt: item.totalAmt || (item.rate || 0) * Number(item.qty),
           });
@@ -876,8 +932,7 @@ export default function Order() {
           f.name,
         ]);
         const maxQty = selectedItemMaxMap[`${contractIndex}-${f.name}`];
-        const selectedItemConfig = contractJSON.contractOptions
-          .flatMap((c) => c.items)
+        const selectedItemConfig = (contractItemsMap[contractIndex] || [])
           .find((item) => item.item === itemDetails?.item);
 
         return (
@@ -962,10 +1017,6 @@ export default function Order() {
                     onChange={(val) => uomHandlers.handleUOMChange(val, contractIndex, f.name)}
                   >
                     {selectedItemConfig?.uomOptions?.map((uom) => (
-                      <Select.Option key={uom} value={uom}>
-                        {uom}
-                      </Select.Option>
-                    )) || contractJSON.uomOptions.map((uom) => (
                       <Select.Option key={uom} value={uom}>
                         {uom}
                       </Select.Option>
@@ -1056,7 +1107,7 @@ export default function Order() {
                     placeholder="Select Contract"
                     onChange={(val) => handleSelectContract(val, field.name)}
                   >
-                    {contractJSON.contractOptions.map((c) => (
+                    {contracts.map((c) => (
                       <Select.Option key={c.contractNo} value={c.contractNo}>
                         {c.contractNo} — {c.companyName}
                       </Select.Option>
@@ -1246,14 +1297,14 @@ export default function Order() {
               ₹{grandTotal.toLocaleString()}
             </div>
           </Col>
-           <Col span={4}>
-  <div className="font-semibold text-amber-700 mb-1">
-    Delivery Address:
-  </div>
-  <div className="text-amber-500">
-    {groupData.deliveryAddress || "N/A"}
-  </div>
-</Col>
+          <Col span={4}>
+            <div className="font-semibold text-amber-700 mb-1">
+              Delivery Address:
+            </div>
+            <div className="text-amber-500">
+              {groupData.deliveryAddress || "N/A"}
+            </div>
+          </Col>
         </Row>
         {isApprovedStatus && (
           <Row
@@ -1292,7 +1343,7 @@ export default function Order() {
                 {contracts[0]?.items[0]?.deliveredDate || "N/A"}
               </div>
             </Col>
-           
+
           </Row>
         )}
         <Divider
@@ -1332,13 +1383,18 @@ export default function Order() {
 
   const addHandlers = useFormHandlers(
     addForm,
+    contractItemsMap,
     setContractItemsMap,
-    setSelectedItemMaxMap
+    setSelectedItemMaxMap,
+    contracts,
+    false
   );
   const editHandlers = useFormHandlers(
     editForm,
+    contractItemsMap,
     setContractItemsMap,
     setSelectedItemMaxMap,
+    contracts,
     true
   );
 
@@ -1351,69 +1407,69 @@ export default function Order() {
         </div>
       </div>
 
-    <div className="flex justify-between items-center mb-3">
-  
-  {/* LEFT: Search */}
-  <div className="flex gap-2">
-    <Input
-      placeholder="Search"
-      className="border-amber-300! w-64! focus:border-amber-500!"
-      prefix={<SearchOutlined className="text-amber-600!" />}
-      value={searchText}
-      onChange={(e) => setSearchText(e.target.value)}
-    />
+      <div className="flex justify-between items-center mb-3">
 
-    <Button
-      icon={<FilterOutlined />}
-      onClick={() => {
-        setSearchText("");
-        setSelectedStatus("All");   // ✅ Reset dropdown also
-      }}
-      className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-    >
-      Reset
-    </Button>
-  </div>
+        {/* LEFT: Search */}
+        <div className="flex gap-2">
+          <Input
+            placeholder="Search"
+            className="border-amber-300! w-64! focus:border-amber-500!"
+            prefix={<SearchOutlined className="text-amber-600!" />}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+          />
 
-  {/* RIGHT: Dropdown + Buttons */}
-  <div className="flex gap-2 items-center">
-    <Select
-      value={selectedStatus}
-      onChange={handleStatusFilter}
-      className="w-48! border-amber-400! text-amber-700!"
-      suffixIcon={<FilterOutlined className="text-amber-600!" />}
-    >
-      {STATUS_FILTERS.map((status) => (
-        <Select.Option key={status} value={status}>
-          {status}
-        </Select.Option>
-      ))}
-    </Select>
+          <Button
+            icon={<FilterOutlined />}
+            onClick={() => {
+              setSearchText("");
+              setSelectedStatus("All");   // ✅ Reset dropdown also
+            }}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
+            Reset
+          </Button>
+        </div>
 
-    <Button
-      className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-      icon={<WalletOutlined />}
-      onClick={() => setWalletOpen(true)}
-    >
-      Wallet
-    </Button>
+        {/* RIGHT: Dropdown + Buttons */}
+        <div className="flex gap-2 items-center">
+          <Select
+            value={selectedStatus}
+            onChange={handleStatusFilter}
+            className="w-48! border-amber-400! text-amber-700!"
+            suffixIcon={<FilterOutlined className="text-amber-600!" />}
+          >
+            {STATUS_FILTERS.map((status) => (
+              <Select.Option key={status} value={status}>
+                {status}
+              </Select.Option>
+            ))}
+          </Select>
 
-    <Button
-      type="primary"
-      icon={<PlusOutlined />}
-      onClick={() => {
-        addForm.setFieldsValue(initialOrderGroup);
-        setContractItemsMap({});
-        setSelectedItemMaxMap({});
-        setIsAddModalOpen(true);
-      }}
-      className="bg-amber-500! hover:bg-amber-600! border-none!"
-    >
-      Add New Order
-    </Button>
-  </div>
+          <Button
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            icon={<WalletOutlined />}
+            onClick={() => setWalletOpen(true)}
+          >
+            Wallet
+          </Button>
 
-</div>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => {
+              addForm.setFieldsValue(initialOrderGroup);
+              setContractItemsMap({});
+              setSelectedItemMaxMap({});
+              setIsAddModalOpen(true);
+            }}
+            className="bg-amber-500! hover:bg-amber-600! border-none!"
+          >
+            Add New Order
+          </Button>
+        </div>
+
+      </div>
 
 
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
@@ -1452,21 +1508,21 @@ export default function Order() {
               </Form.Item>
             </Col>
             <Col span={16}>
-    <Form.Item
-      name="deliveryAddress"
-      label={
-        <span className="font-semibold text-amber-700">
-          Delivery Address <span className="text-red-500">*</span>
-        </span>
-      }
-      rules={[{ required: true, message: "Enter delivery address" }]}
-    >
-      <Input.TextArea
-        rows={2}
-        placeholder="Enter delivery address"
-      />
-    </Form.Item>
-  </Col>
+              <Form.Item
+                name="deliveryAddress"
+                label={
+                  <span className="font-semibold text-amber-700">
+                    Delivery Address <span className="text-red-500">*</span>
+                  </span>
+                }
+                rules={[{ required: true, message: "Enter delivery address" }]}
+              >
+                <Input.TextArea
+                  rows={2}
+                  placeholder="Enter delivery address"
+                />
+              </Form.Item>
+            </Col>
           </Row>
           <Form.List name="contracts">
             {(fields, operations) => (
@@ -1542,15 +1598,15 @@ export default function Order() {
                 />
               </Form.Item>
             </Col>
-             <Col span={18}>
-    <Form.Item
-      name="deliveryAddress"
-      label={<span className="font-semibold text-amber-700">Delivery Address *</span>}
-      rules={[{ required: true }]}
-    >
-      <Input.TextArea rows={2} />
-    </Form.Item>
-  </Col>
+            <Col span={18}>
+              <Form.Item
+                name="deliveryAddress"
+                label={<span className="font-semibold text-amber-700">Delivery Address *</span>}
+                rules={[{ required: true }]}
+              >
+                <Input.TextArea rows={2} />
+              </Form.Item>
+            </Col>
           </Row>
           <Form.List name="contracts">
             {(fields, operations) => (
