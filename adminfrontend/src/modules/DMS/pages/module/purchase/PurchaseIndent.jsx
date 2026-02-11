@@ -1,11 +1,11 @@
-import React, { useState,useEffect } from "react"; 
+ import React, { useState,useEffect } from "react";  
 import { positiveNumberInputProps } from "../../../helpers/numberInput";
 import {
   requiredPositiveNumber,
   optionalPositiveNumber,
   percentageValidation,
 } from "../../../helpers/formValidation";
-import { getPurchaseOrder,getPurchaseContract ,getSoudaByContractId,addPurchaseOrder} from "../../../../../api/purchase";
+import { getPurchaseOrder,getPurchaseContract ,getSoudaByContractId,addPurchaseOrder,getPurchaseOrderById,updatePurchaseOrder} from "../../../../../api/purchase";
 import {
   Table,
   Input,
@@ -118,6 +118,7 @@ const [selectedVendor, setSelectedVendor] = useState(null);
   useEffect(() => {
   fetchPurchaseOrder();
   fetchSoudaNoOptions();
+  
 }, []);
 
 const fetchPurchaseOrder = async () => {
@@ -143,11 +144,14 @@ const formattedData = list.map((item, index) => ({
 
 
     setData(formattedData);
+   
+
   } catch (error) {
     console.error("Failed to fetch purchase orders", error);
     message.error("Failed to load purchase indents");
   } finally {
     setLoading(false);
+    
   }
 };
 const round2 = (num) => Number((num || 0).toFixed(2));
@@ -157,6 +161,8 @@ const fetchSoudaNoOptions = async () => {
     const res = await getPurchaseContract();
     const list = res?.data || res;
     setSoudaContracts(list);
+    console.log("Souda API Response:", list);
+
   } catch (err) {
     message.error("Failed to load souda numbers");
   }
@@ -180,50 +186,37 @@ const handleSearch = (value) => {
 };
 
 
-const handleSoudaSelect = async (contractId, formInstance) => {
+const handleSoudaSelect = async (contractId, formInstance, existingItems = []) => {
   if (!contractId) return;
 
   try {
     const res = await getSoudaByContractId(contractId);
     const data = res?.data || res;
 
-    // 🔑 SAVE ITEMS FOR ITEM DROPDOWN
     setContractItems(data.items || []);
 
-    const itemsForForm = (data.items || []).map((it) => ({
-      product: it.product,
-      hsn_code: it.hsn_code,
-      item: it.item_name,          // used for Select
-      itemCode: it.product,        // or a
-      totalQty: Number(it.qty || 0) + Number(it.free_qty || 0),
-      uom: it.uom_details?.unit_name,
-      rate: Number(it.rate || 0),
-      discountPercent: Number(it.discount_percent || 0),
-      discountAmt: 0,
-  
-   
-    
-    }));
+    // Merge existing items if provided
+    const itemsToSet = existingItems.length
+      ? existingItems.map(it => ({
+          ...it,
+          uom: it.uom_details?.unit_name || it.uom, // ensure uom
+        }))
+      : [];
 
-formInstance.setFieldsValue({
-  vendor: data.vendor,           // ID
-  vendorName: data.vendor_name,  // UI only
+    formInstance.setFieldsValue({
+      vendor: data.vendor,
+      vendorName: data.vendor_name,
+      plantName: data.plant_name,
+      deliveryAddress: data.delivery_address,
+      items: itemsToSet, // ✅ keep existing items
+    });
 
-  plantId: data.plant,
-  plantName: data.plant_name,
-
-  deliveryAddress: data.delivery_address,
-  items: itemsForForm,
-});
-
-
-    setTimeout(() => recalcAll(formInstance), 0);
   } catch (err) {
     message.error("Failed to load souda details");
   }
-  setSelectedVendor(data.vendor);
-
 };
+
+
 
 
 
@@ -286,96 +279,98 @@ formInstance.setFieldsValue({
 
 
 
-const handleFormSubmit = async (values) => {
-  const taxableAmount =
-  values.items?.reduce((sum, item) => {
-    const gross = Number(item.grossAmount || 0);
-    const discount = Number(item.discountAmt || 0);
-    return sum + (gross - discount);
-  }, 0) || 0;
-
-const sgst = round2(
-  (taxableAmount * Number(values.sgstPercent || 0)) / 100
-);
-
-const cgst = round2(
-  (taxableAmount * Number(values.cgstPercent || 0)) / 100
-);
-
-const igst = round2(
-  (taxableAmount * Number(values.igstPercent || 0)) / 100
-);
-
-const totalGST = round2(sgst + cgst + igst);
-const totalAmt = round2(taxableAmount + totalGST + Number(values.tcsAmt || 0));
+const handleFormSubmit = async (values, type) => {
   try {
     const selectedContract = soudaContracts.find(
       (c) => c.id === values.contract
     );
 
-   const payload = {
-  contract: values.contract,
-  vendor: selectedContract?.vendor,
-  souda_no: selectedContract?.contract_number,
+    const taxableAmount =
+      values.items?.reduce((sum, item) => {
+        const gross = Number(item.grossAmount || 0);
+        const discount = Number(item.discountAmt || 0);
+        return sum + (gross - discount);
+      }, 0) || 0;
 
-  plant_name: values.plantName || "",
-  plant_display_name: values.plantName || "",
-  delivery_address: values.deliveryAddress || "",
+    const sgst = round2(
+      (taxableAmount * Number(values.sgstPercent || 0)) / 100
+    );
+    const cgst = round2(
+      (taxableAmount * Number(values.cgstPercent || 0)) / 100
+    );
+    const igst = round2(
+      (taxableAmount * Number(values.igstPercent || 0)) / 100
+    );
 
-  order_date: values.order_date?.format("YYYY-MM-DD"),
-  expected_receiving_date: values.expected_receiving_date?.format("YYYY-MM-DD"),
+    const totalGST = round2(sgst + cgst + igst);
+    const totalAmt = round2(
+      taxableAmount + totalGST + Number(values.tcsAmt || 0)
+    );
 
-  status: values.status || "Fresh",
+    const payload = {
+      contract: values.contract,
+      vendor: selectedContract?.vendor,
+      souda_no: selectedContract?.contract_number,
 
-  // 🔥 IMPORTANT — ADD THESE
-  total_qty_all_items: Number(values.totalQty || 0),
-sgst: Number(values.sgstPercent || 0),   // percentage
-cgst: Number(values.cgstPercent || 0),   // percentage
-igst: Number(values.igstPercent || 0),   // percentage
+      plant_name: values.plantName || "",
+      plant_display_name: values.plantName || "",
+      delivery_address: values.deliveryAddress || "",
 
-total_gst_amount: values.totalGST
-,              // amount
+      order_date: values.order_date?.format("YYYY-MM-DD"),
+      expected_receiving_date:
+        values.expected_receiving_date?.format("YYYY-MM-DD"),
 
+      status: values.status || "Fresh",
 
-total_amount: round2(values.totalAmt),
-grand_total: round2(values.totalAmt),
+      total_qty_all_items: Number(values.totalQty || 0),
 
-  tcs_amount: Number(values.tcsAmt || 0),
+      sgst: Number(values.sgstPercent || 0),
+      cgst: Number(values.cgstPercent || 0),
+      igst: Number(values.igstPercent || 0),
 
-  
+      total_gst_amount: totalGST,
+      total_amount: totalAmt,
+      grand_total: totalAmt,
 
-  items: values.items.map(it => ({
-    product: it.product,
-    item_name: it.item,
-    item_code: it.hsn_code,
-    rate: Number(it.rate),
-    qty: Number(it.qty),
-    free_qty: Number(it.freeQty),
+      tcs_amount: Number(values.tcsAmt || 0),
 
-    discount_percent: Number(it.discountPercent),
-    discount_amount: Number(it.discountAmt),
+      items: values.items.map((it) => ({
+        product: it.product,
+        item_name: it.item,
+        item_code: it.hsn_code,
+        rate: Number(it.rate),
+        qty: Number(it.qty),
+        free_qty: Number(it.freeQty),
+        discount_percent: Number(it.discountPercent),
+        discount_amount: Number(it.discountAmt),
+        gross_amount: Number(it.grossAmount),
+        gross_weight: Number(it.grossWt),
 
-    gross_amount: Number(it.grossAmount),
-    gross_weight: Number(it.grossWt),
+        uom_details: {
+          type: "base",
+          unit_name: it.uom,
+          factor_to_base: "1",
+        },
+      })),
+    };
 
-
-    uom_details: {
-      type: "base",
-      unit_name: it.uom,
-      factor_to_base: "1",
+    // 🔥 API CALL
+    if (type === "edit") {
+      await updatePurchaseOrder(selectedRecord.id, payload);
+      message.success("Purchase order updated successfully");
+      setIsEditModalOpen(false);
+    } else {
+      await addPurchaseOrder(payload);
+      message.success("Purchase order created successfully");
+      setIsAddModalOpen(false);
     }
-  }))
-};
 
-
-    await addPurchaseOrder(payload);
-    message.success("Purchase order created successfully");
+    fetchPurchaseOrder();
   } catch (err) {
-    message.error("Failed to create purchase order");
+    console.error(err);
+    message.error("Something went wrong");
   }
-  setIsAddModalOpen(false);
 };
-
 
 
 
@@ -464,31 +459,131 @@ grand_total: round2(values.totalAmt),
     },
   ];
 
-  const handleView = (record) => {
-    setSelectedRecord(record);
-    const convert = (v) => (v ? dayjs(v) : null);
+const handleView = async (record) => {
+  try {
+    setLoading(true);
+    const res = await getPurchaseOrderById(record.key);
+    const data = res?.data || res;
 
-    viewForm.setFieldsValue({
-      ...record,
-      order_date: convert(record.order_date),
-      expected_receiving_date: convert(record.expected_receiving_date),
-    });
+    // Load contract items
+    await handleSoudaSelect(data.contract, viewForm, data.items);
 
+    const formattedData = {
+      contract: data.contract,
+      vendorName: data.vendor_name,
+      plantName: data.plant_name,
+      deliveryAddress: data.delivery_address,
+      status: data.status,
+      order_date: data.order_date ? dayjs(data.order_date) : null,
+      expected_receiving_date: data.expected_receiving_date
+        ? dayjs(data.expected_receiving_date)
+        : null,
+      items: data.items?.map((it) => ({
+        product: it.product,
+        hsn_code: it.hsn_code,
+        rate: it.rate,
+        qty: it.qty,
+        freeQty: it.free_qty,
+        totalQty: Number(it.qty || 0) + Number(it.free_qty || 0),
+        discountPercent: it.discount_percent,
+        discountAmt: it.discount_amount,
+        grossAmount: it.gross_amount,
+        grossWt: it.gross_weight,
+        uom: it.uom_details?.unit_name,
+      })),
+      totalQty: data.total_qty_all_items || 0,
+      sgstPercent: data.sgst || 0,
+      cgstPercent: data.cgst || 0,
+      igstPercent: data.igst || 0,
+      totalGST: data.total_gst_amount || 0,
+      tcsAmt: data.tcs_amount || 0,
+      totalAmt: data.grand_total || data.total_amount || 0,
+    };
+
+    viewForm.setFieldsValue(formattedData);
+
+    // recalc just in case
+    setTimeout(() => recalcAll(viewForm), 0);
+
+    setSelectedRecord(data);
     setIsViewModalOpen(true);
-  };
+  } catch (err) {
+    console.error(err);
+    message.error("Failed to load purchase order details");
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const handleEdit = (record) => {
-    setSelectedRecord(record);
-    const convert = (v) => (v ? dayjs(v) : null);
 
-    editForm.setFieldsValue({
-      ...record,
-      order_date: convert(record.order_date),
-      expected_receiving_date: convert(record.expected_receiving_date),
-    });
 
+const handleEdit = async (record) => {
+  try {
+    setLoading(true);
+
+    // 🔥 Ensure souda list is loaded first
+    if (!soudaContracts.length) {
+      await fetchSoudaNoOptions();
+    }
+
+    const res = await getPurchaseOrderById(record.key);
+    const data = res?.data || res;
+// 🔥 ALSO load contract items for that souda, pass existing items
+await handleSoudaSelect(data.contract, editForm, data.items);
+
+
+  const formattedData = {
+  contract: data.contract,
+  vendorName: data.vendor_name,
+  plantName: data.plant_name,
+  deliveryAddress: data.delivery_address,
+  status: data.status,
+  order_date: data.order_date ? dayjs(data.order_date) : null,
+  expected_receiving_date: data.expected_receiving_date
+    ? dayjs(data.expected_receiving_date)
+    : null,
+  items: data.items?.map((it) => ({
+    product: it.product,
+    hsn_code: it.hsn_code,
+    rate: it.rate,
+    qty: it.qty,
+    freeQty: it.free_qty,
+    totalQty: Number(it.qty || 0) + Number(it.free_qty || 0),
+    discountPercent: it.discount_percent,
+    discountAmt: it.discount_amount,
+    grossAmount: it.gross_amount,
+    grossWt: it.gross_weight,
+    uom: it.uom_details?.unit_name,
+  })),
+  // ✅ Add these for Tax & Charges
+  totalQty: data.total_qty_all_items || 0,
+  sgstPercent: data.sgst || 0,
+  cgstPercent: data.cgst || 0,
+  igstPercent: data.igst || 0,
+  totalGST: data.total_gst_amount || 0,
+  tcsAmt: data.tcs_amount || 0,
+  totalAmt: data.grand_total || data.total_amount || 0,
+};
+
+
+    editForm.setFieldsValue(formattedData);
+    viewForm.setFieldsValue(formattedData);
+setTimeout(() => {
+  console.log("FORM VALUES:", editForm.getFieldsValue());
+}, 500);
+
+
+    setSelectedRecord(data);
     setIsEditModalOpen(true);
-  };
+
+  } catch (err) {
+    message.error("Failed to load purchase order");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
   // Render form fields (used by Add/Edit/View). When soudaNo is selected, items are prefilled and user can add/remove entries.
   const renderFormFields = (formInstance, disabled = false) => (
@@ -496,24 +591,25 @@ grand_total: round2(values.totalAmt),
       <h6 className=" text-amber-500 ">Basic Information</h6>
       <Row gutter={16}>
         <Col span={6}>
-         <Form.Item
+        <Form.Item
   label="Souda No"
-  name="contract"   // store CONTRACT ID
+  name="contract"   // store contract ID
   rules={[{ required: true }]}
 >
-  <Select
-    placeholder="Select Souda No"
-    onChange={(contractId) =>
-      handleSoudaSelect(contractId, addForm)
-    }
-  >
-    {soudaContracts.map((c) => (
-      <Option key={c.id} value={c.id}>
-        {c.contract_number}
-      </Option>
-    ))}
-  </Select>
+<Select
+  placeholder="Select Souda No"
+  options={soudaContracts.map(c => ({
+    label: c.souda_number,   // ✅ correct field
+    value: c.id
+  }))}
+  onChange={(contractId) =>
+    handleSoudaSelect(contractId, formInstance)
+  }
+/>
+
+
 </Form.Item>
+
 
         </Col>
 
@@ -604,46 +700,44 @@ grand_total: round2(values.totalAmt),
                 </div>
 
                 <Row gutter={24}>
-                  <Col span={6}>
-                  <Form.Item
+                 <Form.Item
   {...field}
   label="Item Name"
-  name={[field.name, "product"]}
-  rules={[{ required: true, message: "Please select item" }]}
+  name={[field.name, "product"]}   // store PRODUCT ID
+  rules={[{ required: true }]}
 >
   <Select
     showSearch
+    placeholder="Select Item"
     disabled={disabled}
-    placeholder="Select item"
-   onChange={(productId) => {
-  const item = contractItems.find((i) => i.product === productId);
-  if (!item) return;
+    onChange={(productId) => {
 
-  formInstance.setFieldsValue({
-    items: formInstance.getFieldValue("items").map((row, i) =>
-      i === field.name
-        ? {
-            ...row,
-            product: item.product,
-            item: item.item_name,
-            hsn_code: item.hsn_code,
-            rate: Number(item.rate || 0),
-            qty: Number(item.qty || 0),
-            freeQty: Number(item.free_qty || 0),
-            uom: item.uom_details?.unit_name,
-            rate: Number(item.rate || 0),
-            discountPercent: Number(item.discount_percent || 0),
-            sgstPercent: Number(item.sgst_percent || 0),
-            cgstPercent: Number(item.cgst_percent || 0),
-            igstPercent: Number(item.igst_percent || 0),
-          }
-        : row
-    ),
-  });
+      const selected = contractItems.find(
+        (i) => i.product === productId
+      );
 
-  setTimeout(() => recalcAll(formInstance), 0);
-}}
+      if (!selected) return;
 
+      const currentItems = formInstance.getFieldValue("items");
+
+      currentItems[field.name] = {
+        ...currentItems[field.name],
+        product: selected.product,                 // ID
+        item_name: selected.item_name,             // name
+        hsn_code: selected.hsn_code,                // HSN
+        rate: Number(selected.rate || 0),
+        qty: Number(selected.qty || 0),
+        freeQty: Number(selected.free_qty || 0),
+        uom: selected.uom_details?.unit_name,
+        discountPercent: Number(selected.discount_percent || 0),
+      };
+
+      formInstance.setFieldsValue({
+        items: currentItems,
+      });
+
+      setTimeout(() => recalcAll(formInstance), 0);
+    }}
   >
     {contractItems.map((it) => (
       <Option key={it.product} value={it.product}>
@@ -653,16 +747,16 @@ grand_total: round2(values.totalAmt),
   </Select>
 </Form.Item>
 
-                  </Col>
 
                   <Col span={4}>
-                    <Form.Item
-                      {...field}
-                      label="Item Code"
-                      name={[field.name, "hsn_code"]}
-                    >
-                      <Input disabled />
-                    </Form.Item>
+                  <Form.Item
+  {...field}
+  label="Item Code"
+  name={[field.name, "hsn_code"]}
+>
+  <Input disabled />
+</Form.Item>
+
                   </Col>
 
                   <Col span={4}>
@@ -704,19 +798,15 @@ grand_total: round2(values.totalAmt),
                     </Form.Item>
                   </Col>
                    <Col span={4}>
-                    <Form.Item
-                      {...field}
-                      label="UOM"
-                      name={[field.name, "uom"]}
-                    >
-                      <Select disabled={disabled}>
-                        {purchaseIndentJSON.uomOptions.map((opt) => (
-                          <Option key={opt} value={opt}>
-                            {opt}
-                          </Option>
-                        ))}
-                      </Select>
-                    </Form.Item>
+                   <Form.Item
+  {...field}
+  label="UOM"
+  name={[field.name, "uom"]}   // ✅ match handleEdit mapping
+>
+  <Input disabled />
+</Form.Item>
+
+
                   </Col>
 
                   <Col span={4}>
@@ -1005,9 +1095,10 @@ grand_total: round2(values.totalAmt),
         footer={null}
         width={1100}
       >
-        <Form layout="vertical" form={viewForm}>
-          {() => renderFormFields(viewForm, true)}
-        </Form>
+       <Form layout="vertical" form={viewForm}>
+  {renderFormFields(viewForm, true)}
+</Form>
+
       </Modal>
     </div>
   );
