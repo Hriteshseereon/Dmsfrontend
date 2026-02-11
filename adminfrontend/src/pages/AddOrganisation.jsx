@@ -166,133 +166,6 @@ export default function AddOrganisation() {
     },
   ];
 
-  // const mapOrgToForm = (org) => ({
-  //   registeredName: org.registered_name,
-  //   organisationType: org.organisation_type,
-  //   phone: org.phone_number_1,
-  //   phone2: org.phone_number_2,
-  //   email: org.email,
-  //   secondaryEmail: org.secondary_email,
-
-  //   organisationAddress: {
-  //     address: org.addresses?.[0]?.address_line_1,
-  //     address2: org.addresses?.[0]?.address_line_2,
-  //     city: org.addresses?.[0]?.city,
-  //     state: org.addresses?.[0]?.state,
-  //     pin: org.addresses?.[0]?.pin_code,
-  //   },
-
-  //   partners: org.persons?.map((p) => ({
-  //     name: p.full_name,
-  //     email: p.email,
-  //     mobileNumber: p.phone_number_1,
-  //     whatsappNumber: p.whatsapp_number,
-  //     gender: p.gender,
-  //   })),
-
-  //   hasBranch: org.branches?.length > 0,
-  //   branches: org.branches?.map((b) => ({
-  //     branchName: b.name,
-  //     shortName: b.short_name,
-  //     city: b.address?.city,
-  //     state: b.address?.state,
-  //     pinNo: b.address?.pin_code,
-  //   })),
-
-  //   ...org.modules_data?.reduce((acc, m) => {
-  //     acc[`module_${m.module}`] = m.is_enabled;
-  //     return acc;
-  //   }, {}),
-  // });
-
-  // updated mapping function to handle new fields and nested structures
-  // const mapOrgToForm = (org) => {
-  //   // ================= HQ ADDRESS =================
-  //   const hqAddress = org.addresses?.find((a) => a.address_category === "HQ");
-
-  //   return {
-  //     // ================= ORG CORE =================
-  //     registeredName: org.registered_name,
-  //     organisationType: org.organisation_type,
-  //     phone: org.phone_number_1,
-  //     phone2: org.phone_number_2,
-  //     email: org.email,
-  //     secondaryEmail: org.secondary_email,
-  //     businessLocation: org.head_office_location,
-
-  //     // ================= HQ ADDRESS =================
-  //     organisationAddress: {
-  //       address: hqAddress?.address_line_1,
-  //       address2: hqAddress?.address_line_2,
-  //       city: hqAddress?.city,
-  //       state: hqAddress?.state,
-  //       pin: hqAddress?.pin_code,
-  //     },
-
-  //     // ================= PERSONS =================
-  //     partners: org.persons?.map((p) => ({
-  //       name: p.full_name,
-  //       email: p.email,
-  //       email2: p.secondary_email,
-
-  //       mobileNumber: p.phone_number_1,
-  //       whatsappNumber: p.whatsapp_number,
-
-  //       gender: p.gender,
-  //       dob: p.date_of_birth ? dayjs(p.date_of_birth) : null,
-  //       percentage: p.interest_percentage
-  //         ? Number(p.interest_percentage)
-  //         : null,
-
-  //       fatherName: p.family_details?.parents_details,
-  //       spouseName: p.family_details?.spouse_name,
-  //       childrenCount: p.family_details?.children_details,
-
-  //       // 🔴 backend gives STRING, form needs nested object
-  //       currentAddress: {
-  //         address1: p.present_address,
-  //       },
-  //       permanentAddress: {
-  //         address1: p.permanent_address,
-  //       },
-
-  //       bankName: p.bank_details?.bank_name,
-  //       accountNo: p.bank_details?.account_number,
-  //       ifsc: p.bank_details?.ifsc_code,
-  //       branchName: p.bank_details?.branch_name,
-
-  //       companyDetails: p.company_details
-  //         ? {
-  //             companyName: p.company_details.company_name,
-  //             registrationNo: p.company_details.registration_no,
-  //             gstNo: p.company_details.gst_no,
-  //             address: {
-  //               city: p.company_details.address,
-  //               state: p.company_details.location,
-  //             },
-  //           }
-  //         : undefined,
-  //     })),
-
-  //     // ================= BRANCHES =================
-  //     hasBranch: org.branches?.length > 0,
-  //     branches: org.branches?.map((b) => ({
-  //       branchName: b.name,
-  //       shortName: b.short_name,
-  //       city: b.address?.city,
-  //       state: b.address?.state,
-  //       pinNo: b.address?.pin_code,
-  //       address1: b.address?.address_line_1,
-  //       address2: b.address?.address_line_2,
-  //     })),
-
-  //     // ================= MODULES =================
-  //     ...(org.modules_data ?? []).reduce((acc, m) => {
-  //       acc[`module_${m.module}`] = m.is_enabled;
-  //       return acc;
-  //     }, {}),
-  //   };
-  // };
   const LEGAL_KEY_MAP = {
     cin: "cin_no",
     pan: "pan_no",
@@ -344,6 +217,7 @@ export default function AddOrganisation() {
       email: org.email,
       secondaryEmail: org.secondary_email,
       businessLocation: org.head_office_location,
+      partnersCount: org.number_of_partners ?? org.persons?.length ?? 0,
 
       // ================= HQ ADDRESS =================
       organisationAddress: {
@@ -432,10 +306,17 @@ export default function AddOrganisation() {
         branchName: b.name,
         shortName: b.short_name,
         city: b.address?.city,
+        gstin: b.gstin,
         state: b.address?.state,
         pinNo: b.address?.pin_code,
         address1: b.address?.address_line_1,
         address2: b.address?.address_line_2,
+        contacts: b.contacts?.map((c) => ({
+          id: c.id,
+          person: c.contact_person,
+          number: c.contact_number,
+          email: c.email,
+        })) ?? [{}],
       })),
 
       // ================= MODULES =================
@@ -511,262 +392,6 @@ export default function AddOrganisation() {
         return [];
     }
   };
-  // add a payload builder to handle file uploads and nested structures
-  // const buildPayload = (values) => {
-  //   return {
-  //     // ================= ORG CORE =================
-  //     registered_name: values.registeredName ?? "",
-  //     rms_org_id: values.rmsOrgId ?? null,
-
-  //     organisation_type: values.organisationType ?? "",
-  //     // legal_type: values.organisationType ?? "",
-
-  //     phone_number_1: values.phone ?? "",
-  //     phone_number_2: values.phone2 ?? null,
-
-  //     email: values.email ?? "",
-  //     secondary_email: values.secondaryEmail ?? null,
-
-  //     is_active: true,
-
-  //     // ================= HQ ADDRESS =================
-  //     addresses: [
-  //       {
-  //         address_line_1: values?.organisationAddress?.address ?? "",
-  //         address_line_2: values?.organisationAddress?.address2 ?? "",
-  //         city: values?.organisationAddress?.city ?? "",
-  //         state: values?.organisationAddress?.state ?? "",
-  //         pin_code: values?.organisationAddress?.pin ?? "",
-  //         country: "India",
-
-  //         address_type: "OWN",
-  //         address_category: "HQ",
-  //         is_branch: false,
-  //       },
-  //     ],
-
-  //     // ================= PERSONS =================
-  //     persons: (values.partners ?? []).map((p) => ({
-  //       full_name: p?.name ?? "",
-  //       role:
-  //         values.organisationType === "pvt"
-  //           ? "DIRECTOR"
-  //           : values.organisationType === "LLP" ||
-  //             values.organisationType === "partnership"
-  //             ? "PARTNER"
-  //             : "PROPRIETOR",
-
-  //       phone_number_1: p?.mobileNumber || p?.contactNumber || null,
-  //       phone_number_2: null,
-  //       whatsapp_number: p?.whatsappNumber ?? null,
-
-  //       email: p?.email ?? null,
-  //       gender: p?.gender ?? null,
-
-  //       // ---------- FAMILY ----------
-  //       family_details: {
-  //         spouse_name: p?.spouseName ?? null,
-  //         children_details:
-  //           p?.childrenCount !== undefined ? String(p.childrenCount) : null,
-  //         parents_details: p?.fatherName ?? null,
-  //       },
-
-  //       // ---------- BANK ----------
-  //       bank_details: {
-  //         bank_name: p?.bankName ?? null,
-  //         account_holder_name: p?.name ?? null,
-  //         account_number: p?.accountNo ?? null,
-  //         ifsc_code: p?.ifsc ?? null,
-  //         branch_name: p?.bankBranch ?? null,
-  //       },
-
-  //       // ---------- COMPANY ----------
-  //       company_details: p?.companyDetails
-  //         ? {
-  //           company_name: p.companyDetails.companyName ?? null,
-  //           registration_no: p.companyDetails.registrationNo ?? null,
-  //           gst_no: p.companyDetails.gstNo ?? null,
-  //           address: p.companyDetails.address?.city ?? null,
-  //           location: p.companyDetails.address?.state ?? null,
-  //         }
-  //         : null,
-  //     })),
-
-  //     // ================= BRANCHES =================
-  //     branches: values.hasBranch
-  //       ? (values.branches ?? []).map((b) => ({
-  //         name: b?.branchName ?? "",
-  //         short_name: b?.shortName ?? "",
-  //         phone_number_1: null,
-  //         email: null,
-  //         // type: "HQ",
-
-  //         address: {
-  //           address_line_1: b?.address1 ?? "",
-  //           address_line_2: b?.address2 ?? "",
-  //           city: b?.city ?? "",
-  //           state: b?.state ?? "",
-  //           pin_code: b?.pinNo ?? "",
-  //           country: "India",
-  //           address_type: "RENTED",
-  //         },
-  //       }))
-  //       : [],
-
-  //     // ================= DEPOS =================
-  //     depos: [],
-
-  //     // ================= MODULES =================
-  //     modules_input: modulesList
-  //       .filter((m) => values[`module_${m.id}`])
-  //       .map((m) => m.id),
-  //   };
-  // };
-
-  // updated latest payload builder with nested structures
-  // const buildPayload = (values) => {
-  //   return {
-  //     // ================= ORG CORE =================
-  //     registered_name: values.registeredName ?? "",
-  //     organisation_type: values.organisationType ?? "",
-  //     legal_type: values.organisationType ?? "",
-
-  //     rms_org_id: values.rmsOrgId ?? null,
-  //     head_office_location: values.businessLocation ?? null,
-
-  //     phone_number_1: values.phone ?? "",
-  //     phone_number_2: values.phone2 ?? null,
-
-  //     email: values.email ?? "",
-  //     secondary_email: values.secondaryEmail ?? null,
-
-  //     number_of_partners: values.partners?.length ?? 0,
-  //     is_active: true,
-
-  //     // ================= HQ ADDRESS =================
-  //     addresses: [
-  //       {
-  //         address_line_1: values.organisationAddress?.address ?? "",
-  //         address_line_2: values.organisationAddress?.address2 ?? "",
-  //         city: values.organisationAddress?.city ?? "",
-  //         state: values.organisationAddress?.state ?? "",
-  //         country: "India",
-  //         pin_code: values.organisationAddress?.pin ?? "",
-
-  //         latitude: null,
-  //         longitude: null,
-
-  //         address_type: "OWN",
-  //         address_category: "HQ",
-  //       },
-  //     ],
-
-  //     // ================= PERSONS =================
-  //     persons: (values.partners ?? []).map((p) => ({
-  //       full_name: p.name ?? "",
-
-  //       role:
-  //         values.organisationType === "PRIVATE_LIMITED"
-  //           ? "DIRECTOR"
-  //           : values.organisationType === "LLP" ||
-  //               values.organisationType === "Partnership"
-  //             ? "PARTNER"
-  //             : "PROPRIETOR",
-
-  //       director_type: "EXECUTIVE",
-  //       gender: p.gender ?? null,
-
-  //       date_of_birth: p.dob ? dayjs(p.dob).format("YYYY-MM-DD") : null,
-  //       interest_percentage: p.percentage ?? null,
-
-  //       phone_number_1: p.mobileNumber ?? null,
-  //       phone_number_2: null,
-  //       whatsapp_number: p.whatsappNumber ?? null,
-
-  //       email: p.email ?? null,
-  //       secondary_email: p.email2 ?? null,
-
-  //       present_address: p.currentAddress
-  //         ? `${p.currentAddress.address1 ?? ""}, ${p.currentAddress.city ?? ""}`
-  //         : null,
-
-  //       permanent_address: p.permanentAddress
-  //         ? `${p.permanentAddress.address1 ?? ""}, ${p.permanentAddress.city ?? ""}`
-  //         : null,
-
-  //       // ---------- FAMILY ----------
-  //       family_details: {
-  //         spouse_name: p.spouseName ?? null,
-  //         children_details:
-  //           p.childrenCount !== undefined ? String(p.childrenCount) : null,
-  //         parents_details: p.fatherName ?? null,
-  //       },
-
-  //       // ---------- BANK ----------
-  //       bank_details: {
-  //         bank_name: p.bankName ?? null,
-  //         account_holder_name: p.name ?? null,
-  //         account_number: p.accountNo ?? null,
-  //         ifsc_code: p.ifsc ?? null,
-  //         branch_name: p.branchName ?? null,
-  //       },
-
-  //       // ---------- COMPANY ----------
-  //       company_details: p.companyDetails
-  //         ? {
-  //             company_name: p.companyDetails.companyName ?? null,
-  //             registration_no: p.companyDetails.registrationNo ?? null,
-  //             gst_no: p.companyDetails.gstNo ?? null,
-  //             address: p.companyDetails.address?.city ?? null,
-  //             location: p.companyDetails.address?.state ?? null,
-  //           }
-  //         : null,
-  //     })),
-
-  //     // ================= LEGAL DETAILS =================
-  //     legal_details: {
-  //       pan_no: values.panNo ?? null,
-  //       gstin: values.gstin ?? null,
-  //       tin_no: values.tinNo ?? null,
-  //       cst_no: values.cstNo ?? null,
-  //       et_no: values.etNo ?? null,
-  //       udyog_aadhaar_no: values.udyamNo ?? null,
-  //       trade_license_no: values.tradeNo ?? null,
-  //     },
-
-  //     // ================= BRANCHES =================
-  //     branches: values.hasBranch
-  //       ? (values.branches ?? []).map((b) => ({
-  //           name: b.branchName ?? "",
-  //           short_name: b.shortName ?? "",
-  //           branch_head_name: null,
-  //           phone_number_1: null,
-  //           phone_number_2: null,
-  //           email: null,
-  //           type: "Main",
-
-  //           address: {
-  //             address_line_1: b.address1 ?? "",
-  //             address_line_2: b.address2 ?? "",
-  //             city: b.city ?? "",
-  //             state: b.state ?? "",
-  //             country: "India",
-  //             pin_code: b.pinNo ?? "",
-  //             address_type: "RENTED",
-  //             address_category: "BRANCH",
-  //           },
-  //         }))
-  //       : [],
-
-  //     // ================= DEPOS =================
-  //     depos: [],
-
-  //     // ================= MODULES =================
-  //     modules_input: modulesList
-  //       .filter((m) => values[`module_${m.id}`])
-  //       .map((m) => m.id),
-  //   };
-  // };
 
   // third build payload
   const buildPayload = (values) => {
@@ -784,7 +409,8 @@ export default function AddOrganisation() {
       email: values.email ?? "",
       secondary_email: values.secondaryEmail ?? null,
 
-      number_of_partners: values.partners?.length ?? 0,
+      number_of_partners: values.partnersCount ?? values.partners?.length ?? 0,
+
       head_office_location: values.businessLocation ?? null,
 
       owner: null,
@@ -1839,7 +1465,7 @@ export default function AddOrganisation() {
                                   Company Website
                                 </span>
                               }
-                              name={[name, "companyWebsite"]}
+                              name={[name, "companyDetails", "companyWebsite"]}
                             >
                               <Input
                                 placeholder="https://www.example.com"
@@ -1913,15 +1539,22 @@ export default function AddOrganisation() {
                             label={<span>City</span>}
                             name={[name, "companyDetails", "address", "city"]}
                             rules={[
+                              { required: true, message: "Please enter city" },
                               {
                                 pattern: /^[A-Za-z\s]+$/,
-                                message: "Only letters are allowed",
+                                message: "Only alphabets are allowed",
                               },
                             ]}
                           >
                             <Input
                               placeholder="Enter city"
                               style={{ borderRadius: "6px" }}
+                              onChange={(e) => {
+                                e.target.value = e.target.value.replace(
+                                  /[^A-Za-z\s]/g,
+                                  "",
+                                );
+                              }}
                             />
                           </Form.Item>
                         </Col>
@@ -1941,6 +1574,34 @@ export default function AddOrganisation() {
                             <Input
                               placeholder="Enter state"
                               style={{ borderRadius: "6px" }}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(
+                                  /[^A-Za-z\s]/g,
+                                  "",
+                                );
+                                form.setFieldsValue({
+                                  partners: {
+                                    [name]: {
+                                      companyDetails: {
+                                        ...form.getFieldValue([
+                                          "partners",
+                                          name,
+                                          "companyDetails",
+                                        ]),
+                                        address: {
+                                          ...form.getFieldValue([
+                                            "partners",
+                                            name,
+                                            "companyDetails",
+                                            "address",
+                                          ]),
+                                          state: value,
+                                        },
+                                      },
+                                    },
+                                  },
+                                });
+                              }}
                             />
                           </Form.Item>
                         </Col>
@@ -2611,7 +2272,7 @@ export default function AddOrganisation() {
         ))}
       </Row>
 
-      <Divider
+      {/* <Divider
         orientation="left"
         style={{ color: "#d97706", fontWeight: 600, marginTop: 24 }}
       >
@@ -2623,7 +2284,7 @@ export default function AddOrganisation() {
             <TextArea rows={4} placeholder="Optional notes or remarks" />
           </Form.Item>
         </Col>
-      </Row>
+      </Row> */}
     </>
   );
 
