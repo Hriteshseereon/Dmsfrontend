@@ -88,6 +88,11 @@ export default function AddOrganisation() {
   const rule = ORG_RULES[orgType];
   const normFile = (e) => (Array.isArray(e) ? e : e?.fileList);
   const navigate = useNavigate();
+  // validation for mobile number: starts with 6-9 and has total 10 digits
+  const handleTenDigitNumber = (fieldPath) => (e) => {
+    const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+    form.setFieldValue(fieldPath, value);
+  };
 
   const steps = [
     { title: "Organisation", description: "Basic Details" },
@@ -288,13 +293,48 @@ export default function AddOrganisation() {
   //     }, {}),
   //   };
   // };
+  const LEGAL_KEY_MAP = {
+    cin: "cin_no",
+    pan: "pan_no",
+    tan: "tan_no",
+    gst: "gst_no",
+    msme: "msme_udyam_no",
+    esi: "esi_no",
+    epf: "epf_no",
+    professionalTax: "professional_tax_no",
+    tradeLicense: "trade_license_no",
+    fssai: "fssai_no",
+    startup: "startup_no",
+    lei: "lei_no",
+  };
 
   // third payload to check with fields mapping while edit
   const mapOrgToForm = (org) => {
     const hqAddress = org.addresses?.find((a) => a.address_category === "HQ");
 
     const legal = org.legal_details ?? {};
+    const selectedLegalDocs = Object.entries(LEGAL_KEY_MAP)
+      .filter(([formKey, apiKey]) => legal?.[apiKey])
+      .map(([formKey]) => formKey);
 
+    const legalDetails = Object.entries(LEGAL_KEY_MAP).reduce(
+      (acc, [formKey, apiKey]) => {
+        acc[formKey] = {
+          number: legal?.[apiKey] ?? null,
+        };
+
+        // Handle validity dynamically
+        const fromKey = apiKey.replace("_no", "_valid_from");
+        const toKey = apiKey.replace("_no", "_valid_to");
+
+        if (legal?.[fromKey] && legal?.[toKey]) {
+          acc[formKey].validity = [dayjs(legal[fromKey]), dayjs(legal[toKey])];
+        }
+
+        return acc;
+      },
+      {},
+    );
     return {
       // ================= ORG CORE =================
       registeredName: org.registered_name,
@@ -368,61 +408,9 @@ export default function AddOrganisation() {
       })),
 
       // ================= LEGAL DETAILS =================
-      legalDetails: {
-        cin: { number: legal.cin_no },
-        pan: { number: legal.pan_no },
-        tan: { number: legal.tan_no },
-        gst: { number: legal.gst_no },
-        msme: { number: legal.msme_udyam_no },
-        esi: { number: legal.esi_no },
-        epf: { number: legal.epf_no },
 
-        professionalTax: {
-          number: legal.professional_tax_no,
-          validity:
-            legal.professional_tax_valid_from && legal.professional_tax_valid_to
-              ? [
-                  dayjs(legal.professional_tax_valid_from),
-                  dayjs(legal.professional_tax_valid_to),
-                ]
-              : null,
-        },
-
-        tradeLicense: {
-          number: legal.trade_license_no,
-          validity:
-            legal.trade_license_valid_from && legal.trade_license_valid_to
-              ? [
-                  dayjs(legal.trade_license_valid_from),
-                  dayjs(legal.trade_license_valid_to),
-                ]
-              : null,
-        },
-
-        fssai: {
-          number: legal.fssai_no,
-          validity:
-            legal.fssai_valid_from && legal.fssai_valid_to
-              ? [dayjs(legal.fssai_valid_from), dayjs(legal.fssai_valid_to)]
-              : null,
-        },
-
-        startup: {
-          number: legal.startup_no,
-          validity:
-            legal.startup_valid_from && legal.startup_valid_to
-              ? [dayjs(legal.startup_valid_from), dayjs(legal.startup_valid_to)]
-              : null,
-        },
-
-        lei: {
-          number: legal.lei_no,
-          validity:
-            legal.lei_valid_from && legal.lei_valid_to
-              ? [dayjs(legal.lei_valid_from), dayjs(legal.lei_valid_to)]
-              : null,
-        },
-      },
+      selectedLegalDocs,
+      legalDetails,
 
       // ================= BRANCHES =================
       hasBranch: org.branches?.length > 0,
@@ -867,73 +855,29 @@ export default function AddOrganisation() {
       })),
 
       // ================= LEGAL DETAILS =================
-      legal_details: {
-        cin_no: values.cinNo ?? null,
-        cin_document: null,
+      legal_details: Object.entries(LEGAL_KEY_MAP).reduce(
+        (acc, [formKey, apiKey]) => {
+          const doc = values.legalDetails?.[formKey];
 
-        gst_no: values.gstNo ?? null,
-        gst_document: null,
+          acc[apiKey] = doc?.number ?? null;
+          acc[apiKey.replace("_no", "_document")] = null;
 
-        pan_no: values.panNo ?? null,
-        pan_document: null,
+          if (doc?.validity?.[0]) {
+            acc[apiKey.replace("_no", "_valid_from")] = dayjs(
+              doc.validity[0],
+            ).format("YYYY-MM-DD");
+          }
 
-        tan_no: values.tanNo ?? null,
-        tan_document: null,
+          if (doc?.validity?.[1]) {
+            acc[apiKey.replace("_no", "_valid_to")] = dayjs(
+              doc.validity[1],
+            ).format("YYYY-MM-DD");
+          }
 
-        msme_udyam_no: values.msmeNo ?? null,
-        msme_udyam_document: null,
-
-        esi_no: values.esiNo ?? null,
-        esi_document: null,
-
-        epf_no: values.epfNo ?? null,
-        epf_document: null,
-
-        professional_tax_no: values.professionalTaxNo ?? null,
-        professional_tax_document: null,
-        professional_tax_valid_from: values.professionalTaxValidity?.[0]
-          ? dayjs(values.professionalTaxValidity[0]).format("YYYY-MM-DD")
-          : null,
-        professional_tax_valid_to: values.professionalTaxValidity?.[1]
-          ? dayjs(values.professionalTaxValidity[1]).format("YYYY-MM-DD")
-          : null,
-
-        trade_license_no: values.tradeLicenseNo ?? null,
-        trade_license_document: null,
-        trade_license_valid_from: values.tradeLicenseValidity?.[0]
-          ? dayjs(values.tradeLicenseValidity[0]).format("YYYY-MM-DD")
-          : null,
-        trade_license_valid_to: values.tradeLicenseValidity?.[1]
-          ? dayjs(values.tradeLicenseValidity[1]).format("YYYY-MM-DD")
-          : null,
-
-        fssai_no: values.fssaiNo ?? null,
-        fssai_document: null,
-        fssai_valid_from: values.fssaiValidity?.[0]
-          ? dayjs(values.fssaiValidity[0]).format("YYYY-MM-DD")
-          : null,
-        fssai_valid_to: values.fssaiValidity?.[1]
-          ? dayjs(values.fssaiValidity[1]).format("YYYY-MM-DD")
-          : null,
-
-        startup_no: values.startupNo ?? null,
-        startup_document: null,
-        startup_valid_from: values.startupValidity?.[0]
-          ? dayjs(values.startupValidity[0]).format("YYYY-MM-DD")
-          : null,
-        startup_valid_to: values.startupValidity?.[1]
-          ? dayjs(values.startupValidity[1]).format("YYYY-MM-DD")
-          : null,
-
-        lei_no: values.leiNo ?? null,
-        lei_document: null,
-        lei_valid_from: values.leiValidity?.[0]
-          ? dayjs(values.leiValidity[0]).format("YYYY-MM-DD")
-          : null,
-        lei_valid_to: values.leiValidity?.[1]
-          ? dayjs(values.leiValidity[1]).format("YYYY-MM-DD")
-          : null,
-      },
+          return acc;
+        },
+        {},
+      ),
 
       // ================= BRANCHES =================
       branches: values.hasBranch
@@ -1050,12 +994,17 @@ export default function AddOrganisation() {
             name="phone2"
             rules={[
               {
-                pattern: /^[0-9]*$/,
-                message: "Only numbers are allowed",
+                pattern: /^[6-9]\d{9}$/,
+                message: "Enter a valid 10-digit mobile number",
               },
             ]}
           >
-            <Input placeholder="Enter phone number" />
+            <Input
+              placeholder="Enter phone number"
+              maxLength={10}
+              inputMode="numeric"
+              onChange={handleTenDigitNumber("phone2")}
+            />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12} md={6}>
@@ -1112,9 +1061,26 @@ export default function AddOrganisation() {
           <Form.Item
             label="State"
             name={["organisationAddress", "state"]}
-            rules={[{ required: true, message: "Enter state" }]}
+            rules={[
+              { required: true, message: "Enter state" },
+              {
+                pattern: /^[A-Za-z\s]+$/,
+                message: "Only alphabets are allowed",
+              },
+            ]}
           >
-            <Input placeholder="State" />
+            <Input
+              placeholder="State"
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^A-Za-z\s]/g, "");
+                form.setFieldsValue({
+                  organisationAddress: {
+                    ...form.getFieldValue("organisationAddress"),
+                    state: value,
+                  },
+                });
+              }}
+            />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12} md={4}>
@@ -1258,12 +1224,21 @@ export default function AddOrganisation() {
                       name={[name, "contactNumber"]}
                       rules={[
                         {
-                          pattern: /^[0-9]*$/,
-                          message: "Only numbers are allowed",
+                          pattern: /^[6-9]\d{9}$/,
+                          message: "Enter a valid 10-digit mobile number",
                         },
                       ]}
                     >
-                      <Input placeholder="Enter contact number" />
+                      <Input
+                        placeholder="Enter contact number"
+                        maxLength={10}
+                        inputMode="numeric"
+                        onChange={handleTenDigitNumber([
+                          "partners",
+                          name,
+                          "contactNumber",
+                        ])}
+                      />
                     </Form.Item>
                   </Col>
                   <Col xs={24} sm={12} md={6}>
@@ -1273,12 +1248,26 @@ export default function AddOrganisation() {
                       name={[name, "mobileNumber"]}
                       rules={[
                         {
-                          pattern: /^[0-9]*$/,
-                          message: "Only numbers are allowed",
+                          required: true,
+                          message: "Please enter mobile number",
+                        },
+
+                        {
+                          pattern: /^[6-9]\d{9}$/,
+                          message: "Enter a valid 10-digit mobile number",
                         },
                       ]}
                     >
-                      <Input placeholder="Enter mobile number" />
+                      <Input
+                        placeholder="Enter mobile number"
+                        maxLength={10}
+                        inputMode="numeric"
+                        onChange={handleTenDigitNumber([
+                          "partners",
+                          name,
+                          "mobileNumber",
+                        ])}
+                      />
                     </Form.Item>
                   </Col>
                   <Col xs={24} sm={12} md={6}>
@@ -1288,12 +1277,21 @@ export default function AddOrganisation() {
                       name={[name, "whatsappNumber"]}
                       rules={[
                         {
-                          pattern: /^[0-9]*$/,
-                          message: "Only numbers are allowed",
+                          pattern: /^[6-9]\d{9}$/,
+                          message: "Enter a valid 10-digit WhatsApp number",
                         },
                       ]}
                     >
-                      <Input placeholder="Enter WhatsApp number" />
+                      <Input
+                        placeholder="Enter WhatsApp number"
+                        maxLength={10}
+                        inputMode="numeric"
+                        onChange={handleTenDigitNumber([
+                          "partners",
+                          name,
+                          "whatsappNumber",
+                        ])}
+                      />
                     </Form.Item>
                   </Col>
                   <Col xs={24} sm={12} md={6}>
