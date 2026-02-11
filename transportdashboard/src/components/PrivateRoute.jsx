@@ -1,16 +1,14 @@
 import { Navigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import useSessionStore from "../store/sessionStrore";
 
-export default function PrivateRoute({ children }) {
-  const { currentUser } = useAuth();
-  return currentUser ? children : <Navigate to="/login" replace />;
-}
+const PrivateRoute = ({ children }) => {
+  const accessToken = useSessionStore((state) => state.accessToken);
 
+  if (!accessToken) {
+    return <Navigate to="/login" replace />;
+  }
 
+  return children;
+};
 
-
-
-
-
-
-
+export default PrivateRoute;

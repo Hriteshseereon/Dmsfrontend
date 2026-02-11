@@ -1,259 +1,141 @@
-import React, { useState } from "react";
-import { Table, Button, Select, Modal, Row, Col } from "antd";
+import React, { useEffect, useState } from "react";
+import { Table, Button, Select, message } from "antd";
+import {
+  getAllpendingTransporters,
+  approveTransporter,
+  getOrganizations,
+} from "../api/transport"; // adjust path
 
 const { Option } = Select;
 
-/* ===== STATIC APPROVAL ORGANISATIONS ===== */
-const approvalOrgList = [
-  "Distributor",
-  "Retailer",
-  "Wholesaler",
-  "Broker",
-  "Vendor",
-];
+function TransportApproval() {
+  const [transporters, setTransporters] = useState([]);
+  const [organisations, setOrganisations] = useState([]);
+  const [loading, setLoading] = useState(false);
 
+  /* ================= FETCH DATA ================= */
 
+  useEffect(() => {
+    fetchData();
+  }, []);
 
+  const fetchData = async () => {
+    try {
+      setLoading(true);
 
-/* ===== CUSTOMER DATA ===== */
-const sampleCustomers = [
-  {
-    id: 1,
-    name: "John Doe",
-    email: "john@example.com",
-    password: "********",
-    contact_person: "John Doe",
-    phone: "+91 9876543210",
-    tele_phone: "+91 9876543210",
-    address_1: "123 Broker Street",
-    address_2: "Suite 100",
-    fax_no: "+91 9876543210",
-    pan_no: "ABCDE1234F",
-    gst_no: "GST123456",
-    state: "Delhi",
-    city: "New Delhi",
-    district: "New Delhi",
-    pin_code: "110001",
-    approvalType: [], 
-    approved: false,
-  },
-  {
-    id: 2,
-    name: "Jane Smith",
-    email: "jane@example.com",
-    password: "********",
-    contact_person: "Jane Smith",
-    phone: "+91 9876543210",
-    tele_phone: "+91 9876543210",
-    address_1: "456 Retailer Avenue",
-    address_2: "Floor 2",
-    fax_no: "+91 9876543210",
-    pan_no: "FGHIJ5678K",
-    gst_no: "GST654321",
-    state: "Maharashtra",
-    district: "Mumbai",
-    pin_code: "400001",
-    approvalType: [],
-    approved: false,
-  },
-];
+      const [pendingRes, orgRes] = await Promise.all([
+        getAllpendingTransporters(),
+        getOrganizations(),
+      ]);
 
-function TranspoertApproval() {
-  const [customers, setCustomers] = useState(sampleCustomers);
- 
+      // Format transporter data
+      const formattedTransporters = pendingRes.map((t) => ({
+        key: t.id,
+        id: t.id,
+        transporter_id: t.transport_id,
+        registered_name: t.registered_name,
+        email_id: t.email_id,
+        phone_number: t.phone_number,
+        selectedOrganisations: [],
+        approved: false,
+      }));
 
-  /* ===== MULTI SELECT HANDLER ===== */
-  const handleApprovalSelect = (id, values) => {
-    setCustomers((prev) =>
-      prev.map((c) =>
-        c.id === id ? { ...c, approvalType: values } : c
-      )
+      setTransporters(formattedTransporters);
+      setOrganisations(orgRes);
+    } catch (error) {
+      message.error("Failed to fetch data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ================= SELECT HANDLER ================= */
+
+  const handleOrgSelect = (id, values) => {
+    setTransporters((prev) =>
+      prev.map((t) =>
+        t.key === id ? { ...t, selectedOrganisations: values } : t,
+      ),
     );
   };
 
+  /* ================= APPROVE HANDLER ================= */
 
-const handleApprove = (id) => {
-  setCustomers((prev) =>
-    prev.map((c) => {
-      if (c.id !== id) return c;
-      if (c.approved) {
-        return {
-          ...c,
-          approved: false,
-          approvalType: [], 
-        };
+  const handleApprove = async (record) => {
+    try {
+      if (record.selectedOrganisations.length === 0) {
+        return message.warning("Please select organisation");
       }
-      return {
-        ...c,
-        approved: true,
+
+      const payload = {
+        transporter_id: record.id,
+        organisation_ids: record.selectedOrganisations,
       };
-    })
-  );
-};
 
+      await approveTransporter(payload);
 
+      message.success("Transporter Approved Successfully");
 
-  /* ===== TABLE COLUMNS ===== */
+      // Remove from list after approve
+      setTransporters((prev) => prev.filter((t) => t.key !== record.key));
+    } catch (error) {
+      message.error("Approval failed");
+    }
+  };
+
+  /* ================= TABLE COLUMNS ================= */
+
   const columns = [
     {
-      title: <span className="text-amber-600 font-bold">Name</span>,
-      dataIndex: "name",
-      render: (text) => (
-        <span className="text-amber-700 font-medium">{text}</span>
+      title: "Registered Name",
+      dataIndex: "registered_name",
+    },
+    {
+      title: "Email",
+      dataIndex: "email_id",
+    },
+    {
+      title: "Phone",
+      dataIndex: "phone_number",
+    },
+    {
+      title: "Link Organisation",
+      render: (_, record) => (
+        <Select
+          mode="multiple"
+          placeholder="Select organisation"
+          style={{ width: 200 }}
+          value={record.selectedOrganisations}
+          onChange={(values) => handleOrgSelect(record.key, values)}
+        >
+          {organisations.map((org) => (
+            <Option key={org.id} value={org.id}>
+              {org.registered_name}
+            </Option>
+          ))}
+        </Select>
       ),
     },
     {
-      title: <span className="text-amber-600 font-bold">Email</span>,
-      dataIndex: "email",
-        render: (text) => ( 
-        <span className="text-amber-700 font-medium">{text}</span>
+      title: "Action",
+      render: (_, record) => (
+        <Button type="primary" onClick={() => handleApprove(record)}>
+          Approve
+        </Button>
       ),
     },
-    {
-      title: <span className="text-amber-600 font-bold">Password</span>,
-      dataIndex: "password",
-      render: (text) => ( 
-        <span className="text-amber-700 font-medium">{text}</span>
-      ),
-    },
-    {
-         title: <span className="text-amber-600 font-bold">Contact Person</span>,   
-        dataIndex: "contact_person",
-        render: (text) => (
-          <span className="text-amber-700 font-medium">{text}</span>
-        ),
-    }
-    ,
-    {
-      title: <span className="text-amber-600 font-bold">Phone</span>,   
-        dataIndex: "phone", 
-
-        render: (text) => (
-          <span className="text-amber-700 font-medium">{text}</span>
-        ),  
-    },
-    {
-      title: <span className="text-amber-600 font-bold">Address</span>,   
-        dataIndex: "address_1",
-        render: (text) => (
-          <span className="text-amber-700 font-medium">{text}</span>
-        ),  
-    },
-     {
-      title: <span className="text-amber-600 font-bold">Address</span>,   
-        dataIndex: "address_2",
-        render: (text) => (
-          <span className="text-amber-700 font-medium">{text}</span>
-        ),  
-    },
-      {
-        title: <span className="text-amber-600 font-bold">Fax No</span>,
-        dataIndex: "fax_no",
-        render: (text) => (
-          <span className="text-amber-700 font-medium">{text}</span>
-        ),
-      },
-      { 
-        title: <span className="text-amber-600 font-bold">PAN No</span>,  
-        dataIndex: "pan_no",
-        render: (text) => (
-          <span className="text-amber-700 font-medium">{text}</span>
-        ),
-      },
-      {
-        title: <span className="text-amber-600 font-bold">GST No</span>,
-        dataIndex: "gst_no",
-        render: (text) => ( 
-          <span className="text-amber-700 font-medium">{text}</span>
-        ),
-      },
-      {
-        title: <span className="text-amber-600 font-bold">State</span>,
-        dataIndex: "state",
-        render: (text) => (
-          <span className="text-amber-700 font-medium">{text}</span>
-        ),  
-      },
-      {
-        title: <span className="text-amber-600 font-bold">City</span>,
-        dataIndex: "city",
-        render: (text) => (
-          <span className="text-amber-700 font-medium">{text}</span>
-        ),  
-      },
-      {
-        title: <span className="text-amber-600 font-bold">District</span>,
-        dataIndex: "district",
-        render: (text) => (
-          <span className="text-amber-700 font-medium">{text}</span>
-        ),  
-      },
-      {
-        title: <span className="text-amber-600 font-bold">Pin Code</span>,
-        dataIndex: "pin_code",
-        render: (text) => (
-          <span className="text-amber-700 font-medium">{text}</span>
-        ),  
-      },
-  
-{
-  title: <span className="text-amber-600 font-bold">Link Organization</span>,
-  render: (_, record) => (
-    <Select
-      mode="multiple"
-      allowClear
-      placeholder="Select organisation"
-      className="w-40"
-      value={record.approvalType}
-      
-      disabled={record.approved}    
-      onChange={(values) =>
-        handleApprovalSelect(record.id, values)
-      }
-    >
-      {approvalOrgList.map((org) => (
-        <Option key={org} value={org}>
-          {org}
-        </Option>
-      ))}
-    </Select>
-  ),
-}
-
-,{
-  title: <span className="text-amber-600 font-bold">Action</span>,
-  render: (_, record) => (
-    <Button
-      disabled={!record.approved && record.approvalType.length === 0}
-      onClick={() => handleApprove(record.id)}
-      className={
-        record.approved
-          ? "bg-green-500! text-white! hover:bg-green-600!"
-          : "bg-amber-500! text-white! hover:bg-amber-600!"
-      }
-    >
-      {record.approved ? "Approved" : "Approve"}
-    </Button>
-  ),
-}
-
-
   ];
 
   return (
-    <div className="p-6">
-     
+    <div style={{ padding: 20 }}>
       <Table
         columns={columns}
-        dataSource={customers}
-        rowKey="id"
+        dataSource={transporters}
+        loading={loading}
         pagination={false}
-        scroll={{ x: 200 }}
       />
-
-   
     </div>
   );
 }
 
-export default TranspoertApproval;
+export default TransportApproval;
