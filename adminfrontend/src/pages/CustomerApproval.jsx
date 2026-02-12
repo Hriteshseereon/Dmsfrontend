@@ -1,64 +1,87 @@
-import React, { useState, useEffect } from "react";
-import { Table, Button, Select, Modal, Row, Col, message, Checkbox } from "antd";
-import { getAllAdminCustomers, getAdminCustomerDetails, assignAdminCustomerOrganisations } from "../api/customer";
-import { getOrganizations } from "../api/organizations";
+import React, { useState } from "react";
+import { Table, Button, Select, Modal, Row, Col } from "antd";
 
 const { Option } = Select;
 
+/* ===== STATIC APPROVAL ORGANISATIONS ===== */
+const approvalOrgList = [
+  "Distributor",
+  "Retailer",
+  "Wholesaler",
+  "Broker",
+  "Vendor",
+];
 
+/* ===== COMPANY MASTER DATA ===== */
+const companyDetails = {
+  "Company 1": {
+    name: "Company 1",
+    phone: "1234567890",
+    email: "company1@example.com",
+    country: "India",
+    state: "Delhi",
+    city: "New Delhi",
+    pin: "110001",
+    tdc: "Yes",
+    gstin: "GST123456",
+    tin: "TIN123456",
+    license: "LIC12345",
+    fssai: "FSSAI123",
+    billingType: "Monthly",
+    aadhaar: "1234-5678-9012",
+    pan: "ABCDE1234F",
+    address: "123 Company Street, Delhi",
+  },
+  "Company 2": {
+    name: "Company 2",
+    phone: "0987654321",
+    email: "company2@example.com",
+    country: "India",
+    state: "Maharashtra",
+    city: "Mumbai",
+    pin: "400001",
+    tdc: "No",
+    gstin: "GST654321",
+    tin: "TIN654321",
+    license: "LIC54321",
+    fssai: "FSSAI456",
+    billingType: "Quarterly",
+    aadhaar: "9876-5432-1098",
+    pan: "FGHIJ5678K",
+    address: "456 Company Street, Mumbai",
+  },
+};
+
+/* ===== CUSTOMER DATA ===== */
+const sampleCustomers = [
+  {
+    id: 1,
+    name: "John Doe",
+    email: "john@example.com",
+    password: "********",
+    phone: "+91 9876543210",
+    address: "123 Broker Street",
+    companies: ["Company 1", "Company 2"],
+    approvalType: [], // ✅ MULTI
+    approved: false,
+  },
+  {
+    id: 2,
+    name: "Jane Smith",
+    email: "jane@example.com",
+    password: "********",
+    phone: "+91 9123456789",
+    address: "456 Broker Lane",
+    companies: ["Company 2"],
+    approvalType: [], // ✅ MULTI
+    approved: false,
+  },
+];
 
 function CustomerApproval() {
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [customers, setCustomers] = useState(sampleCustomers);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalData, setModalData] = useState([]);
-
-  const [organizations, setOrganizations] = useState([]);
-
-  useEffect(() => {
-    const initialize = async () => {
-      const orgs = await fetchOrganizations();
-      await fetchCustomers(orgs);
-    };
-    initialize();
-  }, []);
-
-  const fetchOrganizations = async () => {
-    try {
-      const data = await getOrganizations();
-      setOrganizations(data);
-      return data;
-    } catch (error) {
-      console.error("Failed to fetch organizations:", error);
-      message.error("Failed to fetch organizations");
-      return [];
-    }
-  };
-
-  const fetchCustomers = async (orgs = organizations) => {
-    setLoading(true);
-    try {
-      const data = await getAllAdminCustomers();
-      // Map API data to match existing UI structure
-      const mappedData = data.map((item) => ({
-        id: item.customer_id,
-        name: item.customer_name,
-        email: item.email_address || "N/A",
-        password: "********", // Mock as in original
-        phone: item.mobile_number || item.phone_number || "N/A",
-        address: item.address || "N/A",
-        companies: item.companies || item.company_details || [],
-        approvalType: item.linked_org_ids || [], // Keep as IDs for state
-        approved: item.login_active,
-      }));
-      setCustomers(mappedData);
-    } catch (error) {
-      console.error("Failed to fetch customers:", error);
-      message.error("Failed to fetch customers");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   /* ===== MULTI SELECT HANDLER ===== */
   const handleApprovalSelect = (id, values) => {
@@ -70,70 +93,36 @@ function CustomerApproval() {
   };
 
   /* ===== VIEW CUSTOMER COMPANIES ===== */
-  const handleViewDetails = async (customer) => {
-    try {
-      const details = await getAdminCustomerDetails(customer.id);
-
-      const mappedCompanies = (details.companies || []).map(comp => ({
-        "name": comp.company_name,
-        "phone": comp.phone,
-        "email": comp.email,
-        "country": comp.country,
-        "state": comp.state,
-        "city": comp.city,
-        "pin": comp.pin,
-        "tdc": comp.tds_applicable ? "Yes" : "No",
-        "gstin": comp.gstin,
-        "tin": comp.tin,
-        "license": comp.license_no,
-        "fssai": comp.fssai_no,
-        "billingType": comp.billing_type,
-        "aadhaar": comp.aadhaar_no,
-        "pan": comp.pan,
-        "address": comp.address
-      }));
-
-      setModalData(mappedCompanies);
-      setModalVisible(true);
-    } catch (error) {
-      console.error("Failed to fetch customer details:", error);
-      message.error("Failed to fetch customer details");
-    }
+  const handleViewDetails = (customer) => {
+    const details = customer.companies.map(
+      (c) => companyDetails[c]
+    );
+    setModalData(details);
+    setModalVisible(true);
   };
 
-  const handleApprove = async (id) => {
-    const customer = customers.find(c => c.id === id);
-    if (!customer) return;
+const handleApprove = (id) => {
+  setCustomers((prev) =>
+    prev.map((c) => {
+      if (c.id !== id) return c;
 
-    // Toggle logic: If already approved, we reset (locally for now, or you can add a reset API call)
-    if (customer.approved) {
-      setCustomers((prev) =>
-        prev.map((c) =>
-          c.id === id ? { ...c, approved: false, approvalType: [] } : c
-        )
-      );
-      return;
-    }
+      // SECOND CLICK → RESET
+      if (c.approved) {
+        return {
+          ...c,
+          approved: false,
+          approvalType: [], // ✅ auto remove organisation
+        };
+      }
 
-    try {
-      const payload = {
-        organisation_ids: customer.approvalType,
-        status: "Approved"
+      // FIRST CLICK → APPROVE
+      return {
+        ...c,
+        approved: true,
       };
-
-      await assignAdminCustomerOrganisations(id, payload);
-      message.success("Customer approved and organizations linked successfully");
-
-      setCustomers((prev) =>
-        prev.map((c) =>
-          c.id === id ? { ...c, approved: true } : c
-        )
-      );
-    } catch (error) {
-      console.error("Failed to approve customer:", error);
-      message.error("Failed to approve customer");
-    }
-  };
+    })
+  );
+};
 
 
 
@@ -149,28 +138,28 @@ function CustomerApproval() {
     {
       title: <span className="text-amber-600 font-bold">Email</span>,
       dataIndex: "email",
-      render: (text) => (
+        render: (text) => ( 
         <span className="text-amber-700 font-medium">{text}</span>
       ),
     },
     {
       title: <span className="text-amber-600 font-bold">Password</span>,
       dataIndex: "password",
-      render: (text) => (
+      render: (text) => ( 
         <span className="text-amber-700 font-medium">{text}</span>
       ),
     },
     {
       title: <span className="text-amber-600 font-bold">Phone</span>,
       dataIndex: "phone",
-      render: (text) => (
+      render: (text) => ( 
         <span className="text-amber-700 font-medium">{text}</span>
       ),
     },
     {
       title: <span className="text-amber-600 font-bold">Address</span>,
       dataIndex: "address",
-      render: (text) => (
+      render: (text) => ( 
         <span className="text-amber-700 font-medium">{text}</span>
       ),
     },
@@ -185,67 +174,57 @@ function CustomerApproval() {
         </Button>
       ),
     },
-    {
-      title: <span className="text-amber-600 font-bold">Link Organization</span>,
-      render: (_, record) => (
-        <Select
-          mode="multiple"
-          allowClear
-          placeholder="Select organisation"
-          className="w-full min-w-[10ad0px]"
-          value={record.approvalType}
-          disabled={record.approved}
-          onChange={(values) =>
-            handleApprovalSelect(record.id, values)
-          }
-          maxTagCount="responsive"
-          optionLabelProp="label"
-        >
-          {organizations.map((org) => {
-            const orgName = org.registered_name || org.name;
-            return (
-              <Option key={org.id} value={org.id} label={orgName}>
-                <div className="flex items-center gap-2">
-                  <Checkbox checked={record.approvalType.includes(org.id)} />
-                  <span>{orgName}</span>
-                </div>
-              </Option>
-            );
-          })}
-        </Select>
-      ),
-    }
+{
+  title: <span className="text-amber-600 font-bold">Link Organization</span>,
+  render: (_, record) => (
+    <Select
+      mode="multiple"
+      allowClear
+      placeholder="Select organisation"
+      className="w-40"
+      value={record.approvalType}
+      disabled={record.approved}    
+      onChange={(values) =>
+        handleApprovalSelect(record.id, values)
+      }
+    >
+      {approvalOrgList.map((org) => (
+        <Option key={org} value={org}>
+          {org}
+        </Option>
+      ))}
+    </Select>
+  ),
+}
 
-    , {
-      title: <span className="text-amber-600 font-bold">Action</span>,
-      render: (_, record) => (
-        <Button
-          disabled={!record.approved && record.approvalType.length === 0}
-          onClick={() => handleApprove(record.id)}
-          className={
-            record.approved
-              ? "bg-green-500! text-white! hover:bg-green-600!"
-              : "bg-amber-500! text-white! hover:bg-amber-600!"
-          }
-        >
-          {record.approved ? "Approved" : "Approve"}
-        </Button>
-      ),
-    }
+,{
+  title: <span className="text-amber-600 font-bold">Action</span>,
+  render: (_, record) => (
+    <Button
+      disabled={!record.approved && record.approvalType.length === 0}
+      onClick={() => handleApprove(record.id)}
+      className={
+        record.approved
+          ? "bg-green-500! text-white! hover:bg-green-600!"
+          : "bg-amber-500! text-white! hover:bg-amber-600!"
+      }
+    >
+      {record.approved ? "Approved" : "Approve"}
+    </Button>
+  ),
+}
 
 
   ];
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
-
+    <div className="p-6">
+     
       <Table
         columns={columns}
         dataSource={customers}
         rowKey="id"
         pagination={false}
-        loading={loading}
-        scroll={{ x: 'max-content' }}
       />
 
       {/* ===== MODAL ===== */}
@@ -253,43 +232,34 @@ function CustomerApproval() {
         open={modalVisible}
         footer={null}
         onCancel={() => setModalVisible(false)}
-        width="95%"
-        style={{ maxWidth: "1200px" }}
+        width={1000}
         title={<span className="text-amber-600">Company Details</span>}
       >
         <div className="flex flex-col gap-6">
-          {modalData.length > 0 ? (
-            modalData.map((company, index) => (
-              <div
-                key={index}
-                className="border border-amber-200 rounded-xl p-8 bg-white mb-6 last:mb-0 shadow-sm"
-              >
-                <h3 className="text-2xl font-bold text-amber-600 mb-6">
-                  {company.name}
-                </h3>
-                <Row gutter={[24, 20]}>
-                  {Object.entries(company).map(([key, value]) => (
-                    <Col xs={24} sm={12} md={8} lg={6} key={key}>
-                      <div className="flex gap-2 items-start text-[14px]">
-                        <span className="text-amber-600 font-bold whitespace-nowrap">
-                          {key}:
-                        </span>
-                        <span className="text-slate-900 font-bold leading-tight">
-                          {value || "N/A"}
-                        </span>
-                      </div>
-                    </Col>
-                  ))}
-                </Row>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-10">
-              <span className="text-lg text-gray-500 italic">
-                No company added
-              </span>
+          {modalData.map((company, index) => (
+            <div
+              key={index}
+              className="border border-amber-300 rounded-lg p-4 shadow"
+            >
+              <h3 className="text-xl font-bold text-amber-600 mb-3">
+                {company.name}
+              </h3>
+
+             <Row gutter={[16, 16]}>
+  {Object.entries(company).map(([key, value]) => (
+    <Col span={6} key={key}>
+      <div className="text-sm">
+        <strong className="text-amber-600 block">
+          {key}: <span className=" text-gray-700">{value}</span>
+        </strong>
+       
+      </div>
+    </Col>
+  ))}
+</Row>
+
             </div>
-          )}
+          ))}
         </div>
       </Modal>
     </div>

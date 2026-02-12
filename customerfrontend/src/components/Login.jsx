@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { UserOutlined } from "@ant-design/icons"
 export default function Login() {
-  const { login, currentUser } = useAuth();
+  const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState(null);
   const navigate = useNavigate();
@@ -17,17 +17,21 @@ export default function Login() {
     }
   }, [location.state, location.pathname, navigate]);
 
-  const onFinish = async (values) => {
+  const onFinish = (values) => {
     setLoading(true);
-    const res = await login(values);
-    setLoading(false);
+    setTimeout(() => {
+      const res = login(values);
+      setLoading(false);
 
-    if (res.success) {
-      const from = location.state?.from?.pathname || "/dashboard";
-      navigate(from, { replace: true });
-    } else {
-      setAlert({ type: "warning", message: res.message });
-    }
+      if (res.success) {
+        setAlert({ type: "success", message: res.message });
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 500);
+      } else {
+        setAlert({ type: "warning", message: res.message });
+      }
+    }, 500);
   };
 
   return (
@@ -62,10 +66,10 @@ export default function Login() {
             label={<span className="text-amber-700 font-semibold">Email</span>}
             name="email"
             rules={[{ required: true, },
-            {
-              pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-              message: "Enter a valid email (example@gmail.com)",
-            },
+              {
+        pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+        message: "Enter a valid email (example@gmail.com)",
+      },
             ]}
           >
             <Input placeholder="example@gmail.com" />
