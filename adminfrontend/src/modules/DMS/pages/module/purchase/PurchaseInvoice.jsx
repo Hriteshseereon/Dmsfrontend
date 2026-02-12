@@ -21,19 +21,9 @@ import {
   EditOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { getPurchaseInvoice } from "../../../../../api/purchase";
+import { getPurchaseInvoice,getPurchaseOrder,addPurchaseInvoice,getPurchaseInvoiceById,updatePurchaseInvoice,getPurchaseOrderById } from "../../../../../api/purchase";
 const { Option } = Select;
-
-// ------------------------------
-// Demo: role switch for admin
-// Set to `true` to allow editing of admin-only fields
-// In a real app, wire this up to auth/permissions
 const isAdmin = true; // <-- change to false to simulate non-admin
-// ------------------------------
-
-// 🔹 JSON Data
-// - indentData contains full details per indent (multiple items)
-// - top-level records still exist to show existing invoices
 const purchaseInvoiceJSON = {
   records: [
     {
@@ -207,8 +197,9 @@ const [loading, setLoading] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [recordToAssign, setRecordToAssign] = useState(null);
   const [selectedTransporter, setSelectedTransporter] = useState(null);
-
+  const[orderList,setOrderList]=useState([]);
   const [selectedRecord, setSelectedRecord] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
@@ -216,22 +207,24 @@ const [loading, setLoading] = useState(false);
   const [assignForm] = Form.useForm();
 
   // Search handler
-  const handleSearch = (value) => {
-    setSearchText(value);
-    if (!value) {
-      setData(purchaseInvoiceJSON.records);
-    } else {
-      const filtered = purchaseInvoiceJSON.records.filter((item) =>
-        Object.values(item).some((field) =>
-          String(field).toLowerCase().includes(value.toLowerCase())
-        )
-      );
-      setData(filtered);
-    }
-  };
+ const handleSearch = (value) => {
+  setSearchText(value);
+
+  if (!value) {
+   fetchPurchaseInvoices(); // reset to original data
+    return;
+  }
+
+  const filtered = data.filter((item) =>
+    JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
+  );
+
+  setData(filtered);
+};
 
   useEffect(() => {
   fetchPurchaseInvoices();
+  fetchPurchaseOrders();
 }, []);
 
 const fetchPurchaseInvoices = async () => {
@@ -253,30 +246,87 @@ const fetchPurchaseInvoices = async () => {
     setLoading(false);
   }
 };
+const fetchPurchaseOrders = async () => {
+  try {
+    const res = await getPurchaseOrder();
+    setOrderList(res); // store full order objects
+  } catch (err) {
+    message.error("Failed to load purchase orders");
+    console.error(err);
+  }
+};
+
+const openAddModal = async () => {
+  addForm.resetFields();
+  setIsAddModalOpen(true);
+  await fetchPurchaseOrders();
+};
+const handleOrderSelect = async (orderId) => {
+  try {
+    const order = await getPurchaseOrderById(orderId);
+    
+  setSelectedOrder(order); 
+addForm.setFieldsValue({
+  purchase_order: order.id,
+
+  vendorName: order.vendor_name,
+  plantName: order.plant_name,
+  deliveryAddress: order.delivery_address,
+
+  deliveryDate: order.expected_receiving_date
+    ? dayjs(order.expected_receiving_date)
+    : null,
+
+  sgstPercent: Number(order.sgst),
+  cgstPercent: Number(order.cgst),
+  igstPercent: Number(order.igst),
+
+  sgst: Number(order.total_gst_amount) ? Number(order.sgst) : 0,
+  cgst: Number(order.total_gst_amount) ? Number(order.cgst) : 0,
+  igst: Number(order.total_gst_amount) ? Number(order.igst) : 0,
+
+  totalGST: Number(order.total_gst_amount),
+  tcsAmt: Number(order.tcs_amount),
+
+  totalQty: Number(order.total_qty_all_items),
+  totalAmount: Number(order.grand_total),
+
+  items: order.items.map((item) => ({
+    product_id: item.product,
+    itemName: item.item_name,
+    itemCode: item.hsn_code,  // your API gives hsn_code not item_code
+    qty: Number(item.qty),
+    freeQty: Number(item.free_qty),
+    uom: item.uom_details?.unit_name,
+    rate: Number(item.rate),
+    discountPercent: Number(item.discount_percent),
+    discountAmount: Number(item.discount_amount),
+    grossWt: Number(item.gross_weight),
+    totalGrossWt: Number(item.total_gross_weight),
+    grossAmount: Number(item.gross_amount),
+    totalQty: Number(item.total_qty),
+  })),
+});
+
+
+   
+    console.log(order)
+// calculate totals
+  } catch (err) {
+    message.error("Failed to fetch order details");
+    console.error(err);
+  }
+};
+
 
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Indent No</span>,
-      dataIndex: "indentNo",
+      title: <span className="text-amber-700 font-semibold">Invoice No</span>,
+      dataIndex: "invoice_number",
       width: 140,
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
-    // {
-    //   title: <span className="text-amber-700 font-semibold">Item(s)</span>,
-    //   dataIndex: "itemName",
-    //   width: 240,
-    //   render: (text, record) => {
-    //     const items = record.items || (record.itemName ? [{ itemName: record.itemName }] : []);
-    //     return (
-    //       <div className="text-amber-800">
-    //         <div className="font-semibold">{items[0]?.itemName}</div>
-    //         {items.length > 1 && (
-    //           <div className="text-xs text-gray-500">+{items.length - 1} more</div>
-    //         )}
-    //       </div>
-    //     );
-    //   },
-    // },
+   
     {
       title: <span className="text-amber-700 font-semibold">Total Qty</span>,
       dataIndex: "total_qty",
@@ -293,25 +343,7 @@ const fetchPurchaseInvoices = async () => {
       width: 140,
       render: (text) => <span className="text-amber-800 ">{text}</span>,
     },
-    // {
-    //   title: <span className="text-amber-700 font-semibold">Status</span>,
-    //   dataIndex: "status",
-    //   width: 110,
-    //   render: (status) => {
-    //     const base = "px-3 py-1 rounded-full text-sm font-semibold";
-    //     if (status === "Approved")
-    //       return (
-    //         <span className={`${base} bg-green-100 text-green-700`}>{status}</span>
-    //       );
-    //     if (status === "Pending")
-    //       return (
-    //         <span className={`${base} bg-yellow-100 text-yellow-700`}>{status}</span>
-    //       );
-    //     return (
-    //       <span className={`${base} bg-red-200 text-red-700`}>{status}</span>
-    //     );
-    //   },
-    // },
+   
     {
       title: <span className="text-amber-700 font-semibold">Transporter</span>,
       dataIndex: "transport",
@@ -354,64 +386,151 @@ const fetchPurchaseInvoices = async () => {
   ];
 
   // Open view modal
-  const openView = (record) => {
-    setSelectedRecord(record);
+  const openView = async (record) => {
+  try {
+    setLoading(true);
 
-    const itemFromRoot = (record.items && record.items[0]) || {
-      itemName: record.itemName,
-      itemCode: record.itemCode,
-      qty: record.qty,
-      freeQty: record.freeQty,
-      totalQty: record.totalQty,
-      uom: record.uom,
-      rate: record.rate,
-      discountPercent: record.discountPercent,
-      discountAmount: record.discountAmount,
-      grossWt: record.grossWt,
-      totalGrossWt: record.totalGrossWt,
-      grossAmount: record.grossAmount,
-    };
+    // 🔥 Call API by ID
+    const invoice = await getPurchaseInvoiceById(record.id);
+
+    setSelectedRecord(invoice);
 
     viewForm.setFieldsValue({
-      ...record,
-      invoiceDate: record.invoiceDate ? dayjs(record.invoiceDate) : null,
-      receiveDate: record.receiveDate ? dayjs(record.receiveDate) : null,
-      deliveryDate: record.deliveryDate ? dayjs(record.deliveryDate) : null,
-      items: record.items && record.items.length ? record.items : [itemFromRoot],
+      purchase_order: invoice.order,
+
+      invoiceDate: invoice.invoice_date
+        ? dayjs(invoice.invoice_date)
+        : null,
+
+      deliveryDate: invoice.delivery_date
+        ? dayjs(invoice.delivery_date)
+        : null,
+
+      deliveryAddress: invoice.delivery_address,
+      vendorName: invoice.vendor_name,
+      plantName: invoice.plant_name,
+
+      purchaseType: invoice.purchase_type,
+      billType: invoice.bill_type,
+      billMode: invoice.bill_mode,
+      waybillNo: invoice.waybill_no,
+      status: invoice.status,
+
+      sgstPercent: invoice.sgst_percent,
+      cgstPercent: invoice.cgst_percent,
+      igstPercent: invoice.igst_percent,
+
+      sgst: invoice.sgst_amount,
+      cgst: invoice.cgst_amount,
+      igst: invoice.igst_amount,
+
+      totalGST: invoice.total_gst_amount,
+      tcsAmt: invoice.tcs_amount,
+      totalQty: invoice.total_qty,
+      totalAmount: invoice.total_amount,
+
+      items: invoice.items.map((item) => ({
+        product_id: item.product,
+        itemName: item.item_name,
+        itemCode: item.hsn_code,
+        qty: item.qty,
+        freeQty: item.free_qty,
+        uom: item.uom_details?.unit_name,
+        rate: item.rate,
+        discountPercent: item.dis_percent,
+        discountAmount: item.dis_amount,
+        grossWt: item.gross_wt,
+        totalGrossWt: item.total_gross_wt,
+        grossAmount: item.gross_amount,
+      })),
     });
 
     setIsViewModalOpen(true);
-  };
+
+  } catch (err) {
+    message.error("Failed to fetch invoice details");
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // Open edit modal
-  const openEdit = (record) => {
-    setSelectedRecord(record);
+  const openEdit = async (record) => {
+  try {
+    setLoading(true);
 
-    const itemFromRoot = (record.items && record.items[0]) || {
-      itemName: record.itemName,
-      itemCode: record.itemCode,
-      qty: record.qty,
-      freeQty: record.freeQty,
-      totalQty: record.totalQty,
-      uom: record.uom,
-      rate: record.rate,
-      discountPercent: record.discountPercent,
-      discountAmount: record.discountAmount,
-      grossWt: record.grossWt,
-      totalGrossWt: record.totalGrossWt,
-      grossAmount: record.grossAmount,
-    };
+    // 🔥 Call API by ID
+    const invoice = await getPurchaseInvoiceById(record.id);
 
+    setSelectedRecord(invoice);
+
+    // Map backend response to form structure
     editForm.setFieldsValue({
-      ...record,
-      invoiceDate: record.invoiceDate ? dayjs(record.invoiceDate) : null,
-      receiveDate: record.receiveDate ? dayjs(record.receiveDate) : null,
-      deliveryDate: record.deliveryDate ? dayjs(record.deliveryDate) : null,
-      items: record.items && record.items.length ? record.items : [itemFromRoot],
+      purchase_order: invoice.order,
+
+      purchaseType: invoice.purchase_type,
+      billType: invoice.bill_type,
+      billMode: invoice.bill_mode,
+      waybillNo: invoice.waybill_no,
+      status: invoice.status,
+
+      invoiceDate: invoice.invoice_date
+        ? dayjs(invoice.invoice_date)
+        : null,
+
+      deliveryDate: invoice.delivery_date
+        ? dayjs(invoice.delivery_date)
+        : null,
+
+      deliveryAddress: invoice.delivery_address,
+      vendorName: invoice.vendor_name,
+      plantName: invoice.plant_name,
+
+      sgstPercent: invoice.sgst_percent,
+      cgstPercent: invoice.cgst_percent,
+      igstPercent: invoice.igst_percent,
+
+      sgst: invoice.sgst_amount,
+      cgst: invoice.cgst_amount,
+      igst: invoice.igst_amount,
+
+      totalGST: invoice.total_gst_amount,
+      tcsAmt: invoice.tcs_amount,
+totalQty: invoice.total_qty,
+
+
+      totalAmount: invoice.total_amount,
+
+      items: invoice.items.map((item) => ({
+        product_id: item.product,
+        itemName: item.item_name,
+  // adjust if needed
+        itemCode: item.hsn_code,
+        qty: item.qty,
+        freeQty: item.free_qty,
+        uom: item.uom_details?.unit_name,
+
+        rate: item.rate,
+        discountPercent: item.dis_percent,
+        discountAmount: item.dis_amount,
+        grossWt: item.gross_wt,
+        totalGrossWt: item.total_gross_wt,
+        grossAmount: item.gross_amount,
+      })),
     });
 
     setIsEditModalOpen(true);
-  };
+
+  } catch (err) {
+    message.error("Failed to fetch invoice details");
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // Open assign modal
   const openAssignModal = (record) => {
@@ -441,122 +560,87 @@ const fetchPurchaseInvoices = async () => {
     setIsAssignModalOpen(false);
   };
 
-  // 🔹 Recalculate items and invoice-level totals
-  const recalcAll = (formInstance) => {
-    if (!formInstance) return;
-    const values = formInstance.getFieldsValue(true);
+ 
+const handleFormSubmit = async (values) => {
+  try {
     const items = values.items || [];
+const payload = {
+  order: values.purchase_order,
 
-    let totalInvoiceQty = 0;
-    let taxableAmount = 0;
+  vendor: isAddModalOpen
+    ? selectedOrder?.vendor
+    : selectedRecord?.vendor,
 
-    const updatedItems = items.map((item) => {
-      const qty = Number(item?.qty || 0);
-      const freeQty = Number(item?.freeQty || 0);
-      const rate = Number(item?.rate || 0);
-      const discountPercent = Number(item?.discountPercent || 0);
-      const grossWt = Number(item?.grossWt || 0);
+  invoice_date: values.invoiceDate
+    ? dayjs(values.invoiceDate).format("YYYY-MM-DD")
+    : null,
 
-      const totalQty = qty + freeQty;
-      const grossAmount = qty * rate;
-      const discountAmount = (grossAmount * discountPercent) / 100;
-      const itemTaxable = grossAmount - discountAmount;
-      const totalGrossWt = grossWt;
 
-      totalInvoiceQty += totalQty;
-      taxableAmount += itemTaxable;
+  delivery_date: values.deliveryDate
+    ? dayjs(values.deliveryDate).format("YYYY-MM-DD")
+    : null,
 
-      return {
-        ...item,
-        totalQty,
-        grossAmount,
-        discountAmount,
-        totalGrossWt,
-      };
-    });
+  delivery_address: values.deliveryAddress || "",
+  order_number: selectedOrder?.order_number || "", // optional, for reference
+  purchase_type: values.purchaseType || "",
+  bill_type: values.billType || "",
+  bill_mode: values.billMode || "",
+  waybill_no: values.waybillNo || "",
+  status: values.status || "",
+  sgst_percent: values.sgstPercent || 0,
+  cgst_percent: values.cgstPercent || 0,
+  igst_percent: values.igstPercent || 0,
 
-    const sgstPercent = Number(values.sgstPercent || 0);
-    const cgstPercent = Number(values.cgstPercent || 0);
-    const igstPercent = Number(values.igstPercent || 0);
-    const tcsAmt = Number(values.tcsAmt || 0);
+  sgst_amount: values.sgst || 0,        // ✅ not sgst
+  cgst_amount: values.cgst || 0,        // ✅ not cgst
+  igst_amount: values.igst || 0,        // ✅ not igst
 
-    const sgst = (taxableAmount * sgstPercent) / 100;
-    const cgst = (taxableAmount * cgstPercent) / 100;
-    const igst = (taxableAmount * igstPercent) / 100;
-    const totalGST = sgst + cgst + igst;
-    const totalAmount = taxableAmount + totalGST + tcsAmt;
+  total_gst_amount: values.totalGST || 0,  // ✅ not total_gst
+  tcs_amount: values.tcsAmt || 0,
 
-    formInstance.setFieldsValue({
-      items: updatedItems,
-      totalQty: totalInvoiceQty,
-      sgst,
-      cgst,
-      igst,
-      totalGST,
-      tcsAmt,
-      totalAmount,
-    });
-  };
+  total_qty: values.totalQty || 0,
+  total_amount: values.totalAmount || 0,
 
-  const handleFormSubmit = (values) => {
-    const items = values.items || [];
-    const firstItem = items[0] || {};
+  items: (values.items || []).map((item) => ({
+  product: item.product_id,   // 👈 VERY IMPORTANT
+  qty: item.qty,
+  free_qty: item.freeQty,
+  uom: item.uom,
+  rate: item.rate,
+  dis_percent: item.discountPercent || 0,
+  dis_amount: item.discountAmount || 0,
+  gross_wt: item.grossWt || 0,
+  total_gross_wt: item.totalGrossWt || 0,
+  gross_amount: item.grossAmount || 0,
+}))
 
-    const payload = {
-      ...values,
-      invoiceDate: values.invoiceDate
-        ? dayjs(values.invoiceDate).format("YYYY-MM-DD")
-        : dayjs().format("YYYY-MM-DD"),
-      receiveDate: values.receiveDate
-        ? dayjs(values.receiveDate).format("YYYY-MM-DD")
-        : null,
-      deliveryDate: values.deliveryDate
-        ? dayjs(values.deliveryDate).format("YYYY-MM-DD")
-        : null,
-        deliveryAddress: values.deliveryAddress || "",
-      items,
-      // top-level mappings (for table / backward compatibility)
-      itemName: firstItem.itemName,
-      itemCode: firstItem.itemCode,
-      qty: firstItem.qty,
-      freeQty: firstItem.freeQty,
-      uom: firstItem.uom,
-      rate: firstItem.rate,
-      discountPercent: firstItem.discountPercent,
-      discountAmount: firstItem.discountAmount,
-      grossWt: firstItem.grossWt,
-      totalGrossWt: firstItem.totalGrossWt,
-      grossAmount: firstItem.grossAmount,
-      totalQty: values.totalQty,
-      sgstPercent: values.sgstPercent,
-      cgstPercent: values.cgstPercent,
-      igstPercent: values.igstPercent,
-      sgst: values.sgst,
-      cgst: values.cgst,
-      igst: values.igst,
-      totalGST: values.totalGST,
-      tcsAmt: values.tcsAmt,
-      totalAmount: values.totalAmount,
-      assigned: false,
-      transporterName: null,
-    };
+};
 
-    if (isEditModalOpen) {
-      setData((prev) =>
-        prev.map((item) =>
-          item.key === selectedRecord.key ? { ...payload, key: item.key } : item
-        )
-      );
-      message.success(`Invoice ${payload.indentNo} updated successfully!`);
-      editForm.resetFields();
-      setIsEditModalOpen(false);
-    } else if (isAddModalOpen) {
-      setData((prev) => [...prev, { ...payload, key: prev.length + 1 }]);
-      message.success(`Invoice ${payload.indentNo} added successfully!`);
-      addForm.resetFields();
+
+    // 🔹 ADD INVOICE
+    if (isAddModalOpen) {
+      await addPurchaseInvoice(payload);
+      message.success("Invoice added successfully!");
       setIsAddModalOpen(false);
+      addForm.resetFields();
+      fetchPurchaseInvoices();
     }
-  };
+
+    // 🔹 EDIT INVOICE
+    if (isEditModalOpen && selectedRecord?.id) {
+      await updatePurchaseInvoice(selectedRecord.id, payload);
+      message.success("Invoice updated successfully!");
+      setIsEditModalOpen(false);
+      editForm.resetFields();
+      fetchPurchaseInvoices();
+    }
+
+  } catch (error) {
+    console.error(error);
+    message.error("Something went wrong while saving invoice");
+  }
+};
+
 
   // Render form fields - show only after indent selected (per request)
   const renderFormFields = (formInstance, disabled = false) => {
@@ -567,36 +651,27 @@ const fetchPurchaseInvoices = async () => {
         <h6 className=" text-amber-500 ">Basic Information</h6>
         <Row gutter={24}>
           <Col span={6}>
-            <Form.Item
-              label="Indent No"
-              name="indentNo"
-              rules={[{ required: true, message: "Please select Indent No" }]}
-            >
-              <Select
-                placeholder="Select Indent No"
-                onChange={(val) => onIndentChange(val, formInstance)}
-                disabled={disabled}
-              >
-                {purchaseInvoiceJSON.options.indentOptions.map((val) => (
-                  <Select.Option key={val} value={val}>
-                    {val}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
+          <Form.Item
+  label="Order No"
+  name="purchase_order"
+  rules={[{ required: true, message: "Please select Order No" }]}
+>
+  <Select
+    placeholder="Select Order No"
+    onChange={(val) => handleOrderSelect(val)}
+  >
+    {orderList.map((order) => (
+      <Select.Option key={order.id} value={order.id}>
+        {order.order_number}
+
+      </Select.Option>
+    ))}
+  </Select>
+</Form.Item>
+
           </Col>
 
-          {/* admin-only editable fields (visible immediately but editable only for admin) */}
-          <Col span={6}>
-            <Form.Item label="Delivery Date" name="deliveryDate">
-              <DatePicker
-                className="w-full"
-                disabled={!isAdmin || disabled}
-                format="YYYY-MM-DD"
-                onChange={() => recalcAll(formInstance)}
-              />
-            </Form.Item>
-          </Col>
+         
 
           <Col span={6}>
             <Form.Item label="Purchase Type" name="purchaseType">
@@ -621,10 +696,7 @@ const fetchPurchaseInvoices = async () => {
               </Select>
             </Form.Item>
           </Col>
-        </Row>
-
-        <Row gutter={24}>
-          <Col span={6}>
+           <Col span={6}>
             <Form.Item label="Bill Mode" name="billMode">
               <Select disabled={!isAdmin || disabled} placeholder="Select Bill Mode">
                 {purchaseInvoiceJSON.options.billModeOptions.map((val) => (
@@ -635,6 +707,10 @@ const fetchPurchaseInvoices = async () => {
               </Select>
             </Form.Item>
           </Col>
+        </Row>
+
+        <Row gutter={24}>
+         
 
           <Col span={6}>
             <Form.Item label="Waybill No" name="waybillNo">
@@ -653,9 +729,18 @@ const fetchPurchaseInvoices = async () => {
               </Select>
             </Form.Item>
           </Col>
+ <Col span={6}>
+            <Form.Item label="Delivery Date" name="deliveryDate">
+              <DatePicker
+  className="w-full"
+  disabled
+  format="YYYY-MM-DD"
+/>
 
+            </Form.Item>
+          </Col>
           <Col span={6}>
-            <Form.Item label="Company Name" name="companyName">
+            <Form.Item label="Vendor Name" name="vendorName">
               <Select disabled placeholder="Auto filled">
                 {purchaseInvoiceJSON.options.companyOptions.map((val) => (
                   <Option key={val} value={val}>
@@ -667,8 +752,6 @@ const fetchPurchaseInvoices = async () => {
           </Col>
         </Row>
 
-        {/* Show rest of fields only after indent selected */}
-        {indentChosen && (
           <>
             <Row gutter={24}>
               <Col span={6}>
@@ -683,23 +766,8 @@ const fetchPurchaseInvoices = async () => {
                 </Form.Item>
               </Col>
 
-              <Col span={6}>
-                <Form.Item label="Plant Code" name="plantCode">
-                  <Input disabled placeholder="Auto filled" />
-                </Form.Item>
-              </Col>
 
-              <Col span={6}>
-                <Form.Item label="Depo Name" name="depoName">
-                  <Select disabled placeholder="Auto filled">
-                    {purchaseInvoiceJSON.options.depoOptions.map((val) => (
-                      <Option key={val} value={val}>
-                        {val}
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
+   
               <Col span={6}>
                 <Form.Item label="Invoice Date" name="invoiceDate">
                   <DatePicker className="w-full" disabled format="YYYY-MM-DD" />
@@ -711,7 +779,7 @@ const fetchPurchaseInvoices = async () => {
                 name="deliveryAddress"
                 rules={[{ required: true, message: "Please enter delivery address" }]}
               >
-                <Input disabled={!isAdmin || disabled} placeholder="Delivery address" />
+                <Input disabled placeholder="Delivery address" />
               </Form.Item>
             </Col>
 
@@ -753,13 +821,13 @@ const fetchPurchaseInvoices = async () => {
 
                         <Col span={6}>
                           <Form.Item {...field} label="Qty" name={[field.name, "qty"]}>
-                            <InputNumber className="w-full" disabled onChange={() => recalcAll(formInstance)} />
+                            <InputNumber className="w-full" disabled/>
                           </Form.Item>
                         </Col>
 
                         <Col span={6}>
                           <Form.Item {...field} label="Free Qty" name={[field.name, "freeQty"]}>
-                            <InputNumber className="w-full" disabled onChange={() => recalcAll(formInstance)} />
+                            <InputNumber className="w-full" disabled  />
                           </Form.Item>
                         </Col>
                       </Row>
@@ -773,29 +841,25 @@ const fetchPurchaseInvoices = async () => {
 
                         <Col span={6}>
                           <Form.Item {...field} label="Rate" name={[field.name, "rate"]}>
-                            <InputNumber className="w-full" disabled onChange={() => recalcAll(formInstance)} />
+                            <InputNumber className="w-full" disabled />
                           </Form.Item>
                         </Col>
 
                         <Col span={6}>
                           <Form.Item {...field} label="Dis%" name={[field.name, "discountPercent"]}>
-                            <InputNumber className="w-full" disabled onChange={() => recalcAll(formInstance)} />
+                            <InputNumber className="w-full" disabled  />
                           </Form.Item>
                         </Col>
 
                         <Col span={6}>
                           <Form.Item {...field} label="Gross Wt" name={[field.name, "grossWt"]}>
-                            <InputNumber className="w-full" disabled onChange={() => recalcAll(formInstance)} />
+                            <InputNumber className="w-full" disabled />
                           </Form.Item>
                         </Col>
                       </Row>
 
                       <Row gutter={24}>
-                        <Col span={6}>
-                          <Form.Item {...field} label="Total Qty" name={[field.name, "totalQty"]}>
-                            <InputNumber className="w-full bg-gray-50" disabled />
-                          </Form.Item>
-                        </Col>
+                        
 
                         <Col span={6}>
                           <Form.Item {...field} label="Dis Amt" name={[field.name, "discountAmount"]}>
@@ -803,11 +867,6 @@ const fetchPurchaseInvoices = async () => {
                           </Form.Item>
                         </Col>
 
-                        <Col span={6}>
-                          <Form.Item {...field} label="Total Gross Wt" name={[field.name, "totalGrossWt"]}>
-                            <InputNumber className="w-full bg-gray-50" disabled />
-                          </Form.Item>
-                        </Col>
 
                         <Col span={6}>
                           <Form.Item {...field} label="Gross Amount (₹)" name={[field.name, "grossAmount"]}>
@@ -832,19 +891,19 @@ const fetchPurchaseInvoices = async () => {
 
               <Col span={6}>
                 <Form.Item label="SGST %" name="sgstPercent">
-                  <InputNumber className="w-full" disabled onChange={() => recalcAll(formInstance)} />
+                  <InputNumber className="w-full" disabled  />
                 </Form.Item>
               </Col>
 
               <Col span={6}>
                 <Form.Item label="CGST %" name="cgstPercent">
-                  <InputNumber className="w-full" disabled onChange={() => recalcAll(formInstance)} />
+                  <InputNumber className="w-full" disabled  />
                 </Form.Item>
               </Col>
 
               <Col span={6}>
                 <Form.Item label="IGST %" name="igstPercent">
-                  <InputNumber className="w-full" disabled onChange={() => recalcAll(formInstance)} />
+                  <InputNumber className="w-full" disabled />
                 </Form.Item>
               </Col>
             </Row>
@@ -877,7 +936,7 @@ const fetchPurchaseInvoices = async () => {
             <Row gutter={24}>
               <Col span={6}>
                 <Form.Item label="TCS Amt (₹)" name="tcsAmt">
-                  <InputNumber className="w-full" disabled onChange={() => recalcAll(formInstance)} />
+                  <InputNumber className="w-full" disabled />
                 </Form.Item>
               </Col>
 
@@ -888,7 +947,7 @@ const fetchPurchaseInvoices = async () => {
               </Col>
             </Row>
           </>
-        )}
+    
       </>
     );
   };

@@ -1,4 +1,5 @@
-// PurchaseReturn.jsx
+
+// PurchaseReturn.jsx 
 import React, { useState, useEffect } from "react";
 import {
   Table,
@@ -21,7 +22,7 @@ import {
   FilterOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { getPurchaseReturn } from "../../../../../api/purchase";
+import { getPurchaseReturn,addPurchaseReturn,getPurchaseReturnById,updatePurchaseReturn ,getPurchaseInvoice,getPurchaseInvoiceById} from "../../../../../api/purchase";
 // 🔹 JSON Data
 const purchaseReturnJSON = {
   records: [
@@ -91,6 +92,7 @@ const purchaseReturnJSON = {
     ],
   },
 };
+const statusOptions = ["Pending", "Approved", "Reject"];
 
 export default function PurchaseReturn() {
    const [searchText, setSearchText] = useState("");
@@ -99,6 +101,9 @@ export default function PurchaseReturn() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isOtherReason, setIsOtherReason] = useState(false);
+  const [invoiceList, setInvoiceList] = useState([]);
+const [selectedProductId, setSelectedProductId] = useState(null);
+const [selectedVendorId, setSelectedVendorId] = useState(null);
 
   const [viewForm] = Form.useForm();
   const [addForm] = Form.useForm();
@@ -119,11 +124,17 @@ const fetchPurchaseReturns = async () => {
     const records = res.data || res;
 
     setData(
-      records.map((item, index) => ({
-        key: item.id || index + 1,
-        ...item,
-      }))
-    );
+  records.map((item, index) => ({
+    key: item.id,
+    return_number: item.return_number,
+    return_date: item.return_date,
+   status: item.status || "Pending",
+    item_name: item.items?.[0]?.item_name,
+    total_quantity: item.items?.[0]?.total_quantity,
+    item_return_reason: item.items?.[0]?.item_return_reason,
+  }))
+);
+
   } catch (error) {
     console.error("Failed to fetch purchase returns", error);
   } finally {
@@ -207,61 +218,275 @@ const fetchPurchaseReturns = async () => {
       targetForm.setFieldsValue(base);
     }
   };
-  const handleSubmit = (values, mode) => {
-    const record = {
-      ...values,
-      returnDate: values.returnDate
+ const handleSubmit = async (values, mode) => {
+  if (mode === "add") {
+    try {
+      const payload = {
+        invoice: values.invoiceNo,
+         vendor: selectedVendorId,  
+        status: values.status || "Pending",
+
+        return_date: values.returnDate
+          ? values.returnDate.format("YYYY-MM-DD")
+          : null,
+        reason: values.returnReason,
+        plant_name: values.plantName,
+        
+       
+        items: [
+          {
+            product: selectedProductId,
+            quantity: Number(values.quantity),
+            free_quantity: Number(values.freeQty || 0),
+            total_quantity: Number(values.totalQtyDisplay || 0),
+            rate: Number(values.rate),
+
+            gross_amount: Number(values.grossAmount || 0),
+
+            discount_percent: Number(values.discountPercent || 0),
+            discount_amount: Number(values.discountAmount || 0),
+
+            sgst_percent: Number(values.sgstPercent || 0),
+            cgst_percent: Number(values.cgstPercent || 0),
+            igst_percent: Number(values.igstPercent || 0),
+
+            other_charges: 0,
+            round_off: 0,
+
+            total_amount: Number(values.grandTotal || 0),
+
+            item_return_reason: values.returnReason,
+          },
+        ],
+      };
+
+      await addPurchaseReturn(payload);
+
+      fetchPurchaseReturns();
+      setIsAddModalOpen(false);
+      addForm.resetFields();
+    } catch (error) {
+      console.error("Add failed", error);
+    }
+  }
+  if (mode === "edit") {
+  try {
+    const payload = {
+      invoice: values.invoiceNo,
+      status: values.status,
+      return_date: values.returnDate
         ? values.returnDate.format("YYYY-MM-DD")
         : null,
+      reason: values.returnReason,
+      items: [
+        {
+          product: selectedProductId,
+          quantity: Number(values.quantity),
+          free_quantity: Number(values.freeQty || 0),
+          total_quantity: Number(values.totalQtyDisplay || 0),
+          rate: Number(values.rate),
+          gross_amount: Number(values.grossAmount || 0),
+          discount_percent: Number(values.discountPercent || 0),
+          discount_amount: Number(values.discountAmount || 0),
+          sgst_percent: Number(values.sgstPercent || 0),
+          cgst_percent: Number(values.cgstPercent || 0),
+          igst_percent: Number(values.igstPercent || 0),
+          total_amount: Number(values.grandTotal || 0),
+          item_return_reason: values.returnReason,
+        },
+      ],
     };
 
-    if (record.returnReason === "Other") {
-      record.returnReason = record.otherReasonText || "Other";
-    }
-    delete record.otherReasonText;
+    await updatePurchaseReturn(selectedRecord.id || selectedRecord.key, payload);
 
-    if (mode === "edit") {
-      setData((prev) =>
-        prev.map((item) =>
-          item.key === selectedRecord.key ? { ...item, ...record } : item
-        )
-      );
-      setIsEditModalOpen(false);
-    } else if (mode === "add") {
-      setData((prev) => [...prev, { ...record, key: prev.length + 1 }]);
-      setIsAddModalOpen(false);
-    }
-    addForm.resetFields();
+    // ✅ update table locally (IMPORTANT FIX)
+    setData((prev) =>
+      prev.map((item) =>
+        item.key === (selectedRecord.id || selectedRecord.key)
+          ? { ...item, status: values.status }
+          : item
+      )
+    );
+
+    setIsEditModalOpen(false);
     editForm.resetFields();
-  };
 
-  const handleAddClick = () => {
+  } catch (error) {
+    console.error("Update failed", error);
+  }
+}
+
+};
+
+
+const handleViewClick = async (record) => {
+  try {
+    setLoading(true);
+
+    // ✅ call GET by id API
+    const res = await getPurchaseReturnById(record.key);
+    const data = res.data || res;
+
+    const item = data.items?.[0] || {};
+
+    // ✅ prefill view form
+    viewForm.setFieldsValue({
+      invoiceNo: data.invoice,
+      companyName: data.vendor_name,
+      plantName: data.plant_name,
+
+      returnDate: data.return_date ? dayjs(data.return_date) : null,
+
+      status: data.status,
+
+      item: item.item_name,
+      itemCode: item.hsn_code,
+
+      quantity: item.quantity,
+      freeQty: item.free_quantity,
+      totalQtyDisplay: item.total_quantity,
+
+      rate: item.rate,
+
+      grossAmount: item.gross_amount,
+
+      discountPercent: item.discount_percent,
+      discountAmount: item.discount_amount,
+
+      sgstPercent: item.sgst_percent,
+      cgstPercent: item.cgst_percent,
+      igstPercent: item.igst_percent,
+
+      grandTotal: item.total_amount,
+
+      uom: item.uom_details?.unit_name,
+
+      returnReason: item.item_return_reason,
+    });
+
+    setSelectedRecord(data);
+
+    setIsViewModalOpen(true);
+
+  } catch (error) {
+    console.error("View fetch failed", error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+const handleAddClick = async () => {
+  try {
+    const res = await getPurchaseInvoice();
+    const invoices = res.data || res;
+
+    setInvoiceList(invoices);
+
     addForm.resetFields();
-    addForm.setFieldsValue({ status: "Pending", returnDate: dayjs() });
+    addForm.setFieldsValue({
+      status: "Pending",
+      return_date: dayjs(),
+    });
+
     setIsAddModalOpen(true);
-  };
+  } catch (error) {
+    console.error("Failed to fetch invoices", error);
+  }
+};
 
-  const onInvoiceSelectForAdd = (invoiceNo, formType) => {
-    const source = data.find((r) => r.invoiceNo === invoiceNo);
-    if (!source) return;
+const onInvoiceSelectForAdd = async (invoiceId) => {
+  try {
+    const res = await getPurchaseInvoiceById(invoiceId);
+    const invoice = res.data || res;
 
-    const values = {
-      ...source,
+    const firstItem = invoice.items?.[0] || {};
+
+    setSelectedProductId(firstItem.product);
+
+    // ✅ SAVE vendor id
+    setSelectedVendorId(invoice.vendor);
+
+    addForm.setFieldsValue({
+      invoiceNo: invoice.id,
+      companyName: invoice.vendor_name, // display only
+      plantName: invoice.plant_name,
       returnDate: dayjs(),
       status: "Pending",
-      totalQtyDisplay: (source.quantity || 0) + (source.freeQty || 0),
-      grossAmount: (source.quantity || 0) * (source.rate || 0),
-      discountAmount:
-        ((source.quantity || 0) *
-          (source.rate || 0) *
-          (source.discountPercent || 0)) /
-        100,
-      grandTotal: source.grandTotal || source.totalAmount || 0,
-    };
 
-    if (formType === "add") addForm.setFieldsValue(values);
-    if (formType === "edit") editForm.setFieldsValue(values);
-  };
+      item: firstItem.item_name,
+      itemCode: firstItem.hsn_code,
+      quantity: firstItem.qty,
+      freeQty: firstItem.free_qty,
+      rate: firstItem.rate,
+      uom: firstItem?.uom_details?.unit_name,
+      totalQtyDisplay: Number(invoice.total_qty),
+      grossAmount: Number(firstItem.gross_amount),
+      discountAmount: Number(firstItem.dis_amount),
+      grandTotal: Number(invoice.total_amount),
+
+      discountPercent: firstItem.dis_percent,
+      sgstPercent: invoice.sgst_percent,
+      cgstPercent: invoice.cgst_percent,
+      igstPercent: invoice.igst_percent,
+    });
+
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const handleEditClick = async (record) => {
+  try {
+    setLoading(true);
+
+    // call GET by id API
+    const res = await getPurchaseReturnById(record.key);
+    const data = res.data || res;
+
+    const item = data.items?.[0] || {};
+
+    // save product id for update
+    setSelectedProductId(item.product);
+
+    // prefill edit form
+    editForm.setFieldsValue({
+      invoiceNo: data.invoice,
+      companyName: data.vendor_name,
+      plantName: data.plant_name,
+      returnDate: data.return_date ? dayjs(data.return_date) : null,
+      status: data.status,
+
+      item: item.item_name,
+      itemCode: item.hsn_code,
+      quantity: item.quantity,
+      freeQty: item.free_quantity,
+      totalQtyDisplay: item.total_quantity,
+      rate: item.rate,
+
+      grossAmount: item.gross_amount,
+      discountPercent: item.discount_percent,
+      discountAmount: item.discount_amount,
+
+      sgstPercent: item.sgst_percent,
+      cgstPercent: item.cgst_percent,
+      igstPercent: item.igst_percent,
+
+      grandTotal: item.total_amount,
+      uom: item.uom_details?.unit_name,
+      returnReason: item.item_return_reason,
+    });
+
+    setSelectedRecord(data);
+
+    setIsEditModalOpen(true);
+
+  } catch (error) {
+    console.error("Edit fetch failed", error);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const renderFormFields = (mode = "view") => {
     const isView = mode === "view";
@@ -287,18 +512,17 @@ const fetchPurchaseReturns = async () => {
               name="invoiceNo"
               rules={[{ required: true }]}
             >
-              <Select
-                onChange={(val) => {
-                  if (mode === "add") onInvoiceSelectForAdd(val, "add");
-                  if (mode === "edit") onInvoiceSelectForAdd(val, "edit");
-                }}
-                disabled={isView}
-              >
-                {data.map((r) => (
-                  <Select.Option key={r.invoiceNo} value={r.invoiceNo}>
-                    {r.invoiceNo}
-                  </Select.Option>
-                ))}
+             <Select
+  onChange={(val) => onInvoiceSelectForAdd(val)}
+  disabled={isView}
+>
+
+               {invoiceList.map((inv) => (
+  <Select.Option key={inv.id} value={inv.id}>
+    {inv.invoice_no || inv.invoice_number}
+  </Select.Option>
+))}
+
               </Select>
             </Form.Item>
           </Col>
@@ -309,42 +533,29 @@ const fetchPurchaseReturns = async () => {
             </Form.Item>
           </Col>
 
-          <Col span={6}>
-            <Form.Item label="Plant Name" name="plantName">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Plant Code" name="plantCode">
-              <Input disabled />
-            </Form.Item>
-          </Col>
+         
           <Col span={6}>
             <Form.Item label="Return Date" name="returnDate">
               <DatePicker className="w-full" disabled />
             </Form.Item>
           </Col>
+         <Form.Item
+  label="Status"
+  name="status"
+  rules={[{ required: true, message: "Please select status" }]}
+>
+  <Select disabled={mode === "view"}>
+    {statusOptions.map((status) => (
+      <Select.Option key={status} value={status}>
+        {status}
+      </Select.Option>
+    ))}
+  </Select>
+</Form.Item>
+
         </Row>
 
-        <Row gutter={16}>
-          <Col span={6}>
-            <Form.Item label="Branch Name" name="branchName">
-              <Select disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Depo" name="depo">
-              <Select disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Status" name="status">
-              <Select disabled></Select>
-            </Form.Item>
-          </Col>
-        </Row>
+       
         <h6 className="text-amber-500">Item & Return Details</h6>
         <Row gutter={16}>
           <Col span={6}>
@@ -474,17 +685,6 @@ const fetchPurchaseReturns = async () => {
             </Form.Item>
           </Col>
 
-          <Col span={6}>
-            <Form.Item label="Other Charges" name="otherCharges">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Round Off" name="roundOff">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
 
           <Col span={6}>
             <Form.Item label="Total Amount" name="grandTotal">
@@ -499,41 +699,33 @@ const fetchPurchaseReturns = async () => {
   // 🔹 Table columns
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Invoice No</span>,
-      dataIndex: "invoiceNo",
+      title: <span className="text-amber-700 font-semibold">Return No</span>,
+      dataIndex: "return_number",
       width: 100,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Item Name</span>,
-      dataIndex: "item",
+      dataIndex: "item_name",
       width: 100,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Total Qty</span>,
       width: 100,
-      render: (_, record) => (
-        <span className="text-amber-800">
-          {(record.quantity || 0) + (record.freeQty || 0)} {record.uom}
-        </span>
-      ),
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Total Amt</span>,
-      dataIndex: "grandTotal",
-      width: 100,
+     dataIndex: "total_quantity",
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
+  
     {
       title: <span className="text-amber-700 font-semibold">Return Date</span>,
-      dataIndex: "returnDate",
+      dataIndex: "return_date",
       width: 100,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Reason</span>,
-      dataIndex: "returnReason",
+      dataIndex: "item_return_reason",
       width: 100,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
@@ -566,23 +758,15 @@ const fetchPurchaseReturns = async () => {
       render: (record) => (
         <div className="flex gap-3">
           <EyeOutlined
-            className="cursor-pointer! text-blue-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              setFormValues(record, viewForm, "view");
-              setIsViewModalOpen(true);
-              setIsOtherReason(record.returnReason === "Other");
-            }}
-          />
+  className="cursor-pointer! text-blue-500!"
+  onClick={() => handleViewClick(record)}
+/>
+
           <EditOutlined
-            className="cursor-pointer! text-red-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              setFormValues(record, editForm, "edit");
-              setIsEditModalOpen(true);
-              setIsOtherReason(record.returnReason === "Other");
-            }}
-          />
+  className="cursor-pointer! text-red-500!"
+  onClick={() => handleEditClick(record)}
+/>
+
         </div>
       ),
     },
