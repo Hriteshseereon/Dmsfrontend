@@ -87,19 +87,30 @@ function TransportApproval() {
 
   const columns = [
     {
-      title: "Registered Name",
+      title: <span className="text-amber-600 font-bold">Registered Name</span>,
       dataIndex: "registered_name",
+      render: (text) => (
+        <span className="text-amber-700 font-medium">{text}</span>
+      ),
     },
     {
-      title: "Email",
+      title: <span className="text-amber-600 font-bold">Email</span>,
       dataIndex: "email_id",
+      render: (text) => (
+        <span className="text-amber-700 font-medium">{text}</span>
+      ),
     },
     {
-      title: "Phone",
+      title: <span className="text-amber-600 font-bold">Phone Number</span>,
       dataIndex: "phone_number",
+      render: (text) => (
+        <span className="text-amber-700 font-medium">{text}</span>
+      ),
     },
     {
-      title: "Link Organisation",
+      title: (
+        <span className="text-amber-600 font-bold">Link Organisation</span>
+      ),
       render: (_, record) => (
         <Select
           mode="multiple"
@@ -117,9 +128,13 @@ function TransportApproval() {
       ),
     },
     {
-      title: "Action",
+      title: <span className="text-amber-600 font-bold">Action</span>,
       render: (_, record) => (
-        <Button type="primary" onClick={() => handleApprove(record)}>
+        <Button
+          type="primary"
+          onClick={() => handleApprove(record)}
+          className="bg-amber-500! hover:bg-amber-600!"
+        >
           Approve
         </Button>
       ),
