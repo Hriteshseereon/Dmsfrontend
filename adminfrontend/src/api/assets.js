@@ -1,5 +1,5 @@
 import api from "./axios";
-
+import useSessionStore from "../store/sessionStore";
 // add assset category
 export const addAssetCategory = async (data) => {
   const res = await api.post("/assets/categories/", data);
@@ -30,7 +30,10 @@ export const addAsset = async (payload) => {
 
 // UPDATE
 export const updateAsset = async (id, payload) => {
-  const res = await api.patch(`/assets/${id}/`, payload);
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.patch(`/assets/assets/${id}/`, payload, {
+    params: { organisation: currentOrgId },
+  });
   return res.data;
 };
 

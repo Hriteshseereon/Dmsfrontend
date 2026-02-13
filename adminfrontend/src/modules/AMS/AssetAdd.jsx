@@ -109,7 +109,9 @@ export default function AssetManager() {
         brand: item.brand,
 
         purchaseDate: item.purchase_date,
-
+        purchaseVendor: item.purchase_vendor,
+        purchaseInvoice: item.purchase_invoice,
+        assignedTo: item.assigned_to_employee,
         costPrice: item.cost_price,
         currentValue: item.current_value,
 
@@ -173,9 +175,9 @@ export default function AssetManager() {
 
         purchase_date: values.purchaseDate?.format("YYYY-MM-DD"),
 
-        purchase_vendor: null, // ✅ keep null now
-        purchase_invoice: null, // ✅ keep null now
-        assigned_to_employee: null, // ✅ keep null now
+        purchase_vendor: values.purchaseVendor,
+        purchase_invoice: values.purchaseInvoice,
+        assigned_to_employee: values.assignedTo,
 
         cost_price: values.costPrice?.toString(),
         current_value: values.currentValue
@@ -230,7 +232,9 @@ export default function AssetManager() {
         purchase_date: values.purchaseDate?.format("YYYY-MM-DD"),
         cost_price: values.costPrice,
         current_value: values.currentValue,
-
+        purchase_vendor: values.purchaseVendor,
+        purchase_invoice: values.purchaseInvoice,
+        assigned_to_employee: values.assignedTo,
         depreciation_method: values.depreciationMethod,
         depreciation_rate: values.depreciationRate,
 
@@ -270,8 +274,15 @@ export default function AssetManager() {
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Category</span>,
-      dataIndex: "assetCategory",
+      title: <span className="text-amber-700 font-semibold">Asset Type</span>,
+      dataIndex: "assetType",
+      width: 140,
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+
+    {
+      title: <span className="text-amber-700 font-semibold">Model Number</span>,
+      dataIndex: "modelNumber",
       width: 160,
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
@@ -490,13 +501,33 @@ export default function AssetManager() {
               <span className="text-amber-700 font-medium">Cost Price</span>
             }
             name="costPrice"
-            rules={[{ required: true, message: "Please enter Cost Price" }]}
+            rules={[
+              { required: true, message: "Please enter Cost Price" },
+              {
+                type: "number",
+                transform: (value) => Number(value),
+                message: "Cost Price must be a valid number",
+              },
+            ]}
           >
             <InputNumber
               className="w-full"
               min={0}
               prefix="₹"
+              precision={2}
               disabled={disabled}
+              parser={(value) => value?.replace(/[^\d.]/g, "")}
+              onKeyPress={(e) => {
+                if (!/[0-9.]/.test(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+              onPaste={(e) => {
+                const paste = e.clipboardData.getData("text");
+                if (!/^\d*\.?\d*$/.test(paste)) {
+                  e.preventDefault();
+                }
+              }}
             />
           </Form.Item>
         </Col>
@@ -511,7 +542,20 @@ export default function AssetManager() {
               className="w-full"
               min={0}
               prefix="₹"
+              precision={2}
               disabled={disabled}
+              parser={(value) => value?.replace(/[^\d.]/g, "")}
+              onKeyPress={(e) => {
+                if (!/[0-9.]/.test(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+              onPaste={(e) => {
+                const paste = e.clipboardData.getData("text");
+                if (!/^\d*\.?\d*$/.test(paste)) {
+                  e.preventDefault();
+                }
+              }}
             />
           </Form.Item>
         </Col>
@@ -541,7 +585,7 @@ export default function AssetManager() {
           <Form.Item
             label={
               <span className="text-amber-700 font-medium">
-                Depreciation Rate (%)
+                Depreciation Rate
               </span>
             }
             name="depreciationRate"
@@ -549,8 +593,21 @@ export default function AssetManager() {
             <InputNumber
               className="w-full"
               min={0}
-              max={100}
+              prefix="₹"
+              precision={2}
               disabled={disabled}
+              parser={(value) => value?.replace(/[^\d.]/g, "")}
+              onKeyPress={(e) => {
+                if (!/[0-9.]/.test(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+              onPaste={(e) => {
+                const paste = e.clipboardData.getData("text");
+                if (!/^\d*\.?\d*$/.test(paste)) {
+                  e.preventDefault();
+                }
+              }}
             />
           </Form.Item>
         </Col>
@@ -566,8 +623,20 @@ export default function AssetManager() {
             <InputNumber
               className="w-full"
               min={0}
-              max={100}
+              precision={2}
               disabled={disabled}
+              parser={(value) => value?.replace(/[^\d.]/g, "")}
+              onKeyPress={(e) => {
+                if (!/[0-9.]/.test(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+              onPaste={(e) => {
+                const paste = e.clipboardData.getData("text");
+                if (!/^\d*\.?\d*$/.test(paste)) {
+                  e.preventDefault();
+                }
+              }}
             />
           </Form.Item>
         </Col>
@@ -583,8 +652,21 @@ export default function AssetManager() {
             <InputNumber
               className="w-full"
               min={0}
-              max={100}
+              prefix="₹"
+              precision={2}
               disabled={disabled}
+              parser={(value) => value?.replace(/[^\d.]/g, "")}
+              onKeyPress={(e) => {
+                if (!/[0-9.]/.test(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+              onPaste={(e) => {
+                const paste = e.clipboardData.getData("text");
+                if (!/^\d*\.?\d*$/.test(paste)) {
+                  e.preventDefault();
+                }
+              }}
             />
           </Form.Item>
         </Col>
@@ -697,7 +779,7 @@ export default function AssetManager() {
         </Col>
       </Row>
 
-      <h6 className="text-amber-500 mt-4">Upload Document</h6>
+      {/* <h6 className="text-amber-500 mt-4">Upload Document</h6>
       <Row gutter={16}>
         <Col span={24}>
           <Form.Item
@@ -721,7 +803,7 @@ export default function AssetManager() {
             </Upload>
           </Form.Item>
         </Col>
-      </Row>
+      </Row> */}
     </>
   );
 
