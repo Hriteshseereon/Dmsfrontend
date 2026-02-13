@@ -531,29 +531,28 @@ export default function AddOrganisation() {
       })),
 
       // ================= LEGAL DETAILS =================
-      // legal_details: Object.entries(LEGAL_KEY_MAP).reduce(
-      //   (acc, [formKey, apiKey]) => {
-      //     const doc = values.legalDetails?.[formKey];
+      legal_details: Object.entries(LEGAL_KEY_MAP).reduce(
+        (acc, [formKey, apiKey]) => {
+          const doc = values.legalDetails?.[formKey];
 
-      //     acc[apiKey] = doc?.number ?? null;
-      //     acc[apiKey.replace("_no", "_document")] = doc?.document?.[0]?.originFileObj ?? null
+          acc[apiKey] = doc?.number ?? null;
 
-      //     if (doc?.validity?.[0]) {
-      //       acc[apiKey.replace("_no", "_valid_from")] = dayjs(
-      //         doc.validity[0],
-      //       ).format("YYYY-MM-DD");
-      //     }
+          if (doc?.validity?.[0]) {
+            acc[apiKey.replace("_no", "_valid_from")] = dayjs(
+              doc.validity[0],
+            ).format("YYYY-MM-DD");
+          }
 
-      //     if (doc?.validity?.[1]) {
-      //       acc[apiKey.replace("_no", "_valid_to")] = dayjs(
-      //         doc.validity[1],
-      //       ).format("YYYY-MM-DD");
-      //     }
+          if (doc?.validity?.[1]) {
+            acc[apiKey.replace("_no", "_valid_to")] = dayjs(
+              doc.validity[1],
+            ).format("YYYY-MM-DD");
+          }
 
-      //     return acc;
-      //   },
-      //   {},
-      // ),
+          return acc;
+        },
+        {},
+      ),
 
       // ================= BRANCHES =================
       branches: values.hasBranch
