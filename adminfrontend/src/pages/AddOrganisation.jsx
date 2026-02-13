@@ -183,6 +183,7 @@ export default function AddOrganisation() {
   };
 
   const createExistingFile = (path) => {
+    if (!path) return null
     const fileUrl = `${import.meta.env.VITE_API_URL}/${path}`
     const cleanPath = path.split("?")[0].split("#")[0];
     const fileName = cleanPath.substring(cleanPath.lastIndexOf("/") + 1);
