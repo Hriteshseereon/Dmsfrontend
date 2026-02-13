@@ -31,7 +31,12 @@ import {
   salesContractItems,
   createSalesOrder,
   getSalesOrders,
+  getSalesOrderById,
+  updateSalesOrder,
+  getCustomersByOrganisation,
+  getAllSalesContracts,
 } from "../../../../../api/sales";
+import { getAdminCustomerDetails } from "../../../../../api/customer";
 /* ------------------ data (use your salesOrderJSON) ------------------ */
 const salesOrderJSON = {
   initialData: [
@@ -201,15 +206,29 @@ export default function SaleOrdersInvoice() {
   /* ---------- search filter ---------- */
   const fetchContractPersons = async () => {
     try {
-      const res = await getContractpersonName();
-      console.log("Contract persons fetched:", res);
+      const res = await getCustomersByOrganisation();
+      console.log("Contract persons (Customers) fetched:", res);
       setContractPersonOptions(res);
     } catch (error) {
-      console.error("Error fetching contract persons:", error);
+      console.error("Error fetching customers:", error);
     }
   };
   useEffect(() => {
     fetchContractPersons();
+  }, []);
+
+  const fetchContracts = async () => {
+    try {
+      const res = await getAllSalesContracts();
+      console.log("Fetched All Sales Contracts:", res);
+      setContractOptions(res || []);
+    } catch (err) {
+      console.error("Failed to fetch all sales contracts:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchContracts();
   }, []);
 
   // filtering keys (customerName rather than customer)
@@ -361,29 +380,74 @@ export default function SaleOrdersInvoice() {
     try {
       const res = await getSalesOrders();
 
-      const mappedData = res.map((order, index) => ({
-        key: order.sales_order_id, // REQUIRED by antd table
+      const mappedData = res.map((order, index) => {
+        // Group items by sale_contract_id
+        const contractsMap = {};
+        (order.items || []).forEach((item) => {
+          const cId = item.sale_contract_id;
+          if (!contractsMap[cId]) {
+            contractsMap[cId] = {
+              contract_id: cId,
+              contractNo: item.sale_contract_number,
+              items: [],
+            };
+          }
+          contractsMap[cId].items.push({
+            lineKey: item.id,
+            item: item.product_name,
+            itemCode: item.product_id,
+            uom: item.uom?.unit_name,
+            qty: Number(item.net_qty || 0),
+            freeQty: Number(item.free_qty || 0),
+            totalQty: Number(item.gross_qty || 0),
+            rate: Number(item.rate || 0),
+            discountPercent: Number(item.discount_percent || 0),
+            amount: Number(item.total_amount || 0),
+            // approximate discount amount if not directly provided
+            discountAmt:
+              Number(item.total_amount || 0) - Number(item.line_total || 0),
+            totalAmount: Number(item.line_total || 0),
+            hsnCode: item.hsn_code,
+            orderQuantity: Number(item.ordered_qty || 0),
+          });
+        });
 
-        orderNumber: order.order_number,
-        orderDate: order.order_date,
-        deliveryDate: order.expected_receiving_date,
+        const contracts = Object.values(contractsMap);
 
-        customerName: order.customer_name,
-        customerId: order.customer_business_id,
+        return {
+          key: order.sales_order_id, // REQUIRED by antd table
 
-        status: order.status,
-        billMode: order.bill_mode,
-        purchaseType: order.purchase_type,
+          orderNumber: order.order_number,
+          orderDate: order.order_date,
+          deliveryDate: order.expected_receiving_date,
 
-        totalAmount: order.total_amount,
-        grandTotal: order.grand_total,
+          customerName: order.customer?.name || "-",
+          customerId: order.customer?.customer_id,
+          customer_id: order.customer?.customer_id,
+          customerEmail: order.customer?.email_id,
+          deliveryAddress: order.customer?.address_line1,
 
-        createdAt: order.created_at,
+          status: order.status,
+          billMode: order.bill_mode,
+          purchaseType: order.purchase_type,
 
-        // optional placeholders (to avoid UI crash)
-        companyName: "-",
-        contracts: [],
-      }));
+          totalAmount: order.total_amount,
+          grandTotal: order.grand_total,
+
+          contracts,
+          orderTaxAndTotals: {
+            sgstPercent: Number(order.sgst || 0),
+            cgstPercent: Number(order.cgst || 0),
+            igstPercent: Number(order.igst || 0),
+            tcsAmt: Number(order.tcs_amount || 0),
+            grandTotal: Number(order.grand_total || 0),
+            grossAmountTotal: Number(order.total_amount || 0),
+          },
+
+          createdAt: order.created_at,
+          companyName: "-",
+        };
+      });
 
       setData(mappedData);
     } catch (error) {
@@ -393,42 +457,42 @@ export default function SaleOrdersInvoice() {
   };
 
   const buildSalesOrderPayload = (values) => {
-    return {
-      customer_id: values.customer_id,
+    const { orderTaxAndTotals } = values;
 
+    return {
+      customer_id: values.customerName || values.customer_id,
       order_date: values.orderDate
         ? dayjs(values.orderDate).format("YYYY-MM-DD")
         : null,
-
       expected_receiving_date: values.deliveryDate
         ? dayjs(values.deliveryDate).format("YYYY-MM-DD")
         : null,
-
-      purchase_type: values.purchase_type || "Transit",
-      bill_mode: values.bill_mode || "Cash",
+      delivery_address: values.deliveryAddress || "",
+      cash_discount: 0,
+      cgst: Number(orderTaxAndTotals?.cgstPercent || 0),
+      sgst: Number(orderTaxAndTotals?.sgstPercent || 0),
+      igst: Number(orderTaxAndTotals?.igstPercent || 0),
+      tcs_amount: Number(orderTaxAndTotals?.tcsAmt || 0),
+      round_off_amount: 0,
+      total_amount: Number(orderTaxAndTotals?.grossAmountTotal || 0),
+      grand_total: Number(orderTaxAndTotals?.grandTotal || 0),
 
       items: (values.contracts || []).map((contract) => ({
         sale_contract_id: contract.contract_id,
-
         products: (contract.items || []).map((item) => ({
           product_id: item.itemCode,
           product_name: item.item || "",
           uom_id: null,
-
-          ordered_qty: Number(item.qty || 0),
-          net_qty: Number(item.qty || 0),
+          hsn_code: item.hsnCode || 0,
+          mrp_per_unit: Number(item.rate || 0),
+          rate: Number(item.rate || 0),
           gross_qty: Number(item.totalQty || 0),
           free_qty: Number(item.freeQty || 0),
-
-          rate: Number(item.rate || 0),
-          mrp_per_unit: Number(item.rate || 0),
-
+          net_qty: Number(item.qty || 0),
+          ordered_qty: Number(item.orderQuantity || 0),
           discount_percent: Number(item.discountPercent || 0),
-
-          total_amount: Number(item.amount || 0),
           line_total: Number(item.totalAmount || 0),
-
-          hsn_code: item.hsn_code || 0,
+          total_amount: Number(item.amount || 0),
         })),
       })),
     };
@@ -476,84 +540,261 @@ export default function SaleOrdersInvoice() {
   };
 
   /* ---------- Edit handlers ---------- */
-  useEffect(() => {
-    if (isEditModalOpen && selectedRecord) {
-      // prepare values with dayjs dates
-      const pre = {
-        ...selectedRecord,
-        orderDate: selectedRecord.orderDate
-          ? dayjs(selectedRecord.orderDate)
+  // useEffect(() => {
+  //   if (isEditModalOpen && selectedRecord) {
+  //     // prepare values with dayjs dates
+  //     const pre = {
+  //       ...selectedRecord,
+  //       customerName: selectedRecord.customer_id, // Ensure select shows correct value
+  //       orderDate: selectedRecord.orderDate
+  //         ? dayjs(selectedRecord.orderDate)
+  //         : undefined,
+  //       deliveryDate: selectedRecord.deliveryDate
+  //         ? dayjs(selectedRecord.deliveryDate)
+  //         : undefined,
+  //     };
+  //     editForm.setFieldsValue(pre);
+  //   }
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [isEditModalOpen, selectedRecord]);
+
+  const openEdit = async (record) => {
+    try {
+      const order = await getSalesOrderById(record.key);
+
+      // Ensure customer is in options list so Select displays name correctly
+      if (order.customer) {
+        setContractPersonOptions((prev) => {
+          const exists = prev.find(
+            (p) => String(p.customer_id) === String(order.customer.customer_id),
+          );
+          if (!exists) {
+            return [
+              ...prev,
+              {
+                customer_id: order.customer.customer_id, // ensure ID matches
+                name: order.customer.name,
+                email: order.customer.email_id,
+                mobile: order.customer.mobile_number,
+              },
+            ];
+          }
+          return prev;
+        });
+      }
+
+      // Group items by sale_contract_id
+      const contractsMap = {};
+      (order.items || []).forEach((item) => {
+        const cId = item.sale_contract_id;
+        if (!contractsMap[cId]) {
+          contractsMap[cId] = {
+            contract_id: cId,
+            contractNo: item.sale_contract_number,
+            items: [],
+          };
+        }
+        contractsMap[cId].items.push({
+          lineKey: item.id,
+          item: item.product_name,
+          itemCode: item.product_id,
+          uom: item.uom?.unit_name,
+          qty: Number(item.net_qty || 0),
+          freeQty: Number(item.free_qty || 0),
+          totalQty: Number(item.gross_qty || 0),
+          rate: Number(item.rate || 0),
+          discountPercent: Number(item.discount_percent || 0),
+          amount: Number(item.total_amount || 0),
+          discountAmt:
+            Number(item.total_amount || 0) - Number(item.line_total || 0),
+          totalAmount: Number(item.line_total || 0),
+          hsnCode: item.hsn_code,
+          orderQuantity: Number(item.ordered_qty || 0),
+        });
+      });
+
+      const contracts = Object.values(contractsMap);
+
+      const mappedData = {
+        key: order.sales_order_id,
+        orderNumber: order.order_number,
+        orderDate: order.order_date ? dayjs(order.order_date) : undefined,
+        deliveryDate: order.expected_receiving_date
+          ? dayjs(order.expected_receiving_date)
           : undefined,
-        deliveryDate: selectedRecord.deliveryDate
-          ? dayjs(selectedRecord.deliveryDate)
-          : undefined,
+
+        customerName: order.customer?.customer_id, // For Select to show name
+        customerId: order.customer?.customer_id,
+        customer_id: order.customer?.customer_id,
+        customerEmail: order.customer?.email_id,
+        deliveryAddress: order.customer?.address_line1,
+
+        status: order.status,
+        billMode: order.bill_mode,
+        purchaseType: order.purchase_type,
+
+        contracts,
+        orderTaxAndTotals: {
+          sgstPercent: Number(order.sgst || 0),
+          cgstPercent: Number(order.cgst || 0),
+          igstPercent: Number(order.igst || 0),
+          tcsAmt: Number(order.tcs_amount || 0),
+          grandTotal: Number(order.grand_total || 0),
+          grossAmountTotal: Number(order.total_amount || 0),
+          discountTotal: (order.items || []).reduce(
+            (acc, curr) =>
+              acc + (Number(curr.total_amount) - Number(curr.line_total)),
+            0,
+          ),
+          totalGST:
+            Number(order.grand_total || 0) -
+            Number(order.tcs_amount || 0) -
+            (Number(order.total_amount || 0) -
+              (order.items || []).reduce(
+                (acc, curr) =>
+                  acc + (Number(curr.total_amount) - Number(curr.line_total)),
+                0,
+              )),
+        },
       };
-      editForm.setFieldsValue(pre);
+
+      setSelectedRecord(mappedData);
+      editForm.setFieldsValue(mappedData);
+      setIsEditModalOpen(true);
+    } catch (err) {
+      console.error("Failed to fetch order details for edit:", err);
+      message.error("Failed to load order details for editing");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditModalOpen, selectedRecord]);
+  };
 
-  const handleEditFinish = (values) => {
-    const contracts = (values.contracts || []).map((c) => ({
-      ...c,
-      items: (c.items || []).map((it) => ({
-        ...it,
-        amount: Math.round(Number(it.qty || 0) * Number(it.rate || 0)),
-        discountAmt: Math.round(
-          (Number(it.qty || 0) *
-            Number(it.rate || 0) *
-            Number(it.discountPercent || 0)) /
-            100,
-        ),
-        totalAmount: Math.round(
-          Number(it.qty || 0) * Number(it.rate || 0) -
-            (Number(it.qty || 0) *
-              Number(it.rate || 0) *
-              Number(it.discountPercent || 0)) /
-              100,
-        ),
-        totalQty: Number(it.qty || 0) + Number(it.freeQty || 0),
-      })),
-    }));
-    const { orderTaxAndTotals, orderTotals } = computeOrderTotalsFromContracts(
-      contracts,
-      values.orderTaxAndTotals || {},
-    );
-    const payload = {
-      ...values,
-      contracts,
-      orderTaxAndTotals,
-      orderTotals,
-      orderDate: values.orderDate
-        ? values.orderDate.format("YYYY-MM-DD")
-        : undefined,
-      deliveryDate: values.deliveryDate
-        ? values.deliveryDate.format("YYYY-MM-DD")
-        : undefined,
-    };
+  const handleEditFinish = async (values) => {
+    try {
+      const payload = buildSalesOrderPayload(values);
+      console.log("FINAL UPDATE PAYLOAD 🔥", payload);
 
-    setData((prev) =>
-      prev.map((d) =>
-        d.key === selectedRecord.key ? { ...payload, key: d.key } : d,
-      ),
-    );
-    setIsEditModalOpen(false);
-    editForm.resetFields();
-    setSelectedRecord(null);
+      await updateSalesOrder(selectedRecord.key, payload);
+
+      message.success("Sales Order updated successfully");
+      setIsEditModalOpen(false);
+      editForm.resetFields();
+      fetchSalesOrders(); // Refresh list
+    } catch (error) {
+      console.error("❌ Sales Order Update Error", error);
+      message.error("Failed to update sales order");
+    }
   };
 
   /* ---------- View ---------- */
-  const openView = (record) => {
-    setSelectedRecord(record);
-    const pre = {
-      ...record,
-      orderDate: record.orderDate ? dayjs(record.orderDate) : undefined,
-      deliveryDate: record.deliveryDate
-        ? dayjs(record.deliveryDate)
-        : undefined,
-    };
-    viewForm.setFieldsValue(pre);
-    setIsViewModalOpen(true);
+  const openView = async (record) => {
+    try {
+      const order = await getSalesOrderById(record.key);
+
+      // Group items by sale_contract_id
+      const contractsMap = {};
+      (order.items || []).forEach((item) => {
+        const cId = item.sale_contract_id;
+        if (!contractsMap[cId]) {
+          contractsMap[cId] = {
+            contract_id: cId,
+            contractNo: item.sale_contract_number,
+            items: [],
+          };
+        }
+        contractsMap[cId].items.push({
+          lineKey: item.id,
+          item: item.product_name,
+          itemCode: item.product_id,
+          uom: item.uom?.unit_name,
+          qty: Number(item.net_qty || 0),
+          freeQty: Number(item.free_qty || 0),
+          totalQty: Number(item.gross_qty || 0),
+          rate: Number(item.rate || 0),
+          discountPercent: Number(item.discount_percent || 0),
+          amount: Number(item.total_amount || 0),
+          // approximate discount amount if not directly provided
+          discountAmt:
+            Number(item.total_amount || 0) -
+            Number(item.line_total || 0),
+          totalAmount: Number(item.line_total || 0),
+          hsnCode: item.hsn_code,
+          orderQuantity: Number(item.ordered_qty || 0),
+        });
+      });
+
+      const contracts = Object.values(contractsMap);
+
+      // Ensure customer is in options list so Select displays name correctly
+      if (order.customer) {
+        setContractPersonOptions((prev) => {
+          const exists = prev.find(
+            (p) => String(p.customer_id) === String(order.customer.customer_id),
+          );
+          if (!exists) {
+            return [
+              ...prev,
+              {
+                customer_id: order.customer.customer_id, // ensure ID matches
+                name: order.customer.name,
+                email: order.customer.email_id,
+                mobile: order.customer.mobile_number,
+              },
+            ];
+          }
+          return prev;
+        });
+      }
+
+      const mappedData = {
+        key: order.sales_order_id,
+        orderNumber: order.order_number,
+        orderDate: order.order_date ? dayjs(order.order_date) : undefined,
+        deliveryDate: order.expected_receiving_date
+          ? dayjs(order.expected_receiving_date)
+          : undefined,
+
+        customerName: order.customer?.name || "-",
+        customerId: order.customer?.customer_id,
+        customer_id: order.customer?.customer_id,
+        customerEmail: order.customer?.email_id,
+        deliveryAddress: order.customer?.address_line1,
+
+        status: order.status,
+        billMode: order.bill_mode,
+        purchaseType: order.purchase_type,
+
+        contracts,
+        orderTaxAndTotals: {
+          sgstPercent: Number(order.sgst || 0),
+          cgstPercent: Number(order.cgst || 0),
+          igstPercent: Number(order.igst || 0),
+          tcsAmt: Number(order.tcs_amount || 0),
+          grandTotal: Number(order.grand_total || 0),
+          grossAmountTotal: Number(order.total_amount || 0),
+          // Calculate if missing
+          discountTotal: (order.items || []).reduce(
+            (acc, curr) =>
+              acc + (Number(curr.total_amount) - Number(curr.line_total)),
+            0,
+          ),
+          totalGST:
+            Number(order.grand_total || 0) -
+            Number(order.tcs_amount || 0) -
+            (Number(order.total_amount || 0) -
+              (order.items || []).reduce(
+                (acc, curr) =>
+                  acc + (Number(curr.total_amount) - Number(curr.line_total)),
+                0,
+              )),
+        },
+      };
+
+      setSelectedRecord(mappedData);
+      viewForm.setFieldsValue(mappedData);
+      setIsViewModalOpen(true);
+    } catch (err) {
+      console.error("Failed to fetch order details:", err);
+      message.error("Failed to load order details");
+    }
   };
 
   /* ---------- Columns ---------- */
@@ -634,19 +875,7 @@ export default function SaleOrdersInvoice() {
           />
           <EditOutlined
             className="cursor-pointer! text-red-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              editForm.setFieldsValue({
-                ...record,
-                orderDate: record.orderDate
-                  ? dayjs(record.orderDate)
-                  : undefined,
-                deliveryDate: record.deliveryDate
-                  ? dayjs(record.deliveryDate)
-                  : undefined,
-              });
-              setIsEditModalOpen(true);
-            }}
+            onClick={() => openEdit(record)}
           />
         </div>
       ),
@@ -654,43 +883,45 @@ export default function SaleOrdersInvoice() {
   ];
 
   /* ---------- Contract & Items UI blocks (used in Add/Edit form) ---------- */
-  const ContractsFormList = ({ form }) => (
+  const ContractsFormList = ({ form, disabled }) => (
     <Form.List name="contracts">
       {(contractFields, { add: addContract, remove: removeContract }) => (
         <>
           {/* HEADER */}
           <div className="mb-2 flex justify-between items-center">
             <h6 className="text-amber-500">Contracts</h6>
-            <Button
-              className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
-              type="dashed"
-              icon={<PlusOutlined />}
-              onClick={() =>
-                addContract({
-                  contractNo: `CNT-${Date.now()}`,
-                  items: [
-                    {
-                      lineKey: Date.now(),
-                      item: undefined,
-                      itemCode: undefined,
-                      uom: undefined,
-                      qty: 0,
-                      freeQty: 0,
-                      totalQty: 0,
-                      grossWt: 0,
-                      totalGrossWt: 0,
-                      rate: 0,
-                      amount: 0,
-                      discountPercent: 0,
-                      discountAmt: 0,
-                      totalAmount: 0,
-                    },
-                  ],
-                })
-              }
-            >
-              Add Contract
-            </Button>
+            {!disabled && (
+              <Button
+                className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
+                type="dashed"
+                icon={<PlusOutlined />}
+                onClick={() =>
+                  addContract({
+                    contractNo: `CNT-${Date.now()}`,
+                    items: [
+                      {
+                        lineKey: Date.now(),
+                        item: undefined,
+                        itemCode: undefined,
+                        uom: undefined,
+                        qty: 0,
+                        freeQty: 0,
+                        totalQty: 0,
+                        grossWt: 0,
+                        totalGrossWt: 0,
+                        rate: 0,
+                        amount: 0,
+                        discountPercent: 0,
+                        discountAmt: 0,
+                        totalAmount: 0,
+                      },
+                    ],
+                  })
+                }
+              >
+                Add Contract
+              </Button>
+            )}
           </div>
 
           {contractFields.map((cf, ci) => {
@@ -701,7 +932,6 @@ export default function SaleOrdersInvoice() {
                 key={cf.key}
                 className="mb-4 p-4 border rounded-lg shadow-sm bg-white"
               >
-                {/* CONTRACT HEADER */}
                 <div className="flex justify-between items-center mb-3">
                   <Form.Item
                     label="Contract ID"
@@ -709,37 +939,58 @@ export default function SaleOrdersInvoice() {
                   >
                     <Select
                       placeholder="Select Contract"
+                      disabled={disabled}
                       onChange={async (contractId) => {
-                        const items = await salesContractItems(contractId);
+                        let items = [];
 
+                        // Try to find items locally first
+                        const selectedContract = contractOptions.find(
+                          (c) => c.sale_contract_id === contractId,
+                        );
+                        console.log("Selected Contract:", selectedContract);
+
+                        if (
+                          selectedContract &&
+                          selectedContract.items &&
+                          selectedContract.items.length > 0
+                        ) {
+                          items = selectedContract.items;
+                        } else {
+                          // Fallback to API
+                          items = await salesContractItems(contractId);
+                        }
+
+                        console.log("Contract Items for Dropdown:", items);
+
+                        // Update options for this specific contract row (using stable key)
                         setContractItemsMap((prev) => ({
                           ...prev,
-                          [ci]: items,
+                          [cf.key]: items,
                         }));
 
-                        const mappedItems = items.map((it) => ({
-                          lineKey: Date.now() + Math.random(),
-                          item: it.product_name,
-                          itemCode: it.product_id,
-                          hsnCode: it.hsn_code,
-                          uom: it.uom?.unit_name,
-                          qty: Number(it.net_qty),
-                          freeQty: Number(it.free_qty),
-                          totalQty: Number(it.gross_qty),
-                          grossWt: 0,
-                          totalGrossWt: 0,
-                          rate: Number(it.mrp),
-                          amount: 0,
-                          discountPercent: Number(it.discount_percent),
-                          discountAmt: Number(it.discount_amount),
-                          totalAmount: Number(it.line_total),
-                        }));
-
+                        // Reset items to a single empty row to allow user to select
                         const contracts = form.getFieldValue("contracts") || [];
                         contracts[ci] = {
                           ...(contracts[ci] || {}),
                           contract_id: contractId,
-                          items: mappedItems,
+                          items: [
+                            {
+                              lineKey: Date.now(),
+                              item: undefined,
+                              itemCode: undefined,
+                              uom: undefined,
+                              qty: 0,
+                              freeQty: 0,
+                              totalQty: 0,
+                              grossWt: 0,
+                              totalGrossWt: 0,
+                              rate: 0,
+                              amount: 0,
+                              discountPercent: 0,
+                              discountAmt: 0,
+                              totalAmount: 0,
+                            },
+                          ],
                         };
 
                         form.setFieldsValue({ contracts });
@@ -757,11 +1008,13 @@ export default function SaleOrdersInvoice() {
                     </Select>
                   </Form.Item>
 
-                  <Button
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={() => removeContract(cf.name)}
-                  />
+                  {!disabled && (
+                    <Button
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => removeContract(cf.name)}
+                    />
+                  )}
                 </div>
 
                 {/* ITEMS LIST */}
@@ -783,9 +1036,17 @@ export default function SaleOrdersInvoice() {
                               >
                                 <Select
                                   placeholder="Item"
+                                  disabled={disabled}
                                   onChange={(val) => {
-                                    const sel = contractItems.find(
-                                      (x) => x.product_name === val,
+                                    // Retrieve items using the stable key
+                                    const availableItems =
+                                      contractItemsMap[cf.key] || [];
+                                    const sel = availableItems.find(
+                                      (x) =>
+                                        (x.product_name ||
+                                          x.item_name ||
+                                          (x.product &&
+                                            x.product.product_name)) === val,
                                     );
                                     if (!sel) return;
 
@@ -795,19 +1056,40 @@ export default function SaleOrdersInvoice() {
 
                                     items[ii] = {
                                       ...(items[ii] || {}),
-                                      item: sel.product_name,
-                                      itemCode: sel.product_id,
+                                      item:
+                                        sel.product_name ||
+                                        sel.item_name ||
+                                        (sel.product &&
+                                          sel.product.product_name),
+                                      itemCode:
+                                        sel.product_id ||
+                                        sel.item_code ||
+                                        (sel.product && sel.product.product_id),
                                       hsnCode: sel.hsn_code,
-                                      uom: sel.uom?.unit_name,
-                                      qty: Number(sel.net_qty),
-                                      freeQty: Number(sel.free_qty),
-                                      totalQty: Number(sel.gross_qty),
-                                      rate: Number(sel.mrp),
-                                      discountPercent: Number(
-                                        sel.discount_percent,
+                                      uom: sel.uom?.unit_name || sel.uom,
+                                      qty: Number(
+                                        sel.net_qty || sel.qty || 0,
                                       ),
-                                      discountAmt: Number(sel.discount_amount),
-                                      totalAmount: Number(sel.line_total),
+                                      freeQty: Number(
+                                        sel.free_qty || sel.free_qty || 0,
+                                      ),
+                                      totalQty: Number(
+                                        sel.gross_qty ||
+                                        sel.total_qty ||
+                                        0,
+                                      ),
+                                      rate: Number(sel.mrp || sel.rate || 0),
+                                      discountPercent: Number(
+                                        sel.discount_percent || 0,
+                                      ),
+                                      discountAmt: Number(
+                                        sel.discount_amount || 0,
+                                      ),
+                                      totalAmount: Number(
+                                        sel.line_total ||
+                                        sel.total_amount ||
+                                        0,
+                                      ),
                                     };
 
                                     contracts[ci].items = items;
@@ -818,12 +1100,26 @@ export default function SaleOrdersInvoice() {
                                     );
                                   }}
                                 >
-                                  {contractItems.map((it) => (
+                                  {(
+                                    contractItemsMap[cf.key] || []
+                                  ).map((it) => (
                                     <Select.Option
-                                      key={it.product_id}
-                                      value={it.product_name}
+                                      key={
+                                        it.product_id ||
+                                        it.item_code ||
+                                        (it.product && it.product.product_id)
+                                      }
+                                      value={
+                                        it.product_name ||
+                                        it.item_name ||
+                                        (it.product && it.product.product_name)
+                                      }
                                     >
-                                      {it.product_name}
+                                      {
+                                        it.product_name ||
+                                        it.item_name ||
+                                        (it.product && it.product.product_name)
+                                      }
                                     </Select.Option>
                                   ))}
                                 </Select>
@@ -978,6 +1274,7 @@ export default function SaleOrdersInvoice() {
                                 <InputNumber
                                   min={0}
                                   className="w-full"
+                                  disabled={disabled}
                                   onChange={() =>
                                     onFormValuesChange(
                                       form,
@@ -1017,42 +1314,46 @@ export default function SaleOrdersInvoice() {
 
                             {/* DELETE BUTTON */}
                           </Row>
-                          <Button
-                            danger
-                            icon={<DeleteOutlined />}
-                            onClick={() => {
-                              removeItem(itf.name);
-                              onFormValuesChange(form, form.getFieldsValue());
-                            }}
-                          />
+                          {!disabled && (
+                            <Button
+                              danger
+                              icon={<DeleteOutlined />}
+                              onClick={() => {
+                                removeItem(itf.name);
+                                onFormValuesChange(form, form.getFieldsValue());
+                              }}
+                            />
+                          )}
                         </div>
                       ))}
 
-                      <Button
-                        className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
-                        type="dashed"
-                        icon={<PlusOutlined />}
-                        onClick={() =>
-                          addItem({
-                            lineKey: Date.now(),
-                            item: undefined,
-                            itemCode: undefined,
-                            uom: salesOrderJSON.uomOptions[0],
-                            qty: 0,
-                            freeQty: 0,
-                            totalQty: 0,
-                            grossWt: 0,
-                            totalGrossWt: 0,
-                            rate: 0,
-                            amount: 0,
-                            discountPercent: 0,
-                            discountAmt: 0,
-                            totalAmount: 0,
-                          })
-                        }
-                      >
-                        Add Item
-                      </Button>
+                      {!disabled && (
+                        <Button
+                          className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
+                          type="dashed"
+                          icon={<PlusOutlined />}
+                          onClick={() =>
+                            addItem({
+                              lineKey: Date.now(),
+                              item: undefined,
+                              itemCode: undefined,
+                              uom: salesOrderJSON.uomOptions[0],
+                              qty: 0,
+                              freeQty: 0,
+                              totalQty: 0,
+                              grossWt: 0,
+                              totalGrossWt: 0,
+                              rate: 0,
+                              amount: 0,
+                              discountPercent: 0,
+                              discountAmt: 0,
+                              totalAmount: 0,
+                            })
+                          }
+                        >
+                          Add Item
+                        </Button>
+                      )}
                     </>
                   )}
                 </Form.List>
@@ -1070,7 +1371,7 @@ export default function SaleOrdersInvoice() {
       <h6 className="text-amber-500">Header</h6>
       <Row gutter={16}>
         <Col span={6}>
-          <Form.Item label="Customer Name" name="customer_id">
+          <Form.Item label="Customer Name" name="customerName">
             <Select
               placeholder="Select Customer"
               onChange={async (customerId) => {
@@ -1078,19 +1379,26 @@ export default function SaleOrdersInvoice() {
                   (c) => c.customer_id === customerId,
                 );
 
-                // set customer name if needed elsewhere
-                form.setFieldsValue({
-                  customerName: customer?.name,
-                });
+                if (customer) {
+                  console.log("Selected User for Autofill:", customer);
+                  form.setFieldsValue({
+                    customerName: customer.name,
+                    customerEmail:
+                      customer.email_address || customer.email || "",
+                    customerMobile:
+                      customer.mobile_number || customer.mobile || "",
+                  });
+                }
 
                 // fetch contracts for this customer
-                const contracts = await getContractDetailsbyPerson(customerId);
-                setContractOptions(contracts);
+                // const contracts = await getContractDetailsbyPerson(customerId);
+                // setContractOptions(contracts);
 
                 // reset downstream data
                 setContractItems([]);
                 form.setFieldsValue({ contract_id: undefined });
               }}
+              disabled={disabled}
             >
               {contractPersonOptions.map((c) => (
                 <Select.Option key={c.customer_id} value={c.customer_id}>
@@ -1176,7 +1484,7 @@ export default function SaleOrdersInvoice() {
       <Divider />
 
       {/* contracts + items */}
-      <ContractsFormList form={form} />
+      <ContractsFormList form={form} disabled={disabled} />
 
       <Divider />
 
