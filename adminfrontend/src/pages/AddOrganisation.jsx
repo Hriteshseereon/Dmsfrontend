@@ -183,8 +183,8 @@ export default function AddOrganisation() {
   };
 
   const createExistingFile = (path) => {
-    if (!path) return null
-    const fileUrl = `${import.meta.env.VITE_API_URL}/${path}`
+    if (!path) return null;
+    const fileUrl = `${import.meta.env.VITE_API_URL}/${path}`;
     const cleanPath = path.split("?")[0].split("#")[0];
     const fileName = cleanPath.substring(cleanPath.lastIndexOf("/") + 1);
     return [
@@ -196,7 +196,7 @@ export default function AddOrganisation() {
         thumbUrl: fileUrl,
       },
     ];
-  }
+  };
 
   // third payload to check with fields mapping while edit
   const mapOrgToForm = (org) => {
@@ -209,16 +209,16 @@ export default function AddOrganisation() {
 
     const legalDetails = Object.entries(LEGAL_KEY_MAP).reduce(
       (acc, [formKey, apiKey]) => {
-        const valueKey = apiKey.replace("_no", "")
+        const valueKey = apiKey.replace("_no", "");
         acc[formKey] = {
           number: legal?.[valueKey] ?? null,
         };
 
-        const documentKey = apiKey.replace("_no", "_document")
+        const documentKey = apiKey.replace("_no", "_document");
         if (documentKey && legal?.[documentKey]) {
           acc[formKey] = {
-            document: createExistingFile(legal?.[documentKey])
-          }
+            document: createExistingFile(legal?.[documentKey]),
+          };
         }
 
         // Handle validity dynamically
@@ -306,17 +306,19 @@ export default function AddOrganisation() {
 
         companyDetails: p.company_details
           ? {
-            companyName: p.company_details.company_name,
-            companyWebsite: p.company_details.website,
-            pin: p.company_details.pin_code,
-            registrationNo: p.company_details.registration_no,
-            gstNo: p.company_details.gst_no,
-            address: {
-              city: p.company_details.address,
-              state: p.company_details.location,
-            },
-            company_certificate: createExistingFile(p.company_details.company_certificate)
-          }
+              companyName: p.company_details.company_name,
+              companyWebsite: p.company_details.website,
+              pin: p.company_details.pin_code,
+              registrationNo: p.company_details.registration_no,
+              gstNo: p.company_details.gst_no,
+              address: {
+                city: p.company_details.address,
+                state: p.company_details.location,
+              },
+              company_certificate: createExistingFile(
+                p.company_details.company_certificate,
+              ),
+            }
           : undefined,
       })),
 
@@ -472,7 +474,7 @@ export default function AddOrganisation() {
           values.organisationType === "PRIVATE_LIMITED"
             ? "DIRECTOR"
             : values.organisationType === "LLP" ||
-              values.organisationType === "Partnership"
+                values.organisationType === "Partnership"
               ? "PARTNER"
               : "PROPRIETOR",
 
@@ -522,14 +524,14 @@ export default function AddOrganisation() {
 
         company_details: p.companyDetails
           ? {
-            company_name: p.companyDetails.companyName ?? null,
-            website: p.companyDetails.companyWebsite ?? null,
-            registration_no: p.companyDetails.registrationNo ?? null,
-            gst_no: p.companyDetails.gstNo ?? null,
-            address: p.companyDetails.address?.city ?? null,
-            location: p.companyDetails.address?.state ?? null,
-            pin_code: p.companyDetails.address?.pin ?? null,
-          }
+              company_name: p.companyDetails.companyName ?? null,
+              website: p.companyDetails.companyWebsite ?? null,
+              registration_no: p.companyDetails.registrationNo ?? null,
+              gst_no: p.companyDetails.gstNo ?? null,
+              address: p.companyDetails.address?.city ?? null,
+              location: p.companyDetails.address?.state ?? null,
+              pin_code: p.companyDetails.address?.pin ?? null,
+            }
           : null,
       })),
 
@@ -560,39 +562,39 @@ export default function AddOrganisation() {
       // ================= BRANCHES =================
       branches: values.hasBranch
         ? (values.branches ?? []).map((b) => ({
-          id: b.id ?? undefined,
-          name: b.branchName ?? "",
-          short_name: b.shortName ?? "",
-          branch_head_name: null,
-          phone_number_1: null,
-          phone_number_2: null,
-          email: null,
-          gstin: b.gstin ?? null,
-          type: "Main",
-          contacts: (b.contacts ?? []).map((c) => ({
-            id: c.id ?? undefined,
-            contact_person: c.person ?? "",
-            contact_number: c.number ?? "",
-            email: c.email ?? null,
-          })),
-          address: {
-            address_line_1: b.address1 ?? "",
-            address_line_2: b.address2 ?? "",
-            landmark: null,
-            city: b.city ?? "",
-            state: b.state ?? "",
-            country: "India",
-            pin_code: b.pinNo ?? "",
+            id: b.id ?? undefined,
+            name: b.branchName ?? "",
+            short_name: b.shortName ?? "",
+            branch_head_name: null,
+            phone_number_1: null,
+            phone_number_2: null,
+            email: null,
+            gstin: b.gstin ?? null,
+            type: "Main",
+            contacts: (b.contacts ?? []).map((c) => ({
+              id: c.id ?? undefined,
+              contact_person: c.person ?? "",
+              contact_number: c.number ?? "",
+              email: c.email ?? null,
+            })),
+            address: {
+              address_line_1: b.address1 ?? "",
+              address_line_2: b.address2 ?? "",
+              landmark: null,
+              city: b.city ?? "",
+              state: b.state ?? "",
+              country: "India",
+              pin_code: b.pinNo ?? "",
 
-            latitude: null,
-            longitude: null,
+              latitude: null,
+              longitude: null,
 
-            address_type: "RENTED",
-            address_category: "BRANCH",
-            is_branch: true,
-            agreement_document: null,
-          },
-        }))
+              address_type: "RENTED",
+              address_category: "BRANCH",
+              is_branch: true,
+              agreement_document: null,
+            },
+          }))
         : [],
 
       // ================= DEPOS =================
@@ -614,7 +616,7 @@ export default function AddOrganisation() {
     const formData = new FormData();
 
     // ✅ Append JSON payload as string
-    formData.append("payload", JSON.stringify(jsonPayload));
+    formData.append("payload", JSON.stringify(payload));
 
     // =============================
     // 🔹 Append Legal Document Files
@@ -659,11 +661,18 @@ export default function AddOrganisation() {
           person.photo[0].originFileObj,
         );
       }
+
+      if (person?.companyCertificate?.[0]?.originFileObj) {
+        formData.append(
+          `persons.${index}.company_certificate`,
+          person.companyCertificate[0].originFileObj,
+        );
+      }
     });
 
     if (isEdit) {
       updateOrg(
-        { id: orgId, data: payload },
+        { id: orgId, data: formData },
         {
           onSuccess: () => {
             antMessage.success("Organisation updated successfully");
@@ -676,7 +685,7 @@ export default function AddOrganisation() {
         },
       );
     } else {
-      createOrg(payload, {
+      createOrg(formData, {
         onSuccess: () => {
           antMessage.success("Organisation created successfully");
           navigate("/organizations");
@@ -688,7 +697,7 @@ export default function AddOrganisation() {
       });
     }
   };
-  
+
   // const handleSubmit = () => {
   //   setSubmitError(null);
 
@@ -760,7 +769,7 @@ export default function AddOrganisation() {
   //     },
   //   });
   // };
-  
+
   const handleBack = () => {
     window.history.back();
   };
@@ -1411,7 +1420,12 @@ export default function AddOrganisation() {
                         valuePropName="fileList"
                         getValueFromEvent={normFile}
                       >
-                        <Upload beforeUpload={() => false} onPreview={handlePreview} listType="picture" maxCount={1}>
+                        <Upload
+                          beforeUpload={() => false}
+                          onPreview={handlePreview}
+                          listType="picture"
+                          maxCount={1}
+                        >
                           <Button
                             icon={<UploadOutlined />}
                             style={{ borderRadius: "6px" }}
@@ -1449,7 +1463,10 @@ export default function AddOrganisation() {
                         valuePropName="fileList"
                         getValueFromEvent={normFile}
                       >
-                        <Upload beforeUpload={() => false} onPreview={handlePreview}>
+                        <Upload
+                          beforeUpload={() => false}
+                          onPreview={handlePreview}
+                        >
                           <Button style={{ borderRadius: "6px" }}>
                             Upload Aadhaar
                           </Button>
@@ -1478,7 +1495,10 @@ export default function AddOrganisation() {
                         valuePropName="fileList"
                         getValueFromEvent={normFile}
                       >
-                        <Upload beforeUpload={() => false} onPreview={handlePreview}>
+                        <Upload
+                          beforeUpload={() => false}
+                          onPreview={handlePreview}
+                        >
                           <Button style={{ borderRadius: "6px" }}>
                             Upload PAN
                           </Button>
@@ -1511,7 +1531,10 @@ export default function AddOrganisation() {
                         valuePropName="fileList"
                         getValueFromEvent={normFile}
                       >
-                        <Upload beforeUpload={() => false} onPreview={handlePreview}>
+                        <Upload
+                          beforeUpload={() => false}
+                          onPreview={handlePreview}
+                        >
                           <Button style={{ borderRadius: "6px" }}>
                             Upload GST
                           </Button>
@@ -1636,11 +1659,15 @@ export default function AddOrganisation() {
                           <Form.Item
                             {...restField}
                             label={<span>Company Certificate</span>}
-                            name={[name, "company_certificate"]}
+                            name={[name, "companyCertificate"]}
                             valuePropName="fileList"
                             getValueFromEvent={normFile}
                           >
-                            <Upload beforeUpload={() => false} onPreview={handlePreview} multiple>
+                            <Upload
+                              beforeUpload={() => false}
+                              onPreview={handlePreview}
+                              multiple
+                            >
                               <Button
                                 icon={<UploadOutlined />}
                                 style={{ borderRadius: "6px" }}
@@ -1870,7 +1897,10 @@ export default function AddOrganisation() {
                       valuePropName="fileList"
                       getValueFromEvent={normFile}
                     >
-                      <Upload beforeUpload={() => false} onPreview={handlePreview}>
+                      <Upload
+                        beforeUpload={() => false}
+                        onPreview={handlePreview}
+                      >
                         <Button icon={<UploadOutlined />}>Upload</Button>
                       </Upload>
                     </Form.Item>
@@ -1942,7 +1972,10 @@ export default function AddOrganisation() {
                       valuePropName="fileList"
                       getValueFromEvent={normFile}
                     >
-                      <Upload beforeUpload={() => false} onPreview={handlePreview}>
+                      <Upload
+                        beforeUpload={() => false}
+                        onPreview={handlePreview}
+                      >
                         <Button icon={<UploadOutlined />}>Upload</Button>
                       </Upload>
                     </Form.Item>
