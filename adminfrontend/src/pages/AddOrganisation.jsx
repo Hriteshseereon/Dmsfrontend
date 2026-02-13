@@ -306,19 +306,19 @@ export default function AddOrganisation() {
 
         companyDetails: p.company_details
           ? {
-              companyName: p.company_details.company_name,
-              companyWebsite: p.company_details.website,
-              pin: p.company_details.pin_code,
-              registrationNo: p.company_details.registration_no,
-              gstNo: p.company_details.gst_no,
-              address: {
-                city: p.company_details.address,
-                state: p.company_details.location,
-              },
-              company_certificate: createExistingFile(
-                p.company_details.company_certificate,
-              ),
-            }
+            companyName: p.company_details.company_name,
+            companyWebsite: p.company_details.website,
+            pin: p.company_details.pin_code,
+            registrationNo: p.company_details.registration_no,
+            gstNo: p.company_details.gst_no,
+            address: {
+              city: p.company_details.address,
+              state: p.company_details.location,
+            },
+            company_certificate: createExistingFile(
+              p.company_details.company_certificate,
+            ),
+          }
           : undefined,
       })),
 
@@ -474,7 +474,7 @@ export default function AddOrganisation() {
           values.organisationType === "PRIVATE_LIMITED"
             ? "DIRECTOR"
             : values.organisationType === "LLP" ||
-                values.organisationType === "Partnership"
+              values.organisationType === "Partnership"
               ? "PARTNER"
               : "PROPRIETOR",
 
@@ -524,14 +524,14 @@ export default function AddOrganisation() {
 
         company_details: p.companyDetails
           ? {
-              company_name: p.companyDetails.companyName ?? null,
-              website: p.companyDetails.companyWebsite ?? null,
-              registration_no: p.companyDetails.registrationNo ?? null,
-              gst_no: p.companyDetails.gstNo ?? null,
-              address: p.companyDetails.address?.city ?? null,
-              location: p.companyDetails.address?.state ?? null,
-              pin_code: p.companyDetails.address?.pin ?? null,
-            }
+            company_name: p.companyDetails.companyName ?? null,
+            website: p.companyDetails.companyWebsite ?? null,
+            registration_no: p.companyDetails.registrationNo ?? null,
+            gst_no: p.companyDetails.gstNo ?? null,
+            address: p.companyDetails.address?.city ?? null,
+            location: p.companyDetails.address?.state ?? null,
+            pin_code: p.companyDetails.address?.pin ?? null,
+          }
           : null,
       })),
 
@@ -562,39 +562,39 @@ export default function AddOrganisation() {
       // ================= BRANCHES =================
       branches: values.hasBranch
         ? (values.branches ?? []).map((b) => ({
-            id: b.id ?? undefined,
-            name: b.branchName ?? "",
-            short_name: b.shortName ?? "",
-            branch_head_name: null,
-            phone_number_1: null,
-            phone_number_2: null,
-            email: null,
-            gstin: b.gstin ?? null,
-            type: "Main",
-            contacts: (b.contacts ?? []).map((c) => ({
-              id: c.id ?? undefined,
-              contact_person: c.person ?? "",
-              contact_number: c.number ?? "",
-              email: c.email ?? null,
-            })),
-            address: {
-              address_line_1: b.address1 ?? "",
-              address_line_2: b.address2 ?? "",
-              landmark: null,
-              city: b.city ?? "",
-              state: b.state ?? "",
-              country: "India",
-              pin_code: b.pinNo ?? "",
+          id: b.id ?? undefined,
+          name: b.branchName ?? "",
+          short_name: b.shortName ?? "",
+          branch_head_name: null,
+          phone_number_1: null,
+          phone_number_2: null,
+          email: null,
+          gstin: b.gstin ?? null,
+          type: "Main",
+          contacts: (b.contacts ?? []).map((c) => ({
+            id: c.id ?? undefined,
+            contact_person: c.person ?? "",
+            contact_number: c.number ?? "",
+            email: c.email ?? null,
+          })),
+          address: {
+            address_line_1: b.address1 ?? "",
+            address_line_2: b.address2 ?? "",
+            landmark: null,
+            city: b.city ?? "",
+            state: b.state ?? "",
+            country: "India",
+            pin_code: b.pinNo ?? "",
 
-              latitude: null,
-              longitude: null,
+            latitude: null,
+            longitude: null,
 
-              address_type: "RENTED",
-              address_category: "BRANCH",
-              is_branch: true,
-              agreement_document: null,
-            },
-          }))
+            address_type: "RENTED",
+            address_category: "BRANCH",
+            is_branch: true,
+            agreement_document: null,
+          },
+        }))
         : [],
 
       // ================= DEPOS =================
@@ -622,11 +622,14 @@ export default function AddOrganisation() {
     // 🔹 Append Legal Document Files
     // =============================
     Object.entries(values.legalDetails || {}).forEach(([key, doc]) => {
+      const fieldName = `legal_details.${LEGAL_KEY_MAP[key].replace("_no", "_document")}`;
+
       if (doc?.document?.[0]?.originFileObj) {
-        formData.append(
-          `legal_details.${LEGAL_KEY_MAP[key].replace("_no", "_document")}`,
-          doc.document[0].originFileObj,
-        );
+        // new file selected
+        formData.append(fieldName, doc.document[0].originFileObj);
+      } else if (!doc?.document?.[0]?.url) {
+        // no file & no existing URL (we have deleted the file)
+        formData.append(fieldName, null);
       }
     });
 
@@ -634,41 +637,25 @@ export default function AddOrganisation() {
     // 🔹 Append Person Files
     // =============================
     (values.partners || []).forEach((person, index) => {
-      if (person?.panDocument?.[0]?.originFileObj) {
-        formData.append(
-          `persons.${index}.pan_document`,
-          person.panDocument[0].originFileObj,
-        );
-      }
+      const appendFile = (fieldKey, fileObj) => {
+        const fieldName = `persons.${index}.${fieldKey}`;
 
-      if (person?.adharDocument?.[0]?.originFileObj) {
-        formData.append(
-          `persons.${index}.aadhaar_document`,
-          person.adharDocument[0].originFileObj,
-        );
-      }
+        if (fileObj?.[0]?.originFileObj) {
+          // new file selected
+          formData.append(fieldName, fileObj[0].originFileObj);
+        } else if (!fileObj?.[0]?.url) {
+          // no file at all
+          formData.append(fieldName, null);
+        }
+      };
 
-      if (person?.gstDocument?.[0]?.originFileObj) {
-        formData.append(
-          `persons.${index}.gst_document`,
-          person.gstDocument[0].originFileObj,
-        );
-      }
-
-      if (person?.photo?.[0]?.originFileObj) {
-        formData.append(
-          `persons.${index}.photo`,
-          person.photo[0].originFileObj,
-        );
-      }
-
-      if (person?.companyCertificate?.[0]?.originFileObj) {
-        formData.append(
-          `persons.${index}.company_certificate`,
-          person.companyCertificate[0].originFileObj,
-        );
-      }
+      appendFile("pan_document", person?.panDocument);
+      appendFile("aadhaar_document", person?.adharDocument);
+      appendFile("gst_document", person?.gstDocument);
+      appendFile("photo", person?.photo);
+      appendFile("company_certificate", person?.companyCertificate);
     });
+
 
     if (isEdit) {
       updateOrg(
