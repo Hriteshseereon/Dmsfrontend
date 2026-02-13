@@ -639,7 +639,6 @@ export default function AddOrganisation() {
     (values.partners || []).forEach((person, index) => {
       const appendFile = (fieldKey, fileObj) => {
         const fieldName = `persons.${index}.${fieldKey}`;
-
         if (fileObj?.[0]?.originFileObj) {
           // new file selected
           formData.append(fieldName, fileObj[0].originFileObj);
