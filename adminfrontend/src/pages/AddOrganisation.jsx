@@ -208,8 +208,9 @@ export default function AddOrganisation() {
 
     const legalDetails = Object.entries(LEGAL_KEY_MAP).reduce(
       (acc, [formKey, apiKey]) => {
+        const valueKey = apiKey.replace("_no", "")
         acc[formKey] = {
-          number: legal?.[apiKey] ?? null,
+          number: legal?.[valueKey] ?? null,
         };
 
         const documentKey = apiKey.replace("_no", "_document")
@@ -313,6 +314,7 @@ export default function AddOrganisation() {
               city: p.company_details.address,
               state: p.company_details.location,
             },
+            company_certificate: createExistingFile(p.company_details.company_certificate)
           }
           : undefined,
       })),
@@ -1581,7 +1583,7 @@ export default function AddOrganisation() {
                           <Form.Item
                             {...restField}
                             label={<span>Company Certificate</span>}
-                            name={[name, "documents"]}
+                            name={[name, "company_certificate"]}
                             valuePropName="fileList"
                             getValueFromEvent={normFile}
                           >
