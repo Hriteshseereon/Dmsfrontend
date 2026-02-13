@@ -605,45 +605,11 @@ export default function AddOrganisation() {
     };
   };
 
-  // const handleSubmit = () => {
-  //   setSubmitError(null);
-
-  //   const values = form.getFieldsValue(true);
-  //   const payload = buildPayload(values);
-
-  //   if (isEdit) {
-  //     updateOrg(
-  //       { id: orgId, data: payload },
-  //       {
-  //         onSuccess: () => {
-  //           antMessage.success("Organisation updated successfully");
-  //           navigate("/organizations");
-  //         },
-  //         onError: (error) => {
-  //           antMessage.error("Failed to update organisation");
-  //           console.error("Update Organization Error:", error);
-  //         },
-  //       },
-  //     );
-  //   } else {
-  //     createOrg(payload, {
-  //       onSuccess: () => {
-  //         antMessage.success("Organisation created successfully");
-  //         navigate("/organizations");
-  //       },
-  //       onError: (error) => {
-  //         antMessage.error("Failed to create organisation");
-  //         console.error("Create Organisation Error:", error);
-  //       },
-  //     });
-  //   }
-  // };
   const handleSubmit = () => {
     setSubmitError(null);
 
     const values = form.getFieldsValue(true);
-
-    const jsonPayload = buildPayload(values); // WITHOUT files
+    const payload = buildPayload(values);
 
     const formData = new FormData();
 
@@ -695,20 +661,106 @@ export default function AddOrganisation() {
       }
     });
 
-    // =============================
-    // 🚀 Send request
-    // =============================
-    createOrg(formData, {
-      onSuccess: () => {
-        antMessage.success("Organisation created successfully");
-        navigate("/organizations");
-      },
-      onError: (error) => {
-        antMessage.error("Failed to create organisation");
-        console.error("Create Organisation Error:", error);
-      },
-    });
+    if (isEdit) {
+      updateOrg(
+        { id: orgId, data: payload },
+        {
+          onSuccess: () => {
+            antMessage.success("Organisation updated successfully");
+            navigate("/organizations");
+          },
+          onError: (error) => {
+            antMessage.error("Failed to update organisation");
+            console.error("Update Organization Error:", error);
+          },
+        },
+      );
+    } else {
+      createOrg(payload, {
+        onSuccess: () => {
+          antMessage.success("Organisation created successfully");
+          navigate("/organizations");
+        },
+        onError: (error) => {
+          antMessage.error("Failed to create organisation");
+          console.error("Create Organisation Error:", error);
+        },
+      });
+    }
   };
+  
+  // const handleSubmit = () => {
+  //   setSubmitError(null);
+
+  //   const values = form.getFieldsValue(true);
+
+  //   const jsonPayload = buildPayload(values); // WITHOUT files
+
+  //   const formData = new FormData();
+
+  //   // ✅ Append JSON payload as string
+  //   formData.append("payload", JSON.stringify(jsonPayload));
+
+  //   // =============================
+  //   // 🔹 Append Legal Document Files
+  //   // =============================
+  //   Object.entries(values.legalDetails || {}).forEach(([key, doc]) => {
+  //     if (doc?.document?.[0]?.originFileObj) {
+  //       formData.append(
+  //         `legal_details.${LEGAL_KEY_MAP[key].replace("_no", "_document")}`,
+  //         doc.document[0].originFileObj,
+  //       );
+  //     }
+  //   });
+
+  //   // =============================
+  //   // 🔹 Append Person Files
+  //   // =============================
+  //   (values.partners || []).forEach((person, index) => {
+  //     if (person?.panDocument?.[0]?.originFileObj) {
+  //       formData.append(
+  //         `persons.${index}.pan_document`,
+  //         person.panDocument[0].originFileObj,
+  //       );
+  //     }
+
+  //     if (person?.adharDocument?.[0]?.originFileObj) {
+  //       formData.append(
+  //         `persons.${index}.aadhaar_document`,
+  //         person.adharDocument[0].originFileObj,
+  //       );
+  //     }
+
+  //     if (person?.gstDocument?.[0]?.originFileObj) {
+  //       formData.append(
+  //         `persons.${index}.gst_document`,
+  //         person.gstDocument[0].originFileObj,
+  //       );
+  //     }
+
+  //     if (person?.photo?.[0]?.originFileObj) {
+  //       formData.append(
+  //         `persons.${index}.photo`,
+  //         person.photo[0].originFileObj,
+  //       );
+  //     }
+  //   });
+
+  //   // =============================
+  //   // 🚀 Send request
+  //   // =============================
+  //   createOrg(formData, {
+  //     onSuccess: () => {
+  //       antMessage.success("Organisation created successfully");
+  //       navigate("/organizations");
+  //     },
+  //     onError: (error) => {
+  //       antMessage.error("Failed to create organisation");
+  //       console.error("Create Organisation Error:", error);
+  //     },
+  //   });
+  // };
+  
   const handleBack = () => {
     window.history.back();
   };
