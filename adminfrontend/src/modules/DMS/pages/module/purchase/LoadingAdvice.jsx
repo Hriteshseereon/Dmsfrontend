@@ -20,6 +20,7 @@ import {
   FilterOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { exportToExcel } from "../../../../../utils/exportToExcel";
 import { getLoadingAdvice, getLoadingAdviceById, updateLoadingAdvice } from "../../../../../api/purchase";
 const { Option } = Select;
 
@@ -162,6 +163,70 @@ export default function LoadingAdvice() {
     );
     setData(filtered);
   };
+const handleExport = async () => {
+  try {
+    const res = await getLoadingAdvice();
+    const list = res || [];
+
+    const exportRows = [];
+
+    for (const advice of list) {
+      const detail = await getLoadingAdviceById(advice.loading_id);
+
+      detail.items?.forEach((item) => {
+        exportRows.push({
+          // Basic
+          "Advice No": detail.advice_no,
+          "Loading Advice Date": detail.advice_date,
+          "Status": detail.status,
+
+          // Company Details
+          "Company Name": detail.vendor_name,
+          "Company Address": detail.vendor_address,
+          "Company GSTIN": detail.vendor_gstin,
+          "Contact Person": detail.vendor_contact_person,
+          "Company Phone": detail.vendor_phone,
+
+          // Plant Details
+          "Plant Name": detail.plant_name,
+          "Plant Code": detail.plant_code,
+          "Plant GSTIN": detail.plant_gstin,
+          "Plant Address": detail.plant_address,
+          "Plant Contact Person": detail.plant_contact_person,
+
+          // Item Details
+          "Item Code": item.hsn_code,
+          "Item Name": item.product_name,
+          "Required Qty": item.required_qty,
+          "Actual Qty": item.actual_qty,
+          "Variance": item.variance,
+
+          // Transport Details
+          "Transporter": detail.transporter_name,
+          "Vehicle No": detail.vehicle_no,
+          "Driver Name": detail.driver_name,
+          "Driver Contact": detail.driver_contact,
+          "Insurance Valid Upto": detail.insurance_valid_upto,
+          "PU Valid Upto": detail.pu_valid_upto,
+          "Fitness Valid Upto": detail.fitness_valid_upto,
+
+          // Loading Details
+          "Vehicle In Time": detail.vehicle_in_time,
+          "Vehicle Out Time": detail.vehicle_out_time,
+          "Tare Weight (KG)": detail.tare_weight_kg,
+          "Net Weight (KG)": detail.net_weight_kg,
+          "Gross Weight (KG)": detail.gross_weight_kg,
+        });
+      });
+    }
+
+    exportToExcel(exportRows, "Loading_Advice_Details", "LoadingAdvice");
+
+  } catch (error) {
+    console.error("Export failed:", error);
+    message.error("Export failed");
+  }
+};
 
   const fetchLoadingAdvice = async () => {
     try {
@@ -172,6 +237,7 @@ export default function LoadingAdvice() {
         id: item.loading_id,
 
         // Basic Info
+         advice_no: item.advice_no || "-",
         lodingadvicedate: item.advice_date || "-",
         invoiceNo: item.invoice_no || "-",   // ✅ correct field
         companyName: item.vendor_name || "-", // change if backend sends vendor name
@@ -416,6 +482,11 @@ await updateLoadingAdvice(selectedRecord.loading_id, payload);
 
   // Columns - removed Assign button; Admin can only approve pending ones
   const columns = [
+    {
+      title: <span className="text-amber-700 font-semibold">Advice No</span>,
+      dataIndex: "advice_no",
+      render: (t) => <span className="text-amber-800">{t}</span>,
+    },
     {
       title: <span className="text-amber-700 font-semibold">Loading Advice Date</span>,
       dataIndex: "lodingadvicedate",
@@ -745,9 +816,14 @@ await updateLoadingAdvice(selectedRecord.loading_id, payload);
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} className="border-amber-400! text-amber-700! hover:bg-amber-100!">
-            Export
-          </Button>
+          <Button
+  icon={<DownloadOutlined />}
+  onClick={handleExport}
+  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+>
+  Export
+</Button>
+
           {/* Add New removed as requested */}
         </div>
       </div>

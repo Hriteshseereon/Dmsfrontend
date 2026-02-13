@@ -21,6 +21,8 @@ import {
   EditOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+
+import { exportToExcel } from "../../../../../utils/exportToExcel";
 import { getPurchaseInvoice,getPurchaseOrder,addPurchaseInvoice,getPurchaseInvoiceById,updatePurchaseInvoice,getPurchaseOrderById } from "../../../../../api/purchase";
 const { Option } = Select;
 const isAdmin = true; // <-- change to false to simulate non-admin
@@ -455,6 +457,70 @@ addForm.setFieldsValue({
   }
 };
 
+const handleExport = async () => {
+  try {
+    const res = await getPurchaseInvoice();
+    const list = res?.data || res;
+
+    const exportRows = [];
+
+    for (const invoice of list) {
+      // get full details (important)
+      const detail = await getPurchaseInvoiceById(invoice.id);
+
+      detail.items?.forEach((item) => {
+        exportRows.push({
+          "Invoice No": detail.invoice_number,
+
+          "Purchase Type": detail.purchase_type,
+          "Bill Type": detail.bill_type,
+          "Bill Mode": detail.bill_mode,
+          "Waybill No": detail.waybill_no,
+          "Status": detail.status,
+
+          "Delivery Date": detail.delivery_date,
+          "Invoice Date": detail.invoice_date,
+
+          "Vendor Name": detail.vendor_name,
+          "Plant Name": detail.plant_name,
+          "Delivery Address": detail.delivery_address,
+
+          "Item Name": item.item_name,
+          "Item Code": item.hsn_code,
+          "Qty": item.qty,
+          "Free Qty": item.free_qty,
+          "Total Qty": Number(item.qty || 0) + Number(item.free_qty || 0),
+          "UOM": item.uom_details?.unit_name,
+          "Rate": item.rate,
+          "Dis %": item.dis_percent,
+          "Dis Amt": item.dis_amount,
+          "Gross Wt": item.gross_wt,
+          "Gross Amount (₹)": item.gross_amount,
+
+          "Total Qty (All Items)": detail.total_qty,
+
+          "SGST %": detail.sgst_percent,
+          "CGST %": detail.cgst_percent,
+          "IGST %": detail.igst_percent,
+
+          "SGST (₹)": detail.sgst_amount,
+          "CGST (₹)": detail.cgst_amount,
+          "IGST (₹)": detail.igst_amount,
+
+          "Total GST (₹)": detail.total_gst_amount,
+          "TCS Amt (₹)": detail.tcs_amount,
+          "Total Amount (₹)": detail.total_amount,
+        });
+      });
+    }
+
+    exportToExcel(exportRows, "Purchase_Invoice_Details", "InvoiceData");
+
+  } catch (error) {
+    console.error("Export failed:", error);
+    message.error("Export failed");
+  }
+};
 
   // Open edit modal
   const openEdit = async (record) => {
@@ -1007,8 +1073,9 @@ const payload = {
           </Button>
         </div>
         <div className="flex gap-2">
-          <Button
+            <Button
             icon={<DownloadOutlined />}
+            onClick={handleExport}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Export

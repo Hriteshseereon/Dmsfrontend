@@ -5,6 +5,7 @@ import {
   optionalPositiveNumber,
   percentageValidation,
 } from "../../../helpers/formValidation";
+import { exportToExcel } from "../../../../../utils/exportToExcel";
 import { getPurchaseOrder,getPurchaseContract ,getSoudaByContractId,addPurchaseOrder,getPurchaseOrderById,updatePurchaseOrder} from "../../../../../api/purchase";
 import {
   Table,
@@ -278,6 +279,59 @@ const handleSoudaSelect = async (contractId, formInstance, existingItems = []) =
 };
 
 
+const handleExport = async () => {
+  try {
+    const res = await getPurchaseOrder();
+    const list = res?.data || res;
+
+    const exportRows = [];
+
+    for (const order of list) {
+      // get full details for each order
+      const detailRes = await getPurchaseOrderById(order.id || order.key);
+      const data = detailRes?.data || detailRes;
+
+      data.items?.forEach((item) => {
+        exportRows.push({
+          "Order No": data.order_number,
+          "Plant Name": data.plant_name,
+          "Vendor Name": data.vendor_name,
+
+          "Order Date": data.order_date,
+          "Expected Receiving Date": data.expected_receiving_date,
+          "Status": data.status,
+          "Delivery Address": data.delivery_address,
+
+          "Item Name": item.item_name,
+          "Item Code": item.hsn_code,
+          "Qty": item.qty,
+          "Free Qty": item.free_qty,
+          "Total Qty": Number(item.qty || 0) + Number(item.free_qty || 0),
+          "UOM": item.uom_details?.unit_name,
+          "Rate": item.rate,
+          "Discount %": item.discount_percent,
+          "Discount Amt": item.discount_amount,
+          "Gross Amount": item.gross_amount,
+          "Gross Weight": item.gross_weight,
+
+          "Total Qty (All Items)": data.total_qty_all_items,
+          "SGST %": data.sgst,
+          "CGST %": data.cgst,
+          "IGST %": data.igst,
+          "Total GST (₹)": data.total_gst_amount,
+          "TCS Amt (₹)": data.tcs_amount,
+          "Total Amount (₹)": data.grand_total || data.total_amount,
+        });
+      });
+    }
+
+    exportToExcel(exportRows, "All_Purchase_Indent_Details", "PurchaseIndent");
+
+  } catch (error) {
+    console.error("Export failed:", error);
+    message.error("Export failed");
+  }
+};
 
 const handleFormSubmit = async (values, type) => {
   try {
@@ -1049,12 +1103,14 @@ setTimeout(() => {
         </div>
 
         <div className="flex gap-2">
-          <Button
-            icon={<DownloadOutlined />}
-            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          >
-            Export
-          </Button>
+         <Button
+  icon={<DownloadOutlined />}
+  onClick={handleExport}
+  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+>
+  Export
+</Button>
+
           <Button
             type="primary"
             icon={<PlusOutlined />}

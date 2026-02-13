@@ -5,9 +5,9 @@ import {
   percentageInputProps,
   blockNonNumericInput
 } from "../../../helpers/numberInput";
-import { requiredPositiveNumber, optionalPositiveNumber, percentageValidation } from "../../../helpers/formValidation";
+import { exportToExcel } from "../../../../../utils/exportToExcel";
+import { requiredPositiveNumber, } from "../../../helpers/formValidation";
 import useSessionStore from "../../../../../store/sessionStore";
-import { updateItemComputedFields } from "../../../helpers/calculation";
 import { getPurchaseContract, getAllVendor, addPurchaseContract, getproductbyVendor, getPlantsByVendor ,getPurchaseContractById,updatePurchaseContract} from "../../../../../api/purchase";
 import {
   Table,
@@ -519,6 +519,58 @@ const handleViewClick = async (record) => {
       orderTotals: computed.orderTotals,
     });
   };
+const handleExport = async () => {
+  try {
+    const fullData = await getPurchaseContract();
+
+    const exportRows = [];
+
+    fullData.forEach((record) => {
+      record.items?.forEach((item) => {
+        exportRows.push({
+          "Vendor Name": record.vendor_name,
+          "Plant Name": record.plant_name,
+          "Souda Date": record.created_at, // or souda_date if exists
+          "Start Date": record.from_date,
+          "End Date": record.to_date,
+
+          "Item Name": item.item_name,
+          "Item Code": item.hsn_code,
+          "Qty": item.qty,
+          "Free Qty": item.free_qty,
+          "Total Qty": item.total_qty,
+          "UOM": item.uom,
+          "Rate": item.rate,
+
+          "Discount %": item.discount_percent,
+          "Gross Amount (₹)": item.gross_amount,
+          "Discount Amt (₹)": item.discount_amount,
+
+          "SGST %": item.sgst_percent,
+          "CGST %": item.cgst_percent,
+          "IGST %": item.igst_percent,
+
+          "Total GST (₹)": item.total_gst_amount,
+          "Total Amount (₹)": item.total_amount,
+
+          "Order Total Qty": record.total_qty,
+          "Total Gross Amount": record.gross_amount,
+          "Total Discount (₹)": record.total_discount,
+          "Total GST (₹)": record.total_gst_amount,
+
+          "Status": record.status,
+        });
+      });
+    });
+
+    exportToExcel(exportRows, "All_Purchase_Souda_Details", "SoudaData");
+
+  } catch (error) {
+    console.error("Export failed:", error);
+  }
+};
+
+
 
   // ---------- Form submit ----------
   const handleFormSubmit = async (values) => {
@@ -1146,9 +1198,14 @@ const handleViewClick = async (record) => {
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} className="border-amber-400! text-amber-700! hover:bg-amber-100!">
-            Export
-          </Button>
+         <Button
+  icon={<DownloadOutlined />}
+  onClick={handleExport}
+  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+>
+  Export
+</Button>
+
 
           <Button
             type="primary"
