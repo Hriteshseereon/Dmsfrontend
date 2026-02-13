@@ -88,6 +88,7 @@ export default function AddOrganisation() {
   const rule = ORG_RULES[orgType];
   const normFile = (e) => (Array.isArray(e) ? e : e?.fileList);
   const navigate = useNavigate();
+
   // validation for mobile number: starts with 6-9 and has total 10 digits
   const handleTenDigitNumber = (fieldPath) => (e) => {
     const value = e.target.value.replace(/\D/g, "").slice(0, 10);
@@ -181,6 +182,21 @@ export default function AddOrganisation() {
     lei: "lei_no",
   };
 
+  const createExistingFile = (path) => {
+    const fileUrl = `${import.meta.env.VITE_API_URL}/${path}`
+    const cleanPath = path.split("?")[0].split("#")[0];
+    const fileName = cleanPath.substring(cleanPath.lastIndexOf("/") + 1);
+    return [
+      {
+        uid: fileName,
+        name: fileName,
+        status: "done",
+        url: fileUrl,
+        thumbUrl: fileUrl,
+      },
+    ];
+  }
+
   // third payload to check with fields mapping while edit
   const mapOrgToForm = (org) => {
     const hqAddress = org.addresses?.find((a) => a.address_category === "HQ");
@@ -241,13 +257,13 @@ export default function AddOrganisation() {
         adharNo: p.aadhaar_no,
         panNo: p.pan_no,
         gstNo: p.gst_no,
-        adharDocument: null,
+        adharDocument: createExistingFile(p.aadhaar_document),
         panDocument: null,
         gstDocument: null,
         mobileNumber: p.phone_number_1,
         contactNumber: p.phone_number_2,
         whatsappNumber: p.whatsapp_number,
-
+        photo: createExistingFile(p.photo),
         gender: p.gender,
         dob: p.date_of_birth ? dayjs(p.date_of_birth) : null,
         percentage: p.percentage_of_interest
@@ -281,16 +297,16 @@ export default function AddOrganisation() {
 
         companyDetails: p.company_details
           ? {
-              companyName: p.company_details.company_name,
-              companyWebsite: p.company_details.website,
-              pin: p.company_details.pin_code,
-              registrationNo: p.company_details.registration_no,
-              gstNo: p.company_details.gst_no,
-              address: {
-                city: p.company_details.address,
-                state: p.company_details.location,
-              },
-            }
+            companyName: p.company_details.company_name,
+            companyWebsite: p.company_details.website,
+            pin: p.company_details.pin_code,
+            registrationNo: p.company_details.registration_no,
+            gstNo: p.company_details.gst_no,
+            address: {
+              city: p.company_details.address,
+              state: p.company_details.location,
+            },
+          }
           : undefined,
       })),
 
@@ -446,7 +462,7 @@ export default function AddOrganisation() {
           values.organisationType === "PRIVATE_LIMITED"
             ? "DIRECTOR"
             : values.organisationType === "LLP" ||
-                values.organisationType === "Partnership"
+              values.organisationType === "Partnership"
               ? "PARTNER"
               : "PROPRIETOR",
 
@@ -496,14 +512,14 @@ export default function AddOrganisation() {
 
         company_details: p.companyDetails
           ? {
-              company_name: p.companyDetails.companyName ?? null,
-              website: p.companyDetails.companyWebsite ?? null,
-              registration_no: p.companyDetails.registrationNo ?? null,
-              gst_no: p.companyDetails.gstNo ?? null,
-              address: p.companyDetails.address?.city ?? null,
-              location: p.companyDetails.address?.state ?? null,
-              pin_code: p.companyDetails.address?.pin ?? null,
-            }
+            company_name: p.companyDetails.companyName ?? null,
+            website: p.companyDetails.companyWebsite ?? null,
+            registration_no: p.companyDetails.registrationNo ?? null,
+            gst_no: p.companyDetails.gstNo ?? null,
+            address: p.companyDetails.address?.city ?? null,
+            location: p.companyDetails.address?.state ?? null,
+            pin_code: p.companyDetails.address?.pin ?? null,
+          }
           : null,
       })),
 
@@ -535,39 +551,39 @@ export default function AddOrganisation() {
       // ================= BRANCHES =================
       branches: values.hasBranch
         ? (values.branches ?? []).map((b) => ({
-            id: b.id ?? undefined,
-            name: b.branchName ?? "",
-            short_name: b.shortName ?? "",
-            branch_head_name: null,
-            phone_number_1: null,
-            phone_number_2: null,
-            email: null,
-            gstin: b.gstin ?? null,
-            type: "Main",
-            contacts: (b.contacts ?? []).map((c) => ({
-              id: c.id ?? undefined,
-              contact_person: c.person ?? "",
-              contact_number: c.number ?? "",
-              email: c.email ?? null,
-            })),
-            address: {
-              address_line_1: b.address1 ?? "",
-              address_line_2: b.address2 ?? "",
-              landmark: null,
-              city: b.city ?? "",
-              state: b.state ?? "",
-              country: "India",
-              pin_code: b.pinNo ?? "",
+          id: b.id ?? undefined,
+          name: b.branchName ?? "",
+          short_name: b.shortName ?? "",
+          branch_head_name: null,
+          phone_number_1: null,
+          phone_number_2: null,
+          email: null,
+          gstin: b.gstin ?? null,
+          type: "Main",
+          contacts: (b.contacts ?? []).map((c) => ({
+            id: c.id ?? undefined,
+            contact_person: c.person ?? "",
+            contact_number: c.number ?? "",
+            email: c.email ?? null,
+          })),
+          address: {
+            address_line_1: b.address1 ?? "",
+            address_line_2: b.address2 ?? "",
+            landmark: null,
+            city: b.city ?? "",
+            state: b.state ?? "",
+            country: "India",
+            pin_code: b.pinNo ?? "",
 
-              latitude: null,
-              longitude: null,
+            latitude: null,
+            longitude: null,
 
-              address_type: "RENTED",
-              address_category: "BRANCH",
-              is_branch: true,
-              agreement_document: null,
-            },
-          }))
+            address_type: "RENTED",
+            address_category: "BRANCH",
+            is_branch: true,
+            agreement_document: null,
+          },
+        }))
         : [],
 
       // ================= DEPOS =================
@@ -686,6 +702,14 @@ export default function AddOrganisation() {
   };
   const handleBack = () => {
     window.history.back();
+  };
+
+  const handlePreview = async (file) => {
+    let fileURL = file.url || URL.createObjectURL(file.originFileObj);
+
+    if (fileURL) {
+      window.open(fileURL, "_blank");
+    }
   };
 
   // Step 0: Organisation Details
@@ -1326,7 +1350,7 @@ export default function AddOrganisation() {
                         valuePropName="fileList"
                         getValueFromEvent={normFile}
                       >
-                        <Upload beforeUpload={() => false}>
+                        <Upload beforeUpload={() => false} listType="picture" maxCount={1} onPreview={handlePreview}>
                           <Button
                             icon={<UploadOutlined />}
                             style={{ borderRadius: "6px" }}
@@ -1364,7 +1388,7 @@ export default function AddOrganisation() {
                         valuePropName="fileList"
                         getValueFromEvent={normFile}
                       >
-                        <Upload beforeUpload={() => false}>
+                        <Upload beforeUpload={() => false} onPreview={handlePreview}>
                           <Button style={{ borderRadius: "6px" }}>
                             Upload Aadhaar
                           </Button>
