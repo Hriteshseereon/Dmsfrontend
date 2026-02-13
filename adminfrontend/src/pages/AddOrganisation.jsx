@@ -1350,7 +1350,7 @@ export default function AddOrganisation() {
                         valuePropName="fileList"
                         getValueFromEvent={normFile}
                       >
-                        <Upload beforeUpload={() => false} listType="picture" maxCount={1} onPreview={handlePreview}>
+                        <Upload beforeUpload={() => false} onPreview={handlePreview} listType="picture" maxCount={1}>
                           <Button
                             icon={<UploadOutlined />}
                             style={{ borderRadius: "6px" }}
@@ -1417,7 +1417,7 @@ export default function AddOrganisation() {
                         valuePropName="fileList"
                         getValueFromEvent={normFile}
                       >
-                        <Upload beforeUpload={() => false}>
+                        <Upload beforeUpload={() => false} onPreview={handlePreview}>
                           <Button style={{ borderRadius: "6px" }}>
                             Upload PAN
                           </Button>
@@ -1450,7 +1450,7 @@ export default function AddOrganisation() {
                         valuePropName="fileList"
                         getValueFromEvent={normFile}
                       >
-                        <Upload beforeUpload={() => false}>
+                        <Upload beforeUpload={() => false} onPreview={handlePreview}>
                           <Button style={{ borderRadius: "6px" }}>
                             Upload GST
                           </Button>
@@ -1579,7 +1579,7 @@ export default function AddOrganisation() {
                             valuePropName="fileList"
                             getValueFromEvent={normFile}
                           >
-                            <Upload beforeUpload={() => false} multiple>
+                            <Upload beforeUpload={() => false} onPreview={handlePreview} multiple>
                               <Button
                                 icon={<UploadOutlined />}
                                 style={{ borderRadius: "6px" }}
@@ -1809,7 +1809,7 @@ export default function AddOrganisation() {
                       valuePropName="fileList"
                       getValueFromEvent={normFile}
                     >
-                      <Upload beforeUpload={() => false}>
+                      <Upload beforeUpload={() => false} onPreview={handlePreview}>
                         <Button icon={<UploadOutlined />}>Upload</Button>
                       </Upload>
                     </Form.Item>
@@ -1881,7 +1881,7 @@ export default function AddOrganisation() {
                       valuePropName="fileList"
                       getValueFromEvent={normFile}
                     >
-                      <Upload beforeUpload={() => false}>
+                      <Upload beforeUpload={() => false} onPreview={handlePreview}>
                         <Button icon={<UploadOutlined />}>Upload</Button>
                       </Upload>
                     </Form.Item>
@@ -1918,7 +1918,7 @@ export default function AddOrganisation() {
     //       valuePropName="fileList"
     //       getValueFromEvent={normFile}
     //     >
-    //       <Upload beforeUpload={() => false}>
+    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
     //         <Button icon={<UploadOutlined />} size="small">
     //           Upload
     //         </Button>
@@ -1937,7 +1937,7 @@ export default function AddOrganisation() {
     //       valuePropName="fileList"
     //       getValueFromEvent={normFile}
     //     >
-    //       <Upload beforeUpload={() => false}>
+    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
     //         <Button icon={<UploadOutlined />} size="small">
     //           Upload
     //         </Button>
@@ -1956,7 +1956,7 @@ export default function AddOrganisation() {
     //       valuePropName="fileList"
     //       getValueFromEvent={normFile}
     //     >
-    //       <Upload beforeUpload={() => false}>
+    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
     //         <Button icon={<UploadOutlined />} size="small">
     //           Upload
     //         </Button>
@@ -1975,7 +1975,7 @@ export default function AddOrganisation() {
     //       valuePropName="fileList"
     //       getValueFromEvent={normFile}
     //     >
-    //       <Upload beforeUpload={() => false}>
+    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
     //         <Button icon={<UploadOutlined />} size="small">
     //           Upload
     //         </Button>
@@ -1994,7 +1994,7 @@ export default function AddOrganisation() {
     //       valuePropName="fileList"
     //       getValueFromEvent={normFile}
     //     >
-    //       <Upload beforeUpload={() => false}>
+    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
     //         <Button icon={<UploadOutlined />} size="small">
     //           Upload
     //         </Button>
@@ -2013,7 +2013,7 @@ export default function AddOrganisation() {
     //       valuePropName="fileList"
     //       getValueFromEvent={normFile}
     //     >
-    //       <Upload beforeUpload={() => false}>
+    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
     //         <Button icon={<UploadOutlined />} size="small">
     //           Upload
     //         </Button>
@@ -2032,7 +2032,7 @@ export default function AddOrganisation() {
     //       valuePropName="fileList"
     //       getValueFromEvent={normFile}
     //     >
-    //       <Upload beforeUpload={() => false}>
+    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
     //         <Button icon={<UploadOutlined />} size="small">
     //           Upload
     //         </Button>
@@ -2051,7 +2051,7 @@ export default function AddOrganisation() {
     //       valuePropName="fileList"
     //       getValueFromEvent={normFile}
     //     >
-    //       <Upload beforeUpload={() => false}>
+    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
     //         <Button icon={<UploadOutlined />} size="small">
     //           Upload Document
     //         </Button>
@@ -2065,7 +2065,7 @@ export default function AddOrganisation() {
     //       valuePropName="fileList"
     //       getValueFromEvent={normFile}
     //     >
-    //       <Upload beforeUpload={() => false}>
+    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
     //         <Button icon={<UploadOutlined />} size="small">
     //           Upload Document
     //         </Button>
