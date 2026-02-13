@@ -57,7 +57,7 @@ export default function AssetCategory() {
     try {
       const response = await getAssetCategories();
       console.log("Fetched asset categories:", response);
-      
+
       // Transform API data to match table format
       const transformedData = response.map((item, index) => ({
         key: item.id || index,
@@ -68,7 +68,7 @@ export default function AssetCategory() {
         defaultDepreciationMethod: item.default_depreciation_method,
         defaultDepreciationRate: item.default_depreciation_rate,
       }));
-      
+
       setData(transformedData);
       setFilteredData(transformedData);
     } catch (error) {
@@ -86,40 +86,43 @@ export default function AssetCategory() {
       return;
     }
     const filtered = data.filter((item) =>
-      Object.values(item).join(" ").toLowerCase().includes(value.toLowerCase())
+      Object.values(item).join(" ").toLowerCase().includes(value.toLowerCase()),
     );
     setFilteredData(filtered);
   };
 
   const handleAddCategory = async (values) => {
-  setLoading(true);
-  try {
-    const apiData = {
-      organisation: currentOrgId,
-      category_name: values.categoryName,
-      description: values.description,
-      useful_life: values.usefulLife,
-      default_depreciation_method: values.defaultDepreciationMethod,
-      default_depreciation_rate: Number(values.defaultDepreciationRate).toFixed(2),
-    };
+    setLoading(true);
+    try {
+      const apiData = {
+        organisation: currentOrgId,
+        category_name: values.categoryName,
+        description: values.description,
+        useful_life: values.usefulLife,
+        default_depreciation_method: values.defaultDepreciationMethod,
+        default_depreciation_rate: Number(
+          values.defaultDepreciationRate,
+        ).toFixed(2),
+      };
 
-    console.log("POST payload:", apiData);
+      console.log("POST payload:", apiData);
 
-    const response = await addAssetCategory(apiData);
-    message.success("Asset category added successfully");
-    setIsAddModalOpen(false);
-    addForm.resetFields();
-    fetchAssetCategories();
-  } catch (error) {
-    console.log("Backend error:", error.response?.data);
-    message.error(
-      error.response?.data ? JSON.stringify(error.response.data) : "Failed to add asset category"
-    );
-  } finally {
-    setLoading(false);
-  }
-};
-
+      const response = await addAssetCategory(apiData);
+      message.success("Asset category added successfully");
+      setIsAddModalOpen(false);
+      addForm.resetFields();
+      fetchAssetCategories();
+    } catch (error) {
+      console.log("Backend error:", error.response?.data);
+      message.error(
+        error.response?.data
+          ? JSON.stringify(error.response.data)
+          : "Failed to add asset category",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFormSubmit = (values, type) => {
     if (type === "add") {
@@ -128,13 +131,13 @@ export default function AssetCategory() {
       // Edit functionality - you'll need to add updateAssetCategory API call
       setData((prev) =>
         prev.map((i) =>
-          i.key === selectedRecord.key ? { ...values, key: i.key } : i
-        )
+          i.key === selectedRecord.key ? { ...values, key: i.key } : i,
+        ),
       );
       setFilteredData((prev) =>
         prev.map((i) =>
-          i.key === selectedRecord.key ? { ...values, key: i.key } : i
-        )
+          i.key === selectedRecord.key ? { ...values, key: i.key } : i,
+        ),
       );
       setIsEditModalOpen(false);
       editForm.resetFields();
@@ -226,7 +229,14 @@ export default function AssetCategory() {
               className="w-full"
               placeholder="Enter years"
               min={1}
+              precision={0}
               disabled={disabled}
+              onKeyDown={(e) => {
+                // Block e, E, +, -, .
+                if (["e", "E", "+", "-", "."].includes(e.key)) {
+                  e.preventDefault();
+                }
+              }}
             />
           </Form.Item>
         </Col>
@@ -280,10 +290,17 @@ export default function AssetCategory() {
           >
             <InputNumber
               className="w-full"
-              placeholder="Enter rate"
               min={0}
               max={100}
+              step={0.01}
+              precision={2}
               disabled={disabled}
+              onKeyDown={(e) => {
+                // Block e, E, +, -
+                if (["e", "E", "+", "-"].includes(e.key)) {
+                  e.preventDefault();
+                }
+              }}
             />
           </Form.Item>
         </Col>
