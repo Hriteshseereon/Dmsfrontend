@@ -614,28 +614,28 @@ await updateLoadingAdvice(selectedRecord.loading_id, payload);
   {(fields) => (
     <>
       {fields.map(({ key, name }) => (
-        <Row gutter={24} key={key} className="mt-2 ml-2! border border-amber-200 rounded-lg p-2">
+        <Row gutter={16} key={key} style={{ width: "100%" }} className="mt-2 ml-2! mr-2! border border-amber-200 rounded-lg p-2">
           <Col span={6}>
             <Form.Item label="Item Code" name={[name, "hsn_code"]}>
-              <Input disabled />
+              <Input disabled className="w-full!"/>
             </Form.Item>
           </Col>
 
           <Col span={6}>
             <Form.Item label="Item Name" name={[name, "product_name"]}>
-              <Input disabled />
+              <Input disabled className="w-full!"/>
             </Form.Item>
           </Col>
 
           <Col span={6}>
             <Form.Item label="Req. Qty" name={[name, "required_qty"]}>
-              <Input disabled />
+              <Input disabled className="w-full!"/>
             </Form.Item>
           </Col>
 
           <Col span={6}>
             <Form.Item label="Actual Qty" name={[name, "actual_qty"]}>
-              <Input disabled />
+              <Input disabled className="w-full!"/>
             </Form.Item>
           </Col>
         </Row>

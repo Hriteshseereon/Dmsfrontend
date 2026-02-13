@@ -559,12 +559,13 @@ const handleEditClick = async (record) => {
               <DatePicker className="w-full" disabled />
             </Form.Item>
           </Col>
+          <Col span={6}>
          <Form.Item
   label="Status"
   name="status"
   rules={[{ required: true, message: "Please select status" }]}
 >
-  <Select disabled={mode === "view"}>
+  <Select disabled={mode === "view"} className="w-full!">
     {statusOptions.map((status) => (
       <Select.Option key={status} value={status} disabled={isView}>
         {status}
@@ -572,6 +573,7 @@ const handleEditClick = async (record) => {
     ))}
   </Select>
 </Form.Item>
+          </Col>
 
         </Row>
 
@@ -582,7 +584,7 @@ const handleEditClick = async (record) => {
   {(fields) => (
     <>
       {fields.map(({ key, name, ...restField }) => (
-        <div key={key} className="border p-3 mb-3 rounded">
+        <div key={key} className="border border-amber-500 p-3 mb-3 rounded">
 
           <Row gutter={16}>
             <Col span={6}>
@@ -604,8 +606,17 @@ const handleEditClick = async (record) => {
             </Col>
 
             <Col span={6}>
-             <Form.Item {...restField} name={[name, "quantity"]} label="Quantity">
-  <InputNumber
+             <Form.Item {...restField} name={[name, "quantity"]} label="Quantity"
+                            rules={[
+                 { required: true, message: "Quantity is required" },
+                 {
+                   validator: (_, value) =>
+                     value >= 0
+                       ? Promise.resolve()
+                       : Promise.reject("Enter valid positive number"),
+                 },
+               ]}>
+  <Input
     className="w-full"
     disabled={isView}
   />
@@ -614,8 +625,17 @@ const handleEditClick = async (record) => {
             </Col>
 
             <Col span={6}>
-              <Form.Item {...restField} name={[name, "free_quantity"]} label="Free Qty">
-               <InputNumber
+              <Form.Item {...restField} name={[name, "free_quantity"]} label="Free Qty"
+                             rules={[
+                  { required: true, message: "Quantity is required" },
+                  {
+                    validator: (_, value) =>
+                      value >= 0
+                        ? Promise.resolve()
+                        : Promise.reject("Enter valid positive number"),
+                  },
+                ]}>
+               <Input
   className="w-full"
   disabled={isView}
 />
@@ -625,19 +645,19 @@ const handleEditClick = async (record) => {
 
             <Col span={6}>
               <Form.Item {...restField} name={[name, "total_quantity"]} label="Total Qty">
-                <InputNumber className="w-full" disabled />
+                <InputNumber className="w-full!" disabled />
               </Form.Item>
             </Col>
 
             <Col span={6}>
               <Form.Item {...restField} name={[name, "rate"]} label="Rate">
-                <InputNumber className="w-full" disabled />
+                <InputNumber className="w-full!" disabled />
               </Form.Item>
             </Col>
 
             <Col span={6}>
               <Form.Item {...restField} name={[name, "gross_amount"]} label="Gross Amount">
-                <InputNumber className="w-full" disabled />
+                <InputNumber className="w-full!" disabled />
               </Form.Item>
             </Col>
           </Row>
@@ -647,7 +667,7 @@ const handleEditClick = async (record) => {
           <Row gutter={16}>
            <Form.Item {...restField} name={[name, "discount_percent"]} label="Discount %">
   <InputNumber
-    className="w-full"
+    className="w-full!"
     disabled  // 🔥 IMPORTANT
   />
 </Form.Item>
@@ -655,31 +675,31 @@ const handleEditClick = async (record) => {
 
             <Col span={6}>
               <Form.Item {...restField} name={[name, "discount_amount"]} label="Discount Amount">
-                <InputNumber className="w-full" disabled />
+                <InputNumber className="w-full!" disabled />
               </Form.Item>
             </Col>
 
             <Col span={6}>
               <Form.Item {...restField} name={[name, "sgst_percent"]} label="SGST %">
-                <InputNumber className="w-full" disabled />
+                <InputNumber className="w-full!" disabled />
               </Form.Item>
             </Col>
 
             <Col span={6}>
               <Form.Item {...restField} name={[name, "cgst_percent"]} label="CGST %">
-                <InputNumber className="w-full" disabled />
+                <InputNumber className="w-full!" disabled />
               </Form.Item>
             </Col>
 
             <Col span={6}>
               <Form.Item {...restField} name={[name, "igst_percent"]} label="IGST %">
-                <InputNumber className="w-full" disabled />
+                <InputNumber className="w-full!" disabled />
               </Form.Item>
             </Col>
 
             <Col span={6}>
               <Form.Item {...restField} name={[name, "total_amount"]} label="Total Amount">
-                <InputNumber className="w-full" disabled />
+                <InputNumber className="w-full!" disabled />
               </Form.Item>
             </Col>
 
@@ -735,8 +755,8 @@ const handleEditClick = async (record) => {
 
         <Row gutter={16}>
   <Col span={6}>
-    <Form.Item label="Round Off" name="roundOff" disabled={isView}>
-      <InputNumber className="w-full"  disabled={isView}/>
+    <Form.Item label="Round Off" name="roundOff" >
+      <InputNumber className="w-full!"  disabled/>
     </Form.Item>
   </Col>
 

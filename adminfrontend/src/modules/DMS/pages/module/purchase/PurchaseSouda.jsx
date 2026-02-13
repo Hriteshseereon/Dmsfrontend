@@ -655,10 +655,7 @@ const handleViewClick = async (record) => {
                           { name: ["items", field.name, "item_name"], value: selected?.name || "" },
                           { name: ["items", field.name, "base_unit"], value: selected?.base_unit || "" },
                           { name: ["items", field.name, "rate"], value: selected?.rate || 0 },
-                          { name: ["items", field.name, "sgstPercent"], value: selected?.sgst || 0 },
-                          { name: ["items", field.name, "cgstPercent"], value: selected?.cgst || 0 },
-                          { name: ["items", field.name, "igstPercent"], value: selected?.igst || 0 },
-                        ]);
+                             ]);
                       }}
 
 
@@ -687,11 +684,17 @@ const handleViewClick = async (record) => {
                     {...field}
                     label="Qty"
                     name={[field.name, "qty"]}
-                    rules={requiredPositiveNumber("Quantity")}
-                  >
-                    <InputNumber
+                                    rules={[
+                       { required: true, message: "Quantity is required" },
+                       {
+                         validator: (_, value) =>
+                           value >= 0
+                             ? Promise.resolve()
+                             : Promise.reject("Enter valid positive number"),
+                       },
+                     ]}  >
+                    <Input
 
-                      {...positiveNumberInputProps}
                       disabled={disabled}
                       onChange={() => {
                         const all = form.getFieldsValue();
@@ -709,10 +712,18 @@ const handleViewClick = async (record) => {
                     label="Free Qty"
                     name={[field.name, "freeQty"]}
                     fieldKey={[field.fieldKey, "freeQty"]}
-                    rules={optionalPositiveNumber("Free Qty")}
+                                     rules={[
+                        { required: true, message: " Free Quantity is required" },
+                        {
+                          validator: (_, value) =>
+                            value >= 0
+                              ? Promise.resolve()
+                              : Promise.reject("Enter valid positive number"),
+                        },
+                      ]}
                   >
-                    <InputNumber
-                      {...positiveNumberInputProps}
+                    <Input
+                      
                       disabled={disabled}
                       onChange={() => {
                         const all = form.getFieldsValue();
@@ -773,10 +784,17 @@ const handleViewClick = async (record) => {
                     label="Dis%"
                     name={[field.name, "discountPercent"]}
                     fieldKey={[field.fieldKey, "discountPercent"]}
-                    rules={percentageValidation("Discount")}
-                  >
-                    <InputNumber
-                      {...positiveNumberInputProps}
+                                    rules={[
+                       { required: true, message: "Discount % is required" },
+                       {
+                         validator: (_, value) =>
+                           value >= 0
+                             ? Promise.resolve()
+                             : Promise.reject("Enter valid positive number"),
+                       },
+                     ]}  >
+                    <Input
+                     
                       max={100}
                       disabled={disabled}
                       onChange={() => {
@@ -818,10 +836,18 @@ const handleViewClick = async (record) => {
                     label="SGST %"
                     name={[field.name, "sgstPercent"]}
                     fieldKey={[field.fieldKey, "sgstPercent"]}
-                    rules={percentageValidation("SGST")}
+                                     rules={[
+                        { required: true, message: "SGST % is required" },
+                        {
+                          validator: (_, value) =>
+                            value >= 0
+                              ? Promise.resolve()
+                              : Promise.reject("Enter valid positive number"),
+                        },
+                      ]}
                   >
-                    <InputNumber
-                      {...positiveNumberInputProps}
+                    <Input
+                     
                       max={100}
                       disabled={disabled}
                       onChange={() => {
@@ -841,10 +867,18 @@ const handleViewClick = async (record) => {
                     label="CGST %"
                     name={[field.name, "cgstPercent"]}
                     fieldKey={[field.fieldKey, "cgstPercent"]}
-                    rules={percentageValidation("CGST")}
+                                    rules={[
+                       { required: true, message: "CGST % is required" },
+                       {
+                         validator: (_, value) =>
+                           value >= 0
+                             ? Promise.resolve()
+                             : Promise.reject("Enter valid positive number"),
+                       },
+                     ]}
                   >
-                    <InputNumber
-                      {...positiveNumberInputProps}
+                    <Input
+                     
                       max={100}
                       disabled={disabled}
                       onChange={() => {
@@ -864,10 +898,18 @@ const handleViewClick = async (record) => {
                     label="IGST %"
                     name={[field.name, "igstPercent"]}
                     fieldKey={[field.fieldKey, "igstPercent"]}
-                    rules={percentageValidation("IGST")}
+                    rules={[
+                      { required: true, message: "IGST % is required" },
+                      {
+                        validator: (_, value) =>
+                          value >= 0
+                            ? Promise.resolve()
+                            : Promise.reject("Enter valid positive number"),
+                      },
+                    ]}
                   >
-                    <InputNumber
-                      {...positiveNumberInputProps}
+                    <Input
+                    
                       max={100}
                       disabled={disabled}
                       onChange={() => {
@@ -1015,13 +1057,19 @@ const handleViewClick = async (record) => {
           {/* REMOVED Delivery Date; ADDED Start / End */}
           <Col span={4}>
             <Form.Item label="Start Date" name="from_date">
-              <DatePicker className="w-full" disabled={disabled} />
+              <DatePicker className="w-full"  disabledDate={(current) =>
+     current && current.isBefore(dayjs(), "day")
+    } />
             </Form.Item>
           </Col>
 
           <Col span={4}>
             <Form.Item label="End Date" name="to_date">
-              <DatePicker className="w-full" disabled={disabled} />
+              <DatePicker className="w-full" disabledDate={(current) =>
+      current &&
+      addForm.getFieldValue("from_date") &&
+      current < addForm.getFieldValue("from_date").startOf("day")
+    } />
             </Form.Item>
           </Col>
         </Row>

@@ -821,13 +821,13 @@ const payload = {
 
                         <Col span={6}>
                           <Form.Item {...field} label="Qty" name={[field.name, "qty"]}>
-                            <InputNumber className="w-full" disabled/>
+                            <InputNumber className="w-full!" disabled/>
                           </Form.Item>
                         </Col>
 
                         <Col span={6}>
                           <Form.Item {...field} label="Free Qty" name={[field.name, "freeQty"]}>
-                            <InputNumber className="w-full" disabled  />
+                            <InputNumber className="w-full!" disabled  />
                           </Form.Item>
                         </Col>
                       </Row>
@@ -841,19 +841,19 @@ const payload = {
 
                         <Col span={6}>
                           <Form.Item {...field} label="Rate" name={[field.name, "rate"]}>
-                            <InputNumber className="w-full" disabled />
+                            <InputNumber className="w-full!" disabled />
                           </Form.Item>
                         </Col>
 
                         <Col span={6}>
                           <Form.Item {...field} label="Dis%" name={[field.name, "discountPercent"]}>
-                            <InputNumber className="w-full" disabled  />
+                            <InputNumber className="w-full!" disabled  />
                           </Form.Item>
                         </Col>
 
                         <Col span={6}>
                           <Form.Item {...field} label="Gross Wt" name={[field.name, "grossWt"]}>
-                            <InputNumber className="w-full" disabled />
+                            <InputNumber className="w-full!" disabled />
                           </Form.Item>
                         </Col>
                       </Row>
@@ -863,14 +863,14 @@ const payload = {
 
                         <Col span={6}>
                           <Form.Item {...field} label="Dis Amt" name={[field.name, "discountAmount"]}>
-                            <InputNumber className="w-full bg-gray-50" disabled />
+                            <InputNumber className="w-full! " disabled />
                           </Form.Item>
                         </Col>
 
 
                         <Col span={6}>
                           <Form.Item {...field} label="Gross Amount (₹)" name={[field.name, "grossAmount"]}>
-                            <InputNumber className="w-full bg-gray-50" disabled />
+                            <InputNumber className="w-full!" disabled />
                           </Form.Item>
                         </Col>
                       </Row>
@@ -885,25 +885,25 @@ const payload = {
             <Row gutter={24}>
               <Col span={6}>
                 <Form.Item label="Total Qty (All Items)" name="totalQty">
-                  <InputNumber className="w-full bg-gray-50" disabled />
+                  <InputNumber className="w-full! " disabled />
                 </Form.Item>
               </Col>
 
               <Col span={6}>
                 <Form.Item label="SGST %" name="sgstPercent">
-                  <InputNumber className="w-full" disabled  />
+                  <InputNumber className="w-full!" disabled  />
                 </Form.Item>
               </Col>
 
               <Col span={6}>
                 <Form.Item label="CGST %" name="cgstPercent">
-                  <InputNumber className="w-full" disabled  />
+                  <InputNumber className="w-full!" disabled  />
                 </Form.Item>
               </Col>
 
               <Col span={6}>
                 <Form.Item label="IGST %" name="igstPercent">
-                  <InputNumber className="w-full" disabled />
+                  <InputNumber className="w-full!" disabled />
                 </Form.Item>
               </Col>
             </Row>
@@ -911,24 +911,24 @@ const payload = {
             <Row gutter={24}>
               <Col span={6}>
                 <Form.Item label="SGST (₹)" name="sgst">
-                  <InputNumber className="w-full bg-gray-50" disabled />
+                  <InputNumber className="w-full! " disabled />
                 </Form.Item>
               </Col>
               <Col span={6}>
                 <Form.Item label="CGST (₹)" name="cgst">
-                  <InputNumber className="w-full bg-gray-50" disabled />
+                  <InputNumber className="w-full! " disabled />
                 </Form.Item>
               </Col>
 
               <Col span={6}>
                 <Form.Item label="IGST (₹)" name="igst">
-                  <InputNumber className="w-full bg-gray-50" disabled />
+                  <InputNumber className="w-full! " disabled />
                 </Form.Item>
               </Col>
 
               <Col span={6}>
                 <Form.Item label="Total GST (₹)" name="totalGST">
-                  <InputNumber className="w-full bg-gray-50" disabled />
+                  <InputNumber className="w-full! " disabled />
                 </Form.Item>
               </Col>
             </Row>
@@ -936,13 +936,13 @@ const payload = {
             <Row gutter={24}>
               <Col span={6}>
                 <Form.Item label="TCS Amt (₹)" name="tcsAmt">
-                  <InputNumber className="w-full" disabled />
+                  <InputNumber className="w-full! " disabled />
                 </Form.Item>
               </Col>
 
               <Col span={6}>
                 <Form.Item label="Total Amount (₹)" name="totalAmount" rules={[{ required: true }]}> 
-                  <InputNumber className="w-full bg-gray-50" disabled />
+                  <InputNumber className="w-full! " disabled />
                 </Form.Item>
               </Col>
             </Row>

@@ -612,39 +612,17 @@ setTimeout(() => {
 
 
         </Col>
-
+<Col span={6}>
        <Form.Item label="Plant Name" name="plantName">
   <Input disabled />
 </Form.Item>
+</Col>
+<Col span={6}>
 <Form.Item label="Vendor Name" name="vendorName">
   <Input disabled />
 </Form.Item>
+</Col>
 
-
-
-        <Col span={6}>
-          <Form.Item label="Status" name="status">
-            <Select disabled={disabled}>
-              {purchaseIndentJSON.statusOptions.map((opt) => (
-                <Option key={opt} value={opt}>
-                  {opt}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-        </Col>
-      </Row>
-
-      <Row gutter={16}>
-        <Col span={12}>
-          <Form.Item
-            label="Delivery Address"
-            name="deliveryAddress"
-            rules={[{ required: true }]}
-          >
-            <Input.TextArea rows={2} disabled={disabled} />
-          </Form.Item>
-        </Col>
 
         <Col span={6}>
           <Form.Item label="Order Date" name="order_date">
@@ -652,7 +630,12 @@ setTimeout(() => {
           </Form.Item>
         </Col>
 
-        <Col span={6}>
+
+       
+      </Row>
+
+      <Row gutter={16}>
+         <Col span={6}>
           <Form.Item
             label="Expected Receiving Date"
             name="expected_receiving_date"
@@ -665,6 +648,29 @@ setTimeout(() => {
             />
           </Form.Item>
         </Col>
+         <Col span={6}>
+          <Form.Item label="Status" name="status">
+            <Select disabled={disabled}>
+              {purchaseIndentJSON.statusOptions.map((opt) => (
+                <Option key={opt} value={opt}>
+                  {opt}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+        </Col>
+        <Col span={8}>
+          <Form.Item
+            label="Delivery Address"
+            name="deliveryAddress"
+            rules={[{ required: true }]}
+          >
+            <Input.TextArea rows={2} disabled />
+          </Form.Item>
+        </Col>
+
+
+       
       </Row>
 
       <h6 className=" text-amber-500 mt-4">Item & Pricing Details</h6>
@@ -705,11 +711,13 @@ setTimeout(() => {
   label="Item Name"
   name={[field.name, "product"]}   // store PRODUCT ID
   rules={[{ required: true }]}
+  
 >
   <Select
     showSearch
     placeholder="Select Item"
     disabled={disabled}
+    
     onChange={(productId) => {
 
       const selected = contractItems.find(
@@ -765,8 +773,17 @@ setTimeout(() => {
                       label="Qty"
                       name={[field.name, "qty"]}
                       className="w-full"
+                      rules={[
+    { required: true, message: "Quantity is required" },
+    {
+      validator: (_, value) =>
+        value >= 0
+          ? Promise.resolve()
+          : Promise.reject("Enter valid positive number"),
+    },
+  ]}
                     >
-                      <InputNumber
+                      <Input
                         className="w-full"
                         disabled={disabled}
                         onChange={() => recalcAll(formInstance)}
@@ -779,8 +796,16 @@ setTimeout(() => {
                       {...field}
                       label="Free Qty"
                       name={[field.name, "freeQty"]}
+                       rules={[
+    {
+      validator: (_, value) =>
+        value >= 0
+          ? Promise.resolve()
+          : Promise.reject("Enter valid positive number"),
+    },
+  ]}
                     >
-                      <InputNumber
+                      <Input
                         className="w-full"
                         disabled={disabled}
                         onChange={() => recalcAll(formInstance)}
@@ -794,7 +819,7 @@ setTimeout(() => {
                       label="Total Qty"
                       name={[field.name, "totalQty"]}
                     >
-                      <InputNumber className="w-full bg-gray-50" disabled />
+                      <InputNumber className="w-full! bg-gray-50" disabled />
                     </Form.Item>
                   </Col>
                    <Col span={4}>
@@ -816,7 +841,7 @@ setTimeout(() => {
                       name={[field.name, "rate"]}
                     >
                       <InputNumber
-                        className="w-full"
+                        className="w-full! bg-gray-50"
                         disabled={disabled}
                         onChange={() => recalcAll(formInstance)}
                       />
@@ -828,8 +853,16 @@ setTimeout(() => {
                       {...field}
                       label="Discount %"
                       name={[field.name, "discountPercent"]}
+                               rules={[
+    {
+      validator: (_, value) =>
+        value >= 0
+          ? Promise.resolve()
+          : Promise.reject("Enter valid positive number"),
+    },
+  ]}
                     >
-                      <InputNumber
+                      <Input
                         className="w-full"
                         disabled={disabled}
                         onChange={() => recalcAll(formInstance)}
@@ -843,35 +876,41 @@ setTimeout(() => {
                       label="Discount Amt"
                       name={[field.name, "discountAmt"]}
                     >
-                      <InputNumber className="w-full bg-gray-50" disabled />
+                      <InputNumber className="w-full! bg-gray-50" disabled />
                     </Form.Item>
                   </Col>
 
-                  <Col span={8}>
+                  <Col span={4}>
                     <Form.Item
                       {...field}
                       label="Gross Amount"
                       name={[field.name, "grossAmount"]}
+                      
                     >
-                      <InputNumber className="w-full bg-gray-50" disabled />
+                      <InputNumber className="w-full! bg-gray-50" disabled />
+                    </Form.Item>
+                  </Col>
+                   <Col span={4}>
+                    <Form.Item
+                      {...field}
+                      label="Gross Weight"
+                      name={[field.name, "grossWt"]}
+                               rules={[
+    { required: true, message: "Gross Weight is required" },
+    {
+      validator: (_, value) =>
+        value >= 0
+          ? Promise.resolve()
+          : Promise.reject("Enter valid positive number"),
+    },
+  ]}
+                    >
+                      <Input className="w-full" disabled={disabled} />
                     </Form.Item>
                   </Col>
                 </Row>
 
               
-                <Row gutter={12}>
-                  <Col span={6}>
-                    <Form.Item
-                      {...field}
-                      label="Gross Weight"
-                      name={[field.name, "grossWt"]}
-                    >
-                      <InputNumber className="w-full" disabled={disabled} />
-                    </Form.Item>
-                  </Col>
-
-                 
-                </Row>
               </div>
             ))}
 
@@ -896,13 +935,22 @@ setTimeout(() => {
       <Row gutter={12}>
         <Col span={4}>
           <Form.Item label="Total Qty (All Items)" name="totalQty">
-            <InputNumber className="w-full bg-gray-50" disabled />
+            <InputNumber className="w-full! bg-gray-50" disabled />
           </Form.Item>
         </Col>
 
         <Col span={4}>
-          <Form.Item label="SGST %" name="sgstPercent">
-            <InputNumber
+          <Form.Item label="SGST %" name="sgstPercent"
+                   rules={[
+    { required: true, message: "SGST % is required" },
+    {
+      validator: (_, value) =>
+        value >= 0
+          ? Promise.resolve()
+          : Promise.reject("Enter valid positive number"),
+    },
+  ]}>
+            <Input
               className="w-full"
             
               onChange={() => recalcAll(formInstance)}
@@ -911,8 +959,16 @@ setTimeout(() => {
         </Col>
 
         <Col span={4}>
-          <Form.Item label="CGST %" name="cgstPercent">
-            <InputNumber
+          <Form.Item label="CGST %" name="cgstPercent"          rules={[
+    { required: true, message: "CGST % is required" },
+    {
+      validator: (_, value) =>
+        value >= 0
+          ? Promise.resolve()
+          : Promise.reject("Enter valid positive number"),
+    },
+  ]}>
+            <Input
               className="w-full"
             
               onChange={() => recalcAll(formInstance)}
@@ -921,8 +977,16 @@ setTimeout(() => {
         </Col>
 
         <Col span={4}>
-          <Form.Item label="IGST %" name="igstPercent">
-            <InputNumber
+          <Form.Item label="IGST %" name="igstPercent"          rules={[
+    { required: true, message: "IGST % is required" },
+    {
+      validator: (_, value) =>
+        value >= 0
+          ? Promise.resolve()
+          : Promise.reject("Enter valid positive number"),
+    },
+  ]}>
+            <Input
               className="w-full"
              
               onChange={() => recalcAll(formInstance)}
@@ -932,13 +996,21 @@ setTimeout(() => {
 
         <Col span={4}>
           <Form.Item label="Total GST (₹)" name="totalGST">
-            <InputNumber className="w-full bg-gray-50" disabled />
+            <InputNumber className="w-full! bg-gray-50" disabled />
           </Form.Item>
         </Col>
 
         <Col span={4}>
-          <Form.Item label="TCS Amt (₹)" name="tcsAmt">
-            <InputNumber
+          <Form.Item label="TCS Amt (₹)" name="tcsAmt"          rules={[
+    { required: true, message: "TCS Amount is required" },
+    {
+      validator: (_, value) =>
+        value >= 0
+          ? Promise.resolve()
+          : Promise.reject("Enter valid positive number"),
+    },
+  ]}>
+            <Input
               className="w-full"
              
               onChange={() => recalcAll(formInstance)}
@@ -948,7 +1020,7 @@ setTimeout(() => {
 
         <Col span={4}>
           <Form.Item label="Total Amount (₹)" name="totalAmt">
-            <InputNumber className="w-full bg-gray-50" disabled />
+            <InputNumber className="w-full! bg-gray-50" disabled />
           </Form.Item>
         </Col>
       </Row>
