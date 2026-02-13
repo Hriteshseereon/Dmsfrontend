@@ -456,13 +456,13 @@ export default function AddOrganisation() {
 
         email: p.email ?? null,
         secondary_email: p.email2 ?? null,
-        photo: p.photo?.[0]?.originFileObj ?? null,
+        // photo: p.photo?.[0]?.originFileObj ?? null,
         aadhaar_no: p.adharNo ?? null,
-        aadhaar_document: p.adharDocument?.[0]?.originFileObj ?? null,
+        // aadhaar_document: p.adharDocument?.[0]?.originFileObj ?? null,
         pan_no: p.panNo ?? null,
-        pan_document: p.panDocument?.[0]?.originFileObj ?? null,
+        // pan_document: p.panDocument?.[0]?.originFileObj ?? null,
         gst_no: p.gstNo ?? null,
-        gst_document: p.gstDocument?.[0]?.originFileObj ?? null,
+        // gst_document: p.gstDocument?.[0]?.originFileObj ?? null,
         gender: p.gender ?? null,
         date_of_birth: p.dob ? dayjs(p.dob).format("YYYY-MM-DD") : null,
         percentage_of_interest: p.percentage ?? null,
@@ -508,29 +508,29 @@ export default function AddOrganisation() {
       })),
 
       // ================= LEGAL DETAILS =================
-      legal_details: Object.entries(LEGAL_KEY_MAP).reduce(
-        (acc, [formKey, apiKey]) => {
-          const doc = values.legalDetails?.[formKey];
+      // legal_details: Object.entries(LEGAL_KEY_MAP).reduce(
+      //   (acc, [formKey, apiKey]) => {
+      //     const doc = values.legalDetails?.[formKey];
 
-          acc[apiKey] = doc?.number ?? null;
-          acc[apiKey.replace("_no", "_document")] = doc?.document?.[0]?.originFileObj ?? null
+      //     acc[apiKey] = doc?.number ?? null;
+      //     acc[apiKey.replace("_no", "_document")] = doc?.document?.[0]?.originFileObj ?? null
 
-          if (doc?.validity?.[0]) {
-            acc[apiKey.replace("_no", "_valid_from")] = dayjs(
-              doc.validity[0],
-            ).format("YYYY-MM-DD");
-          }
+      //     if (doc?.validity?.[0]) {
+      //       acc[apiKey.replace("_no", "_valid_from")] = dayjs(
+      //         doc.validity[0],
+      //       ).format("YYYY-MM-DD");
+      //     }
 
-          if (doc?.validity?.[1]) {
-            acc[apiKey.replace("_no", "_valid_to")] = dayjs(
-              doc.validity[1],
-            ).format("YYYY-MM-DD");
-          }
+      //     if (doc?.validity?.[1]) {
+      //       acc[apiKey.replace("_no", "_valid_to")] = dayjs(
+      //         doc.validity[1],
+      //       ).format("YYYY-MM-DD");
+      //     }
 
-          return acc;
-        },
-        {},
-      ),
+      //     return acc;
+      //   },
+      //   {},
+      // ),
 
       // ================= BRANCHES =================
       branches: values.hasBranch
@@ -580,40 +580,110 @@ export default function AddOrganisation() {
     };
   };
 
+  // const handleSubmit = () => {
+  //   setSubmitError(null);
+
+  //   const values = form.getFieldsValue(true);
+  //   const payload = buildPayload(values);
+
+  //   if (isEdit) {
+  //     updateOrg(
+  //       { id: orgId, data: payload },
+  //       {
+  //         onSuccess: () => {
+  //           antMessage.success("Organisation updated successfully");
+  //           navigate("/organizations");
+  //         },
+  //         onError: (error) => {
+  //           antMessage.error("Failed to update organisation");
+  //           console.error("Update Organization Error:", error);
+  //         },
+  //       },
+  //     );
+  //   } else {
+  //     createOrg(payload, {
+  //       onSuccess: () => {
+  //         antMessage.success("Organisation created successfully");
+  //         navigate("/organizations");
+  //       },
+  //       onError: (error) => {
+  //         antMessage.error("Failed to create organisation");
+  //         console.error("Create Organisation Error:", error);
+  //       },
+  //     });
+  //   }
+  // };
   const handleSubmit = () => {
     setSubmitError(null);
 
     const values = form.getFieldsValue(true);
-    const payload = buildPayload(values);
 
-    if (isEdit) {
-      updateOrg(
-        { id: orgId, data: payload },
-        {
-          onSuccess: () => {
-            antMessage.success("Organisation updated successfully");
-            navigate("/organizations");
-          },
-          onError: (error) => {
-            antMessage.error("Failed to update organisation");
-            console.error("Update Organization Error:", error);
-          },
-        },
-      );
-    } else {
-      createOrg(payload, {
-        onSuccess: () => {
-          antMessage.success("Organisation created successfully");
-          navigate("/organizations");
-        },
-        onError: (error) => {
-          antMessage.error("Failed to create organisation");
-          console.error("Create Organisation Error:", error);
-        },
-      });
-    }
+    const jsonPayload = buildPayload(values); // WITHOUT files
+
+    const formData = new FormData();
+
+    // ✅ Append JSON payload as string
+    formData.append("payload", JSON.stringify(jsonPayload));
+
+    // =============================
+    // 🔹 Append Legal Document Files
+    // =============================
+    Object.entries(values.legalDetails || {}).forEach(([key, doc]) => {
+      if (doc?.document?.[0]?.originFileObj) {
+        formData.append(
+          `legal_details.${LEGAL_KEY_MAP[key].replace("_no", "_document")}`,
+          doc.document[0].originFileObj,
+        );
+      }
+    });
+
+    // =============================
+    // 🔹 Append Person Files
+    // =============================
+    (values.partners || []).forEach((person, index) => {
+      if (person?.panDocument?.[0]?.originFileObj) {
+        formData.append(
+          `persons.${index}.pan_document`,
+          person.panDocument[0].originFileObj,
+        );
+      }
+
+      if (person?.adharDocument?.[0]?.originFileObj) {
+        formData.append(
+          `persons.${index}.aadhaar_document`,
+          person.adharDocument[0].originFileObj,
+        );
+      }
+
+      if (person?.gstDocument?.[0]?.originFileObj) {
+        formData.append(
+          `persons.${index}.gst_document`,
+          person.gstDocument[0].originFileObj,
+        );
+      }
+
+      if (person?.photo?.[0]?.originFileObj) {
+        formData.append(
+          `persons.${index}.photo`,
+          person.photo[0].originFileObj,
+        );
+      }
+    });
+
+    // =============================
+    // 🚀 Send request
+    // =============================
+    createOrg(formData, {
+      onSuccess: () => {
+        antMessage.success("Organisation created successfully");
+        navigate("/organizations");
+      },
+      onError: (error) => {
+        antMessage.error("Failed to create organisation");
+        console.error("Create Organisation Error:", error);
+      },
+    });
   };
-
   const handleBack = () => {
     window.history.back();
   };
