@@ -6,12 +6,20 @@ export const getOrganizations = async () => {
 };
 
 export const createOrganization = async (data) => {
-  const res = await api.post("/organisation/organisations/", data);
+  const res = await api.post("/organisation/organisations/", data, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
   return res.data;
 };
 
 export const updateOrganization = async (id, data) => {
-  const res = await api.put(`/organisation/organisations/${id}/`, data);
+  const res = await api.put(`/organisation/organisations/${id}/`, data, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
   return res.data;
 };
 

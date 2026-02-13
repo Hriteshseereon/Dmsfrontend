@@ -513,7 +513,7 @@ export default function AddOrganisation() {
           const doc = values.legalDetails?.[formKey];
 
           acc[apiKey] = doc?.number ?? null;
-          acc[apiKey.replace("_no", "_document")] = null;
+          acc[apiKey.replace("_no", "_document")] = doc?.document?.[0]?.originFileObj ?? null
 
           if (doc?.validity?.[0]) {
             acc[apiKey.replace("_no", "_valid_from")] = dayjs(
