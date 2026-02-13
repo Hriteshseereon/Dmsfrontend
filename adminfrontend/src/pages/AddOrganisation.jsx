@@ -212,6 +212,13 @@ export default function AddOrganisation() {
           number: legal?.[apiKey] ?? null,
         };
 
+        const documentKey = apiKey.replace("_no", "_document")
+        if (documentKey && legal?.[documentKey]) {
+          acc[formKey] = {
+            document: createExistingFile(legal?.[documentKey])
+          }
+        }
+
         // Handle validity dynamically
         const fromKey = apiKey.replace("_no", "_valid_from");
         const toKey = apiKey.replace("_no", "_valid_to");
@@ -258,8 +265,8 @@ export default function AddOrganisation() {
         panNo: p.pan_no,
         gstNo: p.gst_no,
         adharDocument: createExistingFile(p.aadhaar_document),
-        panDocument: null,
-        gstDocument: null,
+        panDocument: createExistingFile(p.pan_document),
+        gstDocument: createExistingFile(p.gst_document),
         mobileNumber: p.phone_number_1,
         contactNumber: p.phone_number_2,
         whatsappNumber: p.whatsapp_number,
