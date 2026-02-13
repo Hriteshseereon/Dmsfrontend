@@ -1,5 +1,5 @@
 // LoadingAdvice.js
-import React, { useState ,useEffect} from "react";
+import React, { useState, useEffect } from "react";
 import {
   Table,
   Input,
@@ -20,7 +20,7 @@ import {
   FilterOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { getLoadingAdvice,getLoadingAdviceById ,updateLoadingAdvice} from "../../../../../api/purchase";
+import { getLoadingAdvice, getLoadingAdviceById, updateLoadingAdvice } from "../../../../../api/purchase";
 const { Option } = Select;
 
 const invoiceData = {
@@ -145,7 +145,7 @@ export default function LoadingAdvice() {
 
   const [form] = Form.useForm();
   const [viewForm] = Form.useForm();
- useEffect(() => {
+  useEffect(() => {
     fetchLoadingAdvice();
   }, []);
   const handleSearch = (value) => {
@@ -163,66 +163,216 @@ export default function LoadingAdvice() {
     setData(filtered);
   };
 
-const fetchLoadingAdvice = async () => {
+  const fetchLoadingAdvice = async () => {
+    try {
+      const res = await getLoadingAdvice();
+
+      const formatted = res.map((item) => ({
+        key: item.loading_id,
+        id: item.loading_id,
+
+        // Basic Info
+        lodingadvicedate: item.advice_date || "-",
+        invoiceNo: item.invoice_no || "-",   // ✅ correct field
+        companyName: item.vendor_name || "-", // change if backend sends vendor name
+        plantName: item.plant_name || "-",
+        status: item.status || "-",
+        vendor_name: item.vendor_name,
+        plant_name: item.plant_name,
+        vendor_address: item.vendor_address,
+        plant_address: item.plant_address,
+        vendor_gstin: item.vendor_gstin,
+        plant_gstin: item.plant_gstin,
+        // Transport Details ✅ correct fields from API
+        transporter: item.transporter_name || "-",
+        vehicleNo: item.vehicle_no || "-",
+        driverName: item.driver_name || "-",
+        driverContact: item.driver_contact || "-",
+        insuranceValidUpto: item.insurance_valid_upto || null,
+        puValidUpto: item.pu_valid_upto || null,
+        fitnessValidUpto: item.fitness_valid_upto || null,
+
+        // Loading Details
+        vehicleInTime: item.vehicle_in_time || "-",
+        vehicleOutTime: item.vehicle_out_time || "-",
+        tareWeight: item.tare_weight_kg || 0,
+        netWeight: item.net_weight_kg || 0,
+        grossWeight: item.gross_weight_kg || 0,
+
+      
+        itemCode: item.items?.[0]?.hsn_code || "-",   // 👈 HSN code
+itemName: item.items?.[0]?.product_name || "-",
+
+        reqQty: item.items?.[0]?.required_qty || 0,
+        actualQty: item.items?.[0]?.actual_qty || 0,
+        variance: item.items?.[0]?.variance || 0,
+
+        original: item,
+      }));
+
+      setData(formatted);
+    } catch (error) {
+      console.error("Failed to fetch loading advice:", error);
+    }
+  };
+
+
+
+  const handleOpenEdit = async (record) => {
+    try {
+      const res = await getLoadingAdviceById(record.id);
+
+      const item = res;
+form.setFieldsValue({
+  invoiceNo: item.invoice_no,
+  lodingadvicedate: item.advice_date ? dayjs(item.advice_date) : null,
+  status: item.status,
+
+  // ✅ COMPANY DETAILS
+  companyName: item.vendor_name,
+  companyAddress: item.vendor_address,
+  companyGST: item.vendor_gstin,
+  contactPerson: item.vendor_contact_person,
+  contactNo: item.vendor_phone,
+
+  // ✅ PLANT DETAILS
+  plantName: item.plant_name,
+  plantCode: item.plant_code,
+  plantGST: item.plant_gstin,
+  plantAddress: item.plant_address,
+  plantContactPerson: item.plant_contact_person,
+
+  // Transport
+  transporter: item.transporter_name,
+  vehicleNo: item.vehicle_no,
+  driverName: item.driver_name,
+  driverContact: item.driver_contact,
+
+  insuranceValidUpto: item.insurance_valid_upto
+    ? dayjs(item.insurance_valid_upto)
+    : null,
+  puValidUpto: item.pu_valid_upto
+    ? dayjs(item.pu_valid_upto)
+    : null,
+  fitnessValidUpto: item.fitness_valid_upto
+    ? dayjs(item.fitness_valid_upto)
+    : null,
+
+  vehicleInTime: item.vehicle_in_time,
+  vehicleOutTime: item.vehicle_out_time,
+  tareWeight: item.tare_weight_kg,
+  netWeight: item.net_weight_kg,
+
+ items: item.items?.map((itm) => ({
+    id: itm.id,
+    product: itm.product,
+    product_name: itm.product_name,
+    hsn_code: itm.hsn_code,
+    required_qty: itm.required_qty,
+    actual_qty: itm.actual_qty,
+    variance: itm.variance,
+  })) || [],
+});
+
+
+      setSelectedRecord(item);
+      setIsEditModalOpen(true);
+    } catch (error) {
+      console.error("Error fetching by ID:", error);
+      message.error("Failed to load data");
+    }
+  };
+
+
+  const handleEdit = async (values) => {
+    try {
+      const payload = {
+        advice_date: values.lodingadvicedate
+    ? dayjs(values.lodingadvicedate).format("YYYY-MM-DD")
+    : null,
+
+  invoice_no: values.invoiceNo,
+  status: values.status,
+        assignment: selectedRecord.assignment,
+
+        transporter_name: values.transporter,
+        vehicle_no: values.vehicleNo,
+        driver_name: values.driverName,
+        driver_contact: values.driverContact,
+        vendor_name: selectedRecord.vendor_name,
+plant_name: selectedRecord.plant_name,
+vendor_address: selectedRecord.vendor_address,
+plant_address: selectedRecord.plant_address,
+vendor_gstin: selectedRecord.vendor_gstin,
+plant_gstin: selectedRecord.plant_gstin,
+
+        insurance_valid_upto: values.insuranceValidUpto
+          ? dayjs(values.insuranceValidUpto).format("YYYY-MM-DD")
+          : null,
+        pu_valid_upto: values.puValidUpto
+          ? dayjs(values.puValidUpto).format("YYYY-MM-DD")
+          : null,
+        fitness_valid_upto: values.fitnessValidUpto
+          ? dayjs(values.fitnessValidUpto).format("YYYY-MM-DD")
+          : null,
+
+        vehicle_in_time: values.vehicleInTime,
+        vehicle_out_time: values.vehicleOutTime,
+        tare_weight_kg: values.tareWeight,
+        net_weight_kg: values.netWeight,
+
+       items: values.items.map((itm) => ({
+  id: itm.id,
+  product: itm.product,
+  product_name: itm.product_name,
+  hsn_code: itm.hsn_code,
+  required_qty: itm.required_qty,
+  actual_qty: itm.actual_qty,
+  variance: itm.variance,
+}))
+
+      };
+await updateLoadingAdvice(selectedRecord.loading_id, payload);
+
+
+      message.success("Updated successfully");
+
+      setIsEditModalOpen(false);
+      form.resetFields();
+
+      fetchLoadingAdvice(); // refresh table
+    } catch (error) {
+      console.error("Update failed:", error);
+      message.error("Update failed");
+    }
+  };
+
+ const handleOpenView = async (record) => {
   try {
-    const res = await getLoadingAdvice();
+    const item = await getLoadingAdviceById(record.id);
 
-    const formatted = res.map((item) => ({
-      key: item.id,
-      id: item.id,
-
-      // Basic Info
-      lodingadvicedate: item.advice_date || "-",
-      invoiceNo: item.invoice_no || "-",   // ✅ correct field
-      companyName: item.vendor_name || "-", // change if backend sends vendor name
-      plantName: item.plant_name || "-",
-      status: item.status || "-",
-
-      // Transport Details ✅ correct fields from API
-      transporter: item.transporter_name || "-",
-      vehicleNo: item.vehicle_no || "-",
-      driverName: item.driver_name || "-",
-      driverContact: item.driver_contact || "-",
-      insuranceValidUpto: item.insurance_valid_upto || null,
-      puValidUpto: item.pu_valid_upto || null,
-      fitnessValidUpto: item.fitness_valid_upto || null,
-
-      // Loading Details
-      vehicleInTime: item.vehicle_in_time || "-",
-      vehicleOutTime: item.vehicle_out_time || "-",
-      tareWeight: item.tare_weight_kg || 0,
-      netWeight: item.net_weight_kg || 0,
-      grossWeight: item.gross_weight_kg || 0,
-
-      // Items (first item only)
-      itemCode: item.items?.[0]?.product || "-",  
-      itemName: item.items?.[0]?.product_name || "-",
-      reqQty: item.items?.[0]?.required_qty || 0,
-      actualQty: item.items?.[0]?.actual_qty || 0,
-      variance: item.items?.[0]?.variance || 0,
-
-      original: item,
-    }));
-
-    setData(formatted);
-  } catch (error) {
-    console.error("Failed to fetch loading advice:", error);
-  }
-};
-
-
- 
-const handleOpenEdit = async (record) => {
-  try {
-    const res = await getLoadingAdviceById(record.id);
-
-    const item = res;
-
-    form.setFieldsValue({
+    viewForm.setFieldsValue({
       invoiceNo: item.invoice_no,
-      lodingadvicedate: item.advice_date ? dayjs(item.advice_date) : null,
+      lodingadvicedate: item.advice_date
+        ? dayjs(item.advice_date)
+        : null,
       status: item.status,
 
+      // Company
+      companyName: item.vendor_name,
+      companyAddress: item.vendor_address,
+      companyGST: item.vendor_gstin,
+      contactPerson: item.vendor_contact_person,
+      contactNo: item.vendor_phone,
+
+      // Plant
+      plantName: item.plant_name,
+      plantCode: item.plant_code,
+      plantGST: item.plant_gstin,
+      plantAddress: item.plant_address,
+      plantContactPerson: item.plant_contact_person,
+
+      // Transport
       transporter: item.transporter_name,
       vehicleNo: item.vehicle_no,
       driverName: item.driver_name,
@@ -243,99 +393,26 @@ const handleOpenEdit = async (record) => {
       tareWeight: item.tare_weight_kg,
       netWeight: item.net_weight_kg,
 
-      // first item
-      itemCode: item.items?.[0]?.product,
-      itemName: item.items?.[0]?.product_name,
-      reqQty: item.items?.[0]?.required_qty,
-      actualQty: item.items?.[0]?.actual_qty,
-      variance: item.items?.[0]?.variance,
+       items: item.items?.map((itm) => ({
+    id: itm.id,
+    product_name: itm.product_name,
+    hsn_code: itm.hsn_code,
+    required_qty: itm.required_qty,
+    actual_qty: itm.actual_qty,
+    variance: itm.variance,
+  })) || [],
     });
 
     setSelectedRecord(item);
-    setIsEditModalOpen(true);
-  } catch (error) {
-    console.error("Error fetching by ID:", error);
-    message.error("Failed to load data");
-  }
-};
-
-
- const handleEdit = async (values) => {
-  try {
-    const payload = {
-      invoice_no: values.invoiceNo,
-      status: values.status,
-
-      transporter_name: values.transporter,
-      vehicle_no: values.vehicleNo,
-      driver_name: values.driverName,
-      driver_contact: values.driverContact,
-
-      insurance_valid_upto: values.insuranceValidUpto
-        ? dayjs(values.insuranceValidUpto).format("YYYY-MM-DD")
-        : null,
-      pu_valid_upto: values.puValidUpto
-        ? dayjs(values.puValidUpto).format("YYYY-MM-DD")
-        : null,
-      fitness_valid_upto: values.fitnessValidUpto
-        ? dayjs(values.fitnessValidUpto).format("YYYY-MM-DD")
-        : null,
-
-      vehicle_in_time: values.vehicleInTime,
-      vehicle_out_time: values.vehicleOutTime,
-      tare_weight_kg: values.tareWeight,
-      net_weight_kg: values.netWeight,
-
-      items: [
-        {
-          id: selectedRecord.items?.[0]?.id,
-          product: values.itemCode,
-          required_qty: values.reqQty,
-          actual_qty: values.actualQty,
-          variance: values.variance,
-        },
-      ],
-    };
-
-    await updateLoadingAdvice(selectedRecord.id, payload);
-
-    message.success("Updated successfully");
-
-    setIsEditModalOpen(false);
-    form.resetFields();
-
-    fetchLoadingAdvice(); // refresh table
-  } catch (error) {
-    console.error("Update failed:", error);
-    message.error("Update failed");
-  }
-};
-
-  const handleOpenView = (record) => {
-    setSelectedRecord(record);
-
-    const convert = (v) => (v ? dayjs(v) : null);
-
-    viewForm.setFieldsValue({
-      ...record,
-      lodingadvicedate: convert(record.lodingadvicedate),
-      insuranceValidUpto: convert(record.insuranceValidUpto),
-      puValidUpto: convert(record.puValidUpto),
-      fitnessValidUpto: convert(record.fitnessValidUpto),
-    });
-
     setIsViewModalOpen(true);
-  };
+  } catch (error) {
+    console.error("View fetch failed:", error);
+    message.error("Failed to load details");
+  }
+};
 
-  // Admin approves a pending transporter-submitted record
-  const handleApprove = (record) => {
-    if (record.status !== "Pending Approval") {
-      message.info("Only records with 'Pending Approval' can be approved.");
-      return;
-    }
-    setData((prev) => prev.map((r) => (r.key === record.key ? { ...r, status: "Approved" } : r)));
-    message.success("Approved.");
-  };
+
+ 
 
   // Columns - removed Assign button; Admin can only approve pending ones
   const columns = [
@@ -349,7 +426,7 @@ const handleOpenEdit = async (record) => {
       dataIndex: "invoiceNo",
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
-  
+
 
     // transporter + vehicle/driver columns (display-only)
     {
@@ -371,21 +448,21 @@ const handleOpenEdit = async (record) => {
       title: <span className="text-amber-700 font-semibold">Assignment</span>,
       dataIndex: "status",
       key: "status",
-    render: (status) => {
-  const colorMap = {
-    Pending: "bg-yellow-100 text-yellow-700",
-    Unassigned: "bg-gray-100 text-gray-700",
-    Assigned: "bg-blue-100 text-blue-700",
-    "Pending Approval": "bg-orange-100 text-orange-700",
-    Approved: "bg-green-100 text-green-700",
-  };
+      render: (status) => {
+        const colorMap = {
+          Pending: "bg-yellow-100 text-yellow-700",
+          Unassigned: "bg-gray-100 text-gray-700",
+          Assigned: "bg-blue-100 text-blue-700",
+          "Pending Approval": "bg-orange-100 text-orange-700",
+          Approved: "bg-green-100 text-green-700",
+        };
 
-  return (
-    <span className={`px-2 py-1 rounded ${colorMap[status] || "bg-gray-100 text-gray-700"}`}>
-      {status || "-"}
-    </span>
-  );
-}
+        return (
+          <span className={`px-2 py-1 rounded ${colorMap[status] || "bg-gray-100 text-gray-700"}`}>
+            {status || "-"}
+          </span>
+        );
+      }
 
     },
     {
@@ -435,7 +512,7 @@ const handleOpenEdit = async (record) => {
                   });
                 }
               }}
-              disabled={disabled}
+              disabled
               showSearch
             >
               {Object.keys(invoiceData).map((k) => (
@@ -477,25 +554,25 @@ const handleOpenEdit = async (record) => {
 
         <Col span={6}>
           <Form.Item label="Company Name" name="companyName" rules={[{ required: true }]}>
-            <Input disabled={disabled} />
+            <Input disabled />
           </Form.Item>
         </Col>
 
         <Col span={6}>
           <Form.Item label="Address" name="companyAddress">
-            <Input disabled={disabled} />
+            <Input disabled />
           </Form.Item>
         </Col>
 
         <Col span={6}>
           <Form.Item label="GSTIN No." name="companyGST">
-            <Input disabled={disabled} />
+            <Input disabled />
           </Form.Item>
         </Col>
 
         <Col span={6}>
           <Form.Item label="Contact Person" name="contactPerson">
-            <Input disabled={disabled} />
+            <Input disabled />
           </Form.Item>
         </Col>
       </Row>
@@ -508,25 +585,21 @@ const handleOpenEdit = async (record) => {
 
         <Col span={6}>
           <Form.Item label="Plant Name" name="plantName">
-            <Input disabled={disabled} />
+            <Input disabled />
           </Form.Item>
         </Col>
 
-        <Col span={6}>
-          <Form.Item label="Plant Code" name="plantCode">
-            <Input disabled={disabled} />
-          </Form.Item>
-        </Col>
+       
 
         <Col span={6}>
           <Form.Item label="GSTIN No." name="plantGST">
-            <Input disabled={disabled} />
+            <Input disabled />
           </Form.Item>
         </Col>
 
         <Col span={6}>
           <Form.Item label="Address" name="plantAddress">
-            <Input disabled={disabled} />
+            <Input disabled />
           </Form.Item>
         </Col>
       </Row>
@@ -537,29 +610,40 @@ const handleOpenEdit = async (record) => {
           <h6 className="text-amber-600 ">Items Details</h6>
         </Col>
 
-        <Col span={6}>
-          <Form.Item label="Item Code" name="itemCode">
-            <Input disabled={disabled} />
-          </Form.Item>
-        </Col>
+        <Form.List name="items">
+  {(fields) => (
+    <>
+      {fields.map(({ key, name }) => (
+        <Row gutter={24} key={key} className="mt-2 ml-2! border border-amber-200 rounded-lg p-2">
+          <Col span={6}>
+            <Form.Item label="Item Code" name={[name, "hsn_code"]}>
+              <Input disabled />
+            </Form.Item>
+          </Col>
 
-        <Col span={6}>
-          <Form.Item label="Item Name" name="itemName">
-            <Input disabled={disabled} />
-          </Form.Item>
-        </Col>
+          <Col span={6}>
+            <Form.Item label="Item Name" name={[name, "product_name"]}>
+              <Input disabled />
+            </Form.Item>
+          </Col>
 
-        <Col span={6}>
-          <Form.Item label="Req. Qty" name="reqQty">
-            <Input type="number" disabled={disabled} />
-          </Form.Item>
-        </Col>
+          <Col span={6}>
+            <Form.Item label="Req. Qty" name={[name, "required_qty"]}>
+              <Input disabled />
+            </Form.Item>
+          </Col>
 
-        <Col span={6}>
-          <Form.Item label="Actual Qty" name="actualQty">
-            <Input type="number" disabled={disabled} />
-          </Form.Item>
-        </Col>
+          <Col span={6}>
+            <Form.Item label="Actual Qty" name={[name, "actual_qty"]}>
+              <Input disabled />
+            </Form.Item>
+          </Col>
+        </Row>
+      ))}
+    </>
+  )}
+</Form.List>
+
       </Row>
 
       {/* Transport Details (display-only) */}
@@ -619,25 +703,25 @@ const handleOpenEdit = async (record) => {
 
         <Col span={6}>
           <Form.Item label="Vehicle In Time" name="vehicleInTime">
-            <Input disabled={disabled} />
+            <Input disabled />
           </Form.Item>
         </Col>
 
         <Col span={6}>
           <Form.Item label="Vehicle Out Time" name="vehicleOutTime">
-            <Input disabled={disabled} />
+            <Input disabled />
           </Form.Item>
         </Col>
 
         <Col span={6}>
           <Form.Item label="Tare Weight (KG)" name="tareWeight">
-            <Input type="number" disabled={disabled} />
+            <Input type="number" disabled />
           </Form.Item>
         </Col>
 
         <Col span={6}>
           <Form.Item label="Net Weight (KG)" name="netWeight">
-            <Input type="number" disabled={disabled} />
+            <Input type="number" disabled />
           </Form.Item>
         </Col>
       </Row>

@@ -24,6 +24,14 @@ import {
 import dayjs from "dayjs";
 import { getPurchaseReturn,addPurchaseReturn,getPurchaseReturnById,updatePurchaseReturn ,getPurchaseInvoice,getPurchaseInvoiceById} from "../../../../../api/purchase";
 // 🔹 JSON Data
+const returnReasons = [
+  "Quality Issue",
+  "Damaged Packaging",
+  "Expired",
+  "Wrong Item",
+  "Other",
+];
+
 const purchaseReturnJSON = {
   records: [
     {
@@ -100,8 +108,7 @@ export default function PurchaseReturn() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [isOtherReason, setIsOtherReason] = useState(false);
-  const [invoiceList, setInvoiceList] = useState([]);
+   const [invoiceList, setInvoiceList] = useState([]);
 const [selectedProductId, setSelectedProductId] = useState(null);
 const [selectedVendorId, setSelectedVendorId] = useState(null);
 
@@ -160,211 +167,212 @@ const fetchPurchaseReturns = async () => {
 };
 
 
-  const calculateTotals = (values) => {
-    const qty = parseFloat(values.quantity || 0);
-    const freeQty = parseFloat(values.freeQty || 0);
-    const rate = parseFloat(values.rate || 0);
-    const discountPercent = parseFloat(values.discountPercent || 0);
-    const sgstPercent = parseFloat(values.sgstPercent || 0);
-    const cgstPercent = parseFloat(values.cgstPercent || 0);
-    const igstPercent = parseFloat(values.igstPercent || 0);
-    const otherCharges = parseFloat(values.otherCharges || 0);
-    const roundOff = parseFloat(values.roundOff || 0);
 
-    const totalQtyDisplay = qty + freeQty;
-    const grossAmount = qty * rate;
-    const discountAmount = (grossAmount * discountPercent) / 100;
-    const taxableAmount = grossAmount - discountAmount;
-    const taxAmount =
-      (taxableAmount * (sgstPercent + cgstPercent + igstPercent)) / 100;
-    const grandTotal = taxableAmount + taxAmount + otherCharges + roundOff;
+ const handleValuesChange = (_, allValues) => {
+  const items = allValues.items || [];
+
+  let grandTotalWithoutRound = 0;
+
+  const updatedItems = items.map((item) => {
+    const qty = Number(item.quantity || 0);
+    const freeQty = Number(item.free_quantity || 0);
+    const rate = Number(item.rate || 0);
+    const discountPercent = Number(item.discount_percent || 0);
+    const sgst = Number(item.sgst_percent || 0);
+    const cgst = Number(item.cgst_percent || 0);
+    const igst = Number(item.igst_percent || 0);
+
+    const totalQty = qty + freeQty;
+    const gross = qty * rate;
+    const discountAmt = (gross * discountPercent) / 100;
+    const taxable = gross - discountAmt;
+    const taxAmt = (taxable * (sgst + cgst + igst)) / 100;
+    const totalAmount = taxable + taxAmt;
+
+    grandTotalWithoutRound += totalAmount;
 
     return {
-      totalQtyDisplay,
-      grossAmount: Number(grossAmount.toFixed(2)),
-      discountAmount: Number(discountAmount.toFixed(2)),
-      grandTotal: Number(grandTotal.toFixed(2)),
+      ...item,
+      total_quantity: Number(totalQty.toFixed(2)),
+      gross_amount: Number(gross.toFixed(2)),
+      discount_amount: Number(discountAmt.toFixed(2)),
+      total_amount: Number(totalAmount.toFixed(2)),
     };
-  };
+  });
 
-  const handleValuesChange = (_, allValues) => {
-    const totals = calculateTotals(allValues);
-    addForm.setFieldsValue(totals);
-    editForm.setFieldsValue(totals);
-  };
+  const roundOff = Number(allValues.roundOff || 0);
+  const finalGrandTotal = grandTotalWithoutRound + roundOff;
 
-  const setFormValues = (record, targetForm, mode = "view") => {
-    const base = {
-      ...record,
-      returnDate: record.returnDate ? dayjs(record.returnDate) : dayjs(),
-      totalQtyDisplay: (record.quantity || 0) + (record.freeQty || 0),
-      grossAmount:
-        record.grossAmount || (record.quantity || 0) * (record.rate || 0),
-      discountAmount:
-        record.discountAmount ||
-        ((record.grossAmount || (record.quantity || 0) * (record.rate || 0)) *
-          (record.discountPercent || 0)) /
-          100,
-      grandTotal: record.grandTotal || record.totalAmount || 0,
-    };
+  // ✅ update form values
+ addForm.setFieldsValue({
+  items: updatedItems,
+});
 
-    if (mode === "add") {
-      targetForm.setFieldsValue({
-        ...base,
-        status: "Pending",
-        returnDate: dayjs(),
-      });
-    } else {
-      targetForm.setFieldsValue(base);
-    }
-  };
+
+  editForm.setFieldsValue({
+    items: updatedItems,
+  });
+};
+
  const handleSubmit = async (values, mode) => {
-  if (mode === "add") {
-    try {
-      const payload = {
-        invoice: values.invoiceNo,
-         vendor: selectedVendorId,  
-        status: values.status || "Pending",
-
-        return_date: values.returnDate
-          ? values.returnDate.format("YYYY-MM-DD")
-          : null,
-        reason: values.returnReason,
-        plant_name: values.plantName,
-        
-       
-        items: [
-          {
-            product: selectedProductId,
-            quantity: Number(values.quantity),
-            free_quantity: Number(values.freeQty || 0),
-            total_quantity: Number(values.totalQtyDisplay || 0),
-            rate: Number(values.rate),
-
-            gross_amount: Number(values.grossAmount || 0),
-
-            discount_percent: Number(values.discountPercent || 0),
-            discount_amount: Number(values.discountAmount || 0),
-
-            sgst_percent: Number(values.sgstPercent || 0),
-            cgst_percent: Number(values.cgstPercent || 0),
-            igst_percent: Number(values.igstPercent || 0),
-
-            other_charges: 0,
-            round_off: 0,
-
-            total_amount: Number(values.grandTotal || 0),
-
-            item_return_reason: values.returnReason,
-          },
-        ],
-      };
-
-      await addPurchaseReturn(payload);
-
-      fetchPurchaseReturns();
-      setIsAddModalOpen(false);
-      addForm.resetFields();
-    } catch (error) {
-      console.error("Add failed", error);
-    }
-  }
-  if (mode === "edit") {
+if (mode === "add") {
   try {
+    const totalAmount = values.items.reduce(
+      (sum, item) => sum + Number(item.total_amount || 0),
+      0
+    );
+
+    const payload = {
+      invoice: values.invoiceNo,
+      vendor: selectedVendorId,
+      status: values.status || "Pending",
+      return_date: values.returnDate
+        ? values.returnDate.format("YYYY-MM-DD")
+        : null,
+
+      round_off: Number(values.roundOff || 0),
+
+      total_amount: Number(totalAmount.toFixed(2)),
+
+      items: values.items.map((item) => ({
+        product: item.product,
+        quantity: Number(item.quantity || 0),
+        free_quantity: Number(item.free_quantity || 0),
+        total_quantity:
+          Number(item.quantity || 0) + Number(item.free_quantity || 0),
+        rate: Number(item.rate || 0),
+        gross_amount: Number(item.gross_amount || 0),
+        discount_percent: Number(item.discount_percent || 0),
+        discount_amount: Number(item.discount_amount || 0),
+        sgst_percent: Number(item.sgst_percent || 0),
+        cgst_percent: Number(item.cgst_percent || 0),
+        igst_percent: Number(item.igst_percent || 0),
+        total_amount: Number(item.total_amount || 0),
+       item_return_reason:
+  item.item_return_reason === "Other"
+    ? item.other_reason
+    : item.item_return_reason,
+
+      })),
+    };
+
+    await addPurchaseReturn(payload);
+
+    fetchPurchaseReturns();
+    setIsAddModalOpen(false);
+    addForm.resetFields();
+  } catch (error) {
+    console.error("Add failed", error);
+  }
+}
+if (mode === "edit") {
+  try {
+    const totalAmount = values.items.reduce(
+      (sum, item) => sum + Number(item.total_amount || 0),
+      0
+    );
+
     const payload = {
       invoice: values.invoiceNo,
       status: values.status,
       return_date: values.returnDate
         ? values.returnDate.format("YYYY-MM-DD")
         : null,
-      reason: values.returnReason,
-      items: [
-        {
-          product: selectedProductId,
-          quantity: Number(values.quantity),
-          free_quantity: Number(values.freeQty || 0),
-          total_quantity: Number(values.totalQtyDisplay || 0),
-          rate: Number(values.rate),
-          gross_amount: Number(values.grossAmount || 0),
-          discount_percent: Number(values.discountPercent || 0),
-          discount_amount: Number(values.discountAmount || 0),
-          sgst_percent: Number(values.sgstPercent || 0),
-          cgst_percent: Number(values.cgstPercent || 0),
-          igst_percent: Number(values.igstPercent || 0),
-          total_amount: Number(values.grandTotal || 0),
-          item_return_reason: values.returnReason,
-        },
-      ],
+
+      round_off: Number(values.roundOff || 0),
+      total_amount: Number(totalAmount.toFixed(2)),
+
+      items: values.items.map((item) => ({
+        product: item.product,
+        quantity: Number(item.quantity || 0),
+        free_quantity: Number(item.free_quantity || 0),
+        total_quantity:
+          Number(item.quantity || 0) + Number(item.free_quantity || 0),
+        rate: Number(item.rate || 0),
+        gross_amount: Number(item.gross_amount || 0),
+        discount_percent: Number(item.discount_percent || 0),
+        discount_amount: Number(item.discount_amount || 0),
+        sgst_percent: Number(item.sgst_percent || 0),
+        cgst_percent: Number(item.cgst_percent || 0),
+        igst_percent: Number(item.igst_percent || 0),
+        total_amount: Number(item.total_amount || 0),
+       item_return_reason:
+  item.item_return_reason === "Other"
+    ? item.other_reason
+    : item.item_return_reason,
+
+      })),
     };
+await updatePurchaseReturn(
+  selectedRecord.id,
+  payload
+);
 
-    await updatePurchaseReturn(selectedRecord.id || selectedRecord.key, payload);
+await updatePurchaseReturn(selectedRecord.id, payload);
 
-    // ✅ update table locally (IMPORTANT FIX)
-    setData((prev) =>
-      prev.map((item) =>
-        item.key === (selectedRecord.id || selectedRecord.key)
-          ? { ...item, status: values.status }
-          : item
-      )
-    );
+// 🔥 Update table instantly without API refetch
+setData((prev) =>
+  prev.map((item) =>
+    item.key === selectedRecord.id
+      ? { ...item, status: values.status }
+      : item
+  )
+);
 
-    setIsEditModalOpen(false);
-    editForm.resetFields();
+setIsEditModalOpen(false);
+editForm.resetFields();
+
+
 
   } catch (error) {
     console.error("Update failed", error);
   }
 }
 
-};
 
+};
 
 const handleViewClick = async (record) => {
   try {
     setLoading(true);
 
-    // ✅ call GET by id API
     const res = await getPurchaseReturnById(record.key);
     const data = res.data || res;
 
-    const item = data.items?.[0] || {};
-
-    // ✅ prefill view form
-    viewForm.setFieldsValue({
-      invoiceNo: data.invoice,
-      companyName: data.vendor_name,
-      plantName: data.plant_name,
-
-      returnDate: data.return_date ? dayjs(data.return_date) : null,
-
-      status: data.status,
-
-      item: item.item_name,
-      itemCode: item.hsn_code,
-
-      quantity: item.quantity,
-      freeQty: item.free_quantity,
-      totalQtyDisplay: item.total_quantity,
-
-      rate: item.rate,
-
-      grossAmount: item.gross_amount,
-
-      discountPercent: item.discount_percent,
-      discountAmount: item.discount_amount,
-
-      sgstPercent: item.sgst_percent,
-      cgstPercent: item.cgst_percent,
-      igstPercent: item.igst_percent,
-
-      grandTotal: item.total_amount,
-
+    const mappedItems = data.items?.map((item) => ({
+      product: item.product,
+      item_name: item.item_name,
+      hsn_code: item.hsn_code,
       uom: item.uom_details?.unit_name,
 
-      returnReason: item.item_return_reason,
-    });
+      quantity: Number(item.quantity),
+      free_quantity: Number(item.free_quantity),
+      total_quantity: Number(item.total_quantity),
 
-    setSelectedRecord(data);
+      rate: Number(item.rate),
+      gross_amount: Number(item.gross_amount),
+
+      discount_percent: Number(item.discount_percent),
+      discount_amount: Number(item.discount_amount),
+
+      sgst_percent: Number(item.sgst_percent),
+      cgst_percent: Number(item.cgst_percent),
+      igst_percent: Number(item.igst_percent),
+
+      total_amount: Number(item.total_amount),
+
+      item_return_reason: item.item_return_reason,
+    })) || [];
+
+    viewForm.setFieldsValue({
+      invoiceNo: data.invoice_number || data.invoice,
+
+      companyName: data.vendor_name,
+      returnDate: data.return_date ? dayjs(data.return_date) : null,
+      status: data.status,
+      roundOff: Number(data.round_off || 0),
+      items: mappedItems,  // 🔥 FIX HERE ALSO
+    });
 
     setIsViewModalOpen(true);
 
@@ -374,6 +382,7 @@ const handleViewClick = async (record) => {
     setLoading(false);
   }
 };
+
 
 const handleAddClick = async () => {
   try {
@@ -399,85 +408,94 @@ const onInvoiceSelectForAdd = async (invoiceId) => {
     const res = await getPurchaseInvoiceById(invoiceId);
     const invoice = res.data || res;
 
-    const firstItem = invoice.items?.[0] || {};
-
-    setSelectedProductId(firstItem.product);
-
-    // ✅ SAVE vendor id
+    // ✅ save vendor id
     setSelectedVendorId(invoice.vendor);
 
+    // ✅ map ALL invoice items
+    const items = invoice.items?.map((it) => ({
+      product: it.product,
+      item_name: it.item_name,
+      hsn_code: it.hsn_code,
+      uom: it?.uom_details?.unit_name,
+
+      quantity: it.qty,
+      free_quantity: it.free_qty,
+      total_quantity: Number(it.qty || 0) + Number(it.free_qty || 0),
+
+      rate: it.rate,
+      gross_amount: it.gross_amount,
+
+      discount_percent: it.dis_percent,
+      discount_amount: it.dis_amount,
+
+      sgst_percent: invoice.sgst_percent,
+      cgst_percent: invoice.cgst_percent,
+      igst_percent: invoice.igst_percent,
+
+      total_amount: it.total_amount,
+
+      item_return_reason: "",
+    })) || [];
+
+    // ✅ set form values
     addForm.setFieldsValue({
       invoiceNo: invoice.id,
-      companyName: invoice.vendor_name, // display only
+      companyName: invoice.vendor_name,
       plantName: invoice.plant_name,
       returnDate: dayjs(),
       status: "Pending",
-
-      item: firstItem.item_name,
-      itemCode: firstItem.hsn_code,
-      quantity: firstItem.qty,
-      freeQty: firstItem.free_qty,
-      rate: firstItem.rate,
-      uom: firstItem?.uom_details?.unit_name,
-      totalQtyDisplay: Number(invoice.total_qty),
-      grossAmount: Number(firstItem.gross_amount),
-      discountAmount: Number(firstItem.dis_amount),
-      grandTotal: Number(invoice.total_amount),
-
-      discountPercent: firstItem.dis_percent,
-      sgstPercent: invoice.sgst_percent,
-      cgstPercent: invoice.cgst_percent,
-      igstPercent: invoice.igst_percent,
+      items: items, // 🔥 THIS IS IMPORTANT
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("Invoice fetch failed", error);
   }
 };
+
 
 const handleEditClick = async (record) => {
   try {
     setLoading(true);
 
-    // call GET by id API
     const res = await getPurchaseReturnById(record.key);
     const data = res.data || res;
 
-    const item = data.items?.[0] || {};
+    const mappedItems = data.items?.map((item) => ({
+      product: item.product,
+      item_name: item.item_name,
+      hsn_code: item.hsn_code,
+      uom: item.uom_details?.unit_name,
 
-    // save product id for update
-    setSelectedProductId(item.product);
+      quantity: Number(item.quantity),
+      free_quantity: Number(item.free_quantity),
+      total_quantity: Number(item.total_quantity),
 
-    // prefill edit form
+      rate: Number(item.rate),
+      gross_amount: Number(item.gross_amount),
+
+      discount_percent: Number(item.discount_percent),
+      discount_amount: Number(item.discount_amount),
+
+      sgst_percent: Number(item.sgst_percent),
+      cgst_percent: Number(item.cgst_percent),
+      igst_percent: Number(item.igst_percent),
+
+      total_amount: Number(item.total_amount),
+
+      item_return_reason: item.item_return_reason,
+    })) || [];
+
     editForm.setFieldsValue({
-      invoiceNo: data.invoice,
+    invoiceNo: data.invoice_number || data.invoice,
+
       companyName: data.vendor_name,
-      plantName: data.plant_name,
       returnDate: data.return_date ? dayjs(data.return_date) : null,
       status: data.status,
-
-      item: item.item_name,
-      itemCode: item.hsn_code,
-      quantity: item.quantity,
-      freeQty: item.free_quantity,
-      totalQtyDisplay: item.total_quantity,
-      rate: item.rate,
-
-      grossAmount: item.gross_amount,
-      discountPercent: item.discount_percent,
-      discountAmount: item.discount_amount,
-
-      sgstPercent: item.sgst_percent,
-      cgstPercent: item.cgst_percent,
-      igstPercent: item.igst_percent,
-
-      grandTotal: item.total_amount,
-      uom: item.uom_details?.unit_name,
-      returnReason: item.item_return_reason,
+      roundOff: Number(data.round_off || 0),
+      items: mappedItems,   // 🔥 THIS IS THE IMPORTANT LINE
     });
 
     setSelectedRecord(data);
-
     setIsEditModalOpen(true);
 
   } catch (error) {
@@ -486,6 +504,7 @@ const handleEditClick = async (record) => {
     setLoading(false);
   }
 };
+
 
 
   const renderFormFields = (mode = "view") => {
@@ -512,10 +531,11 @@ const handleEditClick = async (record) => {
               name="invoiceNo"
               rules={[{ required: true }]}
             >
-             <Select
-  onChange={(val) => onInvoiceSelectForAdd(val)}
+       <Select
+  onChange={(val) => isAdd && onInvoiceSelectForAdd(val)}
   disabled={isView}
 >
+
 
                {invoiceList.map((inv) => (
   <Select.Option key={inv.id} value={inv.id}>
@@ -546,7 +566,7 @@ const handleEditClick = async (record) => {
 >
   <Select disabled={mode === "view"}>
     {statusOptions.map((status) => (
-      <Select.Option key={status} value={status}>
+      <Select.Option key={status} value={status} disabled={isView}>
         {status}
       </Select.Option>
     ))}
@@ -556,142 +576,173 @@ const handleEditClick = async (record) => {
         </Row>
 
        
-        <h6 className="text-amber-500">Item & Return Details</h6>
-        <Row gutter={16}>
-          <Col span={6}>
-            <Form.Item label="Item Name" name="item">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Item Code" name="itemCode">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="UOM" name="uom">
-              <Select disabled />
-            </Form.Item>
-          </Col>
+       <h6 className="text-amber-500">Item & Return Details</h6>
 
-          <Col span={6}>
-            <Form.Item label="Quantity" name="quantity">
-              <InputNumber
-                className="w-full"
-                disabled={disabledFor("quantity")}
-              />
-            </Form.Item>
-          </Col>
+<Form.List name="items">
+  {(fields) => (
+    <>
+      {fields.map(({ key, name, ...restField }) => (
+        <div key={key} className="border p-3 mb-3 rounded">
 
-          <Col span={6}>
-            <Form.Item label="Free Quantity" name="freeQty">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        <Row gutter={16}>
-          <Col span={6}>
-            <Form.Item label="Total Quantity" name="totalQtyDisplay">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Rate" name="rate">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Gross Amount" name="grossAmount">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item
-              label="Return Reason"
-              name="returnReason"
-              rules={[{ required: true }]}
-            >
-              <Select
-                disabled={disabledFor("returnReason")}
-                onChange={(value) => {
-                  setIsOtherReason(value === "Other");
-                  if (value !== "Other") {
-                    if (isAdd) addForm.setFieldsValue({ otherReasonText: "" });
-                    if (isEdit)
-                      editForm.setFieldsValue({ otherReasonText: "" });
-                  }
-                }}
-              >
-                {purchaseReturnJSON.options.returnReasonOptions.map((v) => (
-                  <Select.Option key={v}>{v}</Select.Option>
-                ))}
-                <Select.Option key="Other" value="Other">
-                  Other
-                </Select.Option>
-              </Select>
-            </Form.Item>
-
-            {isOtherReason && (
-              <Form.Item
-                label="Specify Other Reason"
-                name="otherReasonText"
-                rules={[{ required: true, message: "Please enter a reason" }]}
-              >
-                <Input.TextArea
-                  rows={3}
-                  placeholder="Please describe the reason for return"
-                  disabled={disabledFor("returnReason")}
-                />
+          <Row gutter={16}>
+            <Col span={6}>
+              <Form.Item {...restField} name={[name, "item_name"]} label="Item Name">
+                <Input disabled />
               </Form.Item>
-            )}
-          </Col>
-        </Row>
+            </Col>
 
-        <h6 className="text-amber-500">Tax & Amount Details</h6>
+            <Col span={6}>
+              <Form.Item {...restField} name={[name, "hsn_code"]} label="Item Code">
+                <Input disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item {...restField} name={[name, "uom"]} label="UOM">
+                <Input disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+             <Form.Item {...restField} name={[name, "quantity"]} label="Quantity">
+  <InputNumber
+    className="w-full"
+    disabled={isView}
+  />
+</Form.Item>
+
+            </Col>
+
+            <Col span={6}>
+              <Form.Item {...restField} name={[name, "free_quantity"]} label="Free Qty">
+               <InputNumber
+  className="w-full"
+  disabled={isView}
+/>
+
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item {...restField} name={[name, "total_quantity"]} label="Total Qty">
+                <InputNumber className="w-full" disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item {...restField} name={[name, "rate"]} label="Rate">
+                <InputNumber className="w-full" disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item {...restField} name={[name, "gross_amount"]} label="Gross Amount">
+                <InputNumber className="w-full" disabled />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <h6 className="text-amber-500 mt-2">Tax & Amount Details</h6>
+
+          <Row gutter={16}>
+           <Form.Item {...restField} name={[name, "discount_percent"]} label="Discount %">
+  <InputNumber
+    className="w-full"
+    disabled  // 🔥 IMPORTANT
+  />
+</Form.Item>
+
+
+            <Col span={6}>
+              <Form.Item {...restField} name={[name, "discount_amount"]} label="Discount Amount">
+                <InputNumber className="w-full" disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item {...restField} name={[name, "sgst_percent"]} label="SGST %">
+                <InputNumber className="w-full" disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item {...restField} name={[name, "cgst_percent"]} label="CGST %">
+                <InputNumber className="w-full" disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item {...restField} name={[name, "igst_percent"]} label="IGST %">
+                <InputNumber className="w-full" disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item {...restField} name={[name, "total_amount"]} label="Total Amount">
+                <InputNumber className="w-full" disabled />
+              </Form.Item>
+            </Col>
+
+           <Col span={6}>
+ <Form.Item
+  {...restField}
+  name={[name, "item_return_reason"]}
+  label="Return Reason"
+>
+  <Select disabled={isView }>
+    {returnReasons.map((reason) => (
+      <Select.Option key={reason} value={reason} disabled={isView}>
+        {reason}
+      </Select.Option>
+    ))}
+  </Select>
+</Form.Item>
+
+<Form.Item
+  noStyle
+  shouldUpdate={(prev, curr) =>
+    prev.items?.[name]?.item_return_reason !==
+    curr.items?.[name]?.item_return_reason
+  }
+>
+  {({ getFieldValue }) =>
+    getFieldValue(["items", name, "item_return_reason"]) === "Other" ? (
+      <Form.Item
+        {...restField}
+        name={[name, "other_reason"]}
+        label="Enter Reason"
+        rules={[{ required: true, message: "Please enter reason" }]}
+      >
+        <Input />
+      </Form.Item>
+    ) : null
+  }
+</Form.Item>
+
+
+ 
+</Col>
+
+          </Row>
+
+        </div>
+      ))}
+    </>
+  )}
+</Form.List>
+
+
+
         <Row gutter={16}>
-          <Col span={6}>
-            <Form.Item label="Discount %" name="discountPercent">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
+  <Col span={6}>
+    <Form.Item label="Round Off" name="roundOff" disabled={isView}>
+      <InputNumber className="w-full"  disabled={isView}/>
+    </Form.Item>
+  </Col>
 
-          <Col span={6}>
-            <Form.Item label="Discount Amount" name="discountAmount">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
+ 
+</Row>
 
-          <Col span={6}>
-            <Form.Item label="SGST %" name="sgstPercent">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="CGST %" name="cgstPercent">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        <Row gutter={16}>
-          <Col span={6}>
-            <Form.Item label="IGST %" name="igstPercent">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
-
-
-          <Col span={6}>
-            <Form.Item label="Total Amount" name="grandTotal">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
-        </Row>
       </>
     );
   };
