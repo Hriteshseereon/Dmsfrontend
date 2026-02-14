@@ -116,10 +116,15 @@ export const getAssetDepreciations = async () => {
   const res = await api.get("/assets/depreciation/");
   return res.data;
 };
-
+// get depriciation by id
+export const getAssetdepriciationByID = async (id) =>{
+  const res = await api.get(`/assets/depreciation/${id}/`)
+  return res.data;
+} 
 // UPDATE
 export const updateAssetDepreciation = async (id, payload) => {
-  const res = await api.patch(`/assets/depreciation/${id}/`, payload);
+    const { currentOrgId } = useSessionStore.getState();
+  const res = await api.patch(`/assets/depreciation/${id}/`, payload, {params: {organisation: currentOrgId}});    
   return res.data;
 };
 
