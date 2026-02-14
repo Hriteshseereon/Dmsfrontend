@@ -24,6 +24,7 @@ import {
   addAssetAllocation,
   getAssetAllocations,
   getAllAssets,
+  getAssetAllocationById,
 } from "../../api/assets";
 import useSessionStore from "../../store/sessionStore";
 
@@ -113,7 +114,92 @@ export default function AssetAllocation() {
         .includes(searchText.trim().toLowerCase()),
     ),
   );
+  // handle  view option
+  const handleView = async (record) => {
+    try {
+      setLoading(true);
 
+      const data = await getAssetAllocationById(record.id);
+
+      setSelectedRecord(data);
+      setIsViewModalOpen(true);
+      viewForm.setFieldsValue({
+        asset: data.asset,
+        assignedTo: data.assigned_to,
+        allocationDate: data.allocation_date
+          ? dayjs(data.allocation_date)
+          : undefined,
+        returnDate: data.return_date ? dayjs(data.return_date) : undefined,
+        conditionAtIssue: data.condition_at_issue,
+        conditionAtReturn: data.condition_at_return,
+        remarks: data.remarks,
+      });
+
+      setIsViewModalOpen(true);
+    } catch (err) {
+      message.error("Failed to load allocation details");
+    } finally {
+      setLoading(false);
+    }
+  };
+  // handle edit function
+  const handleEdit = async (record) => {
+    try {
+      setLoading(true);
+
+      const data = await getAssetAllocationById(record.id);
+
+      setSelectedRecord(data);
+
+      editForm.setFieldsValue({
+        asset: data.asset,
+        assignedTo: data.assigned_to,
+        allocationDate: data.allocation_date
+          ? dayjs(data.allocation_date)
+          : undefined,
+        returnDate: data.return_date ? dayjs(data.return_date) : undefined,
+        conditionAtIssue: data.condition_at_issue,
+        conditionAtReturn: data.condition_at_return,
+        remarks: data.remarks,
+      });
+
+      setIsEditModalOpen(true);
+    } catch (err) {
+      message.error("Failed to load allocation for edit");
+    } finally {
+      setLoading(false);
+    }
+  };
+  const handleUpdate = async (values) => {
+    try {
+      setLoading(true);
+
+      const payload = {
+        asset: values.asset,
+        assigned_to: values.assignedTo || null,
+        allocation_date: values.allocationDate
+          ? dayjs(values.allocationDate).format("YYYY-MM-DD")
+          : null,
+        return_date: values.returnDate
+          ? dayjs(values.returnDate).format("YYYY-MM-DD")
+          : null,
+        condition_at_issue: values.conditionAtIssue,
+        condition_at_return: values.conditionAtReturn || null,
+        remarks: values.remarks || null,
+      };
+
+      await updateAssetAllocation(selectedRecord.id, payload);
+
+      message.success("Allocation updated successfully");
+
+      setIsEditModalOpen(false);
+      fetchassetallocations(); // refresh table
+    } catch (err) {
+      message.error("Failed to update allocation");
+    } finally {
+      setLoading(false);
+    }
+  };
   // ✅ API add allocation
   const handleAdd = async (values) => {
     try {
@@ -241,36 +327,12 @@ export default function AssetAllocation() {
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              viewForm.setFieldsValue({
-                ...record,
-                allocationDate: record.allocationDate
-                  ? dayjs(record.allocationDate)
-                  : undefined,
-                returnDate: record.returnDate
-                  ? dayjs(record.returnDate)
-                  : undefined,
-              });
-              setIsViewModalOpen(true);
-            }}
+            onClick={() => handleView(record)}
           />
 
           <EditOutlined
             className="cursor-pointer! text-red-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              editForm.setFieldsValue({
-                ...record,
-                allocationDate: record.allocationDate
-                  ? dayjs(record.allocationDate)
-                  : undefined,
-                returnDate: record.returnDate
-                  ? dayjs(record.returnDate)
-                  : undefined,
-              });
-              setIsEditModalOpen(true);
-            }}
+            onClick={() => handleEdit(record)}
           />
         </div>
       ),
@@ -481,6 +543,58 @@ export default function AssetAllocation() {
               className="bg-amber-500! hover:bg-amber-600! border-none!"
             >
               Add
+            </Button>
+          </div>
+        </Form>
+      </Modal>
+      <Modal
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            View Asset Allocation
+          </span>
+        }
+        open={isViewModalOpen}
+        onCancel={() => setIsViewModalOpen(false)}
+        footer={null}
+        width={920}
+      >
+        <Form form={viewForm} layout="vertical">
+          {renderFormFields(true)}
+        </Form>
+      </Modal>
+      <Modal
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Edit Asset Allocation
+          </span>
+        }
+        open={isEditModalOpen}
+        onCancel={() => setIsEditModalOpen(false)}
+        footer={null}
+        width={920}
+      >
+        <Form
+          form={editForm}
+          layout="vertical"
+          onFinish={handleUpdate} // 👈 important
+        >
+          {renderFormFields(false)}
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              onClick={() => setIsEditModalOpen(false)}
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={loading}
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+            >
+              Update
             </Button>
           </div>
         </Form>
