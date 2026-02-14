@@ -90,7 +90,10 @@ export const addAssetMaintenance = async (payload) => {
 
 // UPDATE
 export const updateAssetMaintenance = async (id, payload) => {
-  const res = await api.patch(`/assets/maintenance/${id}/`, payload);
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.patch(`/assets/maintenance/${id}/`, payload,
+   {params: {organisation: currentOrgId}}
+  )
   return res.data;
 };
 
