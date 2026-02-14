@@ -239,7 +239,7 @@ export default function AssetManager() {
         depreciation_rate: values.depreciationRate,
 
         location_description: values.assetLocation,
-        assigned_to_employee: values.assignedTo,
+
         status: values.status,
 
         warranty_expiry_date: values.warrantyExpiryDate?.format("YYYY-MM-DD"),
