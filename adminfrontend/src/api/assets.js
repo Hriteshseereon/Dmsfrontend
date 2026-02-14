@@ -157,7 +157,8 @@ export const addAssetDisposal = async (payload) => {
 
 // UPDATE
 export const updateAssetDisposal = async (id, payload) => {
-  const res = await api.patch(`/assets/disposals/${id}/`, payload);
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.patch(`/assets/disposals/${id}/`, payload, {params: {organisation: currentOrgId}});
   return res.data;
 };
 
