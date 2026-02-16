@@ -596,7 +596,7 @@ export default function SaleOrdersInvoice() {
         }
         contractsMap[cId].items.push({
           lineKey: item.id,
-          item: item.product_name,
+          item: item.product_name_master,
           itemCode: item.product_id,
           uom: item.uom?.unit_name,
           qty: Number(item.net_qty || 0),
