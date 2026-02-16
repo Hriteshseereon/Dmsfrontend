@@ -30,6 +30,7 @@ import {
   getAssetDisposals,
   getAssets,
   updateAssetDisposal,
+  getAssetDisposalById,
 } from "../../api/assets";
 import useSessionStore from "../../store/sessionStore";
 const { Option } = Select;
@@ -77,7 +78,64 @@ export default function AssetDisposal() {
       message.error("Failed to load assets");
     }
   };
+  // create a data mapper to map backend data to form fields
 
+  const mapDisposalToForm = (item) => ({
+    id: item.id,
+    disposalId: item.disposal_id,
+
+    assetId: item.asset, // backend gives pk directly
+    asset_name: item.asset_name,
+
+    disposalType: item.disposal_type,
+    buyerName: item.buyer_name,
+    saleValue: item.sale_value,
+
+    disposalDate: item.disposal_date ? dayjs(item.disposal_date) : undefined,
+
+    approvalDocument: item.approval_document_path,
+    remarks: item.remarks,
+  });
+
+  // handle vieew function for view modal
+  const handleView = async (record) => {
+    try {
+      setLoading(true);
+
+      const res = await getAssetDisposalById(record.id);
+
+      const mapped = mapDisposalToForm(res);
+
+      setSelectedRecord(mapped);
+      viewForm.setFieldsValue(mapped);
+
+      setIsViewModalOpen(true);
+    } catch (error) {
+      message.error("Failed to load disposal details");
+    } finally {
+      setLoading(false);
+    }
+  };
+  // handle edit click to load data into edit form
+  const handleEditClick = async (record) => {
+    try {
+      setLoading(true);
+
+      const res = await getAssetDisposalById(record.id);
+
+      const mapped = mapDisposalToForm(res);
+
+      setSelectedRecord(mapped);
+      editForm.setFieldsValue(mapped);
+
+      setEditFileList([]);
+      setIsEditModalOpen(true);
+    } catch (error) {
+      message.error("Failed to load disposal for editing");
+    } finally {
+      setLoading(false);
+    }
+  };
   const fetchDisposals = async () => {
     setLoading(true);
     try {
@@ -90,7 +148,7 @@ export default function AssetDisposal() {
         disposalId: item.disposal_id,
 
         assetId: item.asset?.asset_code,
-        assetName: item.asset?.asset_name,
+        asset_name: item.asset_name,
         assetPk: item.asset?.id,
 
         disposalType: item.disposal_type,
@@ -132,7 +190,7 @@ export default function AssetDisposal() {
     // },
     {
       title: <span className="text-amber-700 font-semibold">Asset Name</span>,
-      dataIndex: "assetId",
+      dataIndex: "asset_name",
       width: 140,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
@@ -170,12 +228,12 @@ export default function AssetDisposal() {
         </span>
       ),
     },
-    {
-      title: <span className="text-amber-700 font-semibold">Approval Doc</span>,
-      dataIndex: "approvalDocument",
-      width: 160,
-      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
-    },
+    // {
+    //   title: <span className="text-amber-700 font-semibold">Approval Doc</span>,
+    //   dataIndex: "approvalDocument",
+    //   width: 160,
+    //   render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+    // },
     {
       title: <span className="text-amber-700 font-semibold">Remarks</span>,
       dataIndex: "remarks",
@@ -189,32 +247,11 @@ export default function AssetDisposal() {
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              viewForm.setFieldsValue({
-                ...record,
-                assetId: record.assetPk,
-                disposalDate: record.disposalDate
-                  ? dayjs(record.disposalDate)
-                  : undefined,
-              });
-              setIsViewModalOpen(true);
-            }}
+            onClick={() => handleView(record)}
           />
           <EditOutlined
             className="cursor-pointer! text-red-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              editForm.setFieldsValue({
-                ...record,
-                assetId: record.assetPk,
-                disposalDate: record.disposalDate
-                  ? dayjs(record.disposalDate)
-                  : undefined,
-              });
-              setEditFileList(record.files || []);
-              setIsEditModalOpen(true);
-            }}
+            onClick={() => handleEditClick(record)}
           />
         </div>
       ),
@@ -436,7 +473,7 @@ export default function AssetDisposal() {
         </Col>
       </Row>
 
-      <h6 className="text-amber-500 mt-4">File Upload</h6>
+      {/* <h6 className="text-amber-500 mt-4">File Upload</h6>
       <Row gutter={16}>
         <Col span={24}>
           <Form.Item
@@ -473,7 +510,7 @@ export default function AssetDisposal() {
             )}
           </Form.Item>
         </Col>
-      </Row>
+      </Row> */}
     </>
   );
 

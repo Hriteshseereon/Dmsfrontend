@@ -1,5 +1,5 @@
 import api from "./axios";
-
+import useSessionStore from "../store/sessionStore";
 // add assset category
 export const addAssetCategory = async (data) => {
   const res = await api.post("/assets/categories/", data);
@@ -27,10 +27,17 @@ export const addAsset = async (payload) => {
   const res = await api.post("/assets/assets/", payload);
   return res.data;
 };
-
+// get asset by id
+export const getAssetById = async (id) => {
+  const res = await api.get(`/assets/assets/${id}/`);
+  return res.data;
+}
 // UPDATE
 export const updateAsset = async (id, payload) => {
-  const res = await api.patch(`/assets/${id}/`, payload);
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.patch(`/assets/assets/${id}/`, payload, {
+    params: { organisation: currentOrgId },
+  });
   return res.data;
 };
 
@@ -87,7 +94,10 @@ export const addAssetMaintenance = async (payload) => {
 
 // UPDATE
 export const updateAssetMaintenance = async (id, payload) => {
-  const res = await api.patch(`/assets/maintenance/${id}/`, payload);
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.patch(`/assets/maintenance/${id}/`, payload,
+   {params: {organisation: currentOrgId}}
+  )
   return res.data;
 };
 
@@ -110,10 +120,15 @@ export const getAssetDepreciations = async () => {
   const res = await api.get("/assets/depreciation/");
   return res.data;
 };
-
+// get depriciation by id
+export const getAssetdepriciationByID = async (id) =>{
+  const res = await api.get(`/assets/depreciation/${id}/`)
+  return res.data;
+} 
 // UPDATE
 export const updateAssetDepreciation = async (id, payload) => {
-  const res = await api.patch(`/assets/depreciation/${id}/`, payload);
+    const { currentOrgId } = useSessionStore.getState();
+  const res = await api.patch(`/assets/depreciation/${id}/`, payload, {params: {organisation: currentOrgId}});    
   return res.data;
 };
 
@@ -146,7 +161,8 @@ export const addAssetDisposal = async (payload) => {
 
 // UPDATE
 export const updateAssetDisposal = async (id, payload) => {
-  const res = await api.patch(`/assets/disposals/${id}/`, payload);
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.patch(`/assets/disposals/${id}/`, payload, {params: {organisation: currentOrgId}});
   return res.data;
 };
 
