@@ -14,6 +14,8 @@ import {
   Col,
   message,
 } from "antd";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 import {
   SearchOutlined,
   PlusOutlined,
@@ -80,7 +82,103 @@ export default function AssetManager() {
       message.error("Failed to load asset categories");
     }
   };
+  // function to export table data to excel
+  const handleExportExcel = () => {
+    try {
+      if (!filteredData.length) {
+        message.warning("No data to export");
+        return;
+      }
 
+      // Convert table data → Excel friendly format
+      const exportData = filteredData.map((item) => ({
+        "Asset Name": item.assetName,
+        "Asset ID": item.assetId,
+        Category: item.assetCategory,
+        "Asset Type": item.assetType,
+        Brand: item.brand,
+        "Model Number": item.modelNumber,
+        "Serial Number": item.serialNumber,
+
+        "Purchase Date": item.purchaseDate
+          ? dayjs(item.purchaseDate).format("DD-MM-YYYY")
+          : "",
+
+        "Purchase Vendor": item.purchaseVendor,
+        "Cost Price (₹)": item.costPrice,
+        "Current Value (₹)": item.currentValue,
+
+        "Depreciation Method": item.depreciationMethod,
+        "Depreciation Rate": item.depreciationRate,
+
+        Location: item.assetLocation,
+        "Assigned To": item.assignedTo,
+        Status: item.status,
+
+        "Warranty Expiry": item.warrantyExpiryDate
+          ? dayjs(item.warrantyExpiryDate).format("DD-MM-YYYY")
+          : "",
+
+        "Insurance Policy": item.insurancePolicy,
+
+        "Insurance Expiry": item.insuranceExpiryDate
+          ? dayjs(item.insuranceExpiryDate).format("DD-MM-YYYY")
+          : "",
+
+        "Barcode Number": item.barcodeNumber,
+      }));
+
+      // Create worksheet
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+      // Auto column widths (nice formatting)
+      worksheet["!cols"] = [
+        { wch: 25 },
+        { wch: 18 },
+        { wch: 22 },
+        { wch: 15 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 20 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 22 },
+        { wch: 20 },
+        { wch: 18 },
+        { wch: 20 },
+        { wch: 14 },
+        { wch: 18 },
+        { wch: 20 },
+        { wch: 18 },
+      ];
+
+      // Workbook
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Assets");
+
+      // Generate file
+      const excelBuffer = XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "array",
+      });
+
+      const blob = new Blob([excelBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      // Dynamic filename
+      const fileName = `Assets_${dayjs().format("YYYY-MM-DD_HH-mm")}.xlsx`;
+
+      saveAs(blob, fileName);
+
+      message.success("Assets exported successfully");
+    } catch (error) {
+      console.error(error);
+      message.error("Export failed");
+    }
+  };
   useEffect(() => {
     if (!currentOrgId) return;
     fetchAssets();
@@ -832,6 +930,7 @@ export default function AssetManager() {
           <Button
             icon={<DownloadOutlined />}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            onClick={handleExportExcel}
           >
             Export
           </Button>
