@@ -19,11 +19,14 @@ import {
   EditOutlined,
   FilterOutlined,
 } from "@ant-design/icons";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 import dayjs from "dayjs";
 import {
   addAssetAllocation,
   getAssetAllocations,
   getAllAssets,
+  getAssetAllocationById,
 } from "../../api/assets";
 import useSessionStore from "../../store/sessionStore";
 
@@ -48,6 +51,78 @@ export default function AssetAllocation() {
 
   const conditionOptions = ["New", "Good", "Fair", "Damaged"];
 
+  // write the function to dowload the table data as excel file
+  const handleExportExcel = () => {
+    try {
+      if (!filteredData.length) {
+        message.warning("No allocation data to export");
+        return;
+      }
+
+      // helper → convert asset uuid to readable name
+      const getAssetLabel = (assetId) => {
+        const asset = assets.find((a) => a.id === assetId);
+        return asset ? `${asset.name} (${asset.code})` : assetId;
+      };
+
+      const exportData = filteredData.map((item, index) => ({
+        "SL No": index + 1,
+        Asset: getAssetLabel(item.asset),
+        "Assigned To": item.assignedTo || "-",
+
+        "Allocation Date": item.allocationDate
+          ? dayjs(item.allocationDate).format("DD-MM-YYYY")
+          : "",
+
+        "Return Date": item.returnDate
+          ? dayjs(item.returnDate).format("DD-MM-YYYY")
+          : "-",
+
+        "Condition At Issue": item.conditionAtIssue,
+        "Condition At Return": item.conditionAtReturn || "-",
+        Remarks: item.remarks || "-",
+      }));
+
+      // worksheet
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+      // professional column width
+      worksheet["!cols"] = [
+        { wch: 8 },
+        { wch: 30 },
+        { wch: 20 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 20 },
+        { wch: 20 },
+        { wch: 35 },
+      ];
+
+      // workbook
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Asset Allocations");
+
+      const excelBuffer = XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "array",
+      });
+
+      const blob = new Blob([excelBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      const fileName = `Asset_Allocations_${dayjs().format(
+        "YYYY-MM-DD_HH-mm",
+      )}.xlsx`;
+
+      saveAs(blob, fileName);
+
+      message.success("Allocation data exported successfully");
+    } catch (error) {
+      console.error(error);
+      message.error("Export failed");
+    }
+  };
   // ✅ fetch allocations
   const fetchassetallocations = async () => {
     try {
@@ -113,7 +188,92 @@ export default function AssetAllocation() {
         .includes(searchText.trim().toLowerCase()),
     ),
   );
+  // handle  view option
+  const handleView = async (record) => {
+    try {
+      setLoading(true);
 
+      const data = await getAssetAllocationById(record.id);
+
+      setSelectedRecord(data);
+      setIsViewModalOpen(true);
+      viewForm.setFieldsValue({
+        asset: data.asset,
+        assignedTo: data.assigned_to,
+        allocationDate: data.allocation_date
+          ? dayjs(data.allocation_date)
+          : undefined,
+        returnDate: data.return_date ? dayjs(data.return_date) : undefined,
+        conditionAtIssue: data.condition_at_issue,
+        conditionAtReturn: data.condition_at_return,
+        remarks: data.remarks,
+      });
+
+      setIsViewModalOpen(true);
+    } catch (err) {
+      message.error("Failed to load allocation details");
+    } finally {
+      setLoading(false);
+    }
+  };
+  // handle edit function
+  const handleEdit = async (record) => {
+    try {
+      setLoading(true);
+
+      const data = await getAssetAllocationById(record.id);
+
+      setSelectedRecord(data);
+
+      editForm.setFieldsValue({
+        asset: data.asset,
+        assignedTo: data.assigned_to,
+        allocationDate: data.allocation_date
+          ? dayjs(data.allocation_date)
+          : undefined,
+        returnDate: data.return_date ? dayjs(data.return_date) : undefined,
+        conditionAtIssue: data.condition_at_issue,
+        conditionAtReturn: data.condition_at_return,
+        remarks: data.remarks,
+      });
+
+      setIsEditModalOpen(true);
+    } catch (err) {
+      message.error("Failed to load allocation for edit");
+    } finally {
+      setLoading(false);
+    }
+  };
+  const handleUpdate = async (values) => {
+    try {
+      setLoading(true);
+
+      const payload = {
+        asset: values.asset,
+        assigned_to: values.assignedTo || null,
+        allocation_date: values.allocationDate
+          ? dayjs(values.allocationDate).format("YYYY-MM-DD")
+          : null,
+        return_date: values.returnDate
+          ? dayjs(values.returnDate).format("YYYY-MM-DD")
+          : null,
+        condition_at_issue: values.conditionAtIssue,
+        condition_at_return: values.conditionAtReturn || null,
+        remarks: values.remarks || null,
+      };
+
+      await updateAssetAllocation(selectedRecord.id, payload);
+
+      message.success("Allocation updated successfully");
+
+      setIsEditModalOpen(false);
+      fetchassetallocations(); // refresh table
+    } catch (err) {
+      message.error("Failed to update allocation");
+    } finally {
+      setLoading(false);
+    }
+  };
   // ✅ API add allocation
   const handleAdd = async (values) => {
     try {
@@ -241,36 +401,12 @@ export default function AssetAllocation() {
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              viewForm.setFieldsValue({
-                ...record,
-                allocationDate: record.allocationDate
-                  ? dayjs(record.allocationDate)
-                  : undefined,
-                returnDate: record.returnDate
-                  ? dayjs(record.returnDate)
-                  : undefined,
-              });
-              setIsViewModalOpen(true);
-            }}
+            onClick={() => handleView(record)}
           />
 
           <EditOutlined
             className="cursor-pointer! text-red-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              editForm.setFieldsValue({
-                ...record,
-                allocationDate: record.allocationDate
-                  ? dayjs(record.allocationDate)
-                  : undefined,
-                returnDate: record.returnDate
-                  ? dayjs(record.returnDate)
-                  : undefined,
-              });
-              setIsEditModalOpen(true);
-            }}
+            onClick={() => handleEdit(record)}
           />
         </div>
       ),
@@ -412,8 +548,8 @@ export default function AssetAllocation() {
         <div className="flex gap-2">
           <Button
             icon={<DownloadOutlined />}
-            onClick={() => message.info("Export not changed")}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            onClick={handleExportExcel}
           >
             Export
           </Button>
@@ -481,6 +617,58 @@ export default function AssetAllocation() {
               className="bg-amber-500! hover:bg-amber-600! border-none!"
             >
               Add
+            </Button>
+          </div>
+        </Form>
+      </Modal>
+      <Modal
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            View Asset Allocation
+          </span>
+        }
+        open={isViewModalOpen}
+        onCancel={() => setIsViewModalOpen(false)}
+        footer={null}
+        width={920}
+      >
+        <Form form={viewForm} layout="vertical">
+          {renderFormFields(true)}
+        </Form>
+      </Modal>
+      <Modal
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Edit Asset Allocation
+          </span>
+        }
+        open={isEditModalOpen}
+        onCancel={() => setIsEditModalOpen(false)}
+        footer={null}
+        width={920}
+      >
+        <Form
+          form={editForm}
+          layout="vertical"
+          onFinish={handleUpdate} // 👈 important
+        >
+          {renderFormFields(false)}
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              onClick={() => setIsEditModalOpen(false)}
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={loading}
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+            >
+              Update
             </Button>
           </div>
         </Form>

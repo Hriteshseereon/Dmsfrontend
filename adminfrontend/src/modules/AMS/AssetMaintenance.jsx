@@ -29,6 +29,7 @@ import {
   addAssetMaintenance,
   getAssetMaintenances,
   getAssets,
+  getAssetMaintenanceById,
   updateAssetMaintenance,
 } from "../../api/assets";
 import useSessionStore from "../../store/sessionStore";
@@ -82,12 +83,12 @@ export default function AssetMaintenance() {
         maintenanceId: item.maintenance_id,
         assetId: item.asset?.asset_code,
         assetPk: item.asset?.id,
-
+        asset_name: item.asset_name,
         serviceType: item.service_type,
         serviceProvider: item.service_provider,
 
         serviceDate: item.service_date,
-        nextServiceDue: item.next_service_due,
+        next_service_due_date: item.next_service_due_date,
 
         cost: item.cost,
         status: item.status,
@@ -103,6 +104,69 @@ export default function AssetMaintenance() {
     }
   };
 
+  // handle view function to view button click
+  const handleView = async (id) => {
+    try {
+      setLoading(true);
+
+      const res = await getAssetMaintenanceById(id);
+
+      console.log("VIEW API:", res);
+
+      viewForm.setFieldsValue({
+        assetId: res.asset,
+        serviceType: res.service_type,
+        serviceProvider: res.service_provider,
+        serviceDate: res.service_date ? dayjs(res.service_date) : null,
+        nextServiceDue: res.next_service_due_date
+          ? dayjs(res.next_service_due_date)
+          : null,
+        cost: res.cost,
+        status: res.status,
+        remarks: res.remarks,
+      });
+
+      setSelectedRecord(res);
+      setIsViewModalOpen(true);
+    } catch (err) {
+      console.log(err);
+      message.error("Failed to load maintenance details");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // handle edit funtion
+  const handleEditOpen = async (id) => {
+    try {
+      setLoading(true);
+
+      const res = await getAssetMaintenanceById(id);
+
+      console.log("EDIT API:", res);
+
+      editForm.setFieldsValue({
+        assetId: res.asset,
+        serviceType: res.service_type,
+        serviceProvider: res.service_provider,
+        serviceDate: res.service_date ? dayjs(res.service_date) : null,
+        nextServiceDue: res.next_service_due_date
+          ? dayjs(res.next_service_due_date)
+          : null,
+        cost: res.cost,
+        status: res.status,
+        remarks: res.remarks,
+      });
+
+      setSelectedRecord(res); // IMPORTANT → used in update
+      setIsEditModalOpen(true);
+    } catch (err) {
+      console.log(err);
+      message.error("Failed to load maintenance data");
+    } finally {
+      setLoading(false);
+    }
+  };
   const fetchAssets = async () => {
     const res = await getAssets(currentOrgId);
     setAssets(res);
@@ -123,8 +187,8 @@ export default function AssetMaintenance() {
       ),
     },
     {
-      title: <span className="text-amber-700 font-semibold">Asset ID</span>,
-      dataIndex: "assetId",
+      title: <span className="text-amber-700 font-semibold">Asset Name</span>,
+      dataIndex: "asset_name",
       width: 120,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
@@ -154,7 +218,7 @@ export default function AssetMaintenance() {
     },
     {
       title: <span className="text-amber-700 font-semibold">Next Due</span>,
-      dataIndex: "nextServiceDue",
+      dataIndex: "next_service_due_date",
       width: 130,
       render: (d) => (
         <span className="text-amber-800">
@@ -202,46 +266,12 @@ export default function AssetMaintenance() {
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              viewForm.setFieldsValue({
-                assetId: record.assetPk,
-                serviceType: record.serviceType,
-                serviceProvider: record.serviceProvider,
-                serviceDate: record.serviceDate
-                  ? dayjs(record.serviceDate)
-                  : null,
-                nextServiceDue: record.nextServiceDue
-                  ? dayjs(record.nextServiceDue)
-                  : null,
-                cost: record.cost,
-                status: record.status,
-                remarks: record.remarks,
-              });
-              setIsViewModalOpen(true);
-            }}
+            onClick={() => handleView(record.id)}
           />
 
           <EditOutlined
             className="cursor-pointer! text-red-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              editForm.setFieldsValue({
-                assetId: record.assetPk,
-                serviceType: record.serviceType,
-                serviceProvider: record.serviceProvider,
-                serviceDate: record.serviceDate
-                  ? dayjs(record.serviceDate)
-                  : null,
-                nextServiceDue: record.nextServiceDue
-                  ? dayjs(record.nextServiceDue)
-                  : null,
-                cost: record.cost,
-                status: record.status,
-                remarks: record.remarks,
-              });
-              setIsEditModalOpen(true);
-            }}
+            onClick={() => handleEditOpen(record.id)}
           />
         </div>
       ),
@@ -473,8 +503,31 @@ export default function AssetMaintenance() {
           <Form.Item
             label={<span className="text-amber-700">Cost (₹)</span>}
             name="cost"
+            rules={[
+              {
+                type: "number",
+                min: 0,
+                message: "Cost must be a positive number",
+              },
+              {
+                validator: (_, value) => {
+                  if (value === undefined || value === null)
+                    return Promise.resolve();
+                  if (Number.isNaN(value)) {
+                    return Promise.reject("Only numbers are allowed");
+                  }
+                  return Promise.resolve();
+                },
+              },
+            ]}
           >
-            <InputNumber className="w-full" min={0} disabled={disabled} />
+            <InputNumber
+              className="w-full"
+              min={0}
+              disabled={disabled}
+              controls={false}
+              parser={(value) => value.replace(/[^\d.]/g, "")}
+            />
           </Form.Item>
         </Col>
 
@@ -505,7 +558,7 @@ export default function AssetMaintenance() {
         </Col>
       </Row>
 
-      <h6 className="text-amber-500 mt-4">File Upload</h6>
+      {/* <h6 className="text-amber-500 mt-4">File Upload</h6>
       <Row gutter={16}>
         <Col span={24}>
           <Form.Item
@@ -542,7 +595,7 @@ export default function AssetMaintenance() {
             )}
           </Form.Item>
         </Col>
-      </Row>
+      </Row> */}
     </>
   );
 
