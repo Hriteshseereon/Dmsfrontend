@@ -108,61 +108,73 @@ export default function AddOrganisation() {
     {
       key: "cin",
       label: "CIN",
+      full_label: "Company Identification Number",
       validityRequired: false,
     },
     {
       key: "pan",
       label: "PAN",
+      full_label: "Permanent Account Number",
       validityRequired: false,
     },
     {
       key: "tan",
       label: "TAN",
+      full_label: "Tax Deduction and Collection Account Number",
       validityRequired: false,
     },
     {
       key: "gst",
       label: "GST",
+      full_label: "Goods and Services Tax Identification Number",
       validityRequired: false,
     },
     {
       key: "msme",
-      label: "MSME",
+      label: "MSME Udyam",
+      full_label: "Micro, Small and Medium Enterprise",
       validityRequired: false,
     },
     {
       key: "esi",
       label: "ESI",
+      full_label: "Employee State Insurance",
       validityRequired: false,
     },
     {
       key: "epf",
       label: "EPF",
+      full_label: "Employees' Provident Fund",
       validityRequired: false,
     },
     {
       key: "professionalTax",
       label: "Professional Tax",
+      full_label: "Professional Tax Number",
       validityRequired: true,
     },
     {
       key: "tradeLicense",
       label: "Trade License",
+      full_label: "Trade License Number",
       validityRequired: true,
     },
     {
       key: "fssai",
       label: "FSSAI",
+      full_label: "Food Safety and Standards Authority of India",
       validityRequired: true,
     },
     {
       key: "startup",
       label: "Startup India",
+      full_label: "Startup India Recognition Number",
       validityRequired: true,
     },
     {
       key: "lei",
       label: "LEI",
+      full_label: "Legal Entity Identifier",
       validityRequired: true,
     },
   ];
@@ -823,64 +835,7 @@ export default function AddOrganisation() {
             <Input placeholder="Enter registered name" />
           </Form.Item>
         </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Form.Item
-            label="Phone Number"
-            name="phone"
-            rules={[
-              { required: true, message: "Please enter phone number" },
-              {
-                pattern: /^[6-9]\d{9}$/,
-                message: "Enter a valid 10-digit mobile number",
-              },
-            ]}
-          >
-            <Input placeholder="Enter phone number" maxLength={10} />
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Form.Item
-            label="Alternate Phone Number"
-            name="phone2"
-            rules={[
-              {
-                pattern: /^[6-9]\d{9}$/,
-                message: "Enter a valid 10-digit mobile number",
-              },
-            ]}
-          >
-            <Input
-              placeholder="Enter phone number"
-              maxLength={10}
-              inputMode="numeric"
-              onChange={handleTenDigitNumber("phone2")}
-            />
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Form.Item
-            label="Email Address"
-            name="email"
-            rules={[
-              { required: true, message: "Please enter email" },
-              { type: "email", message: "Please enter valid email" },
-            ]}
-          >
-            <Input placeholder="Enter email address" />
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Form.Item
-            label="Secondary Email"
-            name="secondaryEmail"
-            rules={[
-              { message: "Please enter email" },
-              { type: "email", message: "Please enter valid email" },
-            ]}
-          >
-            <Input placeholder="Enter email address" />
-          </Form.Item>
-        </Col>
+
         <Col xs={24} sm={12} md={6}>
           <Form.Item
             label="Address Line 1"
@@ -948,6 +903,95 @@ export default function AddOrganisation() {
             <Input placeholder="PIN" maxLength={6} inputMode="numeric" />
           </Form.Item>
         </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Form.Item
+            label="Phone Number"
+            name="phone"
+            rules={[
+              { required: true, message: "Please enter phone number" },
+              {
+                pattern: /^[6-9]\d{9}$/,
+                message: "Enter a valid 10-digit mobile number",
+              },
+            ]}
+          >
+            <Input placeholder="Enter phone number" maxLength={10} />
+          </Form.Item>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Form.Item
+            label="Alternate Phone Number"
+            name="phone2"
+            rules={[
+              {
+                pattern: /^[6-9]\d{9}$/,
+                message: "Enter a valid 10-digit mobile number",
+              },
+            ]}
+          >
+            <Input
+              placeholder="Enter phone number"
+              maxLength={10}
+              inputMode="numeric"
+              onChange={handleTenDigitNumber("phone2")}
+            />
+          </Form.Item>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Form.Item
+            label="Landline Number"
+            name="landlineNumber"
+            rules={[
+              { message: "Please enter landline number" },
+              {
+                pattern: /^[6-9]\d{9}$/,
+                message: "Enter a valid 10-digit mobile number",
+              },
+            ]}
+          >
+            <Input placeholder="Enter landline number" maxLength={10} />
+          </Form.Item>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Form.Item
+            label="WhatsApp Number"
+            name="whatsappNumber"
+            rules={[
+              { message: "Please enter WhatsApp number" },
+              {
+                pattern: /^[6-9]\d{9}$/,
+                message: "Enter a valid 10-digit mobile number",
+              },
+            ]}
+          >
+            <Input placeholder="Enter WhatsApp number" maxLength={10} />
+          </Form.Item>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Form.Item
+            label="Email Address"
+            name="email"
+            rules={[
+              { required: true, message: "Please enter email" },
+              { type: "email", message: "Please enter valid email" },
+            ]}
+          >
+            <Input placeholder="Enter email address" />
+          </Form.Item>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Form.Item
+            label="Secondary Email"
+            name="secondaryEmail"
+            rules={[
+              { message: "Please enter email" },
+              { type: "email", message: "Please enter valid email" },
+            ]}
+          >
+            <Input placeholder="Enter email address" />
+          </Form.Item>
+        </Col>
+
         <Col xs={24} sm={12} md={6}>
           <Form.Item
             label="Head Office Location"
@@ -1070,30 +1114,6 @@ export default function AddOrganisation() {
                   <Col xs={24} sm={12} md={6}>
                     <Form.Item
                       {...restField}
-                      label="Contact Number"
-                      name={[name, "contactNumber"]}
-                      rules={[
-                        {
-                          pattern: /^[6-9]\d{9}$/,
-                          message: "Enter a valid 10-digit mobile number",
-                        },
-                      ]}
-                    >
-                      <Input
-                        placeholder="Enter contact number"
-                        maxLength={10}
-                        inputMode="numeric"
-                        onChange={handleTenDigitNumber([
-                          "partners",
-                          name,
-                          "contactNumber",
-                        ])}
-                      />
-                    </Form.Item>
-                  </Col>
-                  <Col xs={24} sm={12} md={6}>
-                    <Form.Item
-                      {...restField}
                       label="Mobile Number"
                       name={[name, "mobileNumber"]}
                       rules={[
@@ -1120,6 +1140,31 @@ export default function AddOrganisation() {
                       />
                     </Form.Item>
                   </Col>
+                  <Col xs={24} sm={12} md={6}>
+                    <Form.Item
+                      {...restField}
+                      label="Alternative Number"
+                      name={[name, "contactNumber"]}
+                      rules={[
+                        {
+                          pattern: /^[6-9]\d{9}$/,
+                          message: "Enter a valid 10-digit mobile number",
+                        },
+                      ]}
+                    >
+                      <Input
+                        placeholder="Enter contact number"
+                        maxLength={10}
+                        inputMode="numeric"
+                        onChange={handleTenDigitNumber([
+                          "partners",
+                          name,
+                          "contactNumber",
+                        ])}
+                      />
+                    </Form.Item>
+                  </Col>
+
                   <Col xs={24} sm={12} md={6}>
                     <Form.Item
                       {...restField}
@@ -1580,7 +1625,7 @@ export default function AddOrganisation() {
                   </Divider>
 
                   <Row gutter={[16, 16]}>
-                    <Col xs={24} sm={12} md={8}>
+                    <Col xs={12} sm={8} md={4}>
                       <Form.Item
                         {...restField}
                         label={<span>Bank Name</span>}
@@ -1598,8 +1643,31 @@ export default function AddOrganisation() {
                         />
                       </Form.Item>
                     </Col>
-
-                    <Col xs={24} sm={12} md={8}>
+                    <Col xs={12} sm={8} md={4}>
+                      <Form.Item
+                        {...restField}
+                        label={<span>Branch Name</span>}
+                        name={[name, "branchName"]}
+                      >
+                        <Input
+                          placeholder="Enter branch name"
+                          style={{ borderRadius: "6px" }}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={12} sm={8} md={4}>
+                      <Form.Item
+                        {...restField}
+                        label={<span>Type of Account</span>}
+                        name={[name, "accountType"]}
+                      >
+                        <Input
+                          placeholder="Enter account type"
+                          style={{ borderRadius: "6px" }}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={12} sm={8} md={4}>
                       <Form.Item
                         {...restField}
                         label={<span>Account Number</span>}
@@ -1618,7 +1686,7 @@ export default function AddOrganisation() {
                       </Form.Item>
                     </Col>
 
-                    <Col xs={24} sm={12} md={8}>
+                    <Col xs={12} sm={8} md={4}>
                       <Form.Item
                         {...restField}
                         label={<span>IFSC Code</span>}
@@ -1626,18 +1694,6 @@ export default function AddOrganisation() {
                       >
                         <Input
                           placeholder="SBIN0001234"
-                          style={{ borderRadius: "6px" }}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12} md={8}>
-                      <Form.Item
-                        {...restField}
-                        label={<span>Branch Name</span>}
-                        name={[name, "branchName"]}
-                      >
-                        <Input
-                          placeholder="Enter branch name"
                           style={{ borderRadius: "6px" }}
                         />
                       </Form.Item>
@@ -1657,30 +1713,6 @@ export default function AddOrganisation() {
                       </Divider>
 
                       <Row gutter={[16, 16]}>
-                        {rule.company_website && (
-                          <Col xs={24} sm={6}>
-                            <Form.Item
-                              {...restField}
-                              label={
-                                <span
-                                  style={{
-                                    fontSize: "14px",
-                                    fontWeight: "500",
-                                  }}
-                                >
-                                  Company Website
-                                </span>
-                              }
-                              name={[name, "companyDetails", "companyWebsite"]}
-                            >
-                              <Input
-                                placeholder="https://www.example.com"
-                                style={{ borderRadius: "6px" }}
-                              />
-                            </Form.Item>
-                          </Col>
-                        )}
-
                         {/* <Col xs={24} sm={12}>
                           <Form.Item
                             {...restField}
@@ -1742,7 +1774,29 @@ export default function AddOrganisation() {
                             />
                           </Form.Item>
                         </Col>
-
+                        {rule.company_website && (
+                          <Col xs={24} sm={6}>
+                            <Form.Item
+                              {...restField}
+                              label={
+                                <span
+                                  style={{
+                                    fontSize: "14px",
+                                    fontWeight: "500",
+                                  }}
+                                >
+                                  Company Website
+                                </span>
+                              }
+                              name={[name, "companyDetails", "companyWebsite"]}
+                            >
+                              <Input
+                                placeholder="https://www.example.com"
+                                style={{ borderRadius: "6px" }}
+                              />
+                            </Form.Item>
+                          </Col>
+                        )}
                         <Col xs={24} sm={12} md={6}>
                           <Form.Item
                             {...restField}
@@ -1977,7 +2031,7 @@ export default function AddOrganisation() {
                 key={doc.key}
                 size="small"
                 style={{ marginBottom: 16, background: "#fffbeb" }}
-                title={doc.label}
+                title={`${doc.label} ${doc.full_label ? `(${doc.full_label})` : ""}`}
               >
                 <Row gutter={[16, 8]}>
                   {/* Document Number */}
