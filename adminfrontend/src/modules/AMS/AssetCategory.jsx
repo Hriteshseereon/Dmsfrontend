@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { getAssetCategories, addAssetCategory } from "../../api/assets";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 import {
   Table,
   Input,
@@ -51,6 +53,42 @@ export default function AssetCategory() {
   useEffect(() => {
     fetchAssetCategories();
   }, []);
+  //  function write for download in the excel file
+  const handleExportExcel = () => {
+    try {
+      // choose what you want to export
+      const exportData = data.map((item) => ({
+        "Category Name": item.categoryName,
+        Description: item.description,
+        "Useful Life (Years)": item.usefulLife,
+        "Depreciation Method": item.defaultDepreciationMethod,
+        "Depreciation Rate (%)": item.defaultDepreciationRate,
+      }));
+
+      // Create worksheet
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+      // Create workbook
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Asset Categories");
+
+      // Generate Excel file buffer
+      const excelBuffer = XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "array",
+      });
+
+      // Save file
+      const fileData = new Blob([excelBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      saveAs(fileData, "Asset_Categories.xlsx");
+    } catch (error) {
+      console.error("Export error:", error);
+      message.error("Failed to export data");
+    }
+  };
 
   const fetchAssetCategories = async () => {
     setLoading(true);
@@ -332,6 +370,7 @@ export default function AssetCategory() {
           <Button
             icon={<DownloadOutlined />}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            onClick={handleExportExcel}
           >
             Export
           </Button>
