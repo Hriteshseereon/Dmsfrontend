@@ -19,6 +19,8 @@ import {
   EditOutlined,
   FilterOutlined,
 } from "@ant-design/icons";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 import dayjs from "dayjs";
 import {
   addAssetAllocation,
@@ -49,6 +51,78 @@ export default function AssetAllocation() {
 
   const conditionOptions = ["New", "Good", "Fair", "Damaged"];
 
+  // write the function to dowload the table data as excel file
+  const handleExportExcel = () => {
+    try {
+      if (!filteredData.length) {
+        message.warning("No allocation data to export");
+        return;
+      }
+
+      // helper → convert asset uuid to readable name
+      const getAssetLabel = (assetId) => {
+        const asset = assets.find((a) => a.id === assetId);
+        return asset ? `${asset.name} (${asset.code})` : assetId;
+      };
+
+      const exportData = filteredData.map((item, index) => ({
+        "SL No": index + 1,
+        Asset: getAssetLabel(item.asset),
+        "Assigned To": item.assignedTo || "-",
+
+        "Allocation Date": item.allocationDate
+          ? dayjs(item.allocationDate).format("DD-MM-YYYY")
+          : "",
+
+        "Return Date": item.returnDate
+          ? dayjs(item.returnDate).format("DD-MM-YYYY")
+          : "-",
+
+        "Condition At Issue": item.conditionAtIssue,
+        "Condition At Return": item.conditionAtReturn || "-",
+        Remarks: item.remarks || "-",
+      }));
+
+      // worksheet
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+      // professional column width
+      worksheet["!cols"] = [
+        { wch: 8 },
+        { wch: 30 },
+        { wch: 20 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 20 },
+        { wch: 20 },
+        { wch: 35 },
+      ];
+
+      // workbook
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Asset Allocations");
+
+      const excelBuffer = XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "array",
+      });
+
+      const blob = new Blob([excelBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      const fileName = `Asset_Allocations_${dayjs().format(
+        "YYYY-MM-DD_HH-mm",
+      )}.xlsx`;
+
+      saveAs(blob, fileName);
+
+      message.success("Allocation data exported successfully");
+    } catch (error) {
+      console.error(error);
+      message.error("Export failed");
+    }
+  };
   // ✅ fetch allocations
   const fetchassetallocations = async () => {
     try {
@@ -474,8 +548,8 @@ export default function AssetAllocation() {
         <div className="flex gap-2">
           <Button
             icon={<DownloadOutlined />}
-            onClick={() => message.info("Export not changed")}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            onClick={handleExportExcel}
           >
             Export
           </Button>
