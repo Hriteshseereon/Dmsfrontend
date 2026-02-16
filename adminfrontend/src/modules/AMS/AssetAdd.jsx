@@ -14,6 +14,8 @@ import {
   Col,
   message,
 } from "antd";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 import {
   SearchOutlined,
   PlusOutlined,
@@ -32,6 +34,7 @@ import {
   getAssetCategories,
   getAssets,
   updateAsset,
+  getAssetById,
 } from "../../api/assets";
 
 import useSessionStore from "../../store/sessionStore";
@@ -72,6 +75,52 @@ export default function AssetManager() {
 
   const [fileList, setFileList] = useState([]);
 
+  // const map details
+  const mapAssetToForm = (item) => ({
+    id: item.id,
+
+    assetName: item.asset_name,
+    assetId: item.asset_code,
+
+    assetCategoryId: item.category,
+
+    assetType: item.asset_type,
+    serialNumber: item.serial_number,
+    modelNumber: item.model_number,
+    brand: item.brand,
+
+    purchaseDate: item.purchase_date ? dayjs(item.purchase_date) : undefined,
+
+    purchaseVendor: item.purchase_vendor,
+    purchaseInvoice: item.purchase_invoice,
+
+    assignedTo: item.assigned_to_employee,
+
+    costPrice: Number(item.cost_price),
+    currentValue: Number(item.current_value),
+
+    depreciationMethod: item.depreciation_method,
+    depreciationRate: Number(item.depreciation_rate),
+
+    depreciationPercent: item.depreciation_percent,
+    depreciationValue: item.depreciation_value,
+
+    assetLocation: item.location_description,
+    status: item.status,
+
+    warrantyExpiryDate: item.warranty_expiry_date
+      ? dayjs(item.warranty_expiry_date)
+      : undefined,
+
+    insurancePolicy: item.insurance_policy,
+
+    insuranceExpiryDate: item.insurance_expiry_date
+      ? dayjs(item.insurance_expiry_date)
+      : undefined,
+
+    barcodeNumber: item.barcode_number,
+    additionalInfo: item.additional_info,
+  });
   const fetchCategories = async () => {
     try {
       const res = await getAssetCategories();
@@ -80,7 +129,141 @@ export default function AssetManager() {
       message.error("Failed to load asset categories");
     }
   };
+  // handle view function for view modal
+  const handleView = async (record) => {
+    try {
+      setLoading(true);
 
+      const asset = await getAssetById(record.id);
+
+      const mapped = mapAssetToForm(asset);
+
+      setSelectedRecord(mapped);
+      viewForm.setFieldsValue(mapped);
+
+      setIsViewModalOpen(true);
+    } catch (err) {
+      message.error("Failed to load asset details");
+    } finally {
+      setLoading(false);
+    }
+  };
+  // handle edit function for edit modal
+  const handleEditClick = async (record) => {
+    try {
+      setLoading(true);
+
+      const asset = await getAssetById(record.id);
+
+      const mapped = mapAssetToForm(asset);
+
+      setSelectedRecord(mapped);
+      editForm.setFieldsValue(mapped);
+
+      setIsEditModalOpen(true);
+    } catch (err) {
+      message.error("Failed to load asset for editing");
+    } finally {
+      setLoading(false);
+    }
+  };
+  // function to export table data to excel
+  const handleExportExcel = () => {
+    try {
+      if (!filteredData.length) {
+        message.warning("No data to export");
+        return;
+      }
+
+      // Convert table data → Excel friendly format
+      const exportData = filteredData.map((item) => ({
+        "Asset Name": item.assetName,
+        "Asset ID": item.assetId,
+        Category: item.assetCategory,
+        "Asset Type": item.assetType,
+        Brand: item.brand,
+        "Model Number": item.modelNumber,
+        "Serial Number": item.serialNumber,
+
+        "Purchase Date": item.purchaseDate
+          ? dayjs(item.purchaseDate).format("DD-MM-YYYY")
+          : "",
+
+        "Purchase Vendor": item.purchaseVendor,
+        "Cost Price (₹)": item.costPrice,
+        "Current Value (₹)": item.currentValue,
+
+        "Depreciation Method": item.depreciationMethod,
+        "Depreciation Rate": item.depreciationRate,
+
+        Location: item.assetLocation,
+        "Assigned To": item.assignedTo,
+        Status: item.status,
+
+        "Warranty Expiry": item.warrantyExpiryDate
+          ? dayjs(item.warrantyExpiryDate).format("DD-MM-YYYY")
+          : "",
+
+        "Insurance Policy": item.insurancePolicy,
+
+        "Insurance Expiry": item.insuranceExpiryDate
+          ? dayjs(item.insuranceExpiryDate).format("DD-MM-YYYY")
+          : "",
+
+        "Barcode Number": item.barcodeNumber,
+      }));
+
+      // Create worksheet
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+      // Auto column widths (nice formatting)
+      worksheet["!cols"] = [
+        { wch: 25 },
+        { wch: 18 },
+        { wch: 22 },
+        { wch: 15 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 20 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 22 },
+        { wch: 20 },
+        { wch: 18 },
+        { wch: 20 },
+        { wch: 14 },
+        { wch: 18 },
+        { wch: 20 },
+        { wch: 18 },
+      ];
+
+      // Workbook
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Assets");
+
+      // Generate file
+      const excelBuffer = XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "array",
+      });
+
+      const blob = new Blob([excelBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      // Dynamic filename
+      const fileName = `Assets_${dayjs().format("YYYY-MM-DD_HH-mm")}.xlsx`;
+
+      saveAs(blob, fileName);
+
+      message.success("Assets exported successfully");
+    } catch (error) {
+      console.error(error);
+      message.error("Export failed");
+    }
+  };
   useEffect(() => {
     if (!currentOrgId) return;
     fetchAssets();
@@ -109,7 +292,9 @@ export default function AssetManager() {
         brand: item.brand,
 
         purchaseDate: item.purchase_date,
-
+        purchaseVendor: item.purchase_vendor,
+        purchaseInvoice: item.purchase_invoice,
+        assignedTo: item.assigned_to_employee,
         costPrice: item.cost_price,
         currentValue: item.current_value,
 
@@ -173,9 +358,9 @@ export default function AssetManager() {
 
         purchase_date: values.purchaseDate?.format("YYYY-MM-DD"),
 
-        purchase_vendor: null, // ✅ keep null now
-        purchase_invoice: null, // ✅ keep null now
-        assigned_to_employee: null, // ✅ keep null now
+        purchase_vendor: values.purchaseVendor,
+        purchase_invoice: values.purchaseInvoice,
+        assigned_to_employee: values.assignedTo,
 
         cost_price: values.costPrice?.toString(),
         current_value: values.currentValue
@@ -197,7 +382,7 @@ export default function AssetManager() {
 
         barcode_number: values.barcodeNumber || null,
         location_description: values.assetLocation || null,
-
+        additional_info: values.additionalInfo || null,
         status: values.status || "Active",
       });
 
@@ -230,12 +415,14 @@ export default function AssetManager() {
         purchase_date: values.purchaseDate?.format("YYYY-MM-DD"),
         cost_price: values.costPrice,
         current_value: values.currentValue,
-
+        purchase_vendor: values.purchaseVendor,
+        purchase_invoice: values.purchaseInvoice,
+        assigned_to_employee: values.assignedTo,
         depreciation_method: values.depreciationMethod,
         depreciation_rate: values.depreciationRate,
 
         location_description: values.assetLocation,
-        assigned_to_employee: values.assignedTo,
+
         status: values.status,
 
         warranty_expiry_date: values.warrantyExpiryDate?.format("YYYY-MM-DD"),
@@ -270,8 +457,15 @@ export default function AssetManager() {
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Category</span>,
-      dataIndex: "assetCategory",
+      title: <span className="text-amber-700 font-semibold">Asset Type</span>,
+      dataIndex: "assetType",
+      width: 140,
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+
+    {
+      title: <span className="text-amber-700 font-semibold">Model Number</span>,
+      dataIndex: "modelNumber",
       width: 160,
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
@@ -311,43 +505,11 @@ export default function AssetManager() {
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              viewForm.setFieldsValue({
-                ...record,
-                purchaseDate: record.purchaseDate
-                  ? dayjs(record.purchaseDate)
-                  : undefined,
-                warrantyExpiryDate: record.warrantyExpiryDate
-                  ? dayjs(record.warrantyExpiryDate)
-                  : undefined,
-                insuranceExpiryDate: record.insuranceExpiryDate
-                  ? dayjs(record.insuranceExpiryDate)
-                  : undefined,
-              });
-              setIsViewModalOpen(true);
-            }}
+            onClick={() => handleView(record)}
           />
           <EditOutlined
             className="cursor-pointer! text-red-500! "
-            onClick={() => {
-              setSelectedRecord(record);
-              editForm.setFieldsValue({
-                ...record,
-                assetCategoryId: record.assetCategoryId,
-                purchaseDate: record.purchaseDate
-                  ? dayjs(record.purchaseDate)
-                  : undefined,
-                warrantyExpiryDate: record.warrantyExpiryDate
-                  ? dayjs(record.warrantyExpiryDate)
-                  : undefined,
-                insuranceExpiryDate: record.insuranceExpiryDate
-                  ? dayjs(record.insuranceExpiryDate)
-                  : undefined,
-              });
-              setFileList(record.documents || []);
-              setIsEditModalOpen(true);
-            }}
+            onClick={() => handleEditClick(record)}
           />
         </div>
       ),
@@ -490,13 +652,33 @@ export default function AssetManager() {
               <span className="text-amber-700 font-medium">Cost Price</span>
             }
             name="costPrice"
-            rules={[{ required: true, message: "Please enter Cost Price" }]}
+            rules={[
+              { required: true, message: "Please enter Cost Price" },
+              {
+                type: "number",
+                transform: (value) => Number(value),
+                message: "Cost Price must be a valid number",
+              },
+            ]}
           >
             <InputNumber
               className="w-full"
               min={0}
               prefix="₹"
+              precision={2}
               disabled={disabled}
+              parser={(value) => value?.replace(/[^\d.]/g, "")}
+              onKeyPress={(e) => {
+                if (!/[0-9.]/.test(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+              onPaste={(e) => {
+                const paste = e.clipboardData.getData("text");
+                if (!/^\d*\.?\d*$/.test(paste)) {
+                  e.preventDefault();
+                }
+              }}
             />
           </Form.Item>
         </Col>
@@ -511,7 +693,20 @@ export default function AssetManager() {
               className="w-full"
               min={0}
               prefix="₹"
+              precision={2}
               disabled={disabled}
+              parser={(value) => value?.replace(/[^\d.]/g, "")}
+              onKeyPress={(e) => {
+                if (!/[0-9.]/.test(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+              onPaste={(e) => {
+                const paste = e.clipboardData.getData("text");
+                if (!/^\d*\.?\d*$/.test(paste)) {
+                  e.preventDefault();
+                }
+              }}
             />
           </Form.Item>
         </Col>
@@ -541,7 +736,7 @@ export default function AssetManager() {
           <Form.Item
             label={
               <span className="text-amber-700 font-medium">
-                Depreciation Rate (%)
+                Depreciation Rate
               </span>
             }
             name="depreciationRate"
@@ -549,8 +744,21 @@ export default function AssetManager() {
             <InputNumber
               className="w-full"
               min={0}
-              max={100}
+              prefix="₹"
+              precision={2}
               disabled={disabled}
+              parser={(value) => value?.replace(/[^\d.]/g, "")}
+              onKeyPress={(e) => {
+                if (!/[0-9.]/.test(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+              onPaste={(e) => {
+                const paste = e.clipboardData.getData("text");
+                if (!/^\d*\.?\d*$/.test(paste)) {
+                  e.preventDefault();
+                }
+              }}
             />
           </Form.Item>
         </Col>
@@ -566,8 +774,20 @@ export default function AssetManager() {
             <InputNumber
               className="w-full"
               min={0}
-              max={100}
+              precision={2}
               disabled={disabled}
+              parser={(value) => value?.replace(/[^\d.]/g, "")}
+              onKeyPress={(e) => {
+                if (!/[0-9.]/.test(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+              onPaste={(e) => {
+                const paste = e.clipboardData.getData("text");
+                if (!/^\d*\.?\d*$/.test(paste)) {
+                  e.preventDefault();
+                }
+              }}
             />
           </Form.Item>
         </Col>
@@ -583,8 +803,21 @@ export default function AssetManager() {
             <InputNumber
               className="w-full"
               min={0}
-              max={100}
+              prefix="₹"
+              precision={2}
               disabled={disabled}
+              parser={(value) => value?.replace(/[^\d.]/g, "")}
+              onKeyPress={(e) => {
+                if (!/[0-9.]/.test(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+              onPaste={(e) => {
+                const paste = e.clipboardData.getData("text");
+                if (!/^\d*\.?\d*$/.test(paste)) {
+                  e.preventDefault();
+                }
+              }}
             />
           </Form.Item>
         </Col>
@@ -697,7 +930,7 @@ export default function AssetManager() {
         </Col>
       </Row>
 
-      <h6 className="text-amber-500 mt-4">Upload Document</h6>
+      {/* <h6 className="text-amber-500 mt-4">Upload Document</h6>
       <Row gutter={16}>
         <Col span={24}>
           <Form.Item
@@ -721,7 +954,7 @@ export default function AssetManager() {
             </Upload>
           </Form.Item>
         </Col>
-      </Row>
+      </Row> */}
     </>
   );
 
@@ -750,6 +983,7 @@ export default function AssetManager() {
           <Button
             icon={<DownloadOutlined />}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            onClick={handleExportExcel}
           >
             Export
           </Button>

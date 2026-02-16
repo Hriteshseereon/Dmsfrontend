@@ -30,6 +30,7 @@ import {
   getAssetDepreciations,
   getAssets,
   updateAssetDepreciation,
+  getAssetdepriciationByID,
 } from "../../api/assets";
 import useSessionStore from "../../store/sessionStore";
 
@@ -74,7 +75,70 @@ export default function AssetDepreciation() {
     const res = await getAssets(currentOrgId);
     setAssets(res);
   };
+  // this is the mapper function
+  const mapDepreciationToForm = (data) => ({
+    assetId: data.asset,
+    purchaseValue: Number(data.purchase_value),
+    depreciationRate: Number(data.depreciation_rate),
+    depreciationMethod: data.depreciation_method,
+    depreciationStartDate: data.depreciation_start_date
+      ? dayjs(data.depreciation_start_date)
+      : null,
+    depreciationEndDate: data.depreciation_end_date
+      ? dayjs(data.depreciation_end_date)
+      : null,
+    fiscalYear: data.fiscal_year,
+    currentValue: Number(data.current_value),
+    status: data.status,
+    remarks: data.remarks,
+  });
+  const handleView = async (record) => {
+    try {
+      setLoading(true);
 
+      const res = await getAssetdepriciationByID(record.id);
+
+      setSelectedRecord(res);
+
+      viewForm.setFieldsValue(mapDepreciationToForm(res));
+
+      setIsViewModalOpen(true);
+    } catch (e) {
+      message.error("Failed to load record");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const buildPayload = (values) => ({
+    asset: values.assetId,
+    purchase_value: values.purchaseValue,
+    depreciation_rate: values.depreciationRate,
+    depreciation_method: values.depreciationMethod,
+    depreciation_start_date: values.depreciationStartDate?.format("YYYY-MM-DD"),
+    depreciation_end_date: values.depreciationEndDate?.format("YYYY-MM-DD"),
+    fiscal_year: values.fiscalYear,
+    current_value: values.currentValue,
+    status: values.status,
+    remarks: values.remarks || null,
+  });
+  const handleEditOpen = async (record) => {
+    try {
+      setLoading(true);
+
+      const res = await getAssetdepriciationByID(record.id);
+
+      setSelectedRecord(res);
+
+      editForm.setFieldsValue(mapDepreciationToForm(res));
+
+      setIsEditModalOpen(true);
+    } catch {
+      message.error("Failed to load record");
+    } finally {
+      setLoading(false);
+    }
+  };
   const fetchDepreciations = async () => {
     setLoading(true);
     try {
@@ -86,7 +150,7 @@ export default function AssetDepreciation() {
 
         assetId: item.asset?.asset_code,
         assetPk: item.asset?.id,
-
+        asset_name: item.asset_name,
         purchaseValue: item.purchase_value,
         depreciationRate: item.depreciation_rate,
         depreciationMethod: item.depreciation_method,
@@ -124,8 +188,8 @@ export default function AssetDepreciation() {
       ),
     },
     {
-      title: <span className="text-amber-700 font-semibold">Asset ID</span>,
-      dataIndex: "assetId",
+      title: <span className="text-amber-700 font-semibold">Asset Name</span>,
+      dataIndex: "asset_name",
       width: 140,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
@@ -214,31 +278,11 @@ export default function AssetDepreciation() {
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              viewForm.setFieldsValue({
-                ...record,
-                assetId: record.assetPk,
-                depreciationStartDate: record.depreciationStartDate
-                  ? dayjs(record.depreciationStartDate)
-                  : undefined,
-              });
-              setIsViewModalOpen(true);
-            }}
+            onClick={() => handleView(record)}
           />
           <EditOutlined
             className="cursor-pointer! text-red-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              editForm.setFieldsValue({
-                ...record,
-                assetId: record.assetPk,
-                depreciationStartDate: record.depreciationStartDate
-                  ? dayjs(record.depreciationStartDate)
-                  : undefined,
-              });
-              setIsEditModalOpen(true);
-            }}
+            onClick={() => handleEditOpen(record)}
           />
         </div>
       ),
@@ -356,7 +400,7 @@ export default function AssetDepreciation() {
         remarks: values.remarks || null,
       };
 
-      await updateAssetDepreciation(selectedRecord.id, payload);
+      await updateAssetDepreciation(selectedRecord.id, buildPayload(values));
 
       message.success("Depreciation updated");
       setIsEditModalOpen(false);
@@ -397,7 +441,24 @@ export default function AssetDepreciation() {
             name="purchaseValue"
             rules={[{ required: true, message: "Please enter Purchase Value" }]}
           >
-            <InputNumber className="w-full" min={0} disabled={disabled} />
+            <InputNumber
+              className="w-full"
+              min={0}
+              disabled={disabled}
+              // prevents typing letters like e,+,-
+              onKeyDown={(e) => {
+                if (["e", "E", "+", "-", ","].includes(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+              // remove non-numeric paste/text
+              parser={(value) => value.replace(/[^\d.]/g, "")}
+              // optional display format
+              formatter={(value) => (value ? `${value}` : "")}
+              onChange={(value) => {
+                if (value < 0) return;
+              }}
+            />
           </Form.Item>
         </Col>
 
@@ -414,8 +475,20 @@ export default function AssetDepreciation() {
             <InputNumber
               className="w-full"
               min={0}
-              max={100}
               disabled={disabled}
+              // prevents typing letters like e,+,-
+              onKeyDown={(e) => {
+                if (["e", "E", "+", "-", ","].includes(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+              // remove non-numeric paste/text
+              parser={(value) => value.replace(/[^\d.]/g, "")}
+              // optional display format
+              formatter={(value) => (value ? `${value}` : "")}
+              onChange={(value) => {
+                if (value < 0) return;
+              }}
             />
           </Form.Item>
         </Col>
@@ -468,8 +541,26 @@ export default function AssetDepreciation() {
           <Form.Item
             label={<span className="text-amber-700">Current Value (₹)</span>}
             name="currentValue"
+            rules={[{ required: true }]}
           >
-            <InputNumber className="w-full" min={0} disabled={disabled} />
+            <InputNumber
+              className="w-full"
+              min={0}
+              disabled={disabled}
+              // prevents typing letters like e,+,-
+              onKeyDown={(e) => {
+                if (["e", "E", "+", "-", ","].includes(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+              // remove non-numeric paste/text
+              parser={(value) => value.replace(/[^\d.]/g, "")}
+              // optional display format
+              formatter={(value) => (value ? `${value}` : "")}
+              onChange={(value) => {
+                if (value < 0) return;
+              }}
+            />
           </Form.Item>
         </Col>
       </Row>
@@ -479,9 +570,40 @@ export default function AssetDepreciation() {
           <Form.Item
             label={<span className="text-amber-700">Fiscal Year</span>}
             name="fiscalYear"
-            rules={[{ required: true, message: "Please enter Fiscal Year" }]}
+            rules={[
+              { required: true, message: "Please enter Fiscal Year" },
+              {
+                pattern: /^\d{4}-\d{2}$/,
+                message: "Format must be YYYY-YY (e.g. 2024-25)",
+              },
+            ]}
           >
-            <Input placeholder="e.g. 2024-25" disabled={disabled} />
+            <Input
+              placeholder="e.g. 2024-25"
+              disabled={disabled}
+              maxLength={7}
+              onKeyDown={(e) => {
+                // allow numbers + dash + control keys
+                if (
+                  !/[0-9-]/.test(e.key) &&
+                  ![
+                    "Backspace",
+                    "Delete",
+                    "ArrowLeft",
+                    "ArrowRight",
+                    "Tab",
+                  ].includes(e.key)
+                ) {
+                  e.preventDefault();
+                }
+              }}
+              onPaste={(e) => {
+                const paste = e.clipboardData.getData("text");
+                if (!/^\d*-?\d*$/.test(paste)) {
+                  e.preventDefault();
+                }
+              }}
+            />
           </Form.Item>
         </Col>
 
@@ -516,7 +638,7 @@ export default function AssetDepreciation() {
         </Col>
       </Row>
 
-      <h6 className="text-amber-500 mt-4">File Upload</h6>
+      {/* <h6 className="text-amber-500 mt-4">File Upload</h6>
       <Row gutter={16}>
         <Col span={24}>
           <Form.Item
@@ -553,7 +675,7 @@ export default function AssetDepreciation() {
             )}
           </Form.Item>
         </Col>
-      </Row>
+      </Row> */}
     </>
   );
 
