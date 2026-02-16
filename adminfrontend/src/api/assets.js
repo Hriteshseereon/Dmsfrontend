@@ -27,7 +27,11 @@ export const addAsset = async (payload) => {
   const res = await api.post("/assets/assets/", payload);
   return res.data;
 };
-
+// get asset by id
+export const getAssetById = async (id) => {
+  const res = await api.get(`/assets/assets/${id}/`);
+  return res.data;
+}
 // UPDATE
 export const updateAsset = async (id, payload) => {
   const { currentOrgId } = useSessionStore.getState();

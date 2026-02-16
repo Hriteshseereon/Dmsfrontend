@@ -34,6 +34,7 @@ import {
   getAssetCategories,
   getAssets,
   updateAsset,
+  getAssetById,
 } from "../../api/assets";
 
 import useSessionStore from "../../store/sessionStore";
@@ -74,12 +75,96 @@ export default function AssetManager() {
 
   const [fileList, setFileList] = useState([]);
 
+  // const map details
+  const mapAssetToForm = (item) => ({
+    id: item.id,
+
+    assetName: item.asset_name,
+    assetId: item.asset_code,
+
+    assetCategoryId: item.category,
+
+    assetType: item.asset_type,
+    serialNumber: item.serial_number,
+    modelNumber: item.model_number,
+    brand: item.brand,
+
+    purchaseDate: item.purchase_date ? dayjs(item.purchase_date) : undefined,
+
+    purchaseVendor: item.purchase_vendor,
+    purchaseInvoice: item.purchase_invoice,
+
+    assignedTo: item.assigned_to_employee,
+
+    costPrice: Number(item.cost_price),
+    currentValue: Number(item.current_value),
+
+    depreciationMethod: item.depreciation_method,
+    depreciationRate: Number(item.depreciation_rate),
+
+    depreciationPercent: item.depreciation_percent,
+    depreciationValue: item.depreciation_value,
+
+    assetLocation: item.location_description,
+    status: item.status,
+
+    warrantyExpiryDate: item.warranty_expiry_date
+      ? dayjs(item.warranty_expiry_date)
+      : undefined,
+
+    insurancePolicy: item.insurance_policy,
+
+    insuranceExpiryDate: item.insurance_expiry_date
+      ? dayjs(item.insurance_expiry_date)
+      : undefined,
+
+    barcodeNumber: item.barcode_number,
+    additionalInfo: item.additional_info,
+  });
   const fetchCategories = async () => {
     try {
       const res = await getAssetCategories();
       setCategories(res);
     } catch {
       message.error("Failed to load asset categories");
+    }
+  };
+  // handle view function for view modal
+  const handleView = async (record) => {
+    try {
+      setLoading(true);
+
+      const asset = await getAssetById(record.id);
+
+      const mapped = mapAssetToForm(asset);
+
+      setSelectedRecord(mapped);
+      viewForm.setFieldsValue(mapped);
+
+      setIsViewModalOpen(true);
+    } catch (err) {
+      message.error("Failed to load asset details");
+    } finally {
+      setLoading(false);
+    }
+  };
+  // handle edit function for edit modal
+  const handleEditClick = async (record) => {
+    try {
+      setLoading(true);
+
+      const asset = await getAssetById(record.id);
+
+      const mapped = mapAssetToForm(asset);
+
+      setSelectedRecord(mapped);
+      editForm.setFieldsValue(mapped);
+
+      setIsEditModalOpen(true);
+    } catch (err) {
+      message.error("Failed to load asset for editing");
+    } finally {
+      setLoading(false);
     }
   };
   // function to export table data to excel
@@ -297,7 +382,7 @@ export default function AssetManager() {
 
         barcode_number: values.barcodeNumber || null,
         location_description: values.assetLocation || null,
-
+        additional_info: values.additionalInfo || null,
         status: values.status || "Active",
       });
 
@@ -420,43 +505,11 @@ export default function AssetManager() {
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              viewForm.setFieldsValue({
-                ...record,
-                purchaseDate: record.purchaseDate
-                  ? dayjs(record.purchaseDate)
-                  : undefined,
-                warrantyExpiryDate: record.warrantyExpiryDate
-                  ? dayjs(record.warrantyExpiryDate)
-                  : undefined,
-                insuranceExpiryDate: record.insuranceExpiryDate
-                  ? dayjs(record.insuranceExpiryDate)
-                  : undefined,
-              });
-              setIsViewModalOpen(true);
-            }}
+            onClick={() => handleView(record)}
           />
           <EditOutlined
             className="cursor-pointer! text-red-500! "
-            onClick={() => {
-              setSelectedRecord(record);
-              editForm.setFieldsValue({
-                ...record,
-                assetCategoryId: record.assetCategoryId,
-                purchaseDate: record.purchaseDate
-                  ? dayjs(record.purchaseDate)
-                  : undefined,
-                warrantyExpiryDate: record.warrantyExpiryDate
-                  ? dayjs(record.warrantyExpiryDate)
-                  : undefined,
-                insuranceExpiryDate: record.insuranceExpiryDate
-                  ? dayjs(record.insuranceExpiryDate)
-                  : undefined,
-              });
-              setFileList(record.documents || []);
-              setIsEditModalOpen(true);
-            }}
+            onClick={() => handleEditClick(record)}
           />
         </div>
       ),
