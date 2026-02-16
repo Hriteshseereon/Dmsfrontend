@@ -725,6 +725,8 @@ const payload = {
   <Select
     placeholder="Select Order No"
     onChange={(val) => handleOrderSelect(val)}
+    disabled={disabled || isEditModalOpen || isViewModalOpen}
+     
   >
     {orderList.map((order) => (
       <Select.Option key={order.id} value={order.id}>

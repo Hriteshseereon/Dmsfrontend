@@ -623,6 +623,7 @@ const handleExport = async () => {
 
     console.log("FINAL PAYLOAD:", payload);
     await addPurchaseContract(payload);
+      await fetchPurchaseContracts(); 
     setIsAddModalOpen(false);
   };
 
@@ -691,7 +692,8 @@ const handleExport = async () => {
                   >
                     <Select
                       placeholder={!selectedVendor ? "Select vendor first" : "Select Item"}
-                      disabled={!selectedVendor || products.length === 0}
+                      disabled={!selectedVendor || products.length === 0 || isEditModalOpen || isViewModalOpen}
+                      
                       onChange={(productId) => {
                         const selected = products.find(p => p.id === productId);
 
@@ -710,7 +712,8 @@ const handleExport = async () => {
                              ]);
                       }}
 
-
+                      
+                    
                     >
                       {products.map((p) => (
                         <Select.Option key={p.id} value={p.id}>
@@ -1019,7 +1022,7 @@ const handleExport = async () => {
                 showSearch
                 optionFilterProp="label"
                 onChange={async (vendorId) => {
-                  const selectedVendorObj = vendors.find(v => v.id === vendorId);
+                const selectedVendorObj = vendors.find(v => v.id === vendorId);
 
                   setSelectedVendor(vendorId);
 
@@ -1039,6 +1042,8 @@ const handleExport = async () => {
                   // reset plant
                   addForm.setFieldsValue({ plant: undefined });
                 }}
+                
+    disabled={disabled || isEditModalOpen || isViewModalOpen}
               >
                 {vendors.map(v => (
                   <Select.Option key={v.id} value={v.id} label={v.name}>
@@ -1074,6 +1079,8 @@ const handleExport = async () => {
                     plant_name: selectedPlantObj?.name || "",
                   });
                 }}
+                
+    disabled={disabled || isEditModalOpen || isViewModalOpen}
               >
                 {plants.map(p => (
                   <Select.Option
@@ -1084,6 +1091,7 @@ const handleExport = async () => {
                     {p.name}
                   </Select.Option>
                 ))}
+                
               </Select>
             </Form.Item>
 
@@ -1102,7 +1110,7 @@ const handleExport = async () => {
 
           <Col span={4}>
             <Form.Item label="Souda Date" name="soudaDate" initialValue={dayjs()}>
-              <DatePicker className="w-full" disabled />
+              <DatePicker className="w-full" disabled={disabled}  />
             </Form.Item>
           </Col>
 
@@ -1111,7 +1119,8 @@ const handleExport = async () => {
             <Form.Item label="Start Date" name="from_date">
               <DatePicker className="w-full"  disabledDate={(current) =>
      current && current.isBefore(dayjs(), "day")
-    } />
+    } 
+    disabled={disabled}/>
             </Form.Item>
           </Col>
 
@@ -1121,7 +1130,7 @@ const handleExport = async () => {
       current &&
       addForm.getFieldValue("from_date") &&
       current < addForm.getFieldValue("from_date").startOf("day")
-    } />
+    } disabled={disabled} />
             </Form.Item>
           </Col>
         </Row>

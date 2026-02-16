@@ -601,6 +601,7 @@ await handleSoudaSelect(data.contract, editForm, data.items);
     hsn_code: it.hsn_code,
     rate: it.rate,
     qty: it.qty,
+    maxQty: it.qty,
     freeQty: it.free_qty,
     totalQty: Number(it.qty || 0) + Number(it.free_qty || 0),
     discountPercent: it.discount_percent,
@@ -649,16 +650,18 @@ setTimeout(() => {
   label="Souda No"
   name="contract"   // store contract ID
   rules={[{ required: true }]}
+  
 >
 <Select
   placeholder="Select Souda No"
   options={soudaContracts.map(c => ({
-    label: c.souda_number,   // ✅ correct field
+    label: c.souda_number,   
     value: c.id
   }))}
   onChange={(contractId) =>
     handleSoudaSelect(contractId, formInstance)
   }
+  disabled={disabled || isEditModalOpen || isViewModalOpen}
 />
 
 
@@ -789,6 +792,8 @@ setTimeout(() => {
         hsn_code: selected.hsn_code,                // HSN
         rate: Number(selected.rate || 0),
         qty: Number(selected.qty || 0),
+        maxQty: Number(selected.qty || 0),   // ✅ ADD THIS
+
         freeQty: Number(selected.free_qty || 0),
         uom: selected.uom_details?.unit_name,
         discountPercent: Number(selected.discount_percent || 0),
@@ -827,15 +832,48 @@ setTimeout(() => {
                       label="Qty"
                       name={[field.name, "qty"]}
                       className="w-full"
-                      rules={[
-    { required: true, message: "Quantity is required" },
-    {
-      validator: (_, value) =>
-        value >= 0
-          ? Promise.resolve()
-          : Promise.reject("Enter valid positive number"),
+rules={[
+  { required: true, message: "Quantity is required" },
+
+  ({ getFieldValue }) => ({
+    validator(_, value) {
+
+      if (value === undefined || value === null || value === "") {
+        return Promise.resolve();
+      }
+
+      // ✅ Check if NOT a number
+      if (isNaN(value)) {
+        return Promise.reject(
+          new Error("Enter valid positive number")
+        );
+      }
+
+      const numericValue = Number(value);
+
+      // ✅ Negative check
+      if (numericValue < 0) {
+        return Promise.reject(
+          new Error("Enter valid positive number")
+        );
+      }
+
+        const maxQty =
+        Number(getFieldValue(["items", field.name, "maxQty"])) || 0;
+
+      if (numericValue > maxQty) {
+        message.warning(`You cannot enter more than ${maxQty}`);
+        return Promise.reject(
+          new Error(`Maximum allowed quantity is ${maxQty}`)
+        );
+      }
+
+      return Promise.resolve();
     },
-  ]}
+  }),
+]}
+
+
                     >
                       <Input
                         className="w-full"
@@ -1006,7 +1044,7 @@ setTimeout(() => {
   ]}>
             <Input
               className="w-full"
-            
+             disabled={disabled}
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
@@ -1024,7 +1062,7 @@ setTimeout(() => {
   ]}>
             <Input
               className="w-full"
-            
+             disabled={disabled}
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
@@ -1042,7 +1080,7 @@ setTimeout(() => {
   ]}>
             <Input
               className="w-full"
-             
+              disabled={disabled}
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
@@ -1066,7 +1104,7 @@ setTimeout(() => {
   ]}>
             <Input
               className="w-full"
-             
+              disabled={disabled}
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
