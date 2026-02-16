@@ -570,9 +570,40 @@ export default function AssetDepreciation() {
           <Form.Item
             label={<span className="text-amber-700">Fiscal Year</span>}
             name="fiscalYear"
-            rules={[{ required: true, message: "Please enter Fiscal Year" }]}
+            rules={[
+              { required: true, message: "Please enter Fiscal Year" },
+              {
+                pattern: /^\d{4}-\d{2}$/,
+                message: "Format must be YYYY-YY (e.g. 2024-25)",
+              },
+            ]}
           >
-            <Input placeholder="e.g. 2024-25" disabled={disabled} />
+            <Input
+              placeholder="e.g. 2024-25"
+              disabled={disabled}
+              maxLength={7}
+              onKeyDown={(e) => {
+                // allow numbers + dash + control keys
+                if (
+                  !/[0-9-]/.test(e.key) &&
+                  ![
+                    "Backspace",
+                    "Delete",
+                    "ArrowLeft",
+                    "ArrowRight",
+                    "Tab",
+                  ].includes(e.key)
+                ) {
+                  e.preventDefault();
+                }
+              }}
+              onPaste={(e) => {
+                const paste = e.clipboardData.getData("text");
+                if (!/^\d*-?\d*$/.test(paste)) {
+                  e.preventDefault();
+                }
+              }}
+            />
           </Form.Item>
         </Col>
 
