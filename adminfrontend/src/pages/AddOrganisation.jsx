@@ -88,6 +88,7 @@ export default function AddOrganisation() {
   const rule = ORG_RULES[orgType];
   const normFile = (e) => (Array.isArray(e) ? e : e?.fileList);
   const navigate = useNavigate();
+
   // validation for mobile number: starts with 6-9 and has total 10 digits
   const handleTenDigitNumber = (fieldPath) => (e) => {
     const value = e.target.value.replace(/\D/g, "").slice(0, 10);
@@ -181,6 +182,22 @@ export default function AddOrganisation() {
     lei: "lei_no",
   };
 
+  const createExistingFile = (path) => {
+    if (!path) return null;
+    const fileUrl = `${import.meta.env.VITE_API_URL}/${path}`;
+    const cleanPath = path.split("?")[0].split("#")[0];
+    const fileName = cleanPath.substring(cleanPath.lastIndexOf("/") + 1);
+    return [
+      {
+        uid: fileName,
+        name: fileName,
+        status: "done",
+        url: fileUrl,
+        thumbUrl: fileUrl,
+      },
+    ];
+  };
+
   // third payload to check with fields mapping while edit
   const mapOrgToForm = (org) => {
     const hqAddress = org.addresses?.find((a) => a.address_category === "HQ");
@@ -190,18 +207,55 @@ export default function AddOrganisation() {
       .filter(([formKey, apiKey]) => legal?.[apiKey])
       .map(([formKey]) => formKey);
 
+    // const legalDetails = Object.entries(LEGAL_KEY_MAP).reduce(
+    //   (acc, [formKey, apiKey]) => {
+    //     const valueKey = apiKey.replace("_no", "");
+    //     acc[formKey] = {
+    //       number: legal?.[apiKey] ?? null,
+    //     };
+
+    //     const documentKey = apiKey.replace("_no", "_document");
+    //     if (documentKey && legal?.[documentKey]) {
+    //       acc[formKey] = {
+    //         document: createExistingFile(legal?.[documentKey]),
+    //       };
+    //     }
+
+    //     // Handle validity dynamically
+    //     const fromKey = apiKey.replace("_no", "_valid_from");
+    //     const toKey = apiKey.replace("_no", "_valid_to");
+
+    //     if (legal?.[fromKey] && legal?.[toKey]) {
+    //       acc[formKey].validity = [dayjs(legal[fromKey]), dayjs(legal[toKey])];
+    //     }
+
+    //     return acc;
+    //   },
+    //   {},
+    // );
     const legalDetails = Object.entries(LEGAL_KEY_MAP).reduce(
       (acc, [formKey, apiKey]) => {
         acc[formKey] = {
           number: legal?.[apiKey] ?? null,
         };
 
-        // Handle validity dynamically
+        const documentKey = apiKey.replace("_no", "_document");
+
+        if (legal?.[documentKey]) {
+          acc[formKey] = {
+            ...acc[formKey],
+            document: createExistingFile(legal?.[documentKey]),
+          };
+        }
+
         const fromKey = apiKey.replace("_no", "_valid_from");
         const toKey = apiKey.replace("_no", "_valid_to");
 
         if (legal?.[fromKey] && legal?.[toKey]) {
-          acc[formKey].validity = [dayjs(legal[fromKey]), dayjs(legal[toKey])];
+          acc[formKey] = {
+            ...acc[formKey],
+            validity: [dayjs(legal[fromKey]), dayjs(legal[toKey])],
+          };
         }
 
         return acc;
@@ -237,16 +291,17 @@ export default function AddOrganisation() {
         name: p.full_name,
         email: p.email,
         email2: p.secondary_email,
+
         adharNo: p.aadhaar_no,
         panNo: p.pan_no,
         gstNo: p.gst_no,
-        adharDocument: null,
-        panDocument: null,
-        gstDocument: null,
+        adharDocument: createExistingFile(p.aadhaar_document),
+        panDocument: createExistingFile(p.pan_document),
+        gstDocument: createExistingFile(p.gst_document),
         mobileNumber: p.phone_number_1,
         contactNumber: p.phone_number_2,
         whatsappNumber: p.whatsapp_number,
-
+        photo: createExistingFile(p.photo),
         gender: p.gender,
         dob: p.date_of_birth ? dayjs(p.date_of_birth) : null,
         percentage: p.percentage_of_interest
@@ -289,6 +344,9 @@ export default function AddOrganisation() {
                 city: p.company_details.address,
                 state: p.company_details.location,
               },
+              companyCertificate: createExistingFile(
+                p.company_details.company_certificate,
+              ),
             }
           : undefined,
       })),
@@ -455,12 +513,13 @@ export default function AddOrganisation() {
 
         email: p.email ?? null,
         secondary_email: p.email2 ?? null,
+        // photo: p.photo?.[0]?.originFileObj ?? null,
         aadhaar_no: p.adharNo ?? null,
-        aadhaar_document: p.adharDocument ?? null,
+        // aadhaar_document: p.adharDocument?.[0]?.originFileObj ?? null,
         pan_no: p.panNo ?? null,
-        pan_document: p.panDocument ?? null,
+        // pan_document: p.panDocument?.[0]?.originFileObj ?? null,
         gst_no: p.gstNo ?? null,
-        gst_document: p.gstDocument ?? null,
+        // gst_document: p.gstDocument?.[0]?.originFileObj ?? null,
         gender: p.gender ?? null,
         date_of_birth: p.dob ? dayjs(p.dob).format("YYYY-MM-DD") : null,
         percentage_of_interest: p.percentage ?? null,
@@ -511,7 +570,6 @@ export default function AddOrganisation() {
           const doc = values.legalDetails?.[formKey];
 
           acc[apiKey] = doc?.number ?? null;
-          acc[apiKey.replace("_no", "_document")] = null;
 
           if (doc?.validity?.[0]) {
             acc[apiKey.replace("_no", "_valid_from")] = dayjs(
@@ -584,9 +642,63 @@ export default function AddOrganisation() {
     const values = form.getFieldsValue(true);
     const payload = buildPayload(values);
 
+    const formData = new FormData();
+
+    // ✅ Append JSON payload as string
+    formData.append("payload", JSON.stringify(payload));
+
+    // =============================
+    // 🔹 Append Legal Document Files
+    // =============================
+    Object.entries(values.legalDetails || {}).forEach(([key, doc]) => {
+      const fieldName = `legal_details.${LEGAL_KEY_MAP[key].replace("_no", "_document")}`;
+
+      if (doc?.document?.[0]?.originFileObj) {
+        // new file selected
+        formData.append(fieldName, doc.document[0].originFileObj);
+      } else if (!doc?.document?.[0]?.url) {
+        // no file & no existing URL (we have deleted the file)
+        formData.append(fieldName, null);
+      }
+    });
+
+    // =============================
+    // 🔹 Append Person Files
+    // =============================
+    (values.partners || []).forEach((person, index) => {
+      const appendFile = (fieldKey, fileObj) => {
+        const fieldName = `persons.${index}.${fieldKey}`;
+        if (fileObj?.[0]?.originFileObj) {
+          // new file selected
+          formData.append(fieldName, fileObj[0].originFileObj);
+        } else if (!fileObj?.[0]?.url) {
+          // no file at all
+          formData.append(fieldName, null);
+        }
+      };
+
+      appendFile("pan_document", person?.panDocument);
+      appendFile("aadhaar_document", person?.adharDocument);
+      appendFile("gst_document", person?.gstDocument);
+      appendFile("photo", person?.photo);
+      // appendFile("company_certificate", person?.companyCertificate);
+      const appendNestedFile = (path, fileObj) => {
+        if (fileObj?.[0]?.originFileObj) {
+          formData.append(path, fileObj[0].originFileObj);
+        } else if (!fileObj?.[0]?.url) {
+          formData.append(path, null);
+        }
+      };
+
+      appendNestedFile(
+        `persons.${index}.company_details.company_certificate`,
+        person?.companyCertificate,
+      );
+    });
+
     if (isEdit) {
       updateOrg(
-        { id: orgId, data: payload },
+        { id: orgId, data: formData },
         {
           onSuccess: () => {
             antMessage.success("Organisation updated successfully");
@@ -599,7 +711,7 @@ export default function AddOrganisation() {
         },
       );
     } else {
-      createOrg(payload, {
+      createOrg(formData, {
         onSuccess: () => {
           antMessage.success("Organisation created successfully");
           navigate("/organizations");
@@ -612,8 +724,88 @@ export default function AddOrganisation() {
     }
   };
 
+  // const handleSubmit = () => {
+  //   setSubmitError(null);
+
+  //   const values = form.getFieldsValue(true);
+
+  //   const jsonPayload = buildPayload(values); // WITHOUT files
+
+  //   const formData = new FormData();
+
+  //   // ✅ Append JSON payload as string
+  //   formData.append("payload", JSON.stringify(jsonPayload));
+
+  //   // =============================
+  //   // 🔹 Append Legal Document Files
+  //   // =============================
+  //   Object.entries(values.legalDetails || {}).forEach(([key, doc]) => {
+  //     if (doc?.document?.[0]?.originFileObj) {
+  //       formData.append(
+  //         `legal_details.${LEGAL_KEY_MAP[key].replace("_no", "_document")}`,
+  //         doc.document[0].originFileObj,
+  //       );
+  //     }
+  //   });
+
+  //   // =============================
+  //   // 🔹 Append Person Files
+  //   // =============================
+  //   (values.partners || []).forEach((person, index) => {
+  //     if (person?.panDocument?.[0]?.originFileObj) {
+  //       formData.append(
+  //         `persons.${index}.pan_document`,
+  //         person.panDocument[0].originFileObj,
+  //       );
+  //     }
+
+  //     if (person?.adharDocument?.[0]?.originFileObj) {
+  //       formData.append(
+  //         `persons.${index}.aadhaar_document`,
+  //         person.adharDocument[0].originFileObj,
+  //       );
+  //     }
+
+  //     if (person?.gstDocument?.[0]?.originFileObj) {
+  //       formData.append(
+  //         `persons.${index}.gst_document`,
+  //         person.gstDocument[0].originFileObj,
+  //       );
+  //     }
+
+  //     if (person?.photo?.[0]?.originFileObj) {
+  //       formData.append(
+  //         `persons.${index}.photo`,
+  //         person.photo[0].originFileObj,
+  //       );
+  //     }
+  //   });
+
+  //   // =============================
+  //   // 🚀 Send request
+  //   // =============================
+  //   createOrg(formData, {
+  //     onSuccess: () => {
+  //       antMessage.success("Organisation created successfully");
+  //       navigate("/organizations");
+  //     },
+  //     onError: (error) => {
+  //       antMessage.error("Failed to create organisation");
+  //       console.error("Create Organisation Error:", error);
+  //     },
+  //   });
+  // };
+
   const handleBack = () => {
     window.history.back();
+  };
+
+  const handlePreview = async (file) => {
+    let fileURL = file.url || URL.createObjectURL(file.originFileObj);
+
+    if (fileURL) {
+      window.open(fileURL, "_blank");
+    }
   };
 
   // Step 0: Organisation Details
@@ -1254,7 +1446,12 @@ export default function AddOrganisation() {
                         valuePropName="fileList"
                         getValueFromEvent={normFile}
                       >
-                        <Upload beforeUpload={() => false}>
+                        <Upload
+                          beforeUpload={() => false}
+                          onPreview={handlePreview}
+                          listType="picture"
+                          maxCount={1}
+                        >
                           <Button
                             icon={<UploadOutlined />}
                             style={{ borderRadius: "6px" }}
@@ -1292,7 +1489,10 @@ export default function AddOrganisation() {
                         valuePropName="fileList"
                         getValueFromEvent={normFile}
                       >
-                        <Upload beforeUpload={() => false}>
+                        <Upload
+                          beforeUpload={() => false}
+                          onPreview={handlePreview}
+                        >
                           <Button style={{ borderRadius: "6px" }}>
                             Upload Aadhaar
                           </Button>
@@ -1321,7 +1521,10 @@ export default function AddOrganisation() {
                         valuePropName="fileList"
                         getValueFromEvent={normFile}
                       >
-                        <Upload beforeUpload={() => false}>
+                        <Upload
+                          beforeUpload={() => false}
+                          onPreview={handlePreview}
+                        >
                           <Button style={{ borderRadius: "6px" }}>
                             Upload PAN
                           </Button>
@@ -1354,7 +1557,10 @@ export default function AddOrganisation() {
                         valuePropName="fileList"
                         getValueFromEvent={normFile}
                       >
-                        <Upload beforeUpload={() => false}>
+                        <Upload
+                          beforeUpload={() => false}
+                          onPreview={handlePreview}
+                        >
                           <Button style={{ borderRadius: "6px" }}>
                             Upload GST
                           </Button>
@@ -1475,15 +1681,19 @@ export default function AddOrganisation() {
                           </Col>
                         )}
 
-                        <Col xs={24} sm={12}>
+                        {/* <Col xs={24} sm={12}>
                           <Form.Item
                             {...restField}
                             label={<span>Company Certificate</span>}
-                            name={[name, "documents"]}
+                            name={[name, "companyCertificate"]}
                             valuePropName="fileList"
                             getValueFromEvent={normFile}
                           >
-                            <Upload beforeUpload={() => false} multiple>
+                            <Upload
+                              beforeUpload={() => false}
+                              onPreview={handlePreview}
+                              maxCount={1}
+                            >
                               <Button
                                 icon={<UploadOutlined />}
                                 style={{ borderRadius: "6px" }}
@@ -1492,7 +1702,7 @@ export default function AddOrganisation() {
                               </Button>
                             </Upload>
                           </Form.Item>
-                        </Col>
+                        </Col> */}
 
                         <Col xs={24} sm={12} md={6}>
                           <Form.Item
@@ -1713,7 +1923,10 @@ export default function AddOrganisation() {
                       valuePropName="fileList"
                       getValueFromEvent={normFile}
                     >
-                      <Upload beforeUpload={() => false}>
+                      <Upload
+                        beforeUpload={() => false}
+                        onPreview={handlePreview}
+                      >
                         <Button icon={<UploadOutlined />}>Upload</Button>
                       </Upload>
                     </Form.Item>
@@ -1785,7 +1998,10 @@ export default function AddOrganisation() {
                       valuePropName="fileList"
                       getValueFromEvent={normFile}
                     >
-                      <Upload beforeUpload={() => false}>
+                      <Upload
+                        beforeUpload={() => false}
+                        onPreview={handlePreview}
+                      >
                         <Button icon={<UploadOutlined />}>Upload</Button>
                       </Upload>
                     </Form.Item>
@@ -1822,7 +2038,7 @@ export default function AddOrganisation() {
     //       valuePropName="fileList"
     //       getValueFromEvent={normFile}
     //     >
-    //       <Upload beforeUpload={() => false}>
+    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
     //         <Button icon={<UploadOutlined />} size="small">
     //           Upload
     //         </Button>
@@ -1841,7 +2057,7 @@ export default function AddOrganisation() {
     //       valuePropName="fileList"
     //       getValueFromEvent={normFile}
     //     >
-    //       <Upload beforeUpload={() => false}>
+    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
     //         <Button icon={<UploadOutlined />} size="small">
     //           Upload
     //         </Button>
@@ -1860,7 +2076,7 @@ export default function AddOrganisation() {
     //       valuePropName="fileList"
     //       getValueFromEvent={normFile}
     //     >
-    //       <Upload beforeUpload={() => false}>
+    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
     //         <Button icon={<UploadOutlined />} size="small">
     //           Upload
     //         </Button>
@@ -1879,7 +2095,7 @@ export default function AddOrganisation() {
     //       valuePropName="fileList"
     //       getValueFromEvent={normFile}
     //     >
-    //       <Upload beforeUpload={() => false}>
+    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
     //         <Button icon={<UploadOutlined />} size="small">
     //           Upload
     //         </Button>
@@ -1898,7 +2114,7 @@ export default function AddOrganisation() {
     //       valuePropName="fileList"
     //       getValueFromEvent={normFile}
     //     >
-    //       <Upload beforeUpload={() => false}>
+    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
     //         <Button icon={<UploadOutlined />} size="small">
     //           Upload
     //         </Button>
@@ -1917,7 +2133,7 @@ export default function AddOrganisation() {
     //       valuePropName="fileList"
     //       getValueFromEvent={normFile}
     //     >
-    //       <Upload beforeUpload={() => false}>
+    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
     //         <Button icon={<UploadOutlined />} size="small">
     //           Upload
     //         </Button>
@@ -1936,7 +2152,7 @@ export default function AddOrganisation() {
     //       valuePropName="fileList"
     //       getValueFromEvent={normFile}
     //     >
-    //       <Upload beforeUpload={() => false}>
+    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
     //         <Button icon={<UploadOutlined />} size="small">
     //           Upload
     //         </Button>
@@ -1955,7 +2171,7 @@ export default function AddOrganisation() {
     //       valuePropName="fileList"
     //       getValueFromEvent={normFile}
     //     >
-    //       <Upload beforeUpload={() => false}>
+    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
     //         <Button icon={<UploadOutlined />} size="small">
     //           Upload Document
     //         </Button>
@@ -1969,7 +2185,7 @@ export default function AddOrganisation() {
     //       valuePropName="fileList"
     //       getValueFromEvent={normFile}
     //     >
-    //       <Upload beforeUpload={() => false}>
+    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
     //         <Button icon={<UploadOutlined />} size="small">
     //           Upload Document
     //         </Button>
