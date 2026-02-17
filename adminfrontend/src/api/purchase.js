@@ -139,6 +139,22 @@ export const updatePurchaseInvoice = async (invoiceId, payload) => {
   );
   return res.data;
 }
+
+//Assign dropdown
+export const getAllTransport = async () => {
+  const res = await api.get("transport/dropdown/transporters/");
+  return res.data;
+}
+
+//Assign to transport
+export const addAssignment= async (payload) => {
+  const currentOrgId = useSessionStore.getState().currentOrgId;
+  const res = await api.post("/transport/assignments/", payload, {
+    params: { organisation: currentOrgId }
+  });
+  return res.data;
+}
+
 // PURCHASE RETURNS
 //fetch all purchase returns
 export const getPurchaseReturn = async () => {

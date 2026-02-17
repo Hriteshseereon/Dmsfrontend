@@ -233,8 +233,8 @@ const handleExport = async () => {
       const res = await getLoadingAdvice();
 
       const formatted = res.map((item) => ({
-        key: item.loading_id,
-        id: item.loading_id,
+        key: item.id,
+        id: item.id,
 
         // Basic Info
          advice_no: item.advice_no || "-",

@@ -23,7 +23,7 @@ import {
 import dayjs from "dayjs";
 
 import { exportToExcel } from "../../../../../utils/exportToExcel";
-import { getPurchaseInvoice,getPurchaseOrder,addPurchaseInvoice,getPurchaseInvoiceById,updatePurchaseInvoice,getPurchaseOrderById } from "../../../../../api/purchase";
+import { getPurchaseInvoice,getPurchaseOrder,addPurchaseInvoice,getPurchaseInvoiceById,updatePurchaseInvoice,getPurchaseOrderById ,getAllTransport,addAssignment} from "../../../../../api/purchase";
 const { Option } = Select;
 const isAdmin = true; // <-- change to false to simulate non-admin
 const purchaseInvoiceJSON = {
@@ -202,7 +202,7 @@ const [loading, setLoading] = useState(false);
   const[orderList,setOrderList]=useState([]);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
-
+  const [transportList, setTransportList] = useState([]);
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
@@ -229,15 +229,17 @@ const [loading, setLoading] = useState(false);
   fetchPurchaseOrders();
 }, []);
 
+
 const fetchPurchaseInvoices = async () => {
   try {
     setLoading(true);
     const res = await getPurchaseInvoice();
 
-    // map backend response to table format if needed
     const formatted = res.map((item, index) => ({
       key: index + 1,
       ...item,
+      assigned: item.is_transport_assigned,      // ✅ map correctly
+      transport: item.transport_name,            // ✅ show name not ID
     }));
 
     setData(formatted);
@@ -248,6 +250,17 @@ const fetchPurchaseInvoices = async () => {
     setLoading(false);
   }
 };
+
+const fetchTransportList = async () => {
+  try {
+    const res = await getAllTransport();
+    setTransportList(res); // your API returns array
+  } catch (err) {
+    message.error("Failed to load transport list");
+    console.error(err);
+  }
+};
+
 const fetchPurchaseOrders = async () => {
   try {
     const res = await getPurchaseOrder();
@@ -325,7 +338,7 @@ addForm.setFieldsValue({
     {
       title: <span className="text-amber-700 font-semibold">Invoice No</span>,
       dataIndex: "invoice_number",
-      width: 140,
+      width: 100,
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
    
@@ -342,39 +355,38 @@ addForm.setFieldsValue({
     {
       title: <span className="text-amber-700 font-semibold">Total Amount</span>,
       dataIndex: "total_amount",
-      width: 140,
+      width: 100,
       render: (text) => <span className="text-amber-800 ">{text}</span>,
     },
    
     {
       title: <span className="text-amber-700 font-semibold">Transporter</span>,
       dataIndex: "transport",
-      width: 160,
-      render: (transporter, record) => (
-        <span className="text-amber-800">{transporter || "-"}</span>
+      width: 100,
+      render: (_, record) => (
+        <span className="text-amber-800">{record.transport || "-"}</span>
       ),
     },
-    {
-      title: <span className="text-amber-700 font-semibold">Assign</span>,
-      width: 140,
-      render: (record) => (
-        <div className="flex gap-2">
-          {record.assigned ? (
-            <Button disabled className="bg-green-200! border-none! text-green-800! ">Assigned</Button>
-          ) : isAdmin ? (
-            <Button
-              type="primary"
-              onClick={() => openAssignModal(record)}
-              className="bg-amber-500! hover:bg-amber-600! border-none!"
-            >
-              Assign
-            </Button>
-          ) : (
-            <Button disabled>Assign</Button>
-          )}
-        </div>
-      ),
-    },
+   {
+  title:  <span className="text-amber-700 font-semibold">Assign</span>,
+   width: 100,
+  render: (_, record) => (
+    record.is_transport_assigned ? (
+      <Button disabled className="bg-green-200! border-none! text-green-800!">
+        Assigned
+      </Button>
+    ) : (
+      <Button
+        type="primary"
+        onClick={() => openAssignModal(record)}
+        className="bg-amber-500! hover:bg-amber-600! border-none!"
+      >
+        Assign
+      </Button>
+    )
+  ),
+},
+
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       width: 100,
@@ -599,32 +611,52 @@ totalQty: invoice.total_qty,
 
 
   // Open assign modal
-  const openAssignModal = (record) => {
-    setRecordToAssign(record);
-    setSelectedTransporter(null);
-    assignForm.resetFields();
-    setIsAssignModalOpen(true);
-  };
+const openAssignModal = async (record) => {
+  setRecordToAssign(record);
+  assignForm.resetFields();
+  await fetchTransportList();   // 👈 load transport here
+  setIsAssignModalOpen(true);
+};
+
 
   // Assign submit handler
-  const handleAssignSubmit = (vals) => {
-    const transporter = vals.transporterName || selectedTransporter;
-    if (!transporter) {
-      message.error("Please select a transporter");
-      return;
-    }
+const handleAssignSubmit = async (values) => {
+  try {
+    const selectedTransport = transportList.find(
+      (t) => t.id === values.transporterName
+    );
+
+    const payload = {
+       invoice: recordToAssign.id,      // ✅ must match backend
+  transport: selectedTransport.id ,
+  invoice_number: recordToAssign.invoice_number,
+  transport_name: selectedTransport.registered_name,
+    };
+
+    await addAssignment(payload);
+
+    message.success("Transport assigned successfully");
 
     setData((prev) =>
-      prev.map((r) =>
-        r.key === recordToAssign.key
-          ? { ...r, assigned: true, transporterName: transporter }
-          : r
+      prev.map((item) =>
+        item.id === recordToAssign.id
+          ? {
+              ...item,
+              assigned: true,
+              transport: selectedTransport.registered_name,
+            }
+          : item
       )
     );
 
-    message.success(`Transporter '${transporter}' assigned.`);
     setIsAssignModalOpen(false);
-  };
+  } catch (error) {
+    console.error(error);
+    message.error("Assignment failed");
+  }
+};
+
+
 
  
 const handleFormSubmit = async (values) => {
@@ -1048,11 +1080,7 @@ const payload = {
     setTimeout(() => recalcAll(formInstance), 50);
   };
 
-  // Hooks to wire formInstance for render callbacks inside Form.List (workaround)
-  let formInstance = null;
-  useEffect(() => {
-    // nothing
-  }, []);
+ 
 
   return (
     <div>
@@ -1125,12 +1153,10 @@ const payload = {
           onFinishFailed={(err) => console.log("Add form validation failed:", err)}
         >
           {/* capture form instance for handlers */}
-          <Form.Item noStyle shouldUpdate>
-            {() => {
-              formInstance = addForm;
-              return renderFormFields(addForm, false);
-            }}
-          </Form.Item>
+         <Form.Item noStyle shouldUpdate>
+  {() => renderFormFields(addForm, false)}
+</Form.Item>
+
 
           <div className="flex justify-end gap-2 mt-4">
             <Button onClick={() => setIsAddModalOpen(false)} className="border-amber-400! text-amber-700! hover:bg-amber-100!">Cancel</Button>
@@ -1154,10 +1180,8 @@ const payload = {
           onFinishFailed={(err) => console.log("Edit form validation failed:", err)}
         >
           <Form.Item noStyle shouldUpdate>
-            {() => {
-              formInstance = editForm;
-              return renderFormFields(editForm, false);
-            }}
+           {() => renderFormFields(editForm, false)}
+
           </Form.Item>
 
           <div className="flex justify-end gap-2 mt-4">
@@ -1177,10 +1201,8 @@ const payload = {
       >
         <Form layout="vertical" form={viewForm}>
           <Form.Item noStyle shouldUpdate>
-            {() => {
-              formInstance = viewForm;
-              return renderFormFields(viewForm, true);
-            }}
+          {() => renderFormFields(viewForm, true)}
+
           </Form.Item>
         </Form>
       </Modal>
@@ -1207,9 +1229,12 @@ const payload = {
               placeholder="Select transporter"
               onChange={(val) => setSelectedTransporter(val)}
             >
-              {purchaseInvoiceJSON.options.transporterOptions.map((t) => (
-                <Option key={t} value={t}>{t}</Option>
-              ))}
+             {transportList.map((t) => (
+  <Option key={t.id} value={t.id}>
+    {t.registered_name}
+  </Option>
+))}
+
             </Select>
           </Form.Item>
 

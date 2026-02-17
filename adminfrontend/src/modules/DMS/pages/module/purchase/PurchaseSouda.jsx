@@ -265,6 +265,7 @@ const handleEditSubmit = async (values) => {
       vendor_name: values.vendor_name,
       plant: values.plant,
       plant_name: values.plant_name,
+      status: values.status,
 
       from_date: values.from_date
         ? dayjs(values.from_date).format("YYYY-MM-DD")
