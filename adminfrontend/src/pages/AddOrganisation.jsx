@@ -288,6 +288,8 @@ export default function AddOrganisation() {
       phone: org.phone_number_1,
       phone2: org.phone_number_2,
       email: org.email,
+      landlineNumber: org.landline_number,
+      whatsappNumber: org.whatsapp_number,
       secondaryEmail: org.secondary_email,
       businessLocation: org.head_office_location,
       partnersCount: org.number_of_partners ?? org.persons?.length ?? 0,
