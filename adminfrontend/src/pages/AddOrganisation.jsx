@@ -196,7 +196,9 @@ export default function AddOrganisation() {
 
   const createExistingFile = (path) => {
     if (!path) return null;
-    const fileUrl = `${import.meta.env.VITE_API_URL}/${path}`;
+    const fileUrl = path.startsWith("http")
+      ? path
+      : `${import.meta.env.VITE_API_URL}${path}`;
     const cleanPath = path.split("?")[0].split("#")[0];
     const fileName = cleanPath.substring(cleanPath.lastIndexOf("/") + 1);
     return [
@@ -274,10 +276,15 @@ export default function AddOrganisation() {
       },
       {},
     );
+    // const childrenParsed =
+    //   typeof p.family_details?.children_details === "string"
+    //     ? JSON.parse(p.family_details.children_details)
+    //     : {};
     return {
       // ================= ORG CORE =================
       registeredName: org.registered_name,
       organisationType: org.organisation_type,
+      organisationLogo: createExistingFile(org.organisation_logo),
       phone: org.phone_number_1,
       phone2: org.phone_number_2,
       email: org.email,
@@ -295,73 +302,100 @@ export default function AddOrganisation() {
       },
 
       // ================= PERSONS =================
-      partners: org.persons?.map((p) => ({
-        id: p.id, // include ID for existing persons to handle updates
-        familyId: p.family_details?.id,
-        bankId: p.bank_details?.id,
-        companyId: p.company_details?.id,
-        name: p.full_name,
-        email: p.email,
-        email2: p.secondary_email,
+      partners: org.persons?.map((p) => {
+        let childrenParsed = {};
 
-        adharNo: p.aadhaar_no,
-        panNo: p.pan_no,
-        gstNo: p.gst_no,
-        adharDocument: createExistingFile(p.aadhaar_document),
-        panDocument: createExistingFile(p.pan_document),
-        gstDocument: createExistingFile(p.gst_document),
-        mobileNumber: p.phone_number_1,
-        contactNumber: p.phone_number_2,
-        whatsappNumber: p.whatsapp_number,
-        photo: createExistingFile(p.photo),
-        gender: p.gender,
-        dob: p.date_of_birth ? dayjs(p.date_of_birth) : null,
-        percentage: p.percentage_of_interest
-          ? Number(p.percentage_of_interest)
-          : null,
+        try {
+          childrenParsed =
+            typeof p.family_details?.children_details === "string"
+              ? JSON.parse(p.family_details.children_details)
+              : {};
+        } catch {
+          childrenParsed = {};
+        }
 
-        fatherName: p.family_details?.parents_details,
-        spouseName: p.family_details?.spouse_name,
-        childrenCount: p.family_details?.children_details,
+        return {
+          id: p.id,
+          familyId: p.family_details?.id,
 
-        currentAddress: {
-          address1: p.current_address_line_1,
-          address2: p.current_address_line_2,
-          city: p.current_city,
-          state: p.current_state,
-          pin: p.current_pin_code,
-        },
+          name: p.full_name,
+          email: p.email,
+          email2: p.secondary_email,
 
-        permanentAddress: {
-          address1: p.permanent_address_line_1,
-          address2: p.permanent_address_line_2,
-          city: p.permanent_city,
-          state: p.permanent_state,
-          pin: p.permanent_pin_code,
-        },
+          adharNo: p.aadhaar_no,
+          panNo: p.pan_no,
+          gstNo: p.gst_no,
 
-        bankName: p.bank_details?.bank_name,
-        accountNo: p.bank_details?.account_number,
-        ifsc: p.bank_details?.ifsc_code,
-        branchName: p.bank_details?.branch_name,
+          adharDocument: createExistingFile(p.aadhaar_document),
+          panDocument: createExistingFile(p.pan_document),
+          gstDocument: createExistingFile(p.gst_document),
 
-        companyDetails: p.company_details
-          ? {
-              companyName: p.company_details.company_name,
-              companyWebsite: p.company_details.website,
-              pin: p.company_details.pin_code,
-              registrationNo: p.company_details.registration_no,
-              gstNo: p.company_details.gst_no,
-              address: {
-                city: p.company_details.address,
-                state: p.company_details.location,
-              },
-              companyCertificate: createExistingFile(
-                p.company_details.company_certificate,
-              ),
-            }
-          : undefined,
-      })),
+          mobileNumber: p.phone_number_1,
+          contactNumber: p.phone_number_2,
+          whatsappNumber: p.whatsapp_number,
+          photo: createExistingFile(p.photo),
+
+          gender: p.gender,
+          dob: p.date_of_birth ? dayjs(p.date_of_birth) : null,
+          percentage: p.percentage_of_interest
+            ? Number(p.percentage_of_interest)
+            : null,
+
+          fatherName: p.family_details?.parents_details,
+          spouseName: p.family_details?.spouse_name,
+
+          // ✅ CHILDREN (EDIT MODE FIX)
+          childrenCount: Number(childrenParsed.count ?? 0),
+
+          childrenType: [
+            ...(childrenParsed.sons?.length ? ["SON"] : []),
+            ...(childrenParsed.daughters?.length ? ["DAUGHTER"] : []),
+          ],
+
+          children: {
+            sons: (childrenParsed.sons ?? []).map((s) => s.age),
+            daughters: (childrenParsed.daughters ?? []).map((d) => d.age),
+          },
+
+          currentAddress: {
+            address1: p.current_address_line_1,
+            address2: p.current_address_line_2,
+            city: p.current_city,
+            state: p.current_state,
+            pin: p.current_pin_code,
+          },
+
+          permanentAddress: {
+            address1: p.permanent_address_line_1,
+            address2: p.permanent_address_line_2,
+            city: p.permanent_city,
+            state: p.permanent_state,
+            pin: p.permanent_pin_code,
+          },
+
+          bankDetails: (p.bank_details ?? []).map((b) => ({
+            id: b.id,
+            bankName: b.bank_name,
+            accountNo: b.account_number,
+            ifsc: b.ifsc_code,
+            branchName: b.branch_name,
+            accountType: b.account_type,
+          })),
+
+          companies: (p.company_details ?? []).map((c) => ({
+            id: c.id,
+            companyName: c.company_name,
+            companyWebsite: c.website,
+            registrationNo: c.registration_no,
+            gstNo: c.gst_no,
+            address: {
+              city: c.address,
+              state: c.location,
+            },
+            companyCertificate: createExistingFile(c.company_certificate),
+          })),
+        };
+      }),
 
       // ================= LEGAL DETAILS =================
 
@@ -475,7 +509,8 @@ export default function AddOrganisation() {
 
       phone_number_1: values.phone ?? "",
       phone_number_2: values.phone2 ?? null,
-
+      landline_number: values.landlineNumber ?? null,
+      whatsapp_number: values.whatsappNumber ?? null,
       email: values.email ?? "",
       secondary_email: values.secondaryEmail ?? null,
 
@@ -550,30 +585,46 @@ export default function AddOrganisation() {
 
         family_details: {
           spouse_name: p.spouseName ?? null,
-          children_details:
-            p.childrenCount !== undefined ? String(p.childrenCount) : null,
+          // children_details:
+          //   p.childrenCount !== undefined ? String(p.childrenCount) : null,
+          children_details: JSON.stringify({
+            count: p.childrenCount ?? 0,
+            sons: (p.children?.sons ?? []).map((age) => ({
+              name: null,
+              age: Number(age),
+            })),
+            daughters: (p.children?.daughters ?? []).map((age) => ({
+              name: null,
+              age: Number(age),
+            })),
+          }),
           parents_details: p.fatherName ?? null,
         },
 
-        bank_details: {
-          bank_name: p.bankName ?? null,
+        // bank_details: {
+        //   bank_name: p.bankName ?? null,
+        //   account_holder_name: p.name ?? null,
+        //   account_number: p.accountNo ?? null,
+        //   ifsc_code: p.ifsc ?? null,
+        //   branch_name: p.branchName ?? null,
+        // },
+        bank_details: (p.bankDetails ?? []).map((b) => ({
+          bank_name: b.bankName ?? null,
           account_holder_name: p.name ?? null,
-          account_number: p.accountNo ?? null,
-          ifsc_code: p.ifsc ?? null,
-          branch_name: p.branchName ?? null,
-        },
-
-        company_details: p.companyDetails
-          ? {
-              company_name: p.companyDetails.companyName ?? null,
-              website: p.companyDetails.companyWebsite ?? null,
-              registration_no: p.companyDetails.registrationNo ?? null,
-              gst_no: p.companyDetails.gstNo ?? null,
-              address: p.companyDetails.address?.city ?? null,
-              location: p.companyDetails.address?.state ?? null,
-              pin_code: p.companyDetails.address?.pin ?? null,
-            }
-          : null,
+          account_number: b.accountNo ?? null,
+          ifsc_code: b.ifsc ?? null,
+          branch_name: b.branchName ?? null,
+          branch: b.branchName ?? null,
+          account_type: b.accountType ?? null,
+        })),
+        company_details: (p.companies ?? []).map((c) => ({
+          company_name: c.companyName ?? null,
+          website: c.companyWebsite ?? null,
+          registration_no: c.registrationNo ?? null,
+          gst_no: c.gstNo ?? null,
+          address: c.address?.city ?? null,
+          location: c.address?.state ?? null,
+        })),
       })),
 
       // ================= LEGAL DETAILS =================
@@ -701,7 +752,13 @@ export default function AddOrganisation() {
           formData.append(path, null);
         }
       };
-
+      // file for handle the company logo
+      if (values.organisationLogo?.[0]?.originFileObj) {
+        formData.append(
+          "organisation_logo",
+          values.organisationLogo[0].originFileObj,
+        );
+      }
       appendNestedFile(
         `persons.${index}.company_details.company_certificate`,
         person?.companyCertificate,
@@ -835,7 +892,23 @@ export default function AddOrganisation() {
             <Input placeholder="Enter registered name" />
           </Form.Item>
         </Col>
-
+        <Col xs={24} sm={12} md={6}>
+          <Form.Item
+            label="Organisation Logo"
+            name="organisationLogo"
+            valuePropName="fileList"
+            getValueFromEvent={normFile}
+          >
+            <Upload
+              beforeUpload={() => false}
+              maxCount={1}
+              listType="picture"
+              onPreview={handlePreview}
+            >
+              <Button icon={<UploadOutlined />}>Upload Logo</Button>
+            </Upload>
+          </Form.Item>
+        </Col>
         <Col xs={24} sm={12} md={6}>
           <Form.Item
             label="Address Line 1"
@@ -1287,6 +1360,145 @@ export default function AddOrganisation() {
                       />
                     </Form.Item>
                   </Col>
+
+                  <Form.Item noStyle shouldUpdate>
+                    {({ getFieldValue, setFieldsValue }) => {
+                      const count =
+                        Number(
+                          getFieldValue(["partners", name, "childrenCount"]),
+                        ) || 0;
+
+                      const types =
+                        getFieldValue(["partners", name, "childrenType"]) || [];
+
+                      if (!count) return null;
+
+                      // ---- RESET LOGIC (VERY IMPORTANT) ----
+                      const partners = getFieldValue("partners") || [];
+                      const currentPartner = partners[name] || {};
+
+                      if (
+                        !types.includes("SON") &&
+                        currentPartner?.children?.sons?.length
+                      ) {
+                        const updated = [...partners];
+                        updated[name] = {
+                          ...currentPartner,
+                          children: {
+                            ...currentPartner.children,
+                            sons: [],
+                          },
+                        };
+                        setFieldsValue({ partners: updated });
+                      }
+
+                      if (
+                        !types.includes("DAUGHTER") &&
+                        currentPartner?.children?.daughters?.length
+                      ) {
+                        const updated = [...partners];
+                        updated[name] = {
+                          ...currentPartner,
+                          children: {
+                            ...currentPartner.children,
+                            daughters: [],
+                          },
+                        };
+                        setFieldsValue({ partners: updated });
+                      }
+
+                      return (
+                        <>
+                          {/* ---------- TYPE SELECT ---------- */}
+                          <Row>
+                            <Col>
+                              <Form.Item
+                                label="Children Type"
+                                name={[name, "childrenType"]}
+                              >
+                                <Checkbox.Group>
+                                  <Checkbox value="SON">Son</Checkbox>
+                                  <Checkbox value="DAUGHTER">Daughter</Checkbox>
+                                </Checkbox.Group>
+                              </Form.Item>
+                            </Col>
+                          </Row>
+
+                          {/* ---------- AGE SECTION ---------- */}
+                          {types.length > 0 && (
+                            <>
+                              <Divider orientation="left">
+                                Children Age Details
+                              </Divider>
+
+                              {/* ===== SON ===== */}
+                              {types.includes("SON") && (
+                                <>
+                                  <h4>Son Age</h4>
+                                  <Row gutter={12}>
+                                    {Array.from({ length: count }).map(
+                                      (_, i) => (
+                                        <Col xs={12} md={6} key={`son-${i}`}>
+                                          <Form.Item
+                                            label={`Son ${i + 1}`}
+                                            name={[name, "children", "sons", i]}
+                                            rules={[
+                                              {
+                                                pattern: /^[0-9]*$/,
+                                                message: "Only numbers allowed",
+                                              },
+                                            ]}
+                                          >
+                                            <Input placeholder="Age" />
+                                          </Form.Item>
+                                        </Col>
+                                      ),
+                                    )}
+                                  </Row>
+                                </>
+                              )}
+
+                              {/* ===== DAUGHTER ===== */}
+                              {types.includes("DAUGHTER") && (
+                                <>
+                                  <h4>Daughter Age</h4>
+                                  <Row gutter={12}>
+                                    {Array.from({ length: count }).map(
+                                      (_, i) => (
+                                        <Col
+                                          xs={12}
+                                          md={6}
+                                          key={`daughter-${i}`}
+                                        >
+                                          <Form.Item
+                                            label={`Daughter ${i + 1}`}
+                                            name={[
+                                              name,
+                                              "children",
+                                              "daughters",
+                                              i,
+                                            ]}
+                                            rules={[
+                                              {
+                                                pattern: /^[0-9]*$/,
+                                                message: "Only numbers allowed",
+                                              },
+                                            ]}
+                                          >
+                                            <Input placeholder="Age" />
+                                          </Form.Item>
+                                        </Col>
+                                      ),
+                                    )}
+                                  </Row>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </>
+                      );
+                    }}
+                  </Form.Item>
                   <Divider
                     orientation="left"
                     style={{
@@ -1623,82 +1835,108 @@ export default function AddOrganisation() {
                   >
                     Bank Details
                   </Divider>
+                  <Form.List name={[name, "bankDetails"]} initialValue={[{}]}>
+                    {(fields, { add, remove }) => (
+                      <>
+                        {fields.map(
+                          ({ key, name: bankIndex, ...restField }) => (
+                            <Card
+                              key={key}
+                              size="small"
+                              style={{ marginBottom: 12 }}
+                              extra={
+                                <MinusCircleOutlined
+                                  onClick={() => remove(bankIndex)}
+                                />
+                              }
+                            >
+                              <Row gutter={[16, 16]}>
+                                <Col xs={12} sm={8} md={4}>
+                                  <Form.Item
+                                    {...restField}
+                                    label={<span>Bank Name</span>}
+                                    name={[bankIndex, "bankName"]}
+                                    rules={[
+                                      {
+                                        pattern: /^[A-Za-z\s]+$/,
+                                        message: "Only letters are allowed",
+                                      },
+                                    ]}
+                                  >
+                                    <Input
+                                      placeholder="Enter bank name"
+                                      style={{ borderRadius: "6px" }}
+                                    />
+                                  </Form.Item>
+                                </Col>
+                                <Col xs={12} sm={8} md={4}>
+                                  <Form.Item
+                                    {...restField}
+                                    label={<span>Branch Name</span>}
+                                    name={[bankIndex, "branchName"]}
+                                  >
+                                    <Input
+                                      placeholder="Enter branch name"
+                                      style={{ borderRadius: "6px" }}
+                                    />
+                                  </Form.Item>
+                                </Col>
+                                <Col xs={12} sm={8} md={4}>
+                                  <Form.Item
+                                    {...restField}
+                                    label={<span>Type of Account</span>}
+                                    name={[bankIndex, "accountType"]}
+                                  >
+                                    <Input
+                                      placeholder="Enter account type"
+                                      style={{ borderRadius: "6px" }}
+                                    />
+                                  </Form.Item>
+                                </Col>
+                                <Col xs={12} sm={8} md={4}>
+                                  <Form.Item
+                                    {...restField}
+                                    label={<span>Account Number</span>}
+                                    name={[bankIndex, "accountNo"]}
+                                    rules={[
+                                      {
+                                        pattern: /^[0-9]*$/,
+                                        message: "Only numbers are allowed",
+                                      },
+                                    ]}
+                                  >
+                                    <Input
+                                      placeholder="Enter account number"
+                                      style={{ borderRadius: "6px" }}
+                                    />
+                                  </Form.Item>
+                                </Col>
 
-                  <Row gutter={[16, 16]}>
-                    <Col xs={12} sm={8} md={4}>
-                      <Form.Item
-                        {...restField}
-                        label={<span>Bank Name</span>}
-                        name={[name, "bankName"]}
-                        rules={[
-                          {
-                            pattern: /^[A-Za-z\s]+$/,
-                            message: "Only letters are allowed",
-                          },
-                        ]}
-                      >
-                        <Input
-                          placeholder="Enter bank name"
-                          style={{ borderRadius: "6px" }}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={12} sm={8} md={4}>
-                      <Form.Item
-                        {...restField}
-                        label={<span>Branch Name</span>}
-                        name={[name, "branchName"]}
-                      >
-                        <Input
-                          placeholder="Enter branch name"
-                          style={{ borderRadius: "6px" }}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={12} sm={8} md={4}>
-                      <Form.Item
-                        {...restField}
-                        label={<span>Type of Account</span>}
-                        name={[name, "accountType"]}
-                      >
-                        <Input
-                          placeholder="Enter account type"
-                          style={{ borderRadius: "6px" }}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={12} sm={8} md={4}>
-                      <Form.Item
-                        {...restField}
-                        label={<span>Account Number</span>}
-                        name={[name, "accountNo"]}
-                        rules={[
-                          {
-                            pattern: /^[0-9]*$/,
-                            message: "Only numbers are allowed",
-                          },
-                        ]}
-                      >
-                        <Input
-                          placeholder="Enter account number"
-                          style={{ borderRadius: "6px" }}
-                        />
-                      </Form.Item>
-                    </Col>
+                                <Col xs={12} sm={8} md={4}>
+                                  <Form.Item
+                                    {...restField}
+                                    label={<span>IFSC Code</span>}
+                                    name={[bankIndex, "ifsc"]}
+                                  >
+                                    <Input
+                                      placeholder="SBIN0001234"
+                                      style={{ borderRadius: "6px" }}
+                                    />
+                                  </Form.Item>
+                                </Col>
+                              </Row>
+                            </Card>
+                          ),
+                        )}
 
-                    <Col xs={12} sm={8} md={4}>
-                      <Form.Item
-                        {...restField}
-                        label={<span>IFSC Code</span>}
-                        name={[name, "ifsc"]}
-                      >
-                        <Input
-                          placeholder="SBIN0001234"
-                          style={{ borderRadius: "6px" }}
-                        />
-                      </Form.Item>
-                    </Col>
-                  </Row>
+                        <Row>
+                          <Button type="dashed" onClick={() => add()}>
+                            Add Bank
+                          </Button>
+                        </Row>
+                      </>
+                    )}
+                  </Form.List>
                   {SHOW_COMPANY_DETAILS_FOR.includes(orgType) && (
                     <>
                       <Divider
@@ -1711,9 +1949,22 @@ export default function AddOrganisation() {
                       >
                         Director Associate Company Details
                       </Divider>
-
-                      <Row gutter={[16, 16]}>
-                        {/* <Col xs={24} sm={12}>
+                      <Form.List name={[name, "companies"]}>
+                        {(fields, { add, remove }) => (
+                          <>
+                            {fields.map(
+                              ({ key, name: compIndex, ...restField }) => (
+                                <Card
+                                  key={key}
+                                  size="small"
+                                  extra={
+                                    <MinusCircleOutlined
+                                      onClick={() => remove(compIndex)}
+                                    />
+                                  }
+                                >
+                                  <Row gutter={[16, 16]}>
+                                    {/* <Col xs={24} sm={12}>
                           <Form.Item
                             {...restField}
                             label={<span>Company Certificate</span>}
@@ -1736,141 +1987,147 @@ export default function AddOrganisation() {
                           </Form.Item>
                         </Col> */}
 
-                        <Col xs={24} sm={12} md={6}>
-                          <Form.Item
-                            {...restField}
-                            label={<span>Company Name</span>}
-                            name={[name, "companyDetails", "companyName"]}
-                          >
-                            <Input
-                              placeholder="Enter company name"
-                              style={{ borderRadius: "6px" }}
-                            />
-                          </Form.Item>
-                        </Col>
+                                    <Col xs={24} sm={12} md={6}>
+                                      <Form.Item
+                                        {...restField}
+                                        label={<span>Company Name</span>}
+                                        name={[compIndex, "companyName"]}
+                                      >
+                                        <Input
+                                          placeholder="Enter company name"
+                                          style={{ borderRadius: "6px" }}
+                                        />
+                                      </Form.Item>
+                                    </Col>
 
-                        <Col xs={24} sm={12} md={6}>
-                          <Form.Item
-                            {...restField}
-                            label={<span>Registration Number</span>}
-                            name={[name, "companyDetails", "registrationNo"]}
-                          >
-                            <Input
-                              placeholder="Enter registration number"
-                              style={{ borderRadius: "6px" }}
-                            />
-                          </Form.Item>
-                        </Col>
+                                    <Col xs={24} sm={12} md={6}>
+                                      <Form.Item
+                                        {...restField}
+                                        label={<span>Registration Number</span>}
+                                        name={[compIndex, "registrationNo"]}
+                                      >
+                                        <Input
+                                          placeholder="Enter registration number"
+                                          style={{ borderRadius: "6px" }}
+                                        />
+                                      </Form.Item>
+                                    </Col>
 
-                        <Col xs={24} sm={12} md={6}>
-                          <Form.Item
-                            {...restField}
-                            label={<span>Company GST Number</span>}
-                            name={[name, "companyDetails", "gstNo"]}
-                          >
-                            <Input
-                              placeholder="22AAAAA0000A1Z5"
-                              style={{ borderRadius: "6px" }}
-                            />
-                          </Form.Item>
-                        </Col>
-                        {rule.company_website && (
-                          <Col xs={24} sm={6}>
-                            <Form.Item
-                              {...restField}
-                              label={
-                                <span
-                                  style={{
-                                    fontSize: "14px",
-                                    fontWeight: "500",
-                                  }}
-                                >
-                                  Company Website
-                                </span>
-                              }
-                              name={[name, "companyDetails", "companyWebsite"]}
-                            >
-                              <Input
-                                placeholder="https://www.example.com"
-                                style={{ borderRadius: "6px" }}
-                              />
-                            </Form.Item>
-                          </Col>
-                        )}
-                        <Col xs={24} sm={12} md={6}>
-                          <Form.Item
-                            {...restField}
-                            label={<span>City</span>}
-                            name={[name, "companyDetails", "address", "city"]}
-                            rules={[
-                              { required: true, message: "Please enter city" },
-                              {
-                                pattern: /^[A-Za-z\s]+$/,
-                                message: "Only alphabets are allowed",
-                              },
-                            ]}
-                          >
-                            <Input
-                              placeholder="Enter city"
-                              style={{ borderRadius: "6px" }}
-                              onChange={(e) => {
-                                e.target.value = e.target.value.replace(
-                                  /[^A-Za-z\s]/g,
-                                  "",
-                                );
-                              }}
-                            />
-                          </Form.Item>
-                        </Col>
+                                    <Col xs={24} sm={12} md={6}>
+                                      <Form.Item
+                                        {...restField}
+                                        label={<span>Company GST Number</span>}
+                                        name={[compIndex, "gstNo"]}
+                                      >
+                                        <Input
+                                          placeholder="22AAAAA0000A1Z5"
+                                          style={{ borderRadius: "6px" }}
+                                        />
+                                      </Form.Item>
+                                    </Col>
+                                    {rule.company_website && (
+                                      <Col xs={24} sm={6}>
+                                        <Form.Item
+                                          {...restField}
+                                          label={
+                                            <span
+                                              style={{
+                                                fontSize: "14px",
+                                                fontWeight: "500",
+                                              }}
+                                            >
+                                              Company Website
+                                            </span>
+                                          }
+                                          name={[compIndex, "companyWebsite"]}
+                                        >
+                                          <Input
+                                            placeholder="https://www.example.com"
+                                            style={{ borderRadius: "6px" }}
+                                          />
+                                        </Form.Item>
+                                      </Col>
+                                    )}
+                                    <Col xs={24} sm={12} md={6}>
+                                      <Form.Item
+                                        {...restField}
+                                        label={<span>City</span>}
+                                        name={[compIndex, "address", "city"]}
+                                        rules={[
+                                          {
+                                            required: true,
+                                            message: "Please enter city",
+                                          },
+                                          {
+                                            pattern: /^[A-Za-z\s]+$/,
+                                            message:
+                                              "Only alphabets are allowed",
+                                          },
+                                        ]}
+                                      >
+                                        <Input
+                                          placeholder="Enter city"
+                                          style={{ borderRadius: "6px" }}
+                                          onChange={(e) => {
+                                            e.target.value =
+                                              e.target.value.replace(
+                                                /[^A-Za-z\s]/g,
+                                                "",
+                                              );
+                                          }}
+                                        />
+                                      </Form.Item>
+                                    </Col>
 
-                        <Col xs={24} sm={12} md={6}>
-                          <Form.Item
-                            {...restField}
-                            label={<span>State</span>}
-                            name={[name, "companyDetails", "address", "state"]}
-                            rules={[
-                              {
-                                pattern: /^[A-Za-z\s]+$/,
-                                message: "Only letters are allowed",
-                              },
-                            ]}
-                          >
-                            <Input
-                              placeholder="Enter state"
-                              style={{ borderRadius: "6px" }}
-                              onChange={(e) => {
-                                const value = e.target.value.replace(
-                                  /[^A-Za-z\s]/g,
-                                  "",
-                                );
-                                form.setFieldsValue({
-                                  partners: {
-                                    [name]: {
-                                      companyDetails: {
-                                        ...form.getFieldValue([
-                                          "partners",
-                                          name,
-                                          "companyDetails",
-                                        ]),
-                                        address: {
-                                          ...form.getFieldValue([
-                                            "partners",
-                                            name,
-                                            "companyDetails",
-                                            "address",
-                                          ]),
-                                          state: value,
-                                        },
-                                      },
-                                    },
-                                  },
-                                });
-                              }}
-                            />
-                          </Form.Item>
-                        </Col>
+                                    <Col xs={24} sm={12} md={6}>
+                                      <Form.Item
+                                        {...restField}
+                                        label={<span>State</span>}
+                                        name={[compIndex, "address", "state"]}
+                                        rules={[
+                                          {
+                                            pattern: /^[A-Za-z\s]+$/,
+                                            message: "Only letters are allowed",
+                                          },
+                                        ]}
+                                      >
+                                        <Input
+                                          placeholder="Enter state"
+                                          style={{ borderRadius: "6px" }}
+                                          onChange={(e) => {
+                                            const value =
+                                              e.target.value.replace(
+                                                /[^A-Za-z\s]/g,
+                                                "",
+                                              );
+                                            form.setFieldsValue({
+                                              partners: {
+                                                [name]: {
+                                                  companyDetails: {
+                                                    ...form.getFieldValue([
+                                                      "partners",
+                                                      name,
+                                                      "companyDetails",
+                                                    ]),
+                                                    address: {
+                                                      ...form.getFieldValue([
+                                                        "partners",
+                                                        name,
+                                                        "companyDetails",
+                                                        "address",
+                                                      ]),
+                                                      state: value,
+                                                    },
+                                                  },
+                                                },
+                                              },
+                                            });
+                                          }}
+                                        />
+                                      </Form.Item>
+                                    </Col>
 
-                        {/* <Col xs={24} sm={12} md={4}>
+                                    {/* <Col xs={24} sm={12} md={4}>
                           <Form.Item
                             {...restField}
                             label={<span>PIN Code</span>}
@@ -1889,7 +2146,16 @@ export default function AddOrganisation() {
                             />
                           </Form.Item>
                         </Col> */}
-                      </Row>
+                                  </Row>
+                                </Card>
+                              ),
+                            )}
+                            <Button type="dashed" onClick={() => add()}>
+                              Add Company
+                            </Button>
+                          </>
+                        )}
+                      </Form.List>
                     </>
                   )}
                 </Row>
@@ -2297,9 +2563,9 @@ export default function AddOrganisation() {
                             {...restField}
                             label="Short Name"
                             name={[name, "shortName"]}
-                            rules={[{ max: 2, message: "Max 2 chars" }]}
+                            rules={[{ max: 5, message: "Max 5 chars" }]}
                           >
-                            <Input placeholder="2 chars" maxLength={2} />
+                            <Input placeholder="5 chars" maxLength={5} />
                           </Form.Item>
                         </Col>
                         <Col xs={12} sm={6} md={5}>
