@@ -11,10 +11,12 @@ import {
   X,
   ArrowRight,
   Edit,
+  Download,
 } from "lucide-react";
 import { useOrganizations } from "../queries/useOrganizations";
 import useSessionStore from "../store/sessionStore";
-
+import { getOrganization } from "../api/organizations";
+import { exportOrganisationExcel } from "../utils/exportOrganisationExcel";
 export default function OrganizationList() {
   const { user, setOrgModules } = useAuth();
   const navigate = useNavigate();
@@ -27,7 +29,6 @@ export default function OrganizationList() {
 
   return (
     <div className="min-h-screen mb-0 pb-0 ">
-     
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-2 ">
           <h2 className="text-3xl font-bold text-gray-800"></h2>
@@ -57,12 +58,31 @@ export default function OrganizationList() {
                       ID: {org.id}
                     </p>
                   </div>
-                  <button
-                    onClick={() => navigate(`/organisation/edit/${org.id}`)}
-                    className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center hover:bg-amber-200 transition-colors cursor-pointer"
-                  >
-                    <Edit className="text-amber-600" size={24} />
-                  </button>
+                  <div className="flex gap-2">
+                    {/* ✅ DOWNLOAD BUTTON */}
+                    <button
+                      onClick={async () => {
+                        try {
+                          const fullOrg = await getOrganization(org.id);
+                          exportOrganisationExcel(fullOrg);
+                        } catch (e) {
+                          console.error(e);
+                        }
+                      }}
+                      className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center hover:bg-green-200 transition-colors"
+                      title="Download Excel"
+                    >
+                      <Download className="text-green-600" size={22} />
+                    </button>
+
+                    {/* EDIT BUTTON */}
+                    <button
+                      onClick={() => navigate(`/organisation/edit/${org.id}`)}
+                      className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center hover:bg-amber-200 transition-colors"
+                    >
+                      <Edit className="text-amber-600" size={24} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mb-6">
@@ -93,7 +113,9 @@ export default function OrganizationList() {
                   onClick={() => {
                     setCurrentOrgId(org.id);
                     setOrgModules(org.modules_data || []);
-                    const firstModule = org.modules_data.find(m => m.is_enabled)?.module;
+                    const firstModule = org.modules_data.find(
+                      (m) => m.is_enabled,
+                    )?.module;
                     if (firstModule) {
                       navigate(`/${firstModule.toLowerCase()}`);
                     } else {
