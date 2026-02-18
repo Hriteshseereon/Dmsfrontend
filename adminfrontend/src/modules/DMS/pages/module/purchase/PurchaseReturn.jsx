@@ -1,4 +1,5 @@
-// PurchaseReturn.jsx
+
+// PurchaseReturn.jsx 
 import React, { useState, useEffect } from "react";
 import {
   Table,
@@ -12,6 +13,7 @@ import {
   Col,
   DatePicker,
 } from "antd";
+
 import {
   SearchOutlined,
   PlusOutlined,
@@ -22,7 +24,17 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 
+import { exportToExcel } from "../../../../../utils/exportToExcel";
+import { getPurchaseReturn,addPurchaseReturn,getPurchaseReturnById,updatePurchaseReturn ,getPurchaseInvoice,getPurchaseInvoiceById} from "../../../../../api/purchase";
 // 🔹 JSON Data
+const returnReasons = [
+  "Quality Issue",
+  "Damaged Packaging",
+  "Expired",
+  "Wrong Item",
+  "Other",
+];
+
 const purchaseReturnJSON = {
   records: [
     {
@@ -91,147 +103,298 @@ const purchaseReturnJSON = {
     ],
   },
 };
+const statusOptions = ["Pending", "Approved", "Reject"];
 
 export default function PurchaseReturn() {
-  const [data, setData] = useState(purchaseReturnJSON.records);
-  const [searchText, setSearchText] = useState("");
+   const [searchText, setSearchText] = useState("");
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [isOtherReason, setIsOtherReason] = useState(false);
+   const [invoiceList, setInvoiceList] = useState([]);
+const [selectedProductId, setSelectedProductId] = useState(null);
+const [selectedVendorId, setSelectedVendorId] = useState(null);
 
   const [viewForm] = Form.useForm();
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
+const [data, setData] = useState([]);
+const [loading, setLoading] = useState(false);
+
+useEffect(() => {
+  fetchPurchaseReturns();
+}, []);
+
+const fetchPurchaseReturns = async () => {
+  try {
+    setLoading(true);
+    const res = await getPurchaseReturn();
+
+    const records = res.data || res;
+
+    setData(
+  records.map((item, index) => ({
+    key: item.id,
+    return_number: item.return_number,
+    return_date: item.return_date,
+   status: item.status || "Pending",
+    item_name: item.items?.[0]?.item_name,
+     quantity: item.items?.[0]?.quantity,  
+    item_return_reason: item.items?.[0]?.item_return_reason,
+  }))
+);
+
+  } catch (error) {
+    console.error("Failed to fetch purchase returns", error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleSearch = (value) => {
-    setSearchText(value);
-    if (!value) {
-      setData(purchaseReturnJSON.records);
-    } else {
-      const filtered = purchaseReturnJSON.records.filter((item) =>
-        Object.values(item).some((field) =>
-          String(field).toLowerCase().includes(value.toLowerCase())
-        )
-      );
-      setData(filtered);
-    }
-  };
+  setSearchText(value);
 
-  const calculateTotals = (values) => {
-    const qty = parseFloat(values.quantity || 0);
-    const freeQty = parseFloat(values.freeQty || 0);
-    const rate = parseFloat(values.rate || 0);
-    const discountPercent = parseFloat(values.discountPercent || 0);
-    const sgstPercent = parseFloat(values.sgstPercent || 0);
-    const cgstPercent = parseFloat(values.cgstPercent || 0);
-    const igstPercent = parseFloat(values.igstPercent || 0);
-    const otherCharges = parseFloat(values.otherCharges || 0);
-    const roundOff = parseFloat(values.roundOff || 0);
+  if (!value) {
+    fetchPurchaseReturns();
+    return;
+  }
 
-    const totalQtyDisplay = qty + freeQty;
-    const grossAmount = qty * rate;
-    const discountAmount = (grossAmount * discountPercent) / 100;
-    const taxableAmount = grossAmount - discountAmount;
-    const taxAmount =
-      (taxableAmount * (sgstPercent + cgstPercent + igstPercent)) / 100;
-    const grandTotal = taxableAmount + taxAmount + otherCharges + roundOff;
+  const filtered = data.filter((item) =>
+    Object.values(item).some((field) =>
+      String(field).toLowerCase().includes(value.toLowerCase())
+    )
+  );
 
-    return {
-      totalQtyDisplay,
-      grossAmount: Number(grossAmount.toFixed(2)),
-      discountAmount: Number(discountAmount.toFixed(2)),
-      grandTotal: Number(grandTotal.toFixed(2)),
-    };
-  };
+  setData(filtered);
+};
+const handleExport = async () => {
+  try {
+    const res = await getPurchaseReturn();
+    const list = res.data || res;
 
-  const handleValuesChange = (_, allValues) => {
-    const totals = calculateTotals(allValues);
-    addForm.setFieldsValue(totals);
-    editForm.setFieldsValue(totals);
-  };
+    const exportRows = [];
 
-  const setFormValues = (record, targetForm, mode = "view") => {
-    const base = {
-      ...record,
-      returnDate: record.returnDate ? dayjs(record.returnDate) : dayjs(),
-      totalQtyDisplay: (record.quantity || 0) + (record.freeQty || 0),
-      grossAmount:
-        record.grossAmount || (record.quantity || 0) * (record.rate || 0),
-      discountAmount:
-        record.discountAmount ||
-        ((record.grossAmount || (record.quantity || 0) * (record.rate || 0)) *
-          (record.discountPercent || 0)) /
-          100,
-      grandTotal: record.grandTotal || record.totalAmount || 0,
-    };
+    for (const record of list) {
+      // get full details
+      const detailRes = await getPurchaseReturnById(record.id);
+      const detail = detailRes.data || detailRes;
 
-    if (mode === "add") {
-      targetForm.setFieldsValue({
-        ...base,
-        status: "Pending",
-        returnDate: dayjs(),
+      detail.items?.forEach((item) => {
+        exportRows.push({
+          "Return No": detail.return_number,
+         "Company": detail.vendor_name,
+          "Return Date": detail.return_date,
+          "Status": detail.status,
+
+          "Item Name": item.item_name,
+          "Item Code": item.hsn_code,
+          "UOM": item.uom_details?.unit_name,
+          "Quantity": item.quantity,
+          "Return Reason": item.item_return_reason,
+        });
       });
-    } else {
-      targetForm.setFieldsValue(base);
     }
-  };
-  const handleSubmit = (values, mode) => {
-    const record = {
-      ...values,
-      returnDate: values.returnDate
+
+    exportToExcel(exportRows, "Purchase_Return_Details", "PurchaseReturn");
+
+  } catch (error) {
+    console.error("Export failed:", error);
+  }
+};
+
+
+
+ const handleSubmit = async (values, mode) => {
+if (mode === "add") {
+  try {
+   
+    const payload = {
+      invoice: values.invoiceNo,
+      vendor: selectedVendorId,
+      status: values.status || "Pending",
+      return_date: values.returnDate
         ? values.returnDate.format("YYYY-MM-DD")
         : null,
+
+  
+      items: values.items.map((item) => ({
+        product: item.product,
+        quantity: Number(item.quantity || 0),
+      item_return_reason:
+      item.item_return_reason === "Other"
+    ? item.other_reason
+    : item.item_return_reason,
+
+      })),
     };
 
-    if (record.returnReason === "Other") {
-      record.returnReason = record.otherReasonText || "Other";
-    }
-    delete record.otherReasonText;
+    await addPurchaseReturn(payload);
 
-    if (mode === "edit") {
-      setData((prev) =>
-        prev.map((item) =>
-          item.key === selectedRecord.key ? { ...item, ...record } : item
-        )
-      );
-      setIsEditModalOpen(false);
-    } else if (mode === "add") {
-      setData((prev) => [...prev, { ...record, key: prev.length + 1 }]);
-      setIsAddModalOpen(false);
-    }
+    fetchPurchaseReturns();
+    setIsAddModalOpen(false);
     addForm.resetFields();
+  } catch (error) {
+    console.error("Add failed", error);
+  }
+}
+if (mode === "edit") {
+  try {
+    const payload = {
+      invoice: values.invoiceNo,
+      status: values.status,
+      return_date: values.returnDate
+        ? values.returnDate.format("YYYY-MM-DD")
+        : null,
+      items: values.items.map((item) => ({
+        product: item.product,
+        quantity: Number(item.quantity || 0),
+        item_return_reason:
+          item.item_return_reason === "Other"
+            ? item.other_reason
+            : item.item_return_reason,
+      })),
+    };
+
+    await updatePurchaseReturn(selectedRecord.id, payload);
+
+    await fetchPurchaseReturns(); // 🔥 important
+
+    setIsEditModalOpen(false);
     editForm.resetFields();
-  };
+  } catch (error) {
+    console.error("Update failed", error);
+  }
+}
 
-  const handleAddClick = () => {
+
+
+};
+
+const handleViewClick = async (record) => {
+  try {
+    setLoading(true);
+
+    const res = await getPurchaseReturnById(record.key);
+    const data = res.data || res;
+
+    const mappedItems = data.items?.map((item) => ({
+      product: item.product,
+      item_name: item.item_name,
+      hsn_code: item.hsn_code,
+      uom: item.uom_details?.unit_name,
+
+      quantity: Number(item.quantity),
+      item_return_reason: item.item_return_reason,
+    })) || [];
+
+    viewForm.setFieldsValue({
+      invoiceNo: data.invoice,
+
+
+      companyName: data.vendor_name,
+      returnDate: data.return_date ? dayjs(data.return_date) : null,
+      status: data.status,
+          items: mappedItems,  
+    });
+
+    setIsViewModalOpen(true);
+
+  } catch (error) {
+    console.error("View fetch failed", error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+const handleAddClick = async () => {
+  try {
+    const res = await getPurchaseInvoice();
+    const invoices = res.data || res;
+
+    setInvoiceList(invoices);
+
     addForm.resetFields();
-    addForm.setFieldsValue({ status: "Pending", returnDate: dayjs() });
+    addForm.setFieldsValue({
+      status: "Pending",
+      return_date: dayjs(),
+    });
+
     setIsAddModalOpen(true);
-  };
+  } catch (error) {
+    console.error("Failed to fetch invoices", error);
+  }
+};
 
-  const onInvoiceSelectForAdd = (invoiceNo, formType) => {
-    const source = data.find((r) => r.invoiceNo === invoiceNo);
-    if (!source) return;
+const onInvoiceSelectForAdd = async (invoiceId) => {
+  try {
+    const res = await getPurchaseInvoiceById(invoiceId);
+    const invoice = res.data || res;
+   setSelectedVendorId(invoice.vendor);
+   const items = invoice.items?.map((it) => ({
+      product: it.product,
+      item_name: it.item_name,
+      hsn_code: it.hsn_code,
+      uom: it?.uom_details?.unit_name,
+      quantity: it.qty,
+      item_return_reason: "",
+    })) || [];
 
-    const values = {
-      ...source,
+    // ✅ set form values
+    addForm.setFieldsValue({
+      invoiceNo: invoice.id,
+      companyName: invoice.vendor_name,
+      plantName: invoice.plant_name,
       returnDate: dayjs(),
       status: "Pending",
-      totalQtyDisplay: (source.quantity || 0) + (source.freeQty || 0),
-      grossAmount: (source.quantity || 0) * (source.rate || 0),
-      discountAmount:
-        ((source.quantity || 0) *
-          (source.rate || 0) *
-          (source.discountPercent || 0)) /
-        100,
-      grandTotal: source.grandTotal || source.totalAmount || 0,
-    };
+      items: items, 
+    });
 
-    if (formType === "add") addForm.setFieldsValue(values);
-    if (formType === "edit") editForm.setFieldsValue(values);
-  };
+  } catch (error) {
+    console.error("Invoice fetch failed", error);
+  }
+};
+
+const handleEditClick = async (record) => {
+  try {
+    setLoading(true);
+
+    const invoiceRes = await getPurchaseInvoice();
+    const invoices = invoiceRes.data || invoiceRes;
+    setInvoiceList(invoices);
+
+    const res = await getPurchaseReturnById(record.key);
+    const data = res.data || res;
+
+    const mappedItems = data.items?.map((item) => ({
+      product: item.product,
+      item_name: item.item_name,
+      hsn_code: item.hsn_code,
+      uom: item.uom_details?.unit_name,
+      quantity: Number(item.quantity),
+      item_return_reason: item.item_return_reason,
+    })) || [];
+
+    editForm.setFieldsValue({
+      invoiceNo: data.invoice,   // ⚠️ IMPORTANT → must match option value
+      companyName: data.vendor_name,
+      returnDate: data.return_date ? dayjs(data.return_date) : null,
+      status: data.status,
+      items: mappedItems,
+    });
+
+    setSelectedRecord(data);
+    setIsEditModalOpen(true);
+
+  } catch (error) {
+    console.error("Edit fetch failed", error);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
 
   const renderFormFields = (mode = "view") => {
     const isView = mode === "view";
@@ -257,18 +420,18 @@ export default function PurchaseReturn() {
               name="invoiceNo"
               rules={[{ required: true }]}
             >
-              <Select
-                onChange={(val) => {
-                  if (mode === "add") onInvoiceSelectForAdd(val, "add");
-                  if (mode === "edit") onInvoiceSelectForAdd(val, "edit");
-                }}
-                disabled={isView}
-              >
-                {data.map((r) => (
-                  <Select.Option key={r.invoiceNo} value={r.invoiceNo}>
-                    {r.invoiceNo}
-                  </Select.Option>
-                ))}
+       <Select
+  onChange={(val) => isAdd && onInvoiceSelectForAdd(val)}
+  disabled={isView || isEdit} 
+>
+
+
+               {invoiceList.map((inv) => (
+  <Select.Option key={inv.id} value={inv.id}>
+    {inv.invoice_no || inv.invoice_number}
+  </Select.Option>
+))}
+
               </Select>
             </Form.Item>
           </Col>
@@ -279,189 +442,131 @@ export default function PurchaseReturn() {
             </Form.Item>
           </Col>
 
-          <Col span={6}>
-            <Form.Item label="Plant Name" name="plantName">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Plant Code" name="plantCode">
-              <Input disabled />
-            </Form.Item>
-          </Col>
+         
           <Col span={6}>
             <Form.Item label="Return Date" name="returnDate">
               <DatePicker className="w-full" disabled />
             </Form.Item>
           </Col>
+          <Col span={6}>
+         <Form.Item
+  label="Status"
+  name="status"
+  rules={[{ required: true, message: "Please select status" }]}
+>
+  <Select disabled={mode === "view"} className="w-full!">
+    {statusOptions.map((status) => (
+      <Select.Option key={status} value={status} disabled={isView}>
+        {status}
+      </Select.Option>
+    ))}
+  </Select>
+</Form.Item>
+          </Col>
+
         </Row>
 
-        <Row gutter={16}>
-          <Col span={6}>
-            <Form.Item label="Branch Name" name="branchName">
-              <Select disabled />
-            </Form.Item>
-          </Col>
+       
+       <h6 className="text-amber-500">Item & Return Details</h6>
 
-          <Col span={6}>
-            <Form.Item label="Depo" name="depo">
-              <Select disabled />
-            </Form.Item>
-          </Col>
+<Form.List name="items">
+  {(fields) => (
+    <>
+      {fields.map(({ key, name, ...restField }) => (
+        <div key={key} className="border border-amber-500 p-3 mb-3 rounded">
 
-          <Col span={6}>
-            <Form.Item label="Status" name="status">
-              <Select disabled></Select>
-            </Form.Item>
-          </Col>
-        </Row>
-        <h6 className="text-amber-500">Item & Return Details</h6>
-        <Row gutter={16}>
-          <Col span={6}>
-            <Form.Item label="Item Name" name="item">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Item Code" name="itemCode">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="UOM" name="uom">
-              <Select disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Quantity" name="quantity">
-              <InputNumber
-                className="w-full"
-                disabled={disabledFor("quantity")}
-              />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Free Quantity" name="freeQty">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        <Row gutter={16}>
-          <Col span={6}>
-            <Form.Item label="Total Quantity" name="totalQtyDisplay">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Rate" name="rate">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Gross Amount" name="grossAmount">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item
-              label="Return Reason"
-              name="returnReason"
-              rules={[{ required: true }]}
-            >
-              <Select
-                disabled={disabledFor("returnReason")}
-                onChange={(value) => {
-                  setIsOtherReason(value === "Other");
-                  if (value !== "Other") {
-                    if (isAdd) addForm.setFieldsValue({ otherReasonText: "" });
-                    if (isEdit)
-                      editForm.setFieldsValue({ otherReasonText: "" });
-                  }
-                }}
-              >
-                {purchaseReturnJSON.options.returnReasonOptions.map((v) => (
-                  <Select.Option key={v}>{v}</Select.Option>
-                ))}
-                <Select.Option key="Other" value="Other">
-                  Other
-                </Select.Option>
-              </Select>
-            </Form.Item>
-
-            {isOtherReason && (
-              <Form.Item
-                label="Specify Other Reason"
-                name="otherReasonText"
-                rules={[{ required: true, message: "Please enter a reason" }]}
-              >
-                <Input.TextArea
-                  rows={3}
-                  placeholder="Please describe the reason for return"
-                  disabled={disabledFor("returnReason")}
-                />
+          <Row gutter={16}>
+            <Col span={6}>
+              <Form.Item {...restField} name={[name, "item_name"]} label="Item Name">
+                <Input disabled />
               </Form.Item>
-            )}
-          </Col>
-        </Row>
+            </Col>
 
-        <h6 className="text-amber-500">Tax & Amount Details</h6>
-        <Row gutter={16}>
-          <Col span={6}>
-            <Form.Item label="Discount %" name="discountPercent">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
+            <Col span={6}>
+              <Form.Item {...restField} name={[name, "hsn_code"]} label="Item Code">
+                <Input disabled />
+              </Form.Item>
+            </Col>
 
-          <Col span={6}>
-            <Form.Item label="Discount Amount" name="discountAmount">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
+            <Col span={6}>
+              <Form.Item {...restField} name={[name, "uom"]} label="UOM">
+                <Input disabled />
+              </Form.Item>
+            </Col>
 
-          <Col span={6}>
-            <Form.Item label="SGST %" name="sgstPercent">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
+            <Col span={6}>
+             <Form.Item {...restField} name={[name, "quantity"]} label="Quantity"
+                            rules={[
+                 { required: true, message: "Quantity is required" },
+                 {
+                   validator: (_, value) =>
+                     value >= 0
+                       ? Promise.resolve()
+                       : Promise.reject("Enter valid positive number"),
+                 },
+               ]}>
+  <Input
+    className="w-full"
+    disabled={isView}
+  />
+</Form.Item>
 
-          <Col span={6}>
-            <Form.Item label="CGST %" name="cgstPercent">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
-        </Row>
+            </Col>
 
-        <Row gutter={16}>
-          <Col span={6}>
-            <Form.Item label="IGST %" name="igstPercent">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
+          </Row>
 
-          <Col span={6}>
-            <Form.Item label="Other Charges" name="otherCharges">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
 
-          <Col span={6}>
-            <Form.Item label="Round Off" name="roundOff">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
+          <Row gutter={16}>
+      
 
-          <Col span={6}>
-            <Form.Item label="Total Amount" name="grandTotal">
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col>
-        </Row>
+           <Col span={6}>
+ <Form.Item
+  {...restField}
+  name={[name, "item_return_reason"]}
+  label="Return Reason"
+>
+  <Select disabled={isView }>
+    {returnReasons.map((reason) => (
+      <Select.Option key={reason} value={reason} disabled={isView}>
+        {reason}
+      </Select.Option>
+    ))}
+  </Select>
+</Form.Item>
+
+<Form.Item
+  noStyle
+  shouldUpdate={(prev, curr) =>
+    prev.items?.[name]?.item_return_reason !==
+    curr.items?.[name]?.item_return_reason
+  }
+>
+  {({ getFieldValue }) =>
+    getFieldValue(["items", name, "item_return_reason"]) === "Other" ? (
+      <Form.Item
+        {...restField}
+        name={[name, "other_reason"]}
+        label="Enter Reason"
+        rules={[{ required: true, message: "Please enter reason" }]}
+      >
+        <Input />
+      </Form.Item>
+    ) : null
+  }
+</Form.Item>
+
+
+ 
+</Col>
+
+          </Row>
+
+        </div>
+      ))}
+    </>
+  )}
+</Form.List>
+
       </>
     );
   };
@@ -469,41 +574,33 @@ export default function PurchaseReturn() {
   // 🔹 Table columns
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Invoice No</span>,
-      dataIndex: "invoiceNo",
+      title: <span className="text-amber-700 font-semibold">Return No</span>,
+      dataIndex: "return_number",
       width: 100,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Item Name</span>,
-      dataIndex: "item",
+      dataIndex: "item_name",
       width: 100,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Total Qty</span>,
+      title: <span className="text-amber-700 font-semibold">Qty</span>,
       width: 100,
-      render: (_, record) => (
-        <span className="text-amber-800">
-          {(record.quantity || 0) + (record.freeQty || 0)} {record.uom}
-        </span>
-      ),
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Total Amt</span>,
-      dataIndex: "grandTotal",
-      width: 100,
+     dataIndex: "quantity",
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
+  
     {
       title: <span className="text-amber-700 font-semibold">Return Date</span>,
-      dataIndex: "returnDate",
+      dataIndex: "return_date",
       width: 100,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Reason</span>,
-      dataIndex: "returnReason",
+      dataIndex: "item_return_reason",
       width: 100,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
@@ -536,23 +633,15 @@ export default function PurchaseReturn() {
       render: (record) => (
         <div className="flex gap-3">
           <EyeOutlined
-            className="cursor-pointer! text-blue-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              setFormValues(record, viewForm, "view");
-              setIsViewModalOpen(true);
-              setIsOtherReason(record.returnReason === "Other");
-            }}
-          />
+  className="cursor-pointer! text-blue-500!"
+  onClick={() => handleViewClick(record)}
+/>
+
           <EditOutlined
-            className="cursor-pointer! text-red-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              setFormValues(record, editForm, "edit");
-              setIsEditModalOpen(true);
-              setIsOtherReason(record.returnReason === "Other");
-            }}
-          />
+  className="cursor-pointer! text-red-500!"
+  onClick={() => handleEditClick(record)}
+/>
+
         </div>
       ),
     },
@@ -579,12 +668,13 @@ export default function PurchaseReturn() {
           </Button>
         </div>
         <div className="flex gap-2">
-          <Button
-            icon={<DownloadOutlined />}
-            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          >
-            Export
-          </Button>
+           <Button
+           icon={<DownloadOutlined />}
+           onClick={handleExport}
+           className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+         >
+           Export
+         </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -604,8 +694,14 @@ export default function PurchaseReturn() {
           Manage your purchase Return easily
         </p>
 
-        <Table columns={columns} dataSource={data} pagination={false} />
-      </div>
+       <Table
+  columns={columns}
+  dataSource={data}
+  loading={loading}
+  rowKey="key"
+  pagination={false}
+/>
+ </div>
       {/* Edit Modal */}
       <Modal
         title={
@@ -626,8 +722,7 @@ export default function PurchaseReturn() {
         <Form
           form={editForm}
           layout="vertical"
-          onValuesChange={handleValuesChange}
-        >
+          >
           {renderFormFields("edit")}
         </Form>
       </Modal>
@@ -652,8 +747,7 @@ export default function PurchaseReturn() {
         <Form
           form={addForm}
           layout="vertical"
-          onValuesChange={handleValuesChange}
-        >
+              >
           {renderFormFields("add")}
         </Form>
       </Modal>
