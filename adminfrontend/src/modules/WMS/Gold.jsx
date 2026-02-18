@@ -1,5 +1,5 @@
-// Gold.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { addWealthEntry, getWealthEntries, getWealthEntryById, updateWealthEntry } from "../../api/wealth";
 import {
   Table,
   Input,
@@ -29,29 +29,44 @@ const SAMPLE_ASSETS = [
   "Gold Lot A",
   "Property - Gold Vault 1",
   "Custom Lot",
+  "SGB - Series I",
 ];
 
 export default function Gold() {
-  const [data, setData] = useState([
-    {
-      key: 1,
-      transactionType: "Investment",
-      lotDescription: "Gold Lot A",
-      refNumber: "GL-1001",
-      sellerName: "Gold Seller Co",
-      sellerAddress: "12 Market St, City",
-      brokerName: "Broker X",
-      brokerAddress: "Broker Lane",
-      interestRate: 2.5,
-      interestType: "Cumulative",
-      interestPayment: "Yearly",
-      transactionDate: "2025-08-01",
-      quantity: 10, // grams
-      ratePerGram: 5600,
-      amount: 56000, // quantity * ratePerGram
-      narration: "Purchase of gold lot",
-    },
-  ]);
+  const [data, setData] = useState([]);
+
+  const fetchData = async () => {
+    try {
+      const response = await getWealthEntries({ asset_category: "GOLD" });
+      const mappedData = response.map((item) => ({
+        key: item.id,
+        transactionType: item.transaction_type ? item.transaction_type.charAt(0).toUpperCase() + item.transaction_type.slice(1).toLowerCase() : "Investment",
+        lotDescription: item.lot_description || item.asset_name,
+        refNumber: item.ref_number,
+        sellerName: item.bank_or_seller_name,
+        sellerAddress: item.address,
+        brokerName: item.broker_name,
+        brokerAddress: item.broker_address,
+        interestRate: item.interest_rate,
+        interestType: item.interest_type,
+        interestPayment: item.interest_payment,
+        transactionDate: item.transaction_date,
+        quantity: item.quantity_grams,
+        ratePerGram: item.rate_per_gram,
+        amount: item.amount,
+        narration: item.narration,
+        maturityDate: item.maturity_date, // stored but maybe not shown in columns
+      }));
+      setData(mappedData);
+    } catch (error) {
+      console.error("Error fetching Gold entries:", error);
+      message.error("Failed to fetch data.");
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -136,24 +151,64 @@ export default function Gold() {
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
-            onClick={() => {
+            onClick={async () => {
               setSelectedRecord(record);
-              viewForm.setFieldsValue({
-                ...record,
-                transactionDate: record.transactionDate ? dayjs(record.transactionDate) : undefined,
-              });
-              setIsViewModalOpen(true);
+              try {
+                const data = await getWealthEntryById(record.key);
+                const mappedData = {
+                  transactionType: data.transaction_type ? data.transaction_type.charAt(0).toUpperCase() + data.transaction_type.slice(1).toLowerCase() : "Investment",
+                  lotDescription: data.lot_description || data.asset_name,
+                  refNumber: data.ref_number,
+                  sellerName: data.bank_or_seller_name,
+                  sellerAddress: data.address,
+                  brokerName: data.broker_name,
+                  brokerAddress: data.broker_address,
+                  interestRate: data.interest_rate,
+                  interestType: data.interest_type,
+                  interestPayment: data.interest_payment,
+                  quantity: data.quantity_grams,
+                  ratePerGram: data.rate_per_gram,
+                  amount: data.amount,
+                  narration: data.narration,
+                  transactionDate: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                };
+                viewForm.setFieldsValue(mappedData);
+                setIsViewModalOpen(true);
+              } catch (error) {
+                console.error("Error fetching Gold details:", error);
+                message.error("Failed to load details.");
+              }
             }}
           />
           <EditOutlined
             className="cursor-pointer! text-red-500! "
-            onClick={() => {
+            onClick={async () => {
               setSelectedRecord(record);
-              editForm.setFieldsValue({
-                ...record,
-                transactionDate: record.transactionDate ? dayjs(record.transactionDate) : undefined,
-              });
-              setIsEditModalOpen(true);
+              try {
+                const data = await getWealthEntryById(record.key);
+                const mappedData = {
+                  transactionType: data.transaction_type ? data.transaction_type.charAt(0).toUpperCase() + data.transaction_type.slice(1).toLowerCase() : "Investment",
+                  lotDescription: data.lot_description || data.asset_name,
+                  refNumber: data.ref_number,
+                  sellerName: data.bank_or_seller_name,
+                  sellerAddress: data.address,
+                  brokerName: data.broker_name,
+                  brokerAddress: data.broker_address,
+                  interestRate: data.interest_rate,
+                  interestType: data.interest_type,
+                  interestPayment: data.interest_payment,
+                  quantity: data.quantity_grams,
+                  ratePerGram: data.rate_per_gram,
+                  amount: data.amount,
+                  narration: data.narration,
+                  transactionDate: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                };
+                editForm.setFieldsValue(mappedData);
+                setIsEditModalOpen(true);
+              } catch (error) {
+                console.error("Error fetching Gold data for edit:", error);
+                message.error("Failed to load details for editing.");
+              }
             }}
           />
         </div>
@@ -390,14 +445,14 @@ export default function Gold() {
           <Button
             icon={<FilterOutlined />}
             onClick={() => setSearchText("")}
-               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-              >
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
             Reset
           </Button>
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} onClick={exportCSV}    className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          <Button icon={<DownloadOutlined />} onClick={exportCSV} className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Export
           </Button>
@@ -435,18 +490,41 @@ export default function Gold() {
         <Form
           form={addForm}
           layout="vertical"
-          onFinish={(values) => {
+          onFinish={async (values) => {
             const calcs = computeAmount(values);
-            const payload = {
-              ...values,
-              ...calcs,
-              key: data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1,
-              transactionDate: values.transactionDate ? dayjs(values.transactionDate).format("YYYY-MM-DD") : undefined,
-            };
-            setData((prev) => [payload, ...prev]);
-            setIsAddModalOpen(false);
-            addForm.resetFields();
-            message.success("Record added.");
+            try {
+              const payload = {
+                asset_category: "GOLD",
+                transaction_type: values.transactionType ? values.transactionType.toUpperCase() : "INVESTMENT",
+                transaction_date: values.transactionDate ? dayjs(values.transactionDate).format("YYYY-MM-DD") : null,
+                lot_description: values.lotDescription,
+
+                ref_number: values.refNumber,
+                bank_or_seller_name: values.sellerName,
+                address: values.sellerAddress,
+
+                broker_name: values.brokerName,
+                broker_address: values.brokerAddress,
+
+                amount: Number(calcs.amount || 0).toFixed(2),
+                interest_rate: Number(values.interestRate || 0).toFixed(2),
+                interest_type: values.interestType,
+                interest_payment: values.interestPayment,
+
+                quantity_grams: values.quantity,
+                rate_per_gram: values.ratePerGram,
+                narration: values.narration,
+              };
+
+              await addWealthEntry(payload);
+              fetchData();
+              setIsAddModalOpen(false);
+              addForm.resetFields();
+              message.success("Record added successfully.");
+            } catch (error) {
+              console.error("Error adding gold entry:", error);
+              message.error("Failed to add record.");
+            }
           }}
           onValuesChange={(changed, allValues) => {
             const calcs = computeAmount(allValues);
@@ -461,12 +539,12 @@ export default function Gold() {
                 setIsAddModalOpen(false);
                 addForm.resetFields();
               }}
-                  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+
             >
               Cancel
             </Button>
-            <Button type="primary"  className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
               Add
             </Button>
           </div>
@@ -488,19 +566,43 @@ export default function Gold() {
         <Form
           form={editForm}
           layout="vertical"
-          onFinish={(values) => {
+          onFinish={async (values) => {
             const calcs = computeAmount(values);
-            const payload = {
-              ...selectedRecord,
-              ...values,
-              ...calcs,
-              transactionDate: values.transactionDate ? dayjs(values.transactionDate).format("YYYY-MM-DD") : selectedRecord.transactionDate,
-            };
-            setData((prev) => prev.map((d) => (d.key === payload.key ? payload : d)));
-            setIsEditModalOpen(false);
-            editForm.resetFields();
-            setSelectedRecord(null);
-            message.success("Record updated.");
+            try {
+              const payload = {
+                asset_category: "GOLD",
+                transaction_type: values.transactionType ? values.transactionType.toUpperCase() : "INVESTMENT",
+                transaction_date: values.transactionDate ? dayjs(values.transactionDate).format("YYYY-MM-DD") : null,
+                lot_description: values.lotDescription,
+
+                ref_number: values.refNumber,
+                bank_or_seller_name: values.sellerName,
+                address: values.sellerAddress,
+
+                broker_name: values.brokerName,
+                broker_address: values.brokerAddress,
+
+                amount: Number(calcs.amount || 0).toFixed(2),
+                interest_rate: Number(values.interestRate || 0).toFixed(2),
+                interest_type: values.interestType,
+                interest_payment: values.interestPayment,
+
+                quantity_grams: values.quantity,
+                rate_per_gram: values.ratePerGram,
+                narration: values.narration,
+              };
+
+              await updateWealthEntry(selectedRecord.key, payload);
+
+              fetchData();
+              setIsEditModalOpen(false);
+              editForm.resetFields();
+              setSelectedRecord(null);
+              message.success("Record updated successfully.");
+            } catch (error) {
+              console.error("Error updating gold entry:", error);
+              message.error("Failed to update record.");
+            }
           }}
           onValuesChange={(changed, allValues) => {
             const calcs = computeAmount(allValues);
@@ -516,12 +618,12 @@ export default function Gold() {
                 editForm.resetFields();
                 setSelectedRecord(null);
               }}
-                  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+
             >
               Cancel
             </Button>
-            <Button type="primary"  className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
               Save Changes
             </Button>
           </div>
@@ -530,8 +632,8 @@ export default function Gold() {
 
       {/* View Modal */}
       <Modal
-       title={<span className="text-amber-700 text-2xl font-semibold">View Gold Transaction</span>}
-       
+        title={<span className="text-amber-700 text-2xl font-semibold">View Gold Transaction</span>}
+
         open={isViewModalOpen}
         onCancel={() => {
           setIsViewModalOpen(false);

@@ -1,5 +1,6 @@
 // Nps.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { addWealthEntry, getWealthEntries, getWealthEntryById, updateWealthEntry } from "../../api/wealth";
 import {
   Table,
   Input,
@@ -28,33 +29,7 @@ const PREMIUM_MODES = ["Monthly", "Yearly", "5yrs"];
 const SAMPLE_ASSETS = ["Asset A", "Asset B", "Asset C", "New Plan"];
 
 export default function Ulip() {
-  const [data, setData] = useState([
-    {
-      key: 1,
-      transactionType: "New",
-      planScheme: "New Plan",
-      assetSelected: "Asset A",
-      policyNumber: "POL-1001",
-      insuranceCompany: "ABC Insurance Co",
-      insuranceAddress: "12 MG Road, City",
-      brokerName: "Broker X",
-      brokerAddress: "Broker Address",
-      firstPremium: 5000,
-      date: "2025-08-01",
-      policyDetails: "Quarterly observations",
-      premiumMode: "Yearly",
-      nextPremiumDueDate: "2026-08-01",
-      nextPremiumAmount: 5000,
-      term: 10,
-      maturityDate: "2035-08-01",
-      premiumTerms: "Level premium",
-      lockInPeriod: "5 years",
-      insuredName: "John Doe",
-      nominee: "Jane Doe",
-      sumAssured: 500000,
-      narration: "Standard NPS",
-    },
-  ]);
+  const [data, setData] = useState([]);
 
   const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -65,6 +40,44 @@ export default function Ulip() {
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
+
+  const fetchData = async () => {
+    try {
+      const response = await getWealthEntries({ asset_category: "ULIP" });
+      const mappedData = response.map((item) => ({
+        key: item.id,
+        transactionType: item.transaction_type === "PURCHASE" ? "New" : (item.transaction_type.charAt(0).toUpperCase() + item.transaction_type.slice(1).toLowerCase()),
+        planScheme: item.asset_name,
+        policyNumber: item.policy_number,
+        insuranceCompany: item.insurance_company_name,
+        insuranceAddress: item.insurance_company_address,
+        brokerName: item.broker_name,
+        brokerAddress: item.broker_address,
+        firstPremium: item.first_premium,
+        date: item.transaction_date,
+        policyDetails: item.policy_details,
+        premiumMode: item.premium_mode,
+        nextPremiumDueDate: item.next_premium_due_date,
+        nextPremiumAmount: item.next_premium_amount,
+        term: item.term_years,
+        maturityDate: item.maturity_date,
+        premiumTerms: item.premium_terms,
+        lockInPeriod: item.lock_in_period,
+        insuredName: item.insured_name,
+        nominee: item.nominee,
+        sumAssured: item.sum_assured,
+        narration: item.narration,
+      }));
+      setData(mappedData);
+    } catch (error) {
+      console.error("Error fetching ULIP entries:", error);
+      message.error("Failed to fetch data.");
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const filteredData = data.filter((row) =>
     [
@@ -137,28 +150,76 @@ export default function Ulip() {
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
-            onClick={() => {
+            onClick={async () => {
               setSelectedRecord(record);
-              viewForm.setFieldsValue({
-                ...record,
-                date: record.date ? dayjs(record.date) : undefined,
-                nextPremiumDueDate: record.nextPremiumDueDate ? dayjs(record.nextPremiumDueDate) : undefined,
-                maturityDate: record.maturityDate ? dayjs(record.maturityDate) : undefined,
-              });
-              setIsViewModalOpen(true);
+              try {
+                const data = await getWealthEntryById(record.key);
+                const mappedData = {
+                  transactionType: data.transaction_type === "PURCHASE" ? "New" : (data.transaction_type.charAt(0).toUpperCase() + data.transaction_type.slice(1).toLowerCase()),
+                  planScheme: data.asset_name,
+                  policyNumber: data.policy_number,
+                  insuranceCompany: data.insurance_company_name,
+                  insuranceAddress: data.insurance_company_address,
+                  brokerName: data.broker_name,
+                  brokerAddress: data.broker_address,
+                  firstPremium: data.first_premium,
+                  date: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                  policyDetails: data.policy_details,
+                  premiumMode: data.premium_mode,
+                  nextPremiumDueDate: data.next_premium_due_date ? dayjs(data.next_premium_due_date) : undefined,
+                  nextPremiumAmount: data.next_premium_amount,
+                  term: data.term_years,
+                  maturityDate: data.maturity_date ? dayjs(data.maturity_date) : undefined,
+                  premiumTerms: data.premium_terms,
+                  lockInPeriod: data.lock_in_period,
+                  insuredName: data.insured_name,
+                  nominee: data.nominee,
+                  sumAssured: data.sum_assured,
+                  narration: data.narration,
+                };
+                viewForm.setFieldsValue(mappedData);
+                setIsViewModalOpen(true);
+              } catch (error) {
+                console.error("Error fetching ULIP details:", error);
+                message.error("Failed to load details.");
+              }
             }}
           />
           <EditOutlined
             className="cursor-pointer! text-red-500!"
-            onClick={() => {
+            onClick={async () => {
               setSelectedRecord(record);
-              editForm.setFieldsValue({
-                ...record,
-                date: record.date ? dayjs(record.date) : undefined,
-                nextPremiumDueDate: record.nextPremiumDueDate ? dayjs(record.nextPremiumDueDate) : undefined,
-                maturityDate: record.maturityDate ? dayjs(record.maturityDate) : undefined,
-              });
-              setIsEditModalOpen(true);
+              try {
+                const data = await getWealthEntryById(record.key);
+                const mappedData = {
+                  transactionType: data.transaction_type === "PURCHASE" ? "New" : (data.transaction_type.charAt(0).toUpperCase() + data.transaction_type.slice(1).toLowerCase()),
+                  planScheme: data.asset_name,
+                  policyNumber: data.policy_number,
+                  insuranceCompany: data.insurance_company_name,
+                  insuranceAddress: data.insurance_company_address,
+                  brokerName: data.broker_name,
+                  brokerAddress: data.broker_address,
+                  firstPremium: data.first_premium,
+                  date: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                  policyDetails: data.policy_details,
+                  premiumMode: data.premium_mode,
+                  nextPremiumDueDate: data.next_premium_due_date ? dayjs(data.next_premium_due_date) : undefined,
+                  nextPremiumAmount: data.next_premium_amount,
+                  term: data.term_years,
+                  maturityDate: data.maturity_date ? dayjs(data.maturity_date) : undefined,
+                  premiumTerms: data.premium_terms,
+                  lockInPeriod: data.lock_in_period,
+                  insuredName: data.insured_name,
+                  nominee: data.nominee,
+                  sumAssured: data.sum_assured,
+                  narration: data.narration,
+                };
+                editForm.setFieldsValue(mappedData);
+                setIsEditModalOpen(true);
+              } catch (error) {
+                console.error("Error loading for edit:", error);
+                message.error("Failed to load details for editing.");
+              }
             }}
           />
         </div>
@@ -416,8 +477,8 @@ export default function Ulip() {
           <Button
             icon={<FilterOutlined />}
             onClick={() => setSearchText("")}
-              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-              >
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
             Reset
           </Button>
         </div>
@@ -429,7 +490,7 @@ export default function Ulip() {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            className="bg-amber-500! hover:bg-amber-600! border-none!"  onClick={() => {
+            className="bg-amber-500! hover:bg-amber-600! border-none!" onClick={() => {
               addForm.resetFields();
               setIsAddModalOpen(true);
             }}
@@ -443,7 +504,7 @@ export default function Ulip() {
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">ULIP Investments</h2>
         <p className="text-amber-600 mb-3">Manage insurance-linked investments and fund values</p>
-        <Table columns={columns} dataSource={filteredData} pagination={{ pageSize: 10 }} scroll={{ y: 300 }}/>
+        <Table columns={columns} dataSource={filteredData} pagination={{ pageSize: 10 }} scroll={{ y: 300 }} />
       </div>
 
       {/* Add Modal */}
@@ -460,18 +521,51 @@ export default function Ulip() {
         <Form
           form={addForm}
           layout="vertical"
-          onFinish={(values) => {
-            const payload = {
-              ...values,
-              key: data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1,
-              date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : undefined,
-              nextPremiumDueDate: values.nextPremiumDueDate ? dayjs(values.nextPremiumDueDate).format("YYYY-MM-DD") : undefined,
-              maturityDate: values.maturityDate ? dayjs(values.maturityDate).format("YYYY-MM-DD") : undefined,
-            };
-            setData((prev) => [payload, ...prev]);
-            setIsAddModalOpen(false);
-            addForm.resetFields();
-            message.success("Record added.");
+          onFinish={async (values) => {
+            try {
+              const payload = {
+                asset_category: "ULIP",
+                transaction_type: values.transactionType === "New" ? "PURCHASE" : values.transactionType.toUpperCase(),
+                asset_name: values.planScheme,
+                remarks: "ULIP policy",
+                policy_number: values.policyNumber,
+
+                insurance_company_name: values.insuranceCompany,
+                insurance_company_address: values.insuranceAddress,
+
+                broker_name: values.brokerName,
+                broker_address: values.brokerAddress,
+
+                first_premium: Number(values.firstPremium || 0).toFixed(2),
+                transaction_date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : null,
+
+                policy_details: values.policyDetails,
+                premium_mode: values.premiumMode,
+                next_premium_due_date: values.nextPremiumDueDate ? dayjs(values.nextPremiumDueDate).format("YYYY-MM-DD") : null,
+                next_premium_amount: Number(values.nextPremiumAmount || 0).toFixed(2),
+
+                term_years: values.term,
+                maturity_date: values.maturityDate ? dayjs(values.maturityDate).format("YYYY-MM-DD") : null,
+                premium_terms: values.premiumTerms,
+
+                lock_in_period: values.lockInPeriod,
+                insured_name: values.insuredName,
+                nominee: values.nominee,
+
+                sum_assured: Number(values.sumAssured || 0).toFixed(2),
+                narration: values.narration,
+              };
+
+              await addWealthEntry(payload);
+
+              setIsAddModalOpen(false);
+              addForm.resetFields();
+              message.success("Record added successfully.");
+              fetchData();
+            } catch (error) {
+              console.error("Error adding wealth entry:", error);
+              message.error("Failed to add record.");
+            }
           }}
         >
           {renderFormFields(addForm, false)}
@@ -482,12 +576,12 @@ export default function Ulip() {
                 setIsAddModalOpen(false);
                 addForm.resetFields();
               }}
-                  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+
             >
               Cancel
             </Button>
-            <Button type="primary"  className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
               Add
             </Button>
           </div>
@@ -509,19 +603,52 @@ export default function Ulip() {
         <Form
           form={editForm}
           layout="vertical"
-          onFinish={(values) => {
-            const payload = {
-              ...selectedRecord,
-              ...values,
-              date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : selectedRecord.date,
-              nextPremiumDueDate: values.nextPremiumDueDate ? dayjs(values.nextPremiumDueDate).format("YYYY-MM-DD") : selectedRecord.nextPremiumDueDate,
-              maturityDate: values.maturityDate ? dayjs(values.maturityDate).format("YYYY-MM-DD") : selectedRecord.maturityDate,
-            };
-            setData((prev) => prev.map((d) => (d.key === payload.key ? payload : d)));
-            setIsEditModalOpen(false);
-            editForm.resetFields();
-            setSelectedRecord(null);
-            message.success("Record updated.");
+          onFinish={async (values) => {
+            try {
+              const payload = {
+                asset_category: "ULIP",
+                transaction_type: values.transactionType === "New" ? "PURCHASE" : values.transactionType.toUpperCase(),
+                asset_name: values.planScheme,
+                remarks: "ULIP policy",
+                policy_number: values.policyNumber,
+
+                insurance_company_name: values.insuranceCompany,
+                insurance_company_address: values.insuranceAddress,
+
+                broker_name: values.brokerName,
+                broker_address: values.brokerAddress,
+
+                first_premium: Number(values.firstPremium || 0).toFixed(2),
+                transaction_date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : null,
+
+                policy_details: values.policyDetails,
+                premium_mode: values.premiumMode,
+                next_premium_due_date: values.nextPremiumDueDate ? dayjs(values.nextPremiumDueDate).format("YYYY-MM-DD") : null,
+                next_premium_amount: Number(values.nextPremiumAmount || 0).toFixed(2),
+
+                term_years: values.term,
+                maturity_date: values.maturityDate ? dayjs(values.maturityDate).format("YYYY-MM-DD") : null,
+                premium_terms: values.premiumTerms,
+
+                lock_in_period: values.lockInPeriod,
+                insured_name: values.insuredName,
+                nominee: values.nominee,
+
+                sum_assured: Number(values.sumAssured || 0).toFixed(2),
+                narration: values.narration,
+              };
+
+              await updateWealthEntry(selectedRecord.key, payload);
+
+              setIsEditModalOpen(false);
+              editForm.resetFields();
+              setSelectedRecord(null);
+              message.success("Record updated successfully.");
+              fetchData();
+            } catch (error) {
+              console.error("Error updating wealth entry:", error);
+              message.error("Failed to update record.");
+            }
           }}
         >
           {renderFormFields(editForm, false)}
@@ -533,12 +660,12 @@ export default function Ulip() {
                 editForm.resetFields();
                 setSelectedRecord(null);
               }}
-                  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+
             >
               Cancel
             </Button>
-            <Button type="primary"  className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
               Save Changes
             </Button>
           </div>

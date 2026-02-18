@@ -1,5 +1,6 @@
 // Privatequity.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { addWealthEntry, getWealthEntries, getWealthEntryById, updateWealthEntry } from "../../api/wealth";
 import {
   Table,
   Input,
@@ -33,23 +34,7 @@ const SAMPLE_ASSETS = [
 ];
 
 export default function Privatequity() {
-  const [data, setData] = useState([
-    {
-      key: 1,
-      transactionType: "Subscription",
-      assetName: "PrivateCo Series A",
-      refNumber: "REF-001",
-      insuranceCompany: "InsureCo Ltd",
-      insuranceAddress: "12 Market St, City",
-      brokerName: "Broker X",
-      brokerAddress: "Broker Address",
-      date: "2025-07-20",
-      quantity: 100,
-      rate: 500,
-      amount: 50000,
-      narration: "Initial subscription",
-    },
-  ]);
+  const [data, setData] = useState([]);
 
   const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -60,6 +45,35 @@ export default function Privatequity() {
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
+
+  const fetchData = async () => {
+    try {
+      const response = await getWealthEntries({ asset_category: "PRIVATE_EQUITY" });
+      const mappedData = response.map((item) => ({
+        key: item.id,
+        transactionType: item.transaction_type === "INVESTMENT" ? "Subscription" : (item.transaction_type.charAt(0).toUpperCase() + item.transaction_type.slice(1).toLowerCase()),
+        assetName: item.asset_name,
+        refNumber: item.ref_number,
+        insuranceCompany: item.insurance_company_name,
+        insuranceAddress: item.insurance_company_address,
+        brokerName: item.broker_name,
+        brokerAddress: item.broker_address,
+        date: item.transaction_date,
+        quantity: item.quantity,
+        rate: item.rate,
+        amount: item.amount,
+        narration: item.narration,
+      }));
+      setData(mappedData);
+    } catch (error) {
+      console.error("Error fetching Private Equity entries:", error);
+      message.error("Failed to fetch data.");
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const txnTypes = ["Subscription", "Redemption", "Transfer"];
 
@@ -133,24 +147,58 @@ export default function Privatequity() {
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
-            onClick={() => {
+            onClick={async () => {
               setSelectedRecord(record);
-              viewForm.setFieldsValue({
-                ...record,
-                date: record.date ? dayjs(record.date) : undefined,
-              });
-              setIsViewModalOpen(true);
+              try {
+                const data = await getWealthEntryById(record.key);
+                const mappedData = {
+                  transactionType: data.transaction_type === "INVESTMENT" ? "Subscription" : (data.transaction_type.charAt(0).toUpperCase() + data.transaction_type.slice(1).toLowerCase()),
+                  assetName: data.asset_name,
+                  refNumber: data.ref_number,
+                  insuranceCompany: data.insurance_company_name,
+                  insuranceAddress: data.insurance_company_address,
+                  brokerName: data.broker_name,
+                  brokerAddress: data.broker_address,
+                  date: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                  quantity: data.quantity,
+                  rate: data.rate,
+                  amount: data.amount,
+                  narration: data.narration,
+                };
+                viewForm.setFieldsValue(mappedData);
+                setIsViewModalOpen(true);
+              } catch (error) {
+                console.error("Error fetching Private Equity details:", error);
+                message.error("Failed to load details.");
+              }
             }}
           />
           <EditOutlined
             className="cursor-pointer! text-red-500!"
-            onClick={() => {
+            onClick={async () => {
               setSelectedRecord(record);
-              editForm.setFieldsValue({
-                ...record,
-                date: record.date ? dayjs(record.date) : undefined,
-              });
-              setIsEditModalOpen(true);
+              try {
+                const data = await getWealthEntryById(record.key);
+                const mappedData = {
+                  transactionType: data.transaction_type === "INVESTMENT" ? "Subscription" : (data.transaction_type.charAt(0).toUpperCase() + data.transaction_type.slice(1).toLowerCase()),
+                  assetName: data.asset_name,
+                  refNumber: data.ref_number,
+                  insuranceCompany: data.insurance_company_name,
+                  insuranceAddress: data.insurance_company_address,
+                  brokerName: data.broker_name,
+                  brokerAddress: data.broker_address,
+                  date: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                  quantity: data.quantity,
+                  rate: data.rate,
+                  amount: data.amount,
+                  narration: data.narration,
+                };
+                editForm.setFieldsValue(mappedData);
+                setIsEditModalOpen(true);
+              } catch (error) {
+                console.error("Error loading for edit:", error);
+                message.error("Failed to load details for editing.");
+              }
             }}
           />
         </div>
@@ -347,22 +395,22 @@ export default function Privatequity() {
           <Button
             icon={<FilterOutlined />}
             onClick={() => setSearchText("")}
-                className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+
           >
             Reset
           </Button>
         </div>
 
         <div className="flex gap-2">
-          <Button     className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-           icon={<DownloadOutlined />} onClick={exportCSV} >
+          <Button className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            icon={<DownloadOutlined />} onClick={exportCSV} >
             Export
           </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            className="bg-amber-500! hover:bg-amber-600! border-none!"  onClick={() => {
+            className="bg-amber-500! hover:bg-amber-600! border-none!" onClick={() => {
               addForm.resetFields();
               setIsAddModalOpen(true);
             }}
@@ -393,18 +441,38 @@ export default function Privatequity() {
         <Form
           form={addForm}
           layout="vertical"
-          onFinish={(values) => {
-            const calcs = computeAmounts(values);
-            const payload = {
-              ...values,
-              ...calcs,
-              key: data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1,
-              date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : undefined,
-            };
-            setData((prev) => [payload, ...prev]);
-            setIsAddModalOpen(false);
-            addForm.resetFields();
-            message.success("Record added.");
+          onFinish={async (values) => {
+            try {
+              const calcs = computeAmounts(values);
+              const payload = {
+                asset_category: "PRIVATE_EQUITY",
+                transaction_type: values.transactionType === "Subscription" ? "INVESTMENT" : values.transactionType.toUpperCase(),
+                transaction_date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : null,
+                asset_name: values.assetName,
+
+                ref_number: values.refNumber,
+                insurance_company_name: values.insuranceCompany,
+                insurance_company_address: values.insuranceAddress,
+
+                broker_name: values.brokerName,
+                broker_address: values.brokerAddress,
+
+                amount: Number(calcs.amount || 0).toFixed(2),
+                rate: Number(values.rate || 0),
+                quantity: Number(values.quantity || 0),
+                narration: values.narration,
+              };
+
+              await addWealthEntry(payload);
+
+              setIsAddModalOpen(false);
+              addForm.resetFields();
+              message.success("Record added successfully.");
+              fetchData();
+            } catch (error) {
+              console.error("Error adding wealth entry:", error);
+              message.error("Failed to add record.");
+            }
           }}
           onValuesChange={(changed, allValues) => {
             const calcs = computeAmounts(allValues);
@@ -419,12 +487,12 @@ export default function Privatequity() {
                 setIsAddModalOpen(false);
                 addForm.resetFields();
               }}
-                  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+
             >
               Cancel
             </Button>
-            <Button type="primary"  className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
               Add
             </Button>
           </div>
@@ -446,19 +514,39 @@ export default function Privatequity() {
         <Form
           form={editForm}
           layout="vertical"
-          onFinish={(values) => {
-            const calcs = computeAmounts(values);
-            const payload = {
-              ...selectedRecord,
-              ...values,
-              ...calcs,
-              date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : selectedRecord.date,
-            };
-            setData((prev) => prev.map((d) => (d.key === payload.key ? payload : d)));
-            setIsEditModalOpen(false);
-            editForm.resetFields();
-            setSelectedRecord(null);
-            message.success("Record updated.");
+          onFinish={async (values) => {
+            try {
+              const calcs = computeAmounts(values);
+              const payload = {
+                asset_category: "PRIVATE_EQUITY",
+                transaction_type: values.transactionType === "Subscription" ? "INVESTMENT" : values.transactionType.toUpperCase(),
+                transaction_date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : null,
+                asset_name: values.assetName,
+
+                ref_number: values.refNumber,
+                insurance_company_name: values.insuranceCompany,
+                insurance_company_address: values.insuranceAddress,
+
+                broker_name: values.brokerName,
+                broker_address: values.brokerAddress,
+
+                amount: Number(calcs.amount || 0).toFixed(2),
+                rate: Number(values.rate || 0),
+                quantity: Number(values.quantity || 0),
+                narration: values.narration,
+              };
+
+              await updateWealthEntry(selectedRecord.key, payload);
+
+              setIsEditModalOpen(false);
+              editForm.resetFields();
+              setSelectedRecord(null);
+              message.success("Record updated successfully.");
+              fetchData();
+            } catch (error) {
+              console.error("Error updating wealth entry:", error);
+              message.error("Failed to update record.");
+            }
           }}
           onValuesChange={(changed, allValues) => {
             const calcs = computeAmounts(allValues);
@@ -474,12 +562,12 @@ export default function Privatequity() {
                 editForm.resetFields();
                 setSelectedRecord(null);
               }}
-                  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+
             >
               Cancel
             </Button>
-            <Button type="primary"  className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
               Save Changes
             </Button>
           </div>
@@ -488,7 +576,7 @@ export default function Privatequity() {
 
       {/* View Modal */}
       <Modal
-       title={<span className="text-amber-700 text-2xl font-semibold"> View Private Equity Transaction</span>}
+        title={<span className="text-amber-700 text-2xl font-semibold"> View Private Equity Transaction</span>}
         open={isViewModalOpen}
         onCancel={() => {
           setIsViewModalOpen(false);
