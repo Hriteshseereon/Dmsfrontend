@@ -1,11 +1,12 @@
-import React, { useState } from "react";
+ import React, { useState,useEffect } from "react";  
 import { positiveNumberInputProps } from "../../../helpers/numberInput";
 import {
   requiredPositiveNumber,
   optionalPositiveNumber,
   percentageValidation,
 } from "../../../helpers/formValidation";
-
+import { exportToExcel } from "../../../../../utils/exportToExcel";
+import { getPurchaseOrder,getPurchaseContract ,getSoudaByContractId,addPurchaseOrder,getPurchaseOrderById,updatePurchaseOrder} from "../../../../../api/purchase";
 import {
   Table,
   Input,
@@ -103,201 +104,367 @@ export default function PurchaseIndent() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const [data, setData] = useState(purchaseIndentJSON.records);
+ const [soudaContracts, setSoudaContracts] = useState([]);
+  const [data, setData] = useState([]);
+ const [loading, setLoading] = useState(false);
+ const [contractItems, setContractItems] = useState([]);
+const [vendor, setVendor] = useState(null);
+const [selectedVendor, setSelectedVendor] = useState(null);
+
   const [searchText, setSearchText] = useState("");
 
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
+  useEffect(() => {
+  fetchPurchaseOrder();
+  fetchSoudaNoOptions();
+  
+}, []);
 
-  const handleSearch = (value) => {
-    setSearchText(value);
-    if (!value) {
-      setData(purchaseIndentJSON.records);
-      return;
-    }
-    const filtered = purchaseIndentJSON.records.filter((item) =>
-      Object.values(item)
-        .flatMap((v) =>
-          Array.isArray(v) ? v.map((x) => JSON.stringify(x)) : v
-        )
-        .join(" ")
-        .toLowerCase()
-        .includes(value.toLowerCase())
-    );
-    setData(filtered);
-  };
+const fetchPurchaseOrder = async () => {
+  try {
+    setLoading(true);
 
-  // when souda selected - populate basic info AND items list (user can add/remove items)
-  const handleSoudaSelect = (soudaNo, formInstance) => {
-    if (!soudaNo) return;
-    const souda = soudaMaster[soudaNo];
-    if (!souda) return;
+    const res = await getPurchaseOrder();
 
-    // map items into form list entries (qty/free qty blank so user can fill)
-    const itemsForForm = souda.items.map((it) => ({
-      item: it.item,
-      itemCode: it.itemCode,
-      qty: undefined,
-      freeQty: 0,
-      totalQty: undefined,
-      uom: it.uom || purchaseIndentJSON.uomOptions[0],
-      rate: it.rate || 0,
-      discountPercent: 0,
-      discountAmt: 0,
-      grossWt: 0,
-      totalGrossWt: 0,
-      grossAmount: 0,
-    }));
+    // adjust if API response is wrapped (res.data)
+    const list = res?.data || res;
 
-    formInstance.setFieldsValue({
-      soudaNo: souda.soudaNo,
-      plantName: souda.plantName,
-      plantCode: souda.plantCode,
-      companyName: souda.companyName,
-      depoName: souda.depoName,
-      deliveryAddress: souda.deliveryAddress || "",
-      items: itemsForForm,
-    });
+const formattedData = list.map((item, index) => ({
+  key: item.id || index + 1,
+  contract: item.contract,
+  plant_name: item.plant_name,
+  order_number: item.order_number,
+  vendor_name: item.vendor_name,
+  total_qty_all_items: item.total_qty_all_items || 0,
+  grand_total: item.grand_total || item.total_amount || 0,  // 🔥 ADD THIS
+  status: item.status || "Pending",
+}));
 
-    // recalc after a tick
-    setTimeout(() => recalcAll(formInstance), 50);
-  };
 
-  // recalc same as before, but for multi items
-  const recalcAll = (formInstance) => {
-    if (!formInstance) return;
-    const values = formInstance.getFieldsValue(true);
-    const items = values.items || [];
 
-    let totalIndentQty = 0;
-    let taxableAmount = 0;
+    setData(formattedData);
+   
 
-    const updatedItems = items.map((item) => {
-      const qty = Number(item?.qty || 0);
-      const freeQty = Number(item?.freeQty || 0);
-      const rate = Number(item?.rate || 0);
-      const discountPercent = Number(item?.discountPercent || 0);
-      const grossWt = Number(item?.grossWt || 0);
+  } catch (error) {
+    console.error("Failed to fetch purchase orders", error);
+    message.error("Failed to load purchase indents");
+  } finally {
+    setLoading(false);
+    
+  }
+};
+const round2 = (num) => Number((num || 0).toFixed(2));
 
-      const totalQty = qty + freeQty;
-      const grossAmount = qty * rate;
-      const discountAmt = (grossAmount * discountPercent) / 100;
-      const itemTaxable = grossAmount - discountAmt;
-      const totalGrossWt = grossWt;
+const fetchSoudaNoOptions = async () => {
+  try {
+    const res = await getPurchaseContract();
+    const list = res?.data || res;
+    setSoudaContracts(list);
+    console.log("Souda API Response:", list);
 
-      totalIndentQty += totalQty;
-      taxableAmount += itemTaxable;
+  } catch (err) {
+    message.error("Failed to load souda numbers");
+  }
+};
 
-      return {
-        ...item,
-        totalQty,
-        grossAmount,
-        discountAmt,
-        totalGrossWt,
-      };
-    });
 
-    // taxes (kept simple; you can adjust to compute correctly per indent)
-    const sgstPercent = Number(values.sgstPercent || 0);
-    const cgstPercent = Number(values.cgstPercent || 0);
-    const igstPercent = Number(values.igstPercent || 0);
-    const tcsAmt = Number(values.tcsAmt || 0);
 
-    const sgst = (taxableAmount * sgstPercent) / 100;
-    const cgst = (taxableAmount * cgstPercent) / 100;
-    const igst = (taxableAmount * igstPercent) / 100;
-    const totalGST = sgst + cgst + igst;
-    const totalAmt = taxableAmount + totalGST + tcsAmt;
+const handleSearch = (value) => {
+  setSearchText(value);
+
+  if (!value) {
+    fetchPurchaseOrder();
+    return;
+  }
+
+  const filtered = data.filter((item) =>
+    JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
+  );
+
+  setData(filtered);
+};
+
+
+const handleSoudaSelect = async (contractId, formInstance, existingItems = []) => {
+  if (!contractId) return;
+
+  try {
+    const res = await getSoudaByContractId(contractId);
+    const data = res?.data || res;
+
+    setContractItems(data.items || []);
+
+    // Merge existing items if provided
+    const itemsToSet = existingItems.length
+      ? existingItems.map(it => ({
+          ...it,
+          uom: it.uom_details?.unit_name || it.uom, // ensure uom
+        }))
+      : [];
 
     formInstance.setFieldsValue({
-      items: updatedItems,
-      totalQty: totalIndentQty,
-      sgst,
-      cgst,
-      igst,
-      totalGST,
-      tcsAmt,
-      totalAmt,
+      vendor: data.vendor,
+      vendorName: data.vendor_name,
+      plantName: data.plant_name,
+      deliveryAddress: data.delivery_address,
+      items: itemsToSet, // ✅ keep existing items
     });
-  };
 
-  const handleFormSubmit = (values, type) => {
-    const payloadBase = {
-      ...values,
-      indentDate: values.indentDate
-        ? values.indentDate.format("YYYY-MM-DD")
-        : null,
-      deliveryDate: values.deliveryDate
-        ? values.deliveryDate.format("YYYY-MM-DD")
-        : null,
+  } catch (err) {
+    message.error("Failed to load souda details");
+  }
+};
+
+
+
+
+
+ const recalcAll = (formInstance) => {
+  if (!formInstance) return;
+
+  const values = formInstance.getFieldsValue(true);
+  const items = values.items || [];
+
+  let totalIndentQty = 0;
+  let taxableAmount = 0;
+
+  const updatedItems = items.map((item) => {
+    const qty = Number(item?.qty || 0);
+    const freeQty = Number(item?.freeQty || 0);
+    const rate = Number(item?.rate || 0);
+    const discountPercent = Number(item?.discountPercent || 0);
+
+    const totalQty = qty + freeQty;
+    const grossAmount = round2(qty * rate);
+    const discountAmt = round2((grossAmount * discountPercent) / 100);
+    const itemTaxable = round2(grossAmount - discountAmt);
+
+    totalIndentQty += totalQty;
+    taxableAmount += itemTaxable;
+
+    return {
+      ...item,
+      totalQty,
+      grossAmount,
+      discountAmt,
     };
+  });
 
-    const items = values.items || [];
+  taxableAmount = round2(taxableAmount);
+
+  const sgstPercent = Number(values.sgstPercent || 0);
+  const cgstPercent = Number(values.cgstPercent || 0);
+  const igstPercent = Number(values.igstPercent || 0);
+  const tcsAmt = Number(values.tcsAmt || 0);
+
+  const sgst = round2((taxableAmount * sgstPercent) / 100);
+  const cgst = round2((taxableAmount * cgstPercent) / 100);
+  const igst = round2((taxableAmount * igstPercent) / 100);
+
+  const totalGST = round2(sgst + cgst + igst);
+  const totalAmt = round2(taxableAmount + totalGST + tcsAmt);
+
+  formInstance.setFieldsValue({
+    items: updatedItems,
+    totalQty: totalIndentQty,
+    sgst,
+    cgst,
+    igst,
+    totalGST,
+    tcsAmt: round2(tcsAmt),
+    totalAmt,
+  });
+};
+
+
+const handleExport = async () => {
+  try {
+    const res = await getPurchaseOrder();
+    const list = res?.data || res;
+
+    const exportRows = [];
+
+    for (const order of list) {
+      // get full details for each order
+      const detailRes = await getPurchaseOrderById(order.id || order.key);
+      const data = detailRes?.data || detailRes;
+
+      data.items?.forEach((item) => {
+        exportRows.push({
+          "Order No": data.order_number,
+          "Plant Name": data.plant_name,
+          "Vendor Name": data.vendor_name,
+
+          "Order Date": data.order_date,
+          "Expected Receiving Date": data.expected_receiving_date,
+          "Status": data.status,
+          "Delivery Address": data.delivery_address,
+
+          "Item Name": item.item_name,
+          "Item Code": item.hsn_code,
+          "Qty": item.qty,
+          "Free Qty": item.free_qty,
+          "Total Qty": Number(item.qty || 0) + Number(item.free_qty || 0),
+          "UOM": item.uom_details?.unit_name,
+          "Rate": item.rate,
+          "Discount %": item.discount_percent,
+          "Discount Amt": item.discount_amount,
+          "Gross Amount": item.gross_amount,
+          "Gross Weight": item.gross_weight,
+
+          "Total Qty (All Items)": data.total_qty_all_items,
+          "SGST %": data.sgst,
+          "CGST %": data.cgst,
+          "IGST %": data.igst,
+          "Total GST (₹)": data.total_gst_amount,
+          "TCS Amt (₹)": data.tcs_amount,
+          "Total Amount (₹)": data.grand_total || data.total_amount,
+        });
+      });
+    }
+
+    exportToExcel(exportRows, "All_Purchase_Indent_Details", "PurchaseIndent");
+
+  } catch (error) {
+    console.error("Export failed:", error);
+    message.error("Export failed");
+  }
+};
+
+const handleFormSubmit = async (values, type) => {
+  try {
+    const selectedContract = soudaContracts.find(
+      (c) => c.id === values.contract
+    );
+
+    const taxableAmount =
+      values.items?.reduce((sum, item) => {
+        const gross = Number(item.grossAmount || 0);
+        const discount = Number(item.discountAmt || 0);
+        return sum + (gross - discount);
+      }, 0) || 0;
+
+    const sgst = round2(
+      (taxableAmount * Number(values.sgstPercent || 0)) / 100
+    );
+    const cgst = round2(
+      (taxableAmount * Number(values.cgstPercent || 0)) / 100
+    );
+    const igst = round2(
+      (taxableAmount * Number(values.igstPercent || 0)) / 100
+    );
+
+    const totalGST = round2(sgst + cgst + igst);
+    const totalAmt = round2(
+      taxableAmount + totalGST + Number(values.tcsAmt || 0)
+    );
 
     const payload = {
-      ...payloadBase,
-      items,
-      totalQty: values.totalQty,
-      totalAmt: values.totalAmt,
-      status: values.status || "Pending",
+      contract: values.contract,
+      vendor: selectedContract?.vendor,
+      souda_no: selectedContract?.contract_number,
+
+      plant_name: values.plantName || "",
+      plant_display_name: values.plantName || "",
+      delivery_address: values.deliveryAddress || "",
+
+      order_date: values.order_date?.format("YYYY-MM-DD"),
+      expected_receiving_date:
+        values.expected_receiving_date?.format("YYYY-MM-DD"),
+
+      status: values.status || "Fresh",
+
+      total_qty_all_items: Number(values.totalQty || 0),
+
+      sgst: Number(values.sgstPercent || 0),
+      cgst: Number(values.cgstPercent || 0),
+      igst: Number(values.igstPercent || 0),
+
+      total_gst_amount: totalGST,
+      total_amount: totalAmt,
+      grand_total: totalAmt,
+
+      tcs_amount: Number(values.tcsAmt || 0),
+
+      items: values.items.map((it) => ({
+        product: it.product,
+        item_name: it.item,
+        item_code: it.hsn_code,
+        rate: Number(it.rate),
+        qty: Number(it.qty),
+        free_qty: Number(it.freeQty),
+        discount_percent: Number(it.discountPercent),
+        discount_amount: Number(it.discountAmt),
+        gross_amount: Number(it.grossAmount),
+        gross_weight: Number(it.grossWt),
+
+        uom_details: {
+          type: "base",
+          unit_name: it.uom,
+          factor_to_base: "1",
+        },
+      })),
     };
 
-    if (type === "edit" && selectedRecord) {
-      setData((prev) =>
-        prev.map((i) =>
-          i.key === selectedRecord.key ? { ...payload, key: i.key } : i
-        )
-      );
+    // 🔥 API CALL
+    if (type === "edit") {
+      await updatePurchaseOrder(selectedRecord.id, payload);
+      message.success("Purchase order updated successfully");
       setIsEditModalOpen(false);
-      editForm.resetFields();
-      message.success("Indent updated");
     } else {
-      setData((prev) => [...prev, { ...payload, key: Date.now() }]);
+      await addPurchaseOrder(payload);
+      message.success("Purchase order created successfully");
       setIsAddModalOpen(false);
-      addForm.resetFields();
-      message.success("Indent added");
     }
-  };
+
+    fetchPurchaseOrder();
+  } catch (err) {
+    console.error(err);
+    message.error("Something went wrong");
+  }
+};
+
+
+
+
 
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Souda No</span>,
-      dataIndex: "soudaNo",
+      title: <span className="text-amber-700 font-semibold">Order No</span>,
+      dataIndex: "order_number",
       width: 120,
       render: (t) => <span className="text-amber-800">{t}</span>,
+     
     },
+   
     {
       title: <span className="text-amber-700 font-semibold">Plant</span>,
-      dataIndex: "plantName",
+      dataIndex: "plant_name",
       width: 150,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
-    {
-      title: <span className="text-amber-700 font-semibold">Company</span>,
-      dataIndex: "companyName",
-      width: 150,
-      render: (t) => <span className="text-amber-800">{t}</span>,
-    },
-    // {
-    //   title: <span className="text-amber-700 font-semibold">Delivery Date</span>,
-    //   dataIndex: "deliveryDate",
-    //   width: 120,
-    //   render: (t) => <span className="text-amber-800">{t}</span>,
-    // },
+   {
+  title: <span className="text-amber-700 font-semibold">Vendor</span>,
+  dataIndex: "vendor_name",
+  width: 150,
+  render: (t) => <span className="text-amber-800">{t}</span>,
+},
+
     {
       title: <span className="text-amber-700 font-semibold">Total Qty</span>,
-      dataIndex: "totalQty",
+      dataIndex: "total_qty_all_items",
       width: 120,
-      render: (_, record) => (
-        <span className="text-amber-800">{record.totalQty} </span>
-      ),
+     render: (t) => <span className="text-amber-800">{t}</span>
+      
     },
     {
       title: (
         <span className="text-amber-700 font-semibold">Total Amount (₹)</span>
       ),
-      dataIndex: "totalAmt",
+    dataIndex: "grand_total",
+
       width: 160,
       render: (t) => (
         <span className="text-amber-800">
@@ -346,31 +513,132 @@ export default function PurchaseIndent() {
     },
   ];
 
-  const handleView = (record) => {
-    setSelectedRecord(record);
-    const convert = (v) => (v ? dayjs(v) : null);
+const handleView = async (record) => {
+  try {
+    setLoading(true);
+    const res = await getPurchaseOrderById(record.key);
+    const data = res?.data || res;
 
-    viewForm.setFieldsValue({
-      ...record,
-      indentDate: convert(record.indentDate),
-      deliveryDate: convert(record.deliveryDate),
-    });
+    // Load contract items
+    await handleSoudaSelect(data.contract, viewForm, data.items);
 
+    const formattedData = {
+      contract: data.contract,
+      vendorName: data.vendor_name,
+      plantName: data.plant_name,
+      deliveryAddress: data.delivery_address,
+      status: data.status,
+      order_date: data.order_date ? dayjs(data.order_date) : null,
+      expected_receiving_date: data.expected_receiving_date
+        ? dayjs(data.expected_receiving_date)
+        : null,
+      items: data.items?.map((it) => ({
+        product: it.product,
+        hsn_code: it.hsn_code,
+        rate: it.rate,
+        qty: it.qty,
+        freeQty: it.free_qty,
+        totalQty: Number(it.qty || 0) + Number(it.free_qty || 0),
+        discountPercent: it.discount_percent,
+        discountAmt: it.discount_amount,
+        grossAmount: it.gross_amount,
+        grossWt: it.gross_weight,
+        uom: it.uom_details?.unit_name,
+      })),
+      totalQty: data.total_qty_all_items || 0,
+      sgstPercent: data.sgst || 0,
+      cgstPercent: data.cgst || 0,
+      igstPercent: data.igst || 0,
+      totalGST: data.total_gst_amount || 0,
+      tcsAmt: data.tcs_amount || 0,
+      totalAmt: data.grand_total || data.total_amount || 0,
+    };
+
+    viewForm.setFieldsValue(formattedData);
+
+    // recalc just in case
+    setTimeout(() => recalcAll(viewForm), 0);
+
+    setSelectedRecord(data);
     setIsViewModalOpen(true);
-  };
+  } catch (err) {
+    console.error(err);
+    message.error("Failed to load purchase order details");
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const handleEdit = (record) => {
-    setSelectedRecord(record);
-    const convert = (v) => (v ? dayjs(v) : null);
 
-    editForm.setFieldsValue({
-      ...record,
-      indentDate: convert(record.indentDate),
-      deliveryDate: convert(record.deliveryDate),
-    });
 
+const handleEdit = async (record) => {
+  try {
+    setLoading(true);
+
+    // 🔥 Ensure souda list is loaded first
+    if (!soudaContracts.length) {
+      await fetchSoudaNoOptions();
+    }
+
+    const res = await getPurchaseOrderById(record.key);
+    const data = res?.data || res;
+// 🔥 ALSO load contract items for that souda, pass existing items
+await handleSoudaSelect(data.contract, editForm, data.items);
+
+
+  const formattedData = {
+  contract: data.contract,
+  vendorName: data.vendor_name,
+  plantName: data.plant_name,
+  deliveryAddress: data.delivery_address,
+  status: data.status,
+  order_date: data.order_date ? dayjs(data.order_date) : null,
+  expected_receiving_date: data.expected_receiving_date
+    ? dayjs(data.expected_receiving_date)
+    : null,
+  items: data.items?.map((it) => ({
+    product: it.product,
+    hsn_code: it.hsn_code,
+    rate: it.rate,
+    qty: it.qty,
+    maxQty: it.qty,
+    freeQty: it.free_qty,
+    totalQty: Number(it.qty || 0) + Number(it.free_qty || 0),
+    discountPercent: it.discount_percent,
+    discountAmt: it.discount_amount,
+    grossAmount: it.gross_amount,
+    grossWt: it.gross_weight,
+    uom: it.uom_details?.unit_name,
+  })),
+  // ✅ Add these for Tax & Charges
+  totalQty: data.total_qty_all_items || 0,
+  sgstPercent: data.sgst || 0,
+  cgstPercent: data.cgst || 0,
+  igstPercent: data.igst || 0,
+  totalGST: data.total_gst_amount || 0,
+  tcsAmt: data.tcs_amount || 0,
+  totalAmt: data.grand_total || data.total_amount || 0,
+};
+
+
+    editForm.setFieldsValue(formattedData);
+    viewForm.setFieldsValue(formattedData);
+setTimeout(() => {
+  console.log("FORM VALUES:", editForm.getFieldsValue());
+}, 500);
+
+
+    setSelectedRecord(data);
     setIsEditModalOpen(true);
-  };
+
+  } catch (err) {
+    message.error("Failed to load purchase order");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
   // Render form fields (used by Add/Edit/View). When soudaNo is selected, items are prefilled and user can add/remove entries.
   const renderFormFields = (formInstance, disabled = false) => (
@@ -378,37 +646,66 @@ export default function PurchaseIndent() {
       <h6 className=" text-amber-500 ">Basic Information</h6>
       <Row gutter={16}>
         <Col span={6}>
+        <Form.Item
+  label="Souda No"
+  name="contract"   // store contract ID
+  rules={[{ required: true }]}
+  
+>
+<Select
+  placeholder="Select Souda No"
+  options={soudaContracts.map(c => ({
+    label: c.souda_number,   
+    value: c.id
+  }))}
+  onChange={(contractId) =>
+    handleSoudaSelect(contractId, formInstance)
+  }
+  disabled={disabled || isEditModalOpen || isViewModalOpen}
+/>
+
+
+</Form.Item>
+
+
+        </Col>
+<Col span={6}>
+       <Form.Item label="Plant Name" name="plantName">
+  <Input disabled />
+</Form.Item>
+</Col>
+<Col span={6}>
+<Form.Item label="Vendor Name" name="vendorName">
+  <Input disabled />
+</Form.Item>
+</Col>
+
+
+        <Col span={6}>
+          <Form.Item label="Order Date" name="order_date">
+            <DatePicker className="w-full" disabled />
+          </Form.Item>
+        </Col>
+
+
+       
+      </Row>
+
+      <Row gutter={16}>
+         <Col span={6}>
           <Form.Item
-            label="Souda No"
-            name="soudaNo"
+            label="Expected Receiving Date"
+            name="expected_receiving_date"
             rules={[{ required: true }]}
           >
-            <Select
+            <DatePicker
+              className="w-full"
               disabled={disabled}
-              onChange={(v) => handleSoudaSelect(v, formInstance)}
-            >
-              {purchaseIndentJSON.soudaNoOptions.map((opt) => (
-                <Option key={opt} value={opt}>
-                  {opt}
-                </Option>
-              ))}
-            </Select>
+              disabledDate={(d) => d && d < dayjs().startOf("day")}
+            />
           </Form.Item>
         </Col>
-
-        <Col span={6}>
-          <Form.Item label="Plant Name" name="plantName">
-            <Input disabled />
-          </Form.Item>
-        </Col>
-
-        <Col span={6}>
-          <Form.Item label="Company Name" name="companyName">
-            <Input disabled />
-          </Form.Item>
-        </Col>
-
-        <Col span={6}>
+         <Col span={6}>
           <Form.Item label="Status" name="status">
             <Select disabled={disabled}>
               {purchaseIndentJSON.statusOptions.map((opt) => (
@@ -419,38 +716,18 @@ export default function PurchaseIndent() {
             </Select>
           </Form.Item>
         </Col>
-      </Row>
-
-      <Row gutter={16}>
-        <Col span={12}>
+        <Col span={8}>
           <Form.Item
             label="Delivery Address"
             name="deliveryAddress"
             rules={[{ required: true }]}
           >
-            <Input.TextArea rows={2} disabled={disabled} />
+            <Input.TextArea rows={2} disabled />
           </Form.Item>
         </Col>
 
-        <Col span={6}>
-          <Form.Item label="Indent Date" name="indentDate">
-            <DatePicker className="w-full" disabled />
-          </Form.Item>
-        </Col>
 
-        <Col span={6}>
-          <Form.Item
-            label="Delivery Date"
-            name="deliveryDate"
-            rules={[{ required: true }]}
-          >
-            <DatePicker
-              className="w-full"
-              disabled={disabled}
-              disabledDate={(d) => d && d < dayjs().startOf("day")}
-            />
-          </Form.Item>
-        </Col>
+       
       </Row>
 
       <h6 className=" text-amber-500 mt-4">Item & Pricing Details</h6>
@@ -486,47 +763,67 @@ export default function PurchaseIndent() {
                 </div>
 
                 <Row gutter={24}>
-                  <Col span={6}>
-                    <Form.Item
-                      {...field}
-                      label="Item Name"
-                      name={[field.name, "item"]}
-                      rules={[
-                        { required: true, message: "Please select item" },
-                      ]}
-                    >
-                      {/* item selection is populated from the souda's item list if available */}
-                      <Select
-                        showSearch
-                        disabled={disabled}
-                        placeholder="Select item"
-                        onChange={() =>
-                          setTimeout(() => recalcAll(formInstance), 50)
-                        }
-                      >
-                        {/* if souda selected, prefer those items */}
-                        {(() => {
-                          const soudaNo = formInstance.getFieldValue("soudaNo");
-                          const souda = soudaMaster[soudaNo];
-                          const opts = souda ? souda.items : [];
-                          return (opts.length ? opts : []).map((it) => (
-                            <Option key={it.itemCode} value={it.item}>
-                              {it.item}
-                            </Option>
-                          ));
-                        })()}
-                      </Select>
-                    </Form.Item>
-                  </Col>
+                 <Form.Item
+  {...field}
+  label="Item Name"
+  name={[field.name, "product"]}   // store PRODUCT ID
+  rules={[{ required: true }]}
+  
+>
+  <Select
+    showSearch
+    placeholder="Select Item"
+    disabled={disabled}
+    
+    onChange={(productId) => {
+
+      const selected = contractItems.find(
+        (i) => i.product === productId
+      );
+
+      if (!selected) return;
+
+      const currentItems = formInstance.getFieldValue("items");
+
+      currentItems[field.name] = {
+        ...currentItems[field.name],
+        product: selected.product,                 // ID
+        item_name: selected.item_name,             // name
+        hsn_code: selected.hsn_code,                // HSN
+        rate: Number(selected.rate || 0),
+        qty: Number(selected.qty || 0),
+        maxQty: Number(selected.qty || 0),   // ✅ ADD THIS
+
+        freeQty: Number(selected.free_qty || 0),
+        uom: selected.uom_details?.unit_name,
+        discountPercent: Number(selected.discount_percent || 0),
+      };
+
+      formInstance.setFieldsValue({
+        items: currentItems,
+      });
+
+      setTimeout(() => recalcAll(formInstance), 0);
+    }}
+  >
+    {contractItems.map((it) => (
+      <Option key={it.product} value={it.product}>
+        {it.item_name}
+      </Option>
+    ))}
+  </Select>
+</Form.Item>
+
 
                   <Col span={4}>
-                    <Form.Item
-                      {...field}
-                      label="Item Code"
-                      name={[field.name, "itemCode"]}
-                    >
-                      <Input disabled />
-                    </Form.Item>
+                  <Form.Item
+  {...field}
+  label="Item Code"
+  name={[field.name, "hsn_code"]}
+>
+  <Input disabled />
+</Form.Item>
+
                   </Col>
 
                   <Col span={4}>
@@ -535,8 +832,50 @@ export default function PurchaseIndent() {
                       label="Qty"
                       name={[field.name, "qty"]}
                       className="w-full"
+rules={[
+  { required: true, message: "Quantity is required" },
+
+  ({ getFieldValue }) => ({
+    validator(_, value) {
+
+      if (value === undefined || value === null || value === "") {
+        return Promise.resolve();
+      }
+
+      // ✅ Check if NOT a number
+      if (isNaN(value)) {
+        return Promise.reject(
+          new Error("Enter valid positive number")
+        );
+      }
+
+      const numericValue = Number(value);
+
+      // ✅ Negative check
+      if (numericValue < 0) {
+        return Promise.reject(
+          new Error("Enter valid positive number")
+        );
+      }
+
+        const maxQty =
+        Number(getFieldValue(["items", field.name, "maxQty"])) || 0;
+
+      if (numericValue > maxQty) {
+        message.warning(`You cannot enter more than ${maxQty}`);
+        return Promise.reject(
+          new Error(`Maximum allowed quantity is ${maxQty}`)
+        );
+      }
+
+      return Promise.resolve();
+    },
+  }),
+]}
+
+
                     >
-                      <InputNumber
+                      <Input
                         className="w-full"
                         disabled={disabled}
                         onChange={() => recalcAll(formInstance)}
@@ -549,8 +888,16 @@ export default function PurchaseIndent() {
                       {...field}
                       label="Free Qty"
                       name={[field.name, "freeQty"]}
+                       rules={[
+    {
+      validator: (_, value) =>
+        value >= 0
+          ? Promise.resolve()
+          : Promise.reject("Enter valid positive number"),
+    },
+  ]}
                     >
-                      <InputNumber
+                      <Input
                         className="w-full"
                         disabled={disabled}
                         onChange={() => recalcAll(formInstance)}
@@ -564,23 +911,19 @@ export default function PurchaseIndent() {
                       label="Total Qty"
                       name={[field.name, "totalQty"]}
                     >
-                      <InputNumber className="w-full bg-gray-50" disabled />
+                      <InputNumber className="w-full! bg-gray-50" disabled />
                     </Form.Item>
                   </Col>
                    <Col span={4}>
-                    <Form.Item
-                      {...field}
-                      label="UOM"
-                      name={[field.name, "uom"]}
-                    >
-                      <Select disabled={disabled}>
-                        {purchaseIndentJSON.uomOptions.map((opt) => (
-                          <Option key={opt} value={opt}>
-                            {opt}
-                          </Option>
-                        ))}
-                      </Select>
-                    </Form.Item>
+                   <Form.Item
+  {...field}
+  label="UOM"
+  name={[field.name, "uom"]}   // ✅ match handleEdit mapping
+>
+  <Input disabled />
+</Form.Item>
+
+
                   </Col>
 
                   <Col span={4}>
@@ -590,7 +933,7 @@ export default function PurchaseIndent() {
                       name={[field.name, "rate"]}
                     >
                       <InputNumber
-                        className="w-full"
+                        className="w-full! bg-gray-50"
                         disabled={disabled}
                         onChange={() => recalcAll(formInstance)}
                       />
@@ -602,8 +945,16 @@ export default function PurchaseIndent() {
                       {...field}
                       label="Discount %"
                       name={[field.name, "discountPercent"]}
+                               rules={[
+    {
+      validator: (_, value) =>
+        value >= 0
+          ? Promise.resolve()
+          : Promise.reject("Enter valid positive number"),
+    },
+  ]}
                     >
-                      <InputNumber
+                      <Input
                         className="w-full"
                         disabled={disabled}
                         onChange={() => recalcAll(formInstance)}
@@ -617,43 +968,41 @@ export default function PurchaseIndent() {
                       label="Discount Amt"
                       name={[field.name, "discountAmt"]}
                     >
-                      <InputNumber className="w-full bg-gray-50" disabled />
+                      <InputNumber className="w-full! bg-gray-50" disabled />
                     </Form.Item>
                   </Col>
 
-                  <Col span={8}>
+                  <Col span={4}>
                     <Form.Item
                       {...field}
                       label="Gross Amount"
                       name={[field.name, "grossAmount"]}
+                      
                     >
-                      <InputNumber className="w-full bg-gray-50" disabled />
+                      <InputNumber className="w-full! bg-gray-50" disabled />
+                    </Form.Item>
+                  </Col>
+                   <Col span={4}>
+                    <Form.Item
+                      {...field}
+                      label="Gross Weight"
+                      name={[field.name, "grossWt"]}
+                               rules={[
+    { required: true, message: "Gross Weight is required" },
+    {
+      validator: (_, value) =>
+        value >= 0
+          ? Promise.resolve()
+          : Promise.reject("Enter valid positive number"),
+    },
+  ]}
+                    >
+                      <Input className="w-full" disabled={disabled} />
                     </Form.Item>
                   </Col>
                 </Row>
 
               
-                <Row gutter={12}>
-                  <Col span={6}>
-                    <Form.Item
-                      {...field}
-                      label="Gross Weight"
-                      name={[field.name, "grossWt"]}
-                    >
-                      <InputNumber className="w-full" disabled={disabled} />
-                    </Form.Item>
-                  </Col>
-
-                  <Col span={6}>
-                    <Form.Item
-                      {...field}
-                      label="Total Gross Weight"
-                      name={[field.name, "totalGrossWt"]}
-                    >
-                      <InputNumber className="w-full bg-gray-50" disabled />
-                    </Form.Item>
-                  </Col>
-                </Row>
               </div>
             ))}
 
@@ -678,35 +1027,60 @@ export default function PurchaseIndent() {
       <Row gutter={12}>
         <Col span={4}>
           <Form.Item label="Total Qty (All Items)" name="totalQty">
-            <InputNumber className="w-full bg-gray-50" disabled />
+            <InputNumber className="w-full! bg-gray-50" disabled />
           </Form.Item>
         </Col>
 
         <Col span={4}>
-          <Form.Item label="SGST %" name="sgstPercent">
-            <InputNumber
+          <Form.Item label="SGST %" name="sgstPercent"
+                   rules={[
+    { required: true, message: "SGST % is required" },
+    {
+      validator: (_, value) =>
+        value >= 0
+          ? Promise.resolve()
+          : Promise.reject("Enter valid positive number"),
+    },
+  ]}>
+            <Input
               className="w-full"
-              disabled
+             disabled={disabled}
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
         </Col>
 
         <Col span={4}>
-          <Form.Item label="CGST %" name="cgstPercent">
-            <InputNumber
+          <Form.Item label="CGST %" name="cgstPercent"          rules={[
+    { required: true, message: "CGST % is required" },
+    {
+      validator: (_, value) =>
+        value >= 0
+          ? Promise.resolve()
+          : Promise.reject("Enter valid positive number"),
+    },
+  ]}>
+            <Input
               className="w-full"
-              disabled
+             disabled={disabled}
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
         </Col>
 
         <Col span={4}>
-          <Form.Item label="IGST %" name="igstPercent">
-            <InputNumber
+          <Form.Item label="IGST %" name="igstPercent"          rules={[
+    { required: true, message: "IGST % is required" },
+    {
+      validator: (_, value) =>
+        value >= 0
+          ? Promise.resolve()
+          : Promise.reject("Enter valid positive number"),
+    },
+  ]}>
+            <Input
               className="w-full"
-              disabled
+              disabled={disabled}
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
@@ -714,15 +1088,23 @@ export default function PurchaseIndent() {
 
         <Col span={4}>
           <Form.Item label="Total GST (₹)" name="totalGST">
-            <InputNumber className="w-full bg-gray-50" disabled />
+            <InputNumber className="w-full! bg-gray-50" disabled />
           </Form.Item>
         </Col>
 
         <Col span={4}>
-          <Form.Item label="TCS Amt (₹)" name="tcsAmt">
-            <InputNumber
+          <Form.Item label="TCS Amt (₹)" name="tcsAmt"          rules={[
+    { required: true, message: "TCS Amount is required" },
+    {
+      validator: (_, value) =>
+        value >= 0
+          ? Promise.resolve()
+          : Promise.reject("Enter valid positive number"),
+    },
+  ]}>
+            <Input
               className="w-full"
-              disabled
+              disabled={disabled}
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
@@ -730,7 +1112,7 @@ export default function PurchaseIndent() {
 
         <Col span={4}>
           <Form.Item label="Total Amount (₹)" name="totalAmt">
-            <InputNumber className="w-full bg-gray-50" disabled />
+            <InputNumber className="w-full! bg-gray-50" disabled />
           </Form.Item>
         </Col>
       </Row>
@@ -759,19 +1141,21 @@ export default function PurchaseIndent() {
         </div>
 
         <div className="flex gap-2">
-          <Button
-            icon={<DownloadOutlined />}
-            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          >
-            Export
-          </Button>
+         <Button
+  icon={<DownloadOutlined />}
+  onClick={handleExport}
+  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+>
+  Export
+</Button>
+
           <Button
             type="primary"
             icon={<PlusOutlined />}
             className="bg-amber-500! hover:bg-amber-600! border-none!"
             onClick={() => {
               addForm.resetFields();
-              addForm.setFieldsValue({ indentDate: dayjs(), items: [] });
+              addForm.setFieldsValue({ order_date: dayjs(), items: [] });
               setIsAddModalOpen(true);
             }}
           >
@@ -790,6 +1174,7 @@ export default function PurchaseIndent() {
         <Table
           columns={columns}
           dataSource={data}
+          loading={loading}
           pagination={false}
           scroll={{ y: 260 }}
           rowKey="key"
@@ -876,9 +1261,10 @@ export default function PurchaseIndent() {
         footer={null}
         width={1100}
       >
-        <Form layout="vertical" form={viewForm}>
-          {() => renderFormFields(viewForm, true)}
-        </Form>
+       <Form layout="vertical" form={viewForm}>
+  {renderFormFields(viewForm, true)}
+</Form>
+
       </Modal>
     </div>
   );
