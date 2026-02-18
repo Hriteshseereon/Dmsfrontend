@@ -322,6 +322,7 @@ addForm.setFieldsValue({
     totalQty: Number(item.total_qty),
   })),
 });
+console.log("ORDER RESPONSE:", order);
 
 
    
@@ -668,6 +669,9 @@ const payload = {
   vendor: isAddModalOpen
     ? selectedOrder?.vendor
     : selectedRecord?.vendor,
+     plant: isAddModalOpen
+    ? selectedOrder?.plant    
+    : selectedRecord?.plant,   
 
   invoice_date: values.invoiceDate
     ? dayjs(values.invoiceDate).format("YYYY-MM-DD")
@@ -713,6 +717,8 @@ const payload = {
 }))
 
 };
+console.log("PAYLOAD:", payload);
+
 
 
     // 🔹 ADD INVOICE
