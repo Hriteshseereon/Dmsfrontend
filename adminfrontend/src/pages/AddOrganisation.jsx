@@ -391,8 +391,10 @@ export default function AddOrganisation() {
             registrationNo: c.registration_no,
             gstNo: c.gst_no,
             address: {
-              city: c.address,
-              state: c.location,
+              address1: c.address,
+              address2: c.location,
+              city: c.city,
+              state: c.state,
             },
             companyCertificate: createExistingFile(c.company_certificate),
           })),
@@ -624,8 +626,10 @@ export default function AddOrganisation() {
           website: c.companyWebsite ?? null,
           registration_no: c.registrationNo ?? null,
           gst_no: c.gstNo ?? null,
-          address: c.address?.city ?? null,
-          location: c.address?.state ?? null,
+          address: c.address?.address1 ?? null,
+          location: c.address?.address2 ?? null,
+          city: c.address?.city ?? null,
+          state: c.address?.state ?? null,
         })),
       })),
 
@@ -2050,6 +2054,33 @@ export default function AddOrganisation() {
                                         </Form.Item>
                                       </Col>
                                     )}
+                                    <Col xs={24} sm={12} md={6}>
+                                      <Form.Item
+                                        {...restField}
+                                        label="Address Line 1"
+                                        name={[
+                                          compIndex,
+                                          "address",
+                                          "address1",
+                                        ]}
+                                      >
+                                        <Input placeholder="Address line 1" />
+                                      </Form.Item>
+                                    </Col>
+
+                                    <Col xs={24} sm={12} md={6}>
+                                      <Form.Item
+                                        {...restField}
+                                        label="Address Line 2"
+                                        name={[
+                                          compIndex,
+                                          "address",
+                                          "address2",
+                                        ]}
+                                      >
+                                        <Input placeholder="Address line 2" />
+                                      </Form.Item>
+                                    </Col>
                                     <Col xs={24} sm={12} md={6}>
                                       <Form.Item
                                         {...restField}
