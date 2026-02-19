@@ -12,6 +12,7 @@ import {
   DatePicker,
   InputNumber,
   message,
+  Upload,
 } from "antd";
 import {
   PlusOutlined,
@@ -27,6 +28,7 @@ import {
   getVendors,
   addvendor,
   updateVendor,
+  getVendorDetailsByid,
 } from "../../../../../../../api/bussinesspatnr";
 
 const { Option } = Select;
@@ -46,10 +48,11 @@ export default function VendorTab() {
   /* ================= FETCH ================= */
   const fetchVendors = async () => {
     try {
-      // const res = await getVendors();
-      // const list = Array.isArray(res) ? res : res?.results || [];
-      // setData(list);
-      setData([]); // replace with API call
+      const res = await getVendors();
+
+      const list = Array.isArray(res) ? res : res?.results || [];
+
+      setData(list);
     } catch {
       message.error("Failed to fetch vendors");
     }
@@ -58,42 +61,51 @@ export default function VendorTab() {
   useEffect(() => {
     fetchVendors();
   }, []);
+  const fileFromUrl = (url) => {
+    if (!url) return [];
+
+    return [
+      {
+        uid: url,
+        name: url.split("/").pop(),
+        status: "done",
+        url,
+      },
+    ];
+  };
 
   /* ================= MAP API → FORM ================= */
   const mapDetailsToForm = (d) => ({
     name: d.name,
     shortName: d.short_name,
-    mobileNo1: d.mobile_no1,
-    mobileNo2: d.mobile_no2,
-    email1: d.email1,
-    email2: d.email2,
-    whatsappNo: d.whatsapp_no,
-    socialLink: d.social_link,
-    websiteUrl: d.website_url,
-    // Contact Person
-    contactPerson: d.contact_person_input?.name,
-    contactMobile: d.contact_person_input?.contact_person_no,
-    contactWhatsapp: d.contact_person_input?.contact_person_whats_no,
-    gender: d.contact_person_input?.gender,
-    contactEmail: d.contact_person_input?.contract_person_email,
-    aadharNo: d.contact_person_input?.adhara_no,
-    // Tax
-    tinNo: d.tax?.tin_no,
-    tinDate: d.tax?.tin_date ? dayjs(d.tax.tin_date) : null,
-    panNo: d.tax?.pan,
-    gstIn: d.tax?.gstin,
-    igstApplicable: d.tax?.igst_applicable ? "Yes" : "No",
-    // Address
+    mobileNo1: d.mobile_no_1,
+    email1: d.email_address,
+
+    contactPerson: d.contact_person,
+    contactMobile: d.contact_person_no,
+
+    tinNo: d.business_details?.tin_no,
+    tinDate: d.business_details?.tin_date
+      ? dayjs(d.business_details.tin_date)
+      : null,
+    panNo: d.business_details?.pan,
+    gstIn: d.business_details?.gstin,
+    igstApplicable: d.business_details?.igst_applicable ? "Yes" : "No",
+
     address1: d.addresses?.[0]?.address_line1,
-    address2: d.addresses?.[0]?.address_line2,
-    location: d.addresses?.[0]?.location,
     state: d.addresses?.[0]?.state,
     district: d.addresses?.[0]?.district,
     city: d.addresses?.[0]?.city,
+    location: d.addresses?.[0]?.location,
     pinCode: d.addresses?.[0]?.pin,
+
     status: d.is_active ? "Active" : "Inactive",
-    transactionType: d.transaction_type,
-    // Plants
+
+    // ✅ FILE PREVIEW
+    panDoc: fileFromUrl(d.business_details?.pan_document),
+    gstDoc: fileFromUrl(d.business_details?.gstin_document),
+    tinDoc: fileFromUrl(d.business_details?.tin_document),
+
     plants: (d.plants || []).map((p) => ({
       plantName: p.name,
       address: p.address,
@@ -103,83 +115,106 @@ export default function VendorTab() {
       district: p.district,
       city: p.city,
       pin: p.pin,
-      faxNo: p.fax_no,
     })),
   });
+
+  const openVendor = async (record, view = false) => {
+    try {
+      const details = await getVendorDetailsByid(record.id);
+
+      form.setFieldsValue(mapDetailsToForm(details));
+      setSelected(details);
+      setViewMode(view);
+      setOpen(true);
+    } catch {
+      message.error("Failed to load vendor");
+    }
+  };
+  // payload for create and update the vendor
+  const buildFormData = (values) => {
+    const fd = new FormData();
+
+    const payload = {
+      name: values.name,
+      short_name: values.shortName,
+      mobile_no_1: values.mobileNo1?.toString(),
+      email_address: values.email1,
+      is_active: values.status === "Active",
+
+      // ✅ REQUIRED BY BACKEND
+      contact_person_input: {
+        name: values.contactPerson || "",
+        contact_person_no: values.contactMobile?.toString() || "",
+      },
+
+      addresses: [
+        {
+          address_line1: values.address1,
+          state: values.state,
+          district: values.district,
+          city: values.city,
+          location: values.location,
+          pin: values.pinCode?.toString(),
+        },
+      ],
+
+      plants: (values.plants || []).map((p) => ({
+        name: p.plantName,
+        address: p.address,
+        phone_number: p.phoneNo?.toString(),
+        email_address: p.email,
+        state: p.state,
+        district: p.district,
+        city: p.city,
+        pin: p.pin?.toString(),
+      })),
+
+      business_details: {
+        pan: values.panNo,
+        gstin: values.gstIn,
+        tin_no: values.tinNo,
+        tin_date: values.tinDate
+          ? dayjs(values.tinDate).format("YYYY-MM-DD")
+          : null,
+        igst_applicable: values.igstApplicable === "Yes",
+      },
+    };
+
+    // ✅ JSON inside form-data
+    fd.append("data", JSON.stringify(payload));
+
+    const appendFile = (key, fileList) => {
+      if (fileList?.[0]?.originFileObj) {
+        fd.append(key, fileList[0].originFileObj);
+      }
+    };
+
+    appendFile("pan_document", values.panDoc);
+    appendFile("gstin_document", values.gstDoc);
+    appendFile("tin_document", values.tinDoc);
+    appendFile("aadhaar_documents", values.aadharDoc);
+
+    return fd;
+  };
 
   /* ================= SAVE ================= */
   const handleSubmit = async (values) => {
     try {
-      const payload = {
-        name: values.name || "",
-        short_name: values.shortName || "",
-        is_active: values.status === "Active",
-        mobile_no1: values.mobileNo1,
-        mobile_no2: values.mobileNo2,
-        email1: values.email1,
-        email2: values.email2,
-        whatsapp_no: values.whatsappNo,
-        social_link: values.socialLink,
-        website_url: values.websiteUrl,
-        transaction_type: values.transactionType,
-
-        contact_person_input: {
-          name: values.contactPerson || "",
-          contact_person_no: values.contactMobile || "",
-          gender: values.gender || "",
-          contact_person_whats_no: values.contactWhatsapp || "",
-          contract_person_email: values.contactEmail || "",
-          adhara_no: values.aadharNo || "",
-          adhara_documents: [],
-        },
-
-        addresses: [
-          {
-            address_line1: values.address1 || "",
-            address_line2: values.address2 || "",
-            state: values.state || "",
-            district: values.district || "",
-            city: values.city || "",
-            location: values.location || "",
-            pin: values.pinCode || "",
-          },
-        ],
-
-        plants: (values.plants || []).map((p) => ({
-          name: p.plantName || "",
-          address: p.address || "",
-          phone_number: p.phoneNo || "",
-          email_address: p.email || "",
-          state: p.state || "",
-          district: p.district || "",
-          city: p.city || "",
-          pin: p.pin || "",
-          fax_no: p.faxNo || "",
-        })),
-
-        tax: {
-          pan: values.panNo || "",
-          gstin: values.gstIn || "",
-          tin_no: values.tinNo || "",
-          tin_date: values.tinDate
-            ? dayjs(values.tinDate).format("YYYY-MM-DD")
-            : null,
-          igst_applicable: values.igstApplicable === "Yes",
-        },
-      };
+      const formData = buildFormData(values);
 
       if (selected) {
-        // await updateVendor(selected.id, payload);
+        await updateVendor(selected.id, formData);
         message.success("Vendor Updated");
       } else {
-        // await addvendor(payload);
-        message.success("Vendor Added");
+        await addvendor(formData);
+        message.success("Vendor Created");
       }
 
       setOpen(false);
       form.resetFields();
       fetchVendors();
-    } catch {
+    } catch (e) {
+      console.log(e);
       message.error("Save failed");
     }
   };
@@ -188,8 +223,8 @@ export default function VendorTab() {
   const columns = [
     { title: "Company Name", dataIndex: "name" },
     { title: "Short Name", dataIndex: "short_name" },
-    { title: "Mobile", dataIndex: "mobile_no1" },
-    { title: "Email", dataIndex: "email1" },
+    { title: "Mobile", dataIndex: "mobile_no_1" },
+    { title: "Email", dataIndex: "email_address" },
     {
       title: "Status",
       dataIndex: "is_active",
@@ -200,34 +235,12 @@ export default function VendorTab() {
       render: (_, record) => (
         <div className="flex gap-3">
           <EyeOutlined
-            className="text-blue-500 cursor-pointer text-base"
-            onClick={async () => {
-              try {
-                // const details = await getVendorDetails(record.id);
-                const details = record; // replace with API call
-                form.setFieldsValue(mapDetailsToForm(details));
-                setSelected(details);
-                setViewMode(true);
-                setOpen(true);
-              } catch {
-                message.error("Failed to load vendor details");
-              }
-            }}
+            className="!text-blue-500 !cursor-pointer !text-base"
+            onClick={() => openVendor(record, true)}
           />
           <EditOutlined
-            className="text-amber-500 cursor-pointer text-base"
-            onClick={async () => {
-              try {
-                // const details = await getVendorDetails(record.id);
-                const details = record; // replace with API call
-                form.setFieldsValue(mapDetailsToForm(details));
-                setSelected(details);
-                setViewMode(false);
-                setOpen(true);
-              } catch {
-                message.error("Failed to load vendor details");
-              }
-            }}
+            className="!text-red-500 !cursor-pointer !text-base"
+            onClick={() => openVendor(record, false)}
           />
         </div>
       ),
@@ -578,8 +591,25 @@ export default function VendorTab() {
               </Col>
 
               <Col span={6}>
-                <Form.Item label="Aadhar Document" name="aadharDoc">
-                  <Input type="file" disabled={viewMode} />
+                {/* <Form.Item label="Aadhar Document" name="aadharDoc"> */}
+                <Form.Item
+                  name="aadharDoc"
+                  label="Aadhar Document"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                    onPreview={(file) => {
+                      window.open(
+                        file.url || URL.createObjectURL(file.originFileObj),
+                      );
+                    }}
+                  >
+                    <Button disabled={viewMode}>Select File</Button>
+                  </Upload>
                 </Form.Item>
               </Col>
             </Row>
@@ -617,8 +647,25 @@ export default function VendorTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="TIN Document" name="tinDoc">
-                  <Input type="file" disabled={viewMode} />
+                {/* <Form.Item label="TIN Document" name="tinDoc"> */}
+                <Form.Item
+                  name="tinDoc"
+                  label="TIN Document"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                    onPreview={(file) => {
+                      window.open(
+                        file.url || URL.createObjectURL(file.originFileObj),
+                      );
+                    }}
+                  >
+                    <Button disabled={viewMode}>Select File</Button>
+                  </Upload>
                 </Form.Item>
               </Col>
 
@@ -633,8 +680,24 @@ export default function VendorTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="PAN Document" name="panDoc">
-                  <Input type="file" disabled={viewMode} />
+                <Form.Item
+                  name="panDoc"
+                  label="PAN Document"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                    onPreview={(file) => {
+                      window.open(
+                        file.url || URL.createObjectURL(file.originFileObj),
+                      );
+                    }}
+                  >
+                    <Button disabled={viewMode}>Select File</Button>
+                  </Upload>
                 </Form.Item>
               </Col>
 
@@ -649,8 +712,16 @@ export default function VendorTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="GSTIN Document" name="gstDoc">
-                  <Input type="file" disabled={viewMode} />
+                {/* <Form.Item label="GSTIN Document" name="gstDoc"> */}
+                <Form.Item
+                  name="gstDoc"
+                  label="GSTIN  Document"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload beforeUpload={() => false} maxCount={1}>
+                    <Button>Select File</Button>
+                  </Upload>
                 </Form.Item>
               </Col>
 

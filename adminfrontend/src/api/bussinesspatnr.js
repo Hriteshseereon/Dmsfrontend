@@ -4,7 +4,10 @@ import useSessionStore from "../store/sessionStore";
 // add vendor partner details
 export const addvendor = async (data) => {
     const { currentOrgId } = useSessionStore.getState();
-  const res = await api.post("/vendors/vendors/", data ,{params: {organisation: currentOrgId}});
+  const res = await api.post("/vendors/vendors/", data ,{ headers: {
+      "Content-Type": "multipart/form-data",
+    },
+    params: {organisation: currentOrgId}});
   return res.data;
 }
 
@@ -20,7 +23,12 @@ export const updateVendor = async (id, data) => {
   const res = await api.patch(`/vendors/vendors/${id}/`, data, {params: {organisation: currentOrgId}});
   return res.data;
 }
-
+// get vedor details by id
+export const getVendorDetailsByid = async (id) =>{
+   const { currentOrgId } = useSessionStore.getState();
+   const res = await api.get(`/vendors/vendors/${id}/`,{params:{organisation:currentOrgId}});
+   return res.data;
+}
 // working api on create and get the customer api
 export const addcustomer = async (payload) => {
     const { currentOrgId } = useSessionStore.getState();
