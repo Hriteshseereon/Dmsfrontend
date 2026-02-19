@@ -239,8 +239,8 @@ const handleExport = async () => {
         // Basic Info
          advice_no: item.advice_no || "-",
         lodingadvicedate: item.advice_date || "-",
-        invoiceNo: item.invoice_no || "-",   // ✅ correct field
-        companyName: item.vendor_name || "-", // change if backend sends vendor name
+        invoiceNo: item.invoice_number || "-",   
+        companyName: item.vendor_name || "-",
         plantName: item.plant_name || "-",
         status: item.status || "-",
         vendor_name: item.vendor_name,
@@ -290,7 +290,7 @@ itemName: item.items?.[0]?.product_name || "-",
 
       const item = res;
 form.setFieldsValue({
-  invoiceNo: item.invoice_no,
+  invoiceNo: item.invoice_number,
   lodingadvicedate: item.advice_date ? dayjs(item.advice_date) : null,
   status: item.status,
 
@@ -357,7 +357,7 @@ form.setFieldsValue({
     ? dayjs(values.lodingadvicedate).format("YYYY-MM-DD")
     : null,
 
-  invoice_no: values.invoiceNo,
+  invoice_number: values.invoiceNo,
   status: values.status,
         assignment: selectedRecord.assignment,
 
@@ -418,7 +418,7 @@ await updateLoadingAdvice(selectedRecord.loading_id, payload);
     const item = await getLoadingAdviceById(record.id);
 
     viewForm.setFieldsValue({
-      invoiceNo: item.invoice_no,
+      invoiceNo: item.invoice_number,
       lodingadvicedate: item.advice_date
         ? dayjs(item.advice_date)
         : null,
@@ -483,21 +483,18 @@ await updateLoadingAdvice(selectedRecord.loading_id, payload);
   // Columns - removed Assign button; Admin can only approve pending ones
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Advice No</span>,
-      dataIndex: "advice_no",
-      render: (t) => <span className="text-amber-800">{t}</span>,
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Loading Advice Date</span>,
-      dataIndex: "lodingadvicedate",
-      render: (t) => <span className="text-amber-800">{t}</span>,
-    },
-    {
       title: <span className="text-amber-700 font-semibold">Invoice No</span>,
       dataIndex: "invoiceNo",
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
 
+  
+    {
+      title: <span className="text-amber-700 font-semibold">Loading Advice Date</span>,
+      dataIndex: "lodingadvicedate",
+      render: (t) => <span className="text-amber-800">{t}</span>,
+    },
+    
 
     // transporter + vehicle/driver columns (display-only)
     {

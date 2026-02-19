@@ -60,43 +60,43 @@ const handleAssignClick = async (id) => {
     setSelectedRecord(res);
     setModalState({ open: true, mode: "assign" });
 
-    form.setFieldsValue({
-      vehicleNo: res.vehicle_number,
-      driverName: res.driver_name,
-      driverContact: res.driver_contact,
-      insuranceValidUpto: res.insurance_valid_upto ? dayjs(res.insurance_valid_upto) : null,
-      puValidUpto: res.pu_valid_upto ? dayjs(res.pu_valid_upto) : null,
-      fitnessValidUpto: res.fitness_valid_upto ? dayjs(res.fitness_valid_upto) : null,
-      deliveryDate: res.delivery_date ? dayjs(res.delivery_date) : null,
+  form.setFieldsValue({
+  vehicleNo: res.vehicle_number,
+  driverName: res.driver_name,
+  driverContact: res.driver_contact,
 
-      invoice_number: res.invoice_number,
-      invoiceDate: res.order_date ? dayjs(res.order_date) : null,
-      estimateDeliveryDate: res.est_delivery_date ? dayjs(res.est_delivery_date) : null,
-      wayBill: res.way_bill,
-      status: res.status,
-      deliveryAddress: res.delivery_address,
+  insuranceValidUpto: res.insurance_valid_upto ? dayjs(res.insurance_valid_upto) : null,
+  puValidUpto: res.pu_valid_upto ? dayjs(res.pu_valid_upto) : null,
+  fitnessValidUpto: res.fitness_valid_upto ? dayjs(res.fitness_valid_upto) : null,
+  deliveryDate: res.delivery_date ? dayjs(res.delivery_date) : null,
 
-      vendorName: res.vendor_name,
-      vendorAddress: res.vendor_address,
-      vendorGSTIN: res.vendor_gstin,
-      vendorContactPerson: res.vendor_contact_person,
-      vendorPhoneNumber: res.vendor_phone,
+  invoice_number: res.invoice_number,
+  wayBill: res.way_bill,
+  status: res.status,
+  deliveryAddress: res.delivery_address,
 
-      plantName: res.plant_name,
-      plantCode: res.plant_code,
-      plantGSTIN: res.plant_gstin,
-      plantAddress: res.plant_address,
-      plantContactPerson: res.plant_contact_person,
+  // ✅ VENDOR (FIX HERE)
+  vendorName: res.vendor?.name,
+  vendorAddress: res.invoice_delivery_address, // or vendor address if available
+  vendorContactPerson: res.vendor?.contact_person,
+  vendorPhoneNumber: res.vendor?.contact_person_no,
 
-      products: [
-        {
-          productName: res.product_name,
-          productId: res.product_id,
-          qty: res.qty,
-          uom: res.uom,
-        },
-      ],
-    });
+  // ✅ PLANT (FIX HERE)
+  plantName: res.plant?.name,
+  plantAddress: res.plant?.address,
+  plantContactPerson: "-", // not in API
+  plantPhoneNumber: res.plant?.phone_number,
+
+  // ✅ PRODUCT (FIX HERE)
+  products: [
+    {
+      productName: res.product_name,
+      qty: res.total_qty,   // ❗ you used res.qty (wrong)
+      uom: "-",             // not in API
+    },
+  ],
+});
+
 
   } catch (error) {
     console.error("Error fetching assigned order:", error);
@@ -155,8 +155,7 @@ const handleAssignClick = async (id) => {
   };
 
   const columns = [
-    { title: <span className="text-amber-700 font-semibold">Invoice No</span>, dataIndex: "invoice_number",  width:100, render: (t) => <span className="text-amber-800 font-medium">{t}</span> },
-    { title: <span className="text-amber-700 font-semibold">Vendor</span>, dataIndex: "vendorName", render: (t) => <span className="text-amber-800">{t}</span> },
+    { title: <span className="text-amber-700 font-semibold">Invoice No</span>, dataIndex: "invoice_number", render: (t) => <span className="text-amber-800 font-medium">{t}</span> },
     
     {
   title: <span className="text-amber-700 font-semibold">Product Name</span>,
@@ -243,7 +242,7 @@ const handleAssignClick = async (id) => {
         <Form form={form} layout="vertical" onFinish={onFinish}>
           
           {renderSection("Transport Detail", <>
-           <Col span={4}>
+           <Col span={6}>
   <Form.Item
     label="Vehicle No."
     name="vehicleNo"
@@ -256,7 +255,7 @@ const handleAssignClick = async (id) => {
   </Form.Item>
 </Col>
 
-<Col span={4}>
+<Col span={6}>
   <Form.Item
     label="Driver Name"
     name="driverName"
@@ -268,7 +267,7 @@ const handleAssignClick = async (id) => {
   </Form.Item>
 </Col>
 
-<Col span={4}>
+<Col span={6}>
   <Form.Item
     label="Driver Contact"
     name="driverContact"
@@ -281,7 +280,7 @@ const handleAssignClick = async (id) => {
   </Form.Item>
 </Col>
 
-<Col span={4}>
+<Col span={6}>
   <Form.Item
     label="Insurance Valid"
     name="insuranceValidUpto"
@@ -291,7 +290,7 @@ const handleAssignClick = async (id) => {
   </Form.Item>
 </Col>
 
-<Col span={4}>
+<Col span={6}>
   <Form.Item
     label="PU Valid"
     name="puValidUpto"
@@ -301,7 +300,7 @@ const handleAssignClick = async (id) => {
   </Form.Item>
 </Col>
 
-<Col span={4}>
+<Col span={6}>
   <Form.Item
     label="Fitness Valid"
     name="fitnessValidUpto"
@@ -311,7 +310,7 @@ const handleAssignClick = async (id) => {
   </Form.Item>
 </Col>
 
-<Col span={4}>
+<Col span={6}>
  <Form.Item
   label="Delivery Date"
   name="deliveryDate"
@@ -326,27 +325,25 @@ const handleAssignClick = async (id) => {
 </Col>
    </>)}
           {renderSection("Order Details", <>
-            <Col span={4}><Form.Item label="Invoice No" name="invoice_number"><Input disabled /></Form.Item></Col>
-            <Col span={4}><Form.Item label="Invoice Date" name="invoiceDate" ><DatePicker className="w-full" disabled/></Form.Item></Col>
-            <Col span={4}><Form.Item label="Est. Delivery Date" name="estimateDeliveryDate"><DatePicker className="w-full" disabled /></Form.Item></Col>
-            <Col span={4}><Form.Item label="Way Bill" name="wayBill"><Input disabled/></Form.Item></Col>
-            <Col span={4}><Form.Item label="Status" name="status"><Select disabled={isReadonly || isAssigning} options={[{label: 'Pending', value: 'Pending'}, {label: 'Pending Approval', value: 'Pending Approval'}]} /></Form.Item></Col>
-            <Col span={4}><Form.Item label="Delivery Address" name="deliveryAddress"><Input disabled /></Form.Item></Col>
+            <Col span={6}><Form.Item label="Invoice No" name="invoice_number"><Input disabled /></Form.Item></Col>
+             <Col span={6}><Form.Item label="Way Bill" name="wayBill"><Input disabled/></Form.Item></Col>
+            <Col span={6}><Form.Item label="Status" name="status"><Select disabled={isReadonly || isAssigning} options={[{label: 'Pending', value: 'Pending'}, {label: 'Pending Approval', value: 'Pending Approval'}]} /></Form.Item></Col>
+            <Col span={6}><Form.Item label="Delivery Address" name="deliveryAddress"><Input disabled /></Form.Item></Col>
           </>)}
 
           {renderSection("Vendor Detail", <>
-            <Col span={4}><Form.Item label="Vendor Name" name="vendorName" ><Input disabled /></Form.Item></Col>
-            <Col span={4}><Form.Item label="Address" name="vendorAddress" ><Input disabled /></Form.Item></Col>
-            <Col span={4}><Form.Item label="GSTIN" name="vendorGSTIN" ><Input disabled /></Form.Item></Col>
-            <Col span={4}><Form.Item label="Contact Person" name="vendorContactPerson"><Input disabled /></Form.Item></Col>
-            <Col span={4}><Form.Item label="Phone" name="vendorPhoneNumber" ><Input disabled /></Form.Item></Col>
+            <Col span={6}><Form.Item label="Vendor Name" name="vendorName" ><Input disabled /></Form.Item></Col>
+            <Col span={6}><Form.Item label="Address" name="vendorAddress" ><Input disabled /></Form.Item></Col>
+            <Col span={6}><Form.Item label="Contact Person" name="vendorContactPerson"><Input disabled /></Form.Item></Col>
+            <Col span={6}><Form.Item label="Phone" name="vendorPhoneNumber" ><Input disabled /></Form.Item></Col>
           </>)}
 
           {renderSection("Plant Detail", <>
-            <Col span={4}><Form.Item label="Plant Name" name="plantName" ><Input disabled /></Form.Item></Col>
-             <Col span={4}><Form.Item label="GSTIN" name="plantGSTIN" ><Input disabled/></Form.Item></Col>
-            <Col span={4}><Form.Item label="Address" name="plantAddress" ><Input disabled /></Form.Item></Col>
-            <Col span={4}><Form.Item label="Contact Person" name="plantContactPerson"><Input disabled /></Form.Item></Col>
+            <Col span={6}><Form.Item label="Plant Name" name="plantName" ><Input disabled /></Form.Item></Col>
+              <Col span={6}><Form.Item label="Address" name="plantAddress" ><Input disabled /></Form.Item></Col>
+            <Col span={6}><Form.Item label="Contact Person" name="plantContactPerson"><Input disabled /></Form.Item></Col>
+             <Col span={6}><Form.Item label="Phone" name="plantPhoneNumber" ><Input disabled /></Form.Item></Col>
+         
           </>)}
 
 
@@ -355,8 +352,8 @@ const handleAssignClick = async (id) => {
             {(fields) => fields.map(({ key, name }) => (
               <Row gutter={24} key={key}>
                 <Col span={6}><Form.Item name={[name, 'productName']} label="Product"><Input disabled /></Form.Item></Col>
-                  <Col span={4}><Form.Item name={[name, 'qty']} label="Qty"><Input disabled /></Form.Item></Col>
-                  <Col span={4}><Form.Item name={[name, 'uom']} label="UOM"><Input disabled /></Form.Item></Col>
+                  <Col span={6}><Form.Item name={[name, 'qty']} label="Qty"><Input disabled /></Form.Item></Col>
+                  <Col span={6}><Form.Item name={[name, 'uom']} label="UOM"><Input disabled /></Form.Item></Col>
               
                    </Row>
             ))}

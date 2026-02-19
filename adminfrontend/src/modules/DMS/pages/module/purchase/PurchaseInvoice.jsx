@@ -238,8 +238,8 @@ const fetchPurchaseInvoices = async () => {
     const formatted = res.map((item, index) => ({
       key: index + 1,
       ...item,
-      assigned: item.is_transport_assigned,      // ✅ map correctly
-      transport: item.transport_name,            // ✅ show name not ID
+      assigned: item.is_transport_assigned,      
+      transport: item.transport_name,            
     }));
 
     setData(formatted);
