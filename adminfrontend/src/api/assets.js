@@ -62,14 +62,17 @@ export const getAssetAllocations = async () => {
 };
 
 // CREATE
-export const addAssetAllocation = async ( payload) => {
+export const addAssetAllocation = async (payload) => {
   const res = await api.post("/assets/allocations/", payload);
   return res.data;
 };
 
 // UPDATE
 export const updateAssetAllocation = async (id, payload) => {
-  return api.patch(`/assets/allocations/${id}/`, payload);
+  const { currentOrgId } = useSessionStore.getState();
+  return api.patch(`/assets/allocations/${id}/`, payload, {
+    params: { organisation: currentOrgId },
+  });
 };
 
 
@@ -96,7 +99,7 @@ export const addAssetMaintenance = async (payload) => {
 export const updateAssetMaintenance = async (id, payload) => {
   const { currentOrgId } = useSessionStore.getState();
   const res = await api.patch(`/assets/maintenance/${id}/`, payload,
-   {params: {organisation: currentOrgId}}
+    { params: { organisation: currentOrgId } }
   )
   return res.data;
 };
@@ -121,14 +124,14 @@ export const getAssetDepreciations = async () => {
   return res.data;
 };
 // get depriciation by id
-export const getAssetdepriciationByID = async (id) =>{
+export const getAssetdepriciationByID = async (id) => {
   const res = await api.get(`/assets/depreciation/${id}/`)
   return res.data;
-} 
+}
 // UPDATE
 export const updateAssetDepreciation = async (id, payload) => {
-    const { currentOrgId } = useSessionStore.getState();
-  const res = await api.patch(`/assets/depreciation/${id}/`, payload, {params: {organisation: currentOrgId}});    
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.patch(`/assets/depreciation/${id}/`, payload, { params: { organisation: currentOrgId } });
   return res.data;
 };
 
@@ -162,7 +165,7 @@ export const addAssetDisposal = async (payload) => {
 // UPDATE
 export const updateAssetDisposal = async (id, payload) => {
   const { currentOrgId } = useSessionStore.getState();
-  const res = await api.patch(`/assets/disposals/${id}/`, payload, {params: {organisation: currentOrgId}});
+  const res = await api.patch(`/assets/disposals/${id}/`, payload, { params: { organisation: currentOrgId } });
   return res.data;
 };
 
