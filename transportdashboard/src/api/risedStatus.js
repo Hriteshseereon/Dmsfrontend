@@ -10,7 +10,7 @@ export const getAllAssignedOrder = async () => {
 
 //fetch assigned order by id
 export const getAssignedOrderById = async (assignedId) => {
-  const res = await api.get(`/transport/portal/assignments/${assignedId}/`);
+  const res = await api.get(`/transport/assignments/${assignedId}/`);
   return res.data;
 }
 
