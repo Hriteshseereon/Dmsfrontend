@@ -91,7 +91,21 @@ export default function AddOrganisation() {
 
   // validation for mobile number: starts with 6-9 and has total 10 digits
   const handleTenDigitNumber = (fieldPath) => (e) => {
-    const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+    const value = e.target.value.replace(/\D/g, "").slice(0, 15);
+    form.setFieldValue(fieldPath, value);
+  };
+  const handlePhoneFormat = (fieldPath) => (e) => {
+    let value = e.target.value;
+
+    // allow only numbers + space + hyphen
+    value = value.replace(/[^0-9+\-\s]/g, "");
+
+    // only one "+" and only at start
+    value = value.replace(/(?!^)\+/g, "");
+
+    // optional: limit total length
+    value = value.slice(0, 20);
+
     form.setFieldValue(fieldPath, value);
   };
 
@@ -391,8 +405,10 @@ export default function AddOrganisation() {
             registrationNo: c.registration_no,
             gstNo: c.gst_no,
             address: {
-              city: c.address,
-              state: c.location,
+              address1: c.address,
+              address2: c.location,
+              city: c.city,
+              state: c.state,
             },
             companyCertificate: createExistingFile(c.company_certificate),
           })),
@@ -624,8 +640,10 @@ export default function AddOrganisation() {
           website: c.companyWebsite ?? null,
           registration_no: c.registrationNo ?? null,
           gst_no: c.gstNo ?? null,
-          address: c.address?.city ?? null,
-          location: c.address?.state ?? null,
+          address: c.address?.address1 ?? null,
+          location: c.address?.address2 ?? null,
+          city: c.address?.city ?? null,
+          state: c.address?.state ?? null,
         })),
       })),
 
@@ -985,12 +1003,16 @@ export default function AddOrganisation() {
             rules={[
               { required: true, message: "Please enter phone number" },
               {
-                pattern: /^[6-9]\d{9}$/,
-                message: "Enter a valid 10-digit mobile number",
+                pattern: /^\+?[0-9\s-]{8,20}$/,
+                message: "Invalid phone format",
               },
             ]}
           >
-            <Input placeholder="Enter phone number" maxLength={10} />
+            <Input
+              placeholder="Enter phone number"
+              maxLength={15}
+              onChange={handlePhoneFormat("phone")}
+            />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12} md={6}>
@@ -999,16 +1021,16 @@ export default function AddOrganisation() {
             name="phone2"
             rules={[
               {
-                pattern: /^[6-9]\d{9}$/,
-                message: "Enter a valid 10-digit mobile number",
+                pattern: /^\+?[0-9\s-]{8,20}$/,
+                message: "Invalid phone format",
               },
             ]}
           >
             <Input
               placeholder="Enter phone number"
-              maxLength={10}
+              maxLength={15}
               inputMode="numeric"
-              onChange={handleTenDigitNumber("phone2")}
+              onChange={handlePhoneFormat("phone2")}
             />
           </Form.Item>
         </Col>
@@ -1019,12 +1041,12 @@ export default function AddOrganisation() {
             rules={[
               { message: "Please enter landline number" },
               {
-                pattern: /^[6-9]\d{9}$/,
-                message: "Enter a valid 10-digit mobile number",
+                pattern: /^[0-9]{2,4}-[0-9]{6,8}$/,
+                message: "Enter a valid landline number (e.g. 044-12345678)",
               },
             ]}
           >
-            <Input placeholder="Enter landline number" maxLength={10} />
+            <Input placeholder="e.g. 044-12345678" maxLength={15} />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12} md={6}>
@@ -1034,12 +1056,16 @@ export default function AddOrganisation() {
             rules={[
               { message: "Please enter WhatsApp number" },
               {
-                pattern: /^[6-9]\d{9}$/,
-                message: "Enter a valid 10-digit mobile number",
+                pattern: /^\+?[0-9\s-]{8,20}$/,
+                message: "Invalid phone format",
               },
             ]}
           >
-            <Input placeholder="Enter WhatsApp number" maxLength={10} />
+            <Input
+              placeholder="Enter WhatsApp number"
+              maxLength={15}
+              onChange={handlePhoneFormat("whatsappNumber")}
+            />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12} md={6}>
@@ -1198,16 +1224,16 @@ export default function AddOrganisation() {
                         },
 
                         {
-                          pattern: /^[6-9]\d{9}$/,
-                          message: "Enter a valid 10-digit mobile number",
+                          pattern: /^\+?[0-9\s-]{8,20}$/,
+                          message: "Invalid phone format",
                         },
                       ]}
                     >
                       <Input
                         placeholder="Enter mobile number"
-                        maxLength={10}
+                        maxLength={15}
                         inputMode="numeric"
-                        onChange={handleTenDigitNumber([
+                        onChange={handlePhoneFormat([
                           "partners",
                           name,
                           "mobileNumber",
@@ -1222,16 +1248,16 @@ export default function AddOrganisation() {
                       name={[name, "contactNumber"]}
                       rules={[
                         {
-                          pattern: /^[6-9]\d{9}$/,
-                          message: "Enter a valid 10-digit mobile number",
+                          pattern: /^\+?[0-9\s-]{8,20}$/,
+                          message: "Invalid phone format",
                         },
                       ]}
                     >
                       <Input
                         placeholder="Enter contact number"
-                        maxLength={10}
+                        maxLength={15}
                         inputMode="numeric"
-                        onChange={handleTenDigitNumber([
+                        onChange={handlePhoneFormat([
                           "partners",
                           name,
                           "contactNumber",
@@ -1247,16 +1273,16 @@ export default function AddOrganisation() {
                       name={[name, "whatsappNumber"]}
                       rules={[
                         {
-                          pattern: /^[6-9]\d{9}$/,
-                          message: "Enter a valid 10-digit WhatsApp number",
+                          pattern: /^\+?[0-9\s-]{8,20}$/,
+                          message: "Invalid phone format",
                         },
                       ]}
                     >
                       <Input
                         placeholder="Enter WhatsApp number"
-                        maxLength={10}
+                        maxLength={15}
                         inputMode="numeric"
-                        onChange={handleTenDigitNumber([
+                        onChange={handlePhoneFormat([
                           "partners",
                           name,
                           "whatsappNumber",
@@ -1827,19 +1853,39 @@ export default function AddOrganisation() {
                       </Form.Item>
                     </Col>
                   </Row>
-                  <Divider
-                    orientation="left"
-                    style={{
-                      fontSize: "15px",
-                      fontWeight: "600",
-                      color: "#374151",
-                    }}
-                  >
-                    Bank Details
-                  </Divider>
+
                   <Form.List name={[name, "bankDetails"]} initialValue={[{}]}>
                     {(fields, { add, remove }) => (
                       <>
+                        {/* Custom Divider Row with Add Button */}
+                        <Row
+                          justify="space-between"
+                          align="middle"
+                          style={{ marginBottom: 16 }}
+                        >
+                          <Divider
+                            orientation="left"
+                            style={{
+                              fontSize: "15px",
+                              fontWeight: "600",
+                              color: "#374151",
+                              margin: 0,
+                              flex: 1,
+                            }}
+                          >
+                            Bank Details
+                          </Divider>
+                          <Button
+                            type="dashed"
+                            onClick={() => add()}
+                            icon={<PlusOutlined />}
+                            style={{ marginLeft: 1020, flexShrink: 0 }}
+                            className="!bg-amber-500 hover:!bg-amber-600 !border-none !text-white"
+                          >
+                            Add Bank
+                          </Button>
+                        </Row>
+
                         {fields.map(
                           ({ key, name: bankIndex, ...restField }) => (
                             <Card
@@ -1852,7 +1898,7 @@ export default function AddOrganisation() {
                                 />
                               }
                             >
-                              <Row gutter={[16, 16]}>
+                              <Row gutter={[50, 16]}>
                                 <Col xs={12} sm={8} md={4}>
                                   <Form.Item
                                     {...restField}
@@ -1895,7 +1941,7 @@ export default function AddOrganisation() {
                                     />
                                   </Form.Item>
                                 </Col>
-                                <Col xs={12} sm={8} md={4}>
+                                <Col xs={12} sm={8} md={6}>
                                   <Form.Item
                                     {...restField}
                                     label={<span>Account Number</span>}
@@ -1914,7 +1960,7 @@ export default function AddOrganisation() {
                                   </Form.Item>
                                 </Col>
 
-                                <Col xs={12} sm={8} md={4}>
+                                <Col xs={12} sm={8} md={6}>
                                   <Form.Item
                                     {...restField}
                                     label={<span>IFSC Code</span>}
@@ -1930,30 +1976,40 @@ export default function AddOrganisation() {
                             </Card>
                           ),
                         )}
-
-                        <Row>
-                          <Button type="dashed" onClick={() => add()}>
-                            Add Bank
-                          </Button>
-                        </Row>
                       </>
                     )}
                   </Form.List>
                   {SHOW_COMPANY_DETAILS_FOR.includes(orgType) && (
                     <>
-                      <Divider
-                        orientation="left"
-                        style={{
-                          fontSize: "15px",
-                          fontWeight: "600",
-                          color: "#374151",
-                        }}
-                      >
-                        Director Associate Company Details
-                      </Divider>
                       <Form.List name={[name, "companies"]}>
                         {(fields, { add, remove }) => (
                           <>
+                            <Row
+                              justify="space-between"
+                              align="middle"
+                              style={{ marginBottom: 16 }}
+                            >
+                              <Divider
+                                orientation="left"
+                                style={{
+                                  fontSize: "15px",
+                                  fontWeight: "600",
+                                  color: "#374151",
+                                  margin: 0,
+                                  flex: 1,
+                                }}
+                              >
+                                Director Associate Company Details
+                              </Divider>
+                              <Button
+                                type="dashed"
+                                onClick={() => add()}
+                                style={{ marginLeft: 1020, flexShrink: 0 }}
+                                className="!bg-amber-500 hover:!bg-amber-600 !border-none !text-white"
+                              >
+                                Add Company
+                              </Button>
+                            </Row>
                             {fields.map(
                               ({ key, name: compIndex, ...restField }) => (
                                 <Card
@@ -2050,6 +2106,33 @@ export default function AddOrganisation() {
                                         </Form.Item>
                                       </Col>
                                     )}
+                                    <Col xs={24} sm={12} md={6}>
+                                      <Form.Item
+                                        {...restField}
+                                        label="Address Line 1"
+                                        name={[
+                                          compIndex,
+                                          "address",
+                                          "address1",
+                                        ]}
+                                      >
+                                        <Input placeholder="Address line 1" />
+                                      </Form.Item>
+                                    </Col>
+
+                                    <Col xs={24} sm={12} md={6}>
+                                      <Form.Item
+                                        {...restField}
+                                        label="Address Line 2"
+                                        name={[
+                                          compIndex,
+                                          "address",
+                                          "address2",
+                                        ]}
+                                      >
+                                        <Input placeholder="Address line 2" />
+                                      </Form.Item>
+                                    </Col>
                                     <Col xs={24} sm={12} md={6}>
                                       <Form.Item
                                         {...restField}
@@ -2152,9 +2235,6 @@ export default function AddOrganisation() {
                                 </Card>
                               ),
                             )}
-                            <Button type="dashed" onClick={() => add()}>
-                              Add Company
-                            </Button>
                           </>
                         )}
                       </Form.List>
@@ -2685,15 +2765,22 @@ export default function AddOrganisation() {
                                           name={[cName, "number"]}
                                           rules={[
                                             {
-                                              pattern: /^[0-9]{10}$/,
-                                              message:
-                                                "Enter a valid 10-digit phone number",
+                                              pattern: /^\+?[0-9\s-]{8,20}$/,
+                                              message: "Invalid phone format",
                                             },
                                           ]}
                                         >
                                           <Input
                                             placeholder="Contact no"
                                             size="small"
+                                            onChange={handlePhoneFormat([
+                                              "branches",
+                                              name,
+                                              "contacts",
+                                              cName,
+                                              "number",
+                                            ])}
+                                            maxLength={15}
                                           />
                                         </Form.Item>
                                       </Col>
