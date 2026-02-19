@@ -1,5 +1,6 @@
 // StockEtf.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { addWealthEntry, getWealthEntries, getWealthEntryById, updateWealthEntry } from "../../api/wealth";
 import {
   Table,
   Input,
@@ -47,7 +48,7 @@ const initialData = [
 ];
 
 export default function StockEtf() {
-  const [data, setData] = useState(initialData);
+  const [data, setData] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -57,6 +58,35 @@ export default function StockEtf() {
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
+
+  const fetchData = async () => {
+    try {
+      const response = await getWealthEntries({ asset_category: "STOCK" });
+      const mappedData = response.map((item) => ({
+        key: item.id,
+        assetName: item.asset_name,
+        purchaseQuantity: item.purchase_quantity,
+        purchasePrice: item.purchase_price,
+        brokerage: item.brokerage,
+        stt: item.stt,
+        stampCharges: item.stamp_charges,
+        otherCharges: item.other_charges,
+        gstAndSTax: item.gst_tax,
+        transactionalCharges: item.transactional_charges,
+        purchaseAmount: item.purchase_amount,
+        totalAmount: item.total_amount,
+        remarks: item.remarks,
+      }));
+      setData(mappedData);
+    } catch (error) {
+      console.error("Error fetching wealth entries:", error);
+      message.error("Failed to fetch data.");
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   // Helper: compute derived amounts from values
   const computeAmounts = (values) => {
@@ -142,19 +172,58 @@ export default function StockEtf() {
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
-            onClick={() => {
+            onClick={async () => {
               setSelectedRecord(record);
-              // set view form values and open
-              viewForm.setFieldsValue({ ...record });
-              setIsViewModalOpen(true);
+              try {
+                const data = await getWealthEntryById(record.key);
+                const mappedData = {
+                  assetName: data.asset_name,
+                  purchaseQuantity: data.purchase_quantity,
+                  purchasePrice: data.purchase_price,
+                  brokerage: data.brokerage,
+                  stt: data.stt,
+                  stampCharges: data.stamp_charges,
+                  otherCharges: data.other_charges,
+                  gstAndSTax: data.gst_tax,
+                  transactionalCharges: data.transactional_charges,
+                  purchaseAmount: data.purchase_amount,
+                  totalAmount: data.total_amount,
+                  remarks: data.remarks,
+                };
+                viewForm.setFieldsValue(mappedData);
+                setIsViewModalOpen(true);
+              } catch (error) {
+                console.error("Error fetching entry details:", error);
+                message.error("Failed to load details.");
+              }
             }}
           />
           <EditOutlined
             className="cursor-pointer! text-red-500!"
-            onClick={() => {
+            onClick={async () => {
               setSelectedRecord(record);
-              editForm.setFieldsValue({ ...record });
-              setIsEditModalOpen(true);
+              try {
+                const data = await getWealthEntryById(record.key);
+                const mappedData = {
+                  assetName: data.asset_name,
+                  purchaseQuantity: data.purchase_quantity,
+                  purchasePrice: data.purchase_price,
+                  brokerage: data.brokerage,
+                  stt: data.stt,
+                  stampCharges: data.stamp_charges,
+                  otherCharges: data.other_charges,
+                  gstAndSTax: data.gst_tax,
+                  transactionalCharges: data.transactional_charges,
+                  purchaseAmount: data.purchase_amount,
+                  totalAmount: data.total_amount,
+                  remarks: data.remarks,
+                };
+                editForm.setFieldsValue(mappedData);
+                setIsEditModalOpen(true);
+              } catch (error) {
+                console.error("Error loading for edit:", error);
+                message.error("Failed to load details for editing.");
+              }
             }}
           />
         </div>
@@ -202,7 +271,7 @@ export default function StockEtf() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `stock_etf_${new Date().toISOString().slice(0,19).replace(/[:T]/g, "")}.csv`;
+    a.download = `stock_etf_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -241,7 +310,7 @@ export default function StockEtf() {
             <InputNumber className="w-full!" min={0} disabled={disabled} />
           </Form.Item>
         </Col>
-         <Col span={6}>
+        <Col span={6}>
           <Form.Item label={<span className="text-amber-700">Brokerage (₹)</span>} name="brokerage">
             <InputNumber className="w-full!" min={0} disabled={disabled} />
           </Form.Item>
@@ -250,7 +319,7 @@ export default function StockEtf() {
       </Row>
 
       <Row gutter={24}>
-       
+
         <Col span={6}>
           <Form.Item label={<span className="text-amber-700">STT (₹)</span>} name="stt">
             <InputNumber className="w-full!" min={0} disabled={disabled} />
@@ -268,13 +337,13 @@ export default function StockEtf() {
             <InputNumber className="w-full!" min={0} disabled={disabled} />
           </Form.Item>
         </Col>
-         <Col span={6}>
+        <Col span={6}>
           <Form.Item label={<span className="text-amber-700">GST / S.Tax (₹)</span>} name="gstAndSTax">
             <InputNumber className="w-full!" min={0} disabled={disabled} />
           </Form.Item>
         </Col>
 
-       
+
       </Row>
 
       <Row gutter={24}>
@@ -302,7 +371,7 @@ export default function StockEtf() {
         </Col>
       </Row>
 
-     
+
     </>
   );
 
@@ -366,17 +435,55 @@ export default function StockEtf() {
         <Form
           form={addForm}
           layout="vertical"
-          onFinish={(values) => {
-            const calcs = computeAmounts(values);
-            const payload = {
-              ...values,
-              ...calcs,
-              key: data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1,
-            };
-            setData((prev) => [payload, ...prev]);
-            setIsAddModalOpen(false);
-            addForm.resetFields();
-            message.success("Purchase added.");
+          onFinish={async (values) => {
+            try {
+              const calcs = computeAmounts(values);
+              const payload = {
+                asset_category: "STOCK",
+                asset_name: values.assetName,
+                remarks: values.remarks,
+
+                purchase_quantity: Number(values.purchaseQuantity || 0).toFixed(4),
+                purchase_price: Number(values.purchasePrice || 0).toFixed(2),
+                brokerage: Number(values.brokerage || 0).toFixed(2),
+                stt: Number(values.stt || 0).toFixed(2),
+                stamp_charges: Number(values.stampCharges || 0).toFixed(2),
+                other_charges: Number(values.otherCharges || 0).toFixed(2),
+                gst_tax: Number(values.gstAndSTax || 0).toFixed(2),
+                transactional_charges: Number(values.transactionalCharges || 0).toFixed(2),
+
+                purchase_amount: (calcs.purchaseAmount || 0).toFixed(2),
+                total_amount: (calcs.totalAmount || 0).toFixed(2),
+              };
+
+              const response = await addWealthEntry(payload);
+
+              // Update local state with the new record
+              const newRecord = {
+                key: response.id || (data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1),
+                assetName: values.assetName,
+                purchaseQuantity: values.purchaseQuantity,
+                purchasePrice: values.purchasePrice,
+                brokerage: values.brokerage,
+                stt: values.stt,
+                stampCharges: values.stampCharges,
+                otherCharges: values.otherCharges,
+                gstAndSTax: values.gstAndSTax,
+                transactionalCharges: values.transactionalCharges,
+                purchaseAmount: calcs.purchaseAmount,
+                totalAmount: calcs.totalAmount,
+                remarks: values.remarks,
+              };
+
+              setData((prev) => [newRecord, ...prev]);
+              setIsAddModalOpen(false);
+              addForm.resetFields();
+              message.success("Purchase added successfully.");
+              fetchData();
+            } catch (error) {
+              console.error("Error adding wealth entry:", error);
+              message.error("Failed to add purchase.");
+            }
           }}
           onValuesChange={(changed, allValues) => {
             const calcs = computeAmounts(allValues);
@@ -395,8 +502,8 @@ export default function StockEtf() {
             >
               Cancel
             </Button>
-            <Button type="primary"   className="bg-amber-500! hover:bg-amber-600! border-none!"
-           htmlType="submit">
+            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit">
               Add
             </Button>
           </div>
@@ -418,14 +525,41 @@ export default function StockEtf() {
         <Form
           form={editForm}
           layout="vertical"
-          onFinish={(values) => {
-            const calcs = computeAmounts(values);
-            const payload = { ...selectedRecord, ...values, ...calcs };
-            setData((prev) => prev.map((d) => (d.key === payload.key ? payload : d)));
-            setIsEditModalOpen(false);
-            editForm.resetFields();
-            setSelectedRecord(null);
-            message.success("Purchase updated.");
+          onFinish={async (values) => {
+            try {
+              const calcs = computeAmounts(values);
+              const payload = {
+                asset_category: "STOCK",
+                asset_name: values.assetName,
+                remarks: values.remarks,
+
+                purchase_quantity: Number(values.purchaseQuantity || 0).toFixed(4),
+                purchase_price: Number(values.purchasePrice || 0).toFixed(2),
+                brokerage: Number(values.brokerage || 0).toFixed(2),
+                stt: Number(values.stt || 0).toFixed(2),
+                stamp_charges: Number(values.stampCharges || 0).toFixed(2),
+                other_charges: Number(values.otherCharges || 0).toFixed(2),
+                gst_tax: Number(values.gstAndSTax || 0).toFixed(2),
+                transactional_charges: Number(values.transactionalCharges || 0).toFixed(2),
+
+                purchase_amount: (calcs.purchaseAmount || 0).toFixed(2),
+                total_amount: (calcs.totalAmount || 0).toFixed(2),
+              };
+
+              await updateWealthEntry(selectedRecord.key, payload);
+
+              setData((prev) =>
+                prev.map((d) => (d.key === selectedRecord.key ? { ...selectedRecord, ...values, ...calcs } : d))
+              );
+              setIsEditModalOpen(false);
+              editForm.resetFields();
+              setSelectedRecord(null);
+              message.success("Purchase updated successfully.");
+              fetchData();
+            } catch (error) {
+              console.error("Error updating wealth entry:", error);
+              message.error("Failed to update purchase.");
+            }
           }}
           onValuesChange={(changed, allValues) => {
             const calcs = computeAmounts(allValues);
@@ -445,8 +579,8 @@ export default function StockEtf() {
             >
               Cancel
             </Button>
-            <Button type="primary"   className="bg-amber-500! hover:bg-amber-600! border-none!"
-           htmlType="submit">
+            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit">
               Save Changes
             </Button>
           </div>

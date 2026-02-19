@@ -1,5 +1,6 @@
 // MutualFunds.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { addWealthEntry, getWealthEntries, getWealthEntryById, updateWealthEntry } from "../../api/wealth";
 import {
   Table,
   Input,
@@ -34,25 +35,7 @@ const MF_OPTIONS = [
 ];
 
 export default function MutualFunds() {
-  const [data, setData] = useState([
-    {
-      key: 1,
-      transactionType: "Purchase",
-      date: "2025-07-15",
-      mfName: "HDFC Top 100",
-      folioNo: "FOLIO-1001",
-      type: "Equity",
-      lockInDate: "2026-07-15",
-      agentName: "Agent A",
-      agentAddress: "123, MG Road, City",
-      quantity: 100,
-      nav: 250.5,
-      netAmount: 25050, // qty * nav
-      stampCharges: 5,
-      grossAmount: 25055, // net + stamp
-      remarks: "SIP lump-sum",
-    },
-  ]);
+  const [data, setData] = useState([]);
 
   const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -63,6 +46,37 @@ export default function MutualFunds() {
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
+
+  const fetchData = async () => {
+    try {
+      const response = await getWealthEntries({ asset_category: "MUTUAL_FUND" });
+      const mappedData = response.map((item) => ({
+        key: item.id,
+        transactionType: item.transaction_type === "SUBSCRIPTION" ? "Purchase" : item.transaction_type,
+        date: item.transaction_date,
+        mfName: item.asset_name,
+        remarks: item.remarks,
+        folioNo: item.folio_no,
+        type: item.mf_type,
+        lockInDate: item.lock_in_period_date,
+        agentName: item.agent_name,
+        agentAddress: item.agent_address,
+        quantity: item.quantity,
+        nav: item.nav,
+        grossAmount: item.gross_amount,
+        netAmount: item.net_amount,
+        stampCharges: item.stamp_charges,
+      }));
+      setData(mappedData);
+    } catch (error) {
+      console.error("Error fetching wealth entries:", error);
+      message.error("Failed to fetch data.");
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const filteredData = data.filter((row) =>
     ["transactionType", "mfName", "folioNo", "agentName", "remarks"].some((f) =>
@@ -144,26 +158,62 @@ export default function MutualFunds() {
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
-            onClick={() => {
+            onClick={async () => {
               setSelectedRecord(record);
-              viewForm.setFieldsValue({
-                ...record,
-                date: record.date ? dayjs(record.date) : undefined,
-                lockInDate: record.lockInDate ? dayjs(record.lockInDate) : undefined,
-              });
-              setIsViewModalOpen(true);
+              try {
+                const data = await getWealthEntryById(record.key);
+                const mappedData = {
+                  transactionType: data.transaction_type === "SUBSCRIPTION" ? "Purchase" : data.transaction_type,
+                  date: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                  mfName: data.asset_name,
+                  folioNo: data.folio_no,
+                  type: data.mf_type,
+                  lockInDate: data.lock_in_period_date ? dayjs(data.lock_in_period_date) : undefined,
+                  agentName: data.agent_name,
+                  agentAddress: data.agent_address,
+                  quantity: data.quantity,
+                  nav: data.nav,
+                  netAmount: data.net_amount,
+                  stampCharges: data.stamp_charges,
+                  grossAmount: data.gross_amount,
+                  remarks: data.remarks,
+                };
+                viewForm.setFieldsValue(mappedData);
+                setIsViewModalOpen(true);
+              } catch (error) {
+                console.error("Error fetching entry details:", error);
+                message.error("Failed to load details.");
+              }
             }}
           />
           <EditOutlined
             className="cursor-pointer! text-red-500!"
-            onClick={() => {
+            onClick={async () => {
               setSelectedRecord(record);
-              editForm.setFieldsValue({
-                ...record,
-                date: record.date ? dayjs(record.date) : undefined,
-                lockInDate: record.lockInDate ? dayjs(record.lockInDate) : undefined,
-              });
-              setIsEditModalOpen(true);
+              try {
+                const data = await getWealthEntryById(record.key);
+                const mappedData = {
+                  transactionType: data.transaction_type === "SUBSCRIPTION" ? "Purchase" : data.transaction_type,
+                  date: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                  mfName: data.asset_name,
+                  folioNo: data.folio_no,
+                  type: data.mf_type,
+                  lockInDate: data.lock_in_period_date ? dayjs(data.lock_in_period_date) : undefined,
+                  agentName: data.agent_name,
+                  agentAddress: data.agent_address,
+                  quantity: data.quantity,
+                  nav: data.nav,
+                  netAmount: data.net_amount,
+                  stampCharges: data.stamp_charges,
+                  grossAmount: data.gross_amount,
+                  remarks: data.remarks,
+                };
+                editForm.setFieldsValue(mappedData);
+                setIsEditModalOpen(true);
+              } catch (error) {
+                console.error("Error loading for edit:", error);
+                message.error("Failed to load details for editing.");
+              }
             }}
           />
         </div>
@@ -384,21 +434,21 @@ export default function MutualFunds() {
           <Button
             icon={<FilterOutlined />}
             onClick={() => setSearchText("")}
-              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-            >
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
             Reset
           </Button>
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} onClick={exportCSV}     className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          <Button icon={<DownloadOutlined />} onClick={exportCSV} className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Export
           </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            className="bg-amber-500! hover:bg-amber-600! border-none!"  onClick={() => {
+            className="bg-amber-500! hover:bg-amber-600! border-none!" onClick={() => {
               addForm.resetFields();
               setIsAddModalOpen(true);
             }}
@@ -429,19 +479,58 @@ export default function MutualFunds() {
         <Form
           form={addForm}
           layout="vertical"
-          onFinish={(values) => {
-            const calcs = computeAmounts(values);
-            const payload = {
-              ...values,
-              ...calcs,
-              key: data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1,
-              date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : undefined,
-              lockInDate: values.lockInDate ? dayjs(values.lockInDate).format("YYYY-MM-DD") : undefined,
-            };
-            setData((prev) => [payload, ...prev]);
-            setIsAddModalOpen(false);
-            addForm.resetFields();
-            message.success("Transaction added.");
+          onFinish={async (values) => {
+            try {
+              const calcs = computeAmounts(values);
+              const payload = {
+                asset_category: "MUTUAL_FUND",
+                transaction_type: values.transactionType === "Purchase" ? "SUBSCRIPTION" : values.transactionType.toUpperCase(),
+                transaction_date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : null,
+                asset_name: values.mfName,
+                remarks: values.remarks,
+
+                folio_no: values.folioNo,
+                mf_type: values.type,
+                lock_in_period_date: values.lockInDate ? dayjs(values.lockInDate).format("YYYY-MM-DD") : null,
+
+                quantity: (values.quantity || 0).toFixed(4),
+                nav: (values.nav || 0).toFixed(4),
+                gross_amount: (calcs.grossAmount || 0).toFixed(2),
+                net_amount: (calcs.netAmount || 0).toFixed(2),
+                stamp_charges: (values.stampCharges || 0).toFixed(2),
+                agent_name: values.agentName,
+                agent_address: values.agentAddress,
+              };
+
+              const response = await addWealthEntry(payload);
+
+              const newRecord = {
+                key: response.id || (data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1),
+                transactionType: values.transactionType,
+                date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : undefined,
+                mfName: values.mfName,
+                folioNo: values.folioNo,
+                type: values.type,
+                lockInDate: values.lockInDate ? dayjs(values.lockInDate).format("YYYY-MM-DD") : undefined,
+                agentName: values.agentName,
+                agentAddress: values.agentAddress,
+                quantity: values.quantity,
+                nav: values.nav,
+                netAmount: calcs.netAmount,
+                stampCharges: values.stampCharges,
+                grossAmount: calcs.grossAmount,
+                remarks: values.remarks,
+              };
+
+              setData((prev) => [newRecord, ...prev]);
+              setIsAddModalOpen(false);
+              addForm.resetFields();
+              message.success("Transaction added successfully.");
+              fetchData();
+            } catch (error) {
+              console.error("Error adding wealth entry:", error);
+              message.error("Failed to add transaction.");
+            }
           }}
           onValuesChange={(changed, allValues) => {
             const calcs = computeAmounts(allValues);
@@ -456,12 +545,12 @@ export default function MutualFunds() {
                 setIsAddModalOpen(false);
                 addForm.resetFields();
               }}
-                  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+
             >
               Cancel
             </Button>
-            <Button type="primary"  className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
               Add
             </Button>
           </div>
@@ -483,20 +572,53 @@ export default function MutualFunds() {
         <Form
           form={editForm}
           layout="vertical"
-          onFinish={(values) => {
-            const calcs = computeAmounts(values);
-            const payload = {
-              ...selectedRecord,
-              ...values,
-              ...calcs,
-              date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : selectedRecord.date,
-              lockInDate: values.lockInDate ? dayjs(values.lockInDate).format("YYYY-MM-DD") : selectedRecord.lockInDate,
-            };
-            setData((prev) => prev.map((d) => (d.key === payload.key ? payload : d)));
-            setIsEditModalOpen(false);
-            editForm.resetFields();
-            setSelectedRecord(null);
-            message.success("Transaction updated.");
+          onFinish={async (values) => {
+            try {
+              const calcs = computeAmounts(values);
+              const payload = {
+                asset_category: "MUTUAL_FUND",
+                transaction_type: values.transactionType === "Purchase" ? "SUBSCRIPTION" : values.transactionType.toUpperCase(),
+                transaction_date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : null,
+                asset_name: values.mfName,
+                remarks: values.remarks,
+
+                folio_no: values.folioNo,
+                mf_type: values.type,
+                lock_in_period_date: values.lockInDate ? dayjs(values.lockInDate).format("YYYY-MM-DD") : null,
+
+                quantity: Number(values.quantity || 0).toFixed(4),
+                nav: Number(values.nav || 0).toFixed(4),
+                gross_amount: Number(calcs.grossAmount || 0).toFixed(2),
+                net_amount: Number(calcs.netAmount || 0).toFixed(2),
+                stamp_charges: Number(values.stampCharges || 0).toFixed(2),
+                agent_name: values.agentName,
+                agent_address: values.agentAddress,
+              };
+
+              await updateWealthEntry(selectedRecord.key, payload);
+
+              setData((prev) =>
+                prev.map((d) =>
+                  d.key === selectedRecord.key
+                    ? {
+                        ...selectedRecord,
+                        ...values,
+                        ...calcs,
+                        date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : undefined,
+                        lockInDate: values.lockInDate ? dayjs(values.lockInDate).format("YYYY-MM-DD") : undefined,
+                      }
+                    : d
+                )
+              );
+              setIsEditModalOpen(false);
+              editForm.resetFields();
+              setSelectedRecord(null);
+              message.success("Transaction updated successfully.");
+              fetchData();
+            } catch (error) {
+              console.error("Error updating wealth entry:", error);
+              message.error("Failed to update transaction.");
+            }
           }}
           onValuesChange={(changed, allValues) => {
             const calcs = computeAmounts(allValues);
@@ -512,12 +634,12 @@ export default function MutualFunds() {
                 editForm.resetFields();
                 setSelectedRecord(null);
               }}
-                  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+
             >
               Cancel
             </Button>
-            <Button type="primary"  className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
               Save Changes
             </Button>
           </div>
@@ -526,8 +648,8 @@ export default function MutualFunds() {
 
       {/* View Modal */}
       <Modal
-         title={<span className="text-amber-700 text-2xl font-semibold">View Mutual Fund Details</span>}
-     
+        title={<span className="text-amber-700 text-2xl font-semibold">View Mutual Fund Details</span>}
+
         open={isViewModalOpen}
         onCancel={() => {
           setIsViewModalOpen(false);
@@ -541,6 +663,6 @@ export default function MutualFunds() {
           {renderFormFields(viewForm, true)}
         </Form>
       </Modal>
-    </div>
+    </div >
   );
 }

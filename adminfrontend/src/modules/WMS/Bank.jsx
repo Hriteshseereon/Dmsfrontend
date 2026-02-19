@@ -1,5 +1,6 @@
 // Bank.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { addWealthEntry, getWealthEntries, getWealthEntryById, updateWealthEntry } from "../../api/wealth";
 import {
   Table,
   Input,
@@ -26,28 +27,7 @@ import dayjs from "dayjs";
 const { Option } = Select;
 
 export default function Bank() {
-  const [data, setData] = useState([
-    {
-      key: 1,
-      transactionType: "Deposit",
-      bankName: "State Bank of India",
-      accountNo: "SBIN0001234",
-      date: "2025-08-01",
-      amount: 50000,
-      chequeRef: "CHQ001",
-      narration: "Customer refund",
-    },
-    {
-      key: 2,
-      transactionType: "Withdrawal",
-      bankName: "HDFC Bank",
-      accountNo: "HDFC0005678",
-      date: "2025-09-10",
-      amount: 120000,
-      chequeRef: "CHQ045",
-      narration: "Office rent",
-    },
-  ]);
+  const [data, setData] = useState([]);
 
   const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -58,6 +38,34 @@ export default function Bank() {
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
+
+  const fetchData = async () => {
+    try {
+      const response = await getWealthEntries({ asset_category: "BANK" });
+      const mappedData = response.map((item) => ({
+        key: item.id,
+        // Convert 'DEPOSIT' -> 'Deposit', otherwise just capitalize first letter if needed
+        // Here we can simply title-case or use as is if backend matches frontend options
+        transactionType: item.transaction_type
+          ? item.transaction_type.charAt(0).toUpperCase() + item.transaction_type.slice(1).toLowerCase()
+          : "-",
+        date: item.transaction_date,
+        bankName: item.bank_name,
+        accountNo: item.bank_account_no,
+        amount: item.amount,
+        chequeRef: item.cheque_ref,
+        narration: item.narration,
+      }));
+      setData(mappedData);
+    } catch (error) {
+      console.error("Error fetching bank entries:", error);
+      message.error("Failed to fetch data.");
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const txnTypes = ["Deposit", "Withdrawal", "OD"];
 
@@ -121,24 +129,52 @@ export default function Bank() {
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
-            onClick={() => {
+            onClick={async () => {
               setSelectedRecord(record);
-              viewForm.setFieldsValue({
-                ...record,
-                date: record.date ? dayjs(record.date) : undefined,
-              });
-              setIsViewModalOpen(true);
+              try {
+                const data = await getWealthEntryById(record.key);
+                const mappedData = {
+                  transactionType: data.transaction_type
+                    ? data.transaction_type.charAt(0).toUpperCase() + data.transaction_type.slice(1).toLowerCase()
+                    : "-",
+                  date: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                  bankName: data.bank_name,
+                  accountNo: data.bank_account_no,
+                  amount: data.amount,
+                  chequeRef: data.cheque_ref,
+                  narration: data.narration,
+                };
+                viewForm.setFieldsValue(mappedData);
+                setIsViewModalOpen(true);
+              } catch (error) {
+                console.error("Error fetching entry details:", error);
+                message.error("Failed to load details.");
+              }
             }}
           />
           <EditOutlined
             className="cursor-pointer! text-red-500!"
-            onClick={() => {
+            onClick={async () => {
               setSelectedRecord(record);
-              editForm.setFieldsValue({
-                ...record,
-                date: record.date ? dayjs(record.date) : undefined,
-              });
-              setIsEditModalOpen(true);
+              try {
+                const data = await getWealthEntryById(record.key);
+                const mappedData = {
+                  transactionType: data.transaction_type
+                    ? data.transaction_type.charAt(0).toUpperCase() + data.transaction_type.slice(1).toLowerCase()
+                    : "-",
+                  date: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                  bankName: data.bank_name,
+                  accountNo: data.bank_account_no,
+                  amount: data.amount,
+                  chequeRef: data.cheque_ref,
+                  narration: data.narration,
+                };
+                editForm.setFieldsValue(mappedData);
+                setIsEditModalOpen(true);
+              } catch (error) {
+                console.error("Error loading for edit:", error);
+                message.error("Failed to load details for editing.");
+              }
             }}
           />
         </div>
@@ -269,8 +305,8 @@ export default function Bank() {
           <Button
             icon={<FilterOutlined />}
             onClick={() => setSearchText("")}
-               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-              >
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
             Reset
           </Button>
         </div>
@@ -313,16 +349,44 @@ export default function Bank() {
         <Form
           form={addForm}
           layout="vertical"
-          onFinish={(values) => {
-            const payload = {
-              ...values,
-              key: data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1,
-              date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : undefined,
-            };
-            setData((prev) => [payload, ...prev]);
-            setIsAddModalOpen(false);
-            addForm.resetFields();
-            message.success("Transaction added.");
+          onFinish={async (values) => {
+            try {
+              const payload = {
+                asset_category: "BANK",
+                transaction_type: values.transactionType.toUpperCase(),
+                transaction_date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : null,
+                asset_name: values.bankName,
+                remarks: "Bank Entry",
+
+                bank_name: values.bankName,
+                bank_account_no: values.accountNo,
+                amount: (values.amount || 0).toFixed(2),
+                cheque_ref: values.chequeRef,
+                narration: values.narration,
+              };
+
+              const response = await addWealthEntry(payload);
+
+              const newRecord = {
+                key: response.id || (data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1),
+                transactionType: values.transactionType,
+                date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : undefined,
+                bankName: values.bankName,
+                accountNo: values.accountNo,
+                amount: values.amount,
+                chequeRef: values.chequeRef,
+                narration: values.narration,
+              };
+
+              setData((prev) => [newRecord, ...prev]);
+              setIsAddModalOpen(false);
+              addForm.resetFields();
+              message.success("Transaction added successfully.");
+              fetchData();
+            } catch (error) {
+              console.error("Error adding wealth entry:", error);
+              message.error("Failed to add transaction.");
+            }
           }}
         >
           {renderFormFields(addForm, false)}
@@ -333,12 +397,12 @@ export default function Bank() {
                 setIsAddModalOpen(false);
                 addForm.resetFields();
               }}
-                  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+
             >
               Cancel
             </Button>
-            <Button type="primary"  className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
               Add
             </Button>
           </div>
@@ -360,17 +424,44 @@ export default function Bank() {
         <Form
           form={editForm}
           layout="vertical"
-          onFinish={(values) => {
-            const payload = {
-              ...selectedRecord,
-              ...values,
-              date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : selectedRecord.date,
-            };
-            setData((prev) => prev.map((d) => (d.key === payload.key ? payload : d)));
-            setIsEditModalOpen(false);
-            editForm.resetFields();
-            setSelectedRecord(null);
-            message.success("Transaction updated.");
+          onFinish={async (values) => {
+            try {
+              const payload = {
+                asset_category: "BANK",
+                transaction_type: values.transactionType.toUpperCase(),
+                transaction_date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : null,
+                asset_name: values.bankName,
+                remarks: "Bank Entry",
+
+                bank_name: values.bankName,
+                bank_account_no: values.accountNo,
+                amount: Number(values.amount || 0).toFixed(2),
+                cheque_ref: values.chequeRef,
+                narration: values.narration,
+              };
+
+              await updateWealthEntry(selectedRecord.key, payload);
+
+              setData((prev) =>
+                prev.map((d) =>
+                  d.key === selectedRecord.key
+                    ? {
+                      ...selectedRecord,
+                      ...values,
+                      date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : undefined,
+                    }
+                    : d
+                )
+              );
+              setIsEditModalOpen(false);
+              editForm.resetFields();
+              setSelectedRecord(null);
+              message.success("Transaction updated successfully.");
+              fetchData();
+            } catch (error) {
+              console.error("Error updating wealth entry:", error);
+              message.error("Failed to update transaction.");
+            }
           }}
         >
           {renderFormFields(editForm, false)}
@@ -382,12 +473,12 @@ export default function Bank() {
                 editForm.resetFields();
                 setSelectedRecord(null);
               }}
-                  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+
             >
               Cancel
             </Button>
-            <Button type="primary"  className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
               Save Changes
             </Button>
           </div>
@@ -410,6 +501,6 @@ export default function Bank() {
           {renderFormFields(viewForm, true)}
         </Form>
       </Modal>
-    </div>
+    </div >
   );
 }
