@@ -722,7 +722,7 @@ setTimeout(() => {
             name="deliveryAddress"
             rules={[{ required: true }]}
           >
-            <Input.TextArea rows={2} disabled />
+            <Input.TextArea rows={2} />
           </Form.Item>
         </Col>
 

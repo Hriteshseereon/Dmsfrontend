@@ -39,7 +39,7 @@ const fetchAssignedOrders = async () => {
           productName: item.product_name,
           qty: item.total_qty,
           productId: item.invoice,
-          uom: "-",   
+          uom: item.unit_name,   
         },
       ],
 
@@ -75,24 +75,20 @@ const handleAssignClick = async (id) => {
   status: res.status,
   deliveryAddress: res.delivery_address,
 
-  // ✅ VENDOR (FIX HERE)
-  vendorName: res.vendor?.name,
-  vendorAddress: res.invoice_delivery_address, // or vendor address if available
-  vendorContactPerson: res.vendor?.contact_person,
-  vendorPhoneNumber: res.vendor?.contact_person_no,
+  vendorName: res.vendor_details?.name,
+vendorContactPerson: res.vendor_details?.contact_person,
+vendorPhoneNumber: res.vendor_details?.contact_person_no,
 
-  // ✅ PLANT (FIX HERE)
-  plantName: res.plant?.name,
-  plantAddress: res.plant?.address,
-  plantContactPerson: "-", // not in API
-  plantPhoneNumber: res.plant?.phone_number,
+plantName: res.plant_details?.name,
+plantAddress: res.plant_details?.address,
+plantPhoneNumber: res.plant_details?.phone_number,
 
   // ✅ PRODUCT (FIX HERE)
   products: [
     {
       productName: res.product_name,
       qty: res.total_qty,   // ❗ you used res.qty (wrong)
-      uom: "-",             // not in API
+      uom: res.invoice_items?.[0]?.uom_details?.unit_name,            // not in API
     },
   ],
 });

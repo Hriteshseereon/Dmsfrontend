@@ -362,10 +362,10 @@ console.log("ORDER RESPONSE:", order);
    
     {
       title: <span className="text-amber-700 font-semibold">Transporter</span>,
-      dataIndex: "transport",
+      dataIndex: "transporter_name",
       width: 100,
       render: (_, record) => (
-        <span className="text-amber-800">{record.transport || "-"}</span>
+        <span className="text-amber-800">{record.transporter_name || "-"}</span>
       ),
     },
    {
@@ -638,17 +638,7 @@ const handleAssignSubmit = async (values) => {
 
     message.success("Transport assigned successfully");
 
-    setData((prev) =>
-      prev.map((item) =>
-        item.id === recordToAssign.id
-          ? {
-              ...item,
-              assigned: true,
-              transport: selectedTransport.registered_name,
-            }
-          : item
-      )
-    );
+   await fetchPurchaseInvoices();
 
     setIsAssignModalOpen(false);
   } catch (error) {

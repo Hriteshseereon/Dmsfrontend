@@ -390,6 +390,7 @@ plant_gstin: selectedRecord.plant_gstin,
        items: values.items.map((itm) => ({
   id: itm.id,
   product: itm.product,
+  loading_advice: selectedRecord.id,
   product_name: itm.product_name,
   hsn_code: itm.hsn_code,
   required_qty: itm.required_qty,
@@ -398,7 +399,7 @@ plant_gstin: selectedRecord.plant_gstin,
 }))
 
       };
-await updateLoadingAdvice(selectedRecord.loading_id, payload);
+await updateLoadingAdvice(selectedRecord.id, payload);
 
 
       message.success("Updated successfully");
@@ -482,6 +483,12 @@ await updateLoadingAdvice(selectedRecord.loading_id, payload);
 
   // Columns - removed Assign button; Admin can only approve pending ones
   const columns = [
+    {
+       title: <span className="text-amber-700 font-semibold">Invoice No</span>,
+      dataIndex: "advice_no",
+      render: (t) => <span className="text-amber-800">{t}</span>,
+
+    },
     {
       title: <span className="text-amber-700 font-semibold">Invoice No</span>,
       dataIndex: "invoiceNo",
