@@ -2624,7 +2624,12 @@ export default function AddOrganisation() {
                       label="Validity Period"
                       name={[name, "validity"]}
                     >
-                      <DatePicker.RangePicker style={{ width: "100%" }} />
+                      <DatePicker.RangePicker
+                        style={{ width: "100%" }}
+                        format="DD-MM-YYYY"
+                        placeholder={["DD-MM-YYYY", "DD-MM-YYYY"]}
+                        inputReadOnly={false}
+                      />
                     </Form.Item>
                   </Col>
                 </Row>
@@ -2699,7 +2704,12 @@ export default function AddOrganisation() {
                         label="Validity Period"
                         name={["legalDetails", doc.key, "validity"]}
                       >
-                        <DatePicker.RangePicker style={{ width: "100%" }} />
+                        <DatePicker.RangePicker
+                          style={{ width: "100%" }}
+                          format="DD-MM-YYYY"
+                          placeholder={["DD-MM-YYYY", "DD-MM-YYYY"]}
+                          inputReadOnly={false}
+                        />
                       </Form.Item>
                     </Col>
                   )}
