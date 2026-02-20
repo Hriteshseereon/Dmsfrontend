@@ -1430,13 +1430,11 @@ export default function AddOrganisation() {
                         Number(
                           getFieldValue(["partners", name, "childrenCount"]),
                         ) || 0;
-
                       const types =
                         getFieldValue(["partners", name, "childrenType"]) || [];
 
                       if (!count) return null;
 
-                      // ---- RESET LOGIC (VERY IMPORTANT) ----
                       const partners = getFieldValue("partners") || [];
                       const currentPartner = partners[name] || {};
 
@@ -1447,10 +1445,7 @@ export default function AddOrganisation() {
                         const updated = [...partners];
                         updated[name] = {
                           ...currentPartner,
-                          children: {
-                            ...currentPartner.children,
-                            sons: [],
-                          },
+                          children: { ...currentPartner.children, sons: [] },
                         };
                         setFieldsValue({ partners: updated });
                       }
@@ -1472,122 +1467,268 @@ export default function AddOrganisation() {
 
                       return (
                         <>
-                          {/* ---------- TYPE SELECT ---------- */}
-                          <Row>
-                            <Col>
-                              <Form.Item
-                                label="Children Type"
-                                name={[name, "childrenType"]}
-                              >
-                                <Checkbox.Group>
-                                  <Checkbox value="SON">Son</Checkbox>
-                                  <Checkbox value="DAUGHTER">Daughter</Checkbox>
-                                </Checkbox.Group>
-                              </Form.Item>
-                            </Col>
-                          </Row>
+                          {/* Children Type Checkbox */}
+                          <Col xs={24}>
+                            <Form.Item
+                              label="Children Type"
+                              name={[name, "childrenType"]}
+                            >
+                              <Checkbox.Group>
+                                <Checkbox value="SON">Son</Checkbox>
+                                <Checkbox value="DAUGHTER">Daughter</Checkbox>
+                              </Checkbox.Group>
+                            </Form.Item>
+                          </Col>
 
-                          {/* ---------- AGE SECTION ---------- */}
                           {types.length > 0 && (
-                            <>
-                              <Divider orientation="left">
-                                Children Age Details
+                            <Col xs={24}>
+                              <Divider
+                                orientation="left"
+                                style={{
+                                  fontSize: "14px",
+                                  fontWeight: 600,
+                                  color: "#374151",
+                                }}
+                              >
+                                Children Details
                               </Divider>
 
-                              {/* ===== SON ===== */}
-                              {types.includes("SON") && (
-                                <>
-                                  <h4>Son Age</h4>
-                                  <Row gutter={12}>
-                                    {Array.from({ length: count }).map(
-                                      (_, i) => (
-                                        <Col xs={12} md={6} key={`son-${i}`}>
-                                          <Form.Item
-                                            label={`Son ${i + 1} Name`}
-                                            name={[
-                                              name,
-                                              "children",
-                                              "sons",
-                                              i,
-                                              "name",
-                                            ]}
-                                          >
-                                            <Input placeholder="Name" />
-                                          </Form.Item>
-                                          <Form.Item
-                                            label={`Son ${i + 1}`}
-                                            name={[
-                                              name,
-                                              "children",
-                                              "sons",
-                                              i,
-                                              "age",
-                                            ]}
-                                            rules={[
-                                              {
-                                                pattern: /^[0-9]*$/,
-                                                message: "Only numbers allowed",
-                                              },
-                                            ]}
-                                          >
-                                            <Input placeholder="Age" />
-                                          </Form.Item>
-                                        </Col>
-                                      ),
-                                    )}
-                                  </Row>
-                                </>
-                              )}
-
-                              {/* ===== DAUGHTER ===== */}
-                              {types.includes("DAUGHTER") && (
-                                <>
-                                  <h4>Daughter Age</h4>
-                                  <Row gutter={12}>
-                                    {Array.from({ length: count }).map(
-                                      (_, i) => (
-                                        <Col
-                                          xs={12}
-                                          md={6}
-                                          key={`daughter-${i}`}
+                              <Row gutter={[16, 16]}>
+                                {/* SON SECTION */}
+                                {types.includes("SON") && (
+                                  <Col
+                                    xs={24}
+                                    md={types.includes("DAUGHTER") ? 12 : 24}
+                                  >
+                                    <Card
+                                      size="small"
+                                      title={
+                                        <span
+                                          style={{
+                                            color: "#2563eb",
+                                            fontWeight: 600,
+                                            fontSize: "13px",
+                                          }}
                                         >
-                                          <Form.Item
-                                            label={`daughter ${i + 1} Name`}
-                                            name={[
-                                              name,
-                                              "children",
-                                              "daughter",
-                                              i,
-                                              "name",
-                                            ]}
+                                          👦 Son Details
+                                        </span>
+                                      }
+                                      style={{
+                                        background: "#eff6ff",
+                                        border: "1px solid #bfdbfe",
+                                        borderRadius: "8px",
+                                      }}
+                                      bodyStyle={{ padding: "12px" }}
+                                    >
+                                      {Array.from({ length: count }).map(
+                                        (_, i) => (
+                                          <div
+                                            key={`son-${i}`}
+                                            style={{
+                                              display: "flex",
+                                              gap: "12px",
+                                              alignItems: "flex-start",
+                                              marginBottom:
+                                                i < count - 1 ? "12px" : 0,
+                                              padding: "10px",
+                                              background: "#fff",
+                                              borderRadius: "6px",
+                                              border: "1px solid #dbeafe",
+                                            }}
                                           >
-                                            <Input placeholder="Name" />
-                                          </Form.Item>
-                                          <Form.Item
-                                            label={`Daughter ${i + 1}`}
-                                            name={[
-                                              name,
-                                              "children",
-                                              "daughters",
-                                              i,
-                                              "age",
-                                            ]}
-                                            rules={[
-                                              {
-                                                pattern: /^[0-9]*$/,
-                                                message: "Only numbers allowed",
-                                              },
-                                            ]}
+                                            {/* Son Number Badge */}
+                                            <div
+                                              style={{
+                                                minWidth: "28px",
+                                                height: "28px",
+                                                borderRadius: "50%",
+                                                background: "#2563eb",
+                                                color: "#fff",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                fontSize: "12px",
+                                                fontWeight: 700,
+                                                marginTop: "4px",
+                                                flexShrink: 0,
+                                              }}
+                                            >
+                                              {i + 1}
+                                            </div>
+
+                                            {/* Name */}
+                                            <Form.Item
+                                              label="Name"
+                                              name={[
+                                                name,
+                                                "children",
+                                                "sons",
+                                                i,
+                                                "name",
+                                              ]}
+                                              style={{
+                                                flex: 1,
+                                                marginBottom: 0,
+                                              }}
+                                            >
+                                              <Input
+                                                placeholder={`Son ${i + 1} name`}
+                                                size="small"
+                                              />
+                                            </Form.Item>
+
+                                            {/* Age */}
+                                            <Form.Item
+                                              label="Age"
+                                              name={[
+                                                name,
+                                                "children",
+                                                "sons",
+                                                i,
+                                                "age",
+                                              ]}
+                                              style={{
+                                                width: "90px",
+                                                marginBottom: 0,
+                                              }}
+                                              rules={[
+                                                {
+                                                  pattern: /^[0-9]*$/,
+                                                  message: "Numbers only",
+                                                },
+                                              ]}
+                                            >
+                                              <Input
+                                                placeholder="Age"
+                                                size="small"
+                                                maxLength={2}
+                                              />
+                                            </Form.Item>
+                                          </div>
+                                        ),
+                                      )}
+                                    </Card>
+                                  </Col>
+                                )}
+
+                                {/* DAUGHTER SECTION */}
+                                {types.includes("DAUGHTER") && (
+                                  <Col
+                                    xs={24}
+                                    md={types.includes("SON") ? 12 : 24}
+                                  >
+                                    <Card
+                                      size="small"
+                                      title={
+                                        <span
+                                          style={{
+                                            color: "#db2777",
+                                            fontWeight: 600,
+                                            fontSize: "13px",
+                                          }}
+                                        >
+                                          👧 Daughter Details
+                                        </span>
+                                      }
+                                      style={{
+                                        background: "#fdf2f8",
+                                        border: "1px solid #fbcfe8",
+                                        borderRadius: "8px",
+                                      }}
+                                      bodyStyle={{ padding: "12px" }}
+                                    >
+                                      {Array.from({ length: count }).map(
+                                        (_, i) => (
+                                          <div
+                                            key={`daughter-${i}`}
+                                            style={{
+                                              display: "flex",
+                                              gap: "12px",
+                                              alignItems: "flex-start",
+                                              marginBottom:
+                                                i < count - 1 ? "12px" : 0,
+                                              padding: "10px",
+                                              background: "#fff",
+                                              borderRadius: "6px",
+                                              border: "1px solid #fce7f3",
+                                            }}
                                           >
-                                            <Input placeholder="Age" />
-                                          </Form.Item>
-                                        </Col>
-                                      ),
-                                    )}
-                                  </Row>
-                                </>
-                              )}
-                            </>
+                                            {/* Daughter Number Badge */}
+                                            <div
+                                              style={{
+                                                minWidth: "28px",
+                                                height: "28px",
+                                                borderRadius: "50%",
+                                                background: "#db2777",
+                                                color: "#fff",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                fontSize: "12px",
+                                                fontWeight: 700,
+                                                marginTop: "4px",
+                                                flexShrink: 0,
+                                              }}
+                                            >
+                                              {i + 1}
+                                            </div>
+
+                                            {/* Name */}
+                                            <Form.Item
+                                              label="Name"
+                                              name={[
+                                                name,
+                                                "children",
+                                                "daughters",
+                                                i,
+                                                "name",
+                                              ]}
+                                              style={{
+                                                flex: 1,
+                                                marginBottom: 0,
+                                              }}
+                                            >
+                                              <Input
+                                                placeholder={`Daughter ${i + 1} name`}
+                                                size="small"
+                                              />
+                                            </Form.Item>
+
+                                            {/* Age */}
+                                            <Form.Item
+                                              label="Age"
+                                              name={[
+                                                name,
+                                                "children",
+                                                "daughters",
+                                                i,
+                                                "age",
+                                              ]}
+                                              style={{
+                                                width: "90px",
+                                                marginBottom: 0,
+                                              }}
+                                              rules={[
+                                                {
+                                                  pattern: /^[0-9]*$/,
+                                                  message: "Numbers only",
+                                                },
+                                              ]}
+                                            >
+                                              <Input
+                                                placeholder="Age"
+                                                size="small"
+                                                maxLength={2}
+                                              />
+                                            </Form.Item>
+                                          </div>
+                                        ),
+                                      )}
+                                    </Card>
+                                  </Col>
+                                )}
+                              </Row>
+                            </Col>
                           )}
                         </>
                       );
