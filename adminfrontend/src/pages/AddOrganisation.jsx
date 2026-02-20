@@ -315,11 +315,11 @@ export default function AddOrganisation() {
           adharNo: p.aadhaar_no,
           panNo: p.pan_no,
           gstNo: p.gst_no,
-
+          dinNumber: p.din_no,
           adharDocument: createExistingFile(p.aadhaar_document),
           panDocument: createExistingFile(p.pan_document),
           gstDocument: createExistingFile(p.gst_document),
-
+          dinDocument: createExistingFile(p.din_document),
           mobileNumber: p.phone_number_1,
           contactNumber: p.phone_number_2,
           whatsappNumber: p.whatsapp_number,
@@ -375,6 +375,7 @@ export default function AddOrganisation() {
             ifsc: b.ifsc_code,
             branchName: b.branch_name,
             accountType: b.account_type,
+            cancelCheque: createExistingFile(b.cancel_cheque),
           })),
 
           companies: (p.company_details ?? []).map((c) => ({
@@ -390,6 +391,8 @@ export default function AddOrganisation() {
               state: c.state,
             },
             companyCertificate: createExistingFile(c.company_certificate),
+            cinDocument: createExistingFile(c.cin_document),
+            gstDocument: createExistingFile(c.gst_document),
           })),
         };
       }),
