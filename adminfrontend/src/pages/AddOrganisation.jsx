@@ -384,11 +384,13 @@ export default function AddOrganisation() {
             companyWebsite: c.website,
             registrationNo: c.registration_no,
             gstNo: c.gst_no,
+
             address: {
               address1: c.address,
               address2: c.location,
               city: c.city,
               state: c.state,
+              pin: c.pin_code,
             },
             companyCertificate: createExistingFile(c.company_certificate),
             cinDocument: createExistingFile(c.cin_document),
@@ -658,6 +660,7 @@ export default function AddOrganisation() {
           location: c.address?.address2 ?? null,
           city: c.address?.city ?? null,
           state: c.address?.state ?? null,
+          pin_code: c.address?.pin ?? null,
         })),
       })),
 
@@ -2493,25 +2496,26 @@ export default function AddOrganisation() {
                                       </Form.Item>
                                     </Col>
 
-                                    {/* <Col xs={24} sm={12} md={4}>
-                          <Form.Item
-                            {...restField}
-                            label={<span>PIN Code</span>}
-                            name={[name, "companyDetails", "address", "pin"]}
-                            rules={[
-                              {
-                                pattern: /^[0-9]{6}$/,
-                                message: "Enter a valid 6-digit PIN code",
-                              },
-                            ]}
-                          >
-                            <Input
-                              maxLength={6}
-                              placeholder="123456"
-                              style={{ borderRadius: "6px" }}
-                            />
-                          </Form.Item>
-                        </Col> */}
+                                    <Col xs={24} sm={12} md={4}>
+                                      <Form.Item
+                                        {...restField}
+                                        label={<span>PIN Code</span>}
+                                        name={[compIndex, "address", "pin"]}
+                                        rules={[
+                                          {
+                                            pattern: /^[0-9]{6}$/,
+                                            message:
+                                              "Enter a valid 6-digit PIN code",
+                                          },
+                                        ]}
+                                      >
+                                        <Input
+                                          maxLength={6}
+                                          placeholder="123456"
+                                          style={{ borderRadius: "6px" }}
+                                        />
+                                      </Form.Item>
+                                    </Col>
                                   </Row>
                                 </Card>
                               ),
