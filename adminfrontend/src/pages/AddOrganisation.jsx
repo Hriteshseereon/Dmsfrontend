@@ -512,8 +512,17 @@ export default function AddOrganisation() {
           antMessage.error(`Please fill all ${count} ${rule.label} details`);
           throw new Error("Director count mismatch");
         }
+        const fields = [];
 
-        return ["partners"];
+        partners.forEach((_, index) => {
+          fields.push(
+            ["partners", index, "name"],
+            ["partners", index, "email"],
+            ["partners", index, "mobileNumber"],
+          );
+        });
+
+        return fields;
       }
       case 2:
         return []; // Legal details are optional
@@ -1207,7 +1216,7 @@ export default function AddOrganisation() {
                       {...restField}
                       label={`${rule.label} Name`}
                       name={[name, "name"]}
-                      rules={[{ message: "Please enter name" }]}
+                      rules={[{ required: true, message: "Please enter name" }]}
                     >
                       <Input placeholder="Enter name" />
                     </Form.Item>
@@ -1217,7 +1226,13 @@ export default function AddOrganisation() {
                       {...restField}
                       label="Email"
                       name={[name, "email"]}
-                      rules={[{ type: "email", message: "Invalid email" }]}
+                      rules={[
+                        {
+                          required: true,
+                          type: "email",
+                          message: "Invalid email",
+                        },
+                      ]}
                     >
                       <Input placeholder="Enter email" />
                     </Form.Item>
