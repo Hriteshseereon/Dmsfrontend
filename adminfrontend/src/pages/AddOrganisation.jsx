@@ -235,32 +235,6 @@ export default function AddOrganisation() {
       .filter(([formKey, apiKey]) => legal?.[apiKey])
       .map(([formKey]) => formKey);
 
-    // const legalDetails = Object.entries(LEGAL_KEY_MAP).reduce(
-    //   (acc, [formKey, apiKey]) => {
-    //     const valueKey = apiKey.replace("_no", "");
-    //     acc[formKey] = {
-    //       number: legal?.[apiKey] ?? null,
-    //     };
-
-    //     const documentKey = apiKey.replace("_no", "_document");
-    //     if (documentKey && legal?.[documentKey]) {
-    //       acc[formKey] = {
-    //         document: createExistingFile(legal?.[documentKey]),
-    //       };
-    //     }
-
-    //     // Handle validity dynamically
-    //     const fromKey = apiKey.replace("_no", "_valid_from");
-    //     const toKey = apiKey.replace("_no", "_valid_to");
-
-    //     if (legal?.[fromKey] && legal?.[toKey]) {
-    //       acc[formKey].validity = [dayjs(legal[fromKey]), dayjs(legal[toKey])];
-    //     }
-
-    //     return acc;
-    //   },
-    //   {},
-    // );
     const legalDetails = Object.entries(LEGAL_KEY_MAP).reduce(
       (acc, [formKey, apiKey]) => {
         acc[formKey] = {
@@ -369,10 +343,15 @@ export default function AddOrganisation() {
           ],
 
           children: {
-            sons: (childrenParsed.sons ?? []).map((s) => s.age),
-            daughters: (childrenParsed.daughters ?? []).map((d) => d.age),
+            sons: (childrenParsed.sons ?? []).map((s) => ({
+              name: s.name || "",
+              age: s.age || "",
+            })),
+            daughters: (childrenParsed.daughters ?? []).map((d) => ({
+              name: d.name || "",
+              age: d.age || "",
+            })),
           },
-
           currentAddress: {
             address1: p.current_address_line_1,
             address2: p.current_address_line_2,
@@ -460,6 +439,25 @@ export default function AddOrganisation() {
       setCurrentStep(0);
     }
   }, [orgData, isEdit]);
+  // ✅ Auto create director forms based on count
+  useEffect(() => {
+    const count = form.getFieldValue("partnersCount");
+
+    if (!rule?.askCount) return;
+
+    if (count && count > 0) {
+      const currentPartners = form.getFieldValue("partners") || [];
+
+      // only recreate if length different
+      if (currentPartners.length !== count) {
+        const arr = Array.from({ length: count }, (_, i) => {
+          return currentPartners[i] || {};
+        });
+
+        form.setFieldsValue({ partners: arr });
+      }
+    }
+  }, [form, orgType, form.getFieldValue("partnersCount")]);
 
   const handleOrgTypeChange = (value) => {
     setOrgType(value);
@@ -504,8 +502,19 @@ export default function AddOrganisation() {
           "organisationType",
         ];
         return [];
-      case 1:
-        return orgType ? ["partners"] : [];
+      case 1: {
+        if (!orgType) return [];
+
+        const partners = form.getFieldValue("partners") || [];
+        const count = form.getFieldValue("partnersCount");
+
+        if (rule?.askCount && count && partners.length !== count) {
+          antMessage.error(`Please fill all ${count} ${rule.label} details`);
+          throw new Error("Director count mismatch");
+        }
+
+        return ["partners"];
+      }
       case 2:
         return []; // Legal details are optional
       case 3:
@@ -585,6 +594,7 @@ export default function AddOrganisation() {
         // pan_document: p.panDocument?.[0]?.originFileObj ?? null,
         gst_no: p.gstNo ?? null,
         // gst_document: p.gstDocument?.[0]?.originFileObj ?? null,
+        din_no: p.dinNumber ?? null,
         gender: p.gender ?? null,
         date_of_birth: p.dob ? dayjs(p.dob).format("YYYY-MM-DD") : null,
         percentage_of_interest: p.percentage ?? null,
@@ -607,25 +617,17 @@ export default function AddOrganisation() {
           //   p.childrenCount !== undefined ? String(p.childrenCount) : null,
           children_details: JSON.stringify({
             count: p.childrenCount ?? 0,
-            sons: (p.children?.sons ?? []).map((age) => ({
-              name: null,
-              age: Number(age),
+            sons: (p.children?.sons ?? []).map((c) => ({
+              name: c?.name ?? null,
+              age: Number(c?.age) || null,
             })),
-            daughters: (p.children?.daughters ?? []).map((age) => ({
-              name: null,
-              age: Number(age),
+            daughters: (p.children?.daughters ?? []).map((c) => ({
+              name: c?.name ?? null,
+              age: Number(c?.age) || null,
             })),
           }),
           parents_details: p.fatherName ?? null,
         },
-
-        // bank_details: {
-        //   bank_name: p.bankName ?? null,
-        //   account_holder_name: p.name ?? null,
-        //   account_number: p.accountNo ?? null,
-        //   ifsc_code: p.ifsc ?? null,
-        //   branch_name: p.branchName ?? null,
-        // },
         bank_details: (p.bankDetails ?? []).map((b) => ({
           bank_name: b.bankName ?? null,
           account_holder_name: p.name ?? null,
@@ -763,6 +765,7 @@ export default function AddOrganisation() {
       appendFile("pan_document", person?.panDocument);
       appendFile("aadhaar_document", person?.adharDocument);
       appendFile("gst_document", person?.gstDocument);
+      appendFile("din_document", person?.dinDocument);
       appendFile("photo", person?.photo);
       // appendFile("company_certificate", person?.companyCertificate);
       const appendNestedFile = (path, fileObj) => {
@@ -783,6 +786,23 @@ export default function AddOrganisation() {
         `persons.${index}.company_details.company_certificate`,
         person?.companyCertificate,
       );
+      (person.companies || []).forEach((c, companyIndex) => {
+        appendNestedFile(
+          `persons.${index}.company_details.${companyIndex}.cin_document`,
+          c?.cinDocument,
+        );
+
+        appendNestedFile(
+          `persons.${index}.company_details.${companyIndex}.gst_document`,
+          c?.gstDocument,
+        );
+      });
+      (person.bankDetails || []).forEach((b, bankIndex) => {
+        appendNestedFile(
+          `persons.${index}.bank_details.${bankIndex}.cancel_cheque`,
+          b?.cancelCheque,
+        );
+      });
     });
 
     if (isEdit) {
@@ -1468,8 +1488,26 @@ export default function AddOrganisation() {
                                       (_, i) => (
                                         <Col xs={12} md={6} key={`son-${i}`}>
                                           <Form.Item
+                                            label={`Son ${i + 1} Name`}
+                                            name={[
+                                              name,
+                                              "children",
+                                              "sons",
+                                              i,
+                                              "name",
+                                            ]}
+                                          >
+                                            <Input placeholder="Name" />
+                                          </Form.Item>
+                                          <Form.Item
                                             label={`Son ${i + 1}`}
-                                            name={[name, "children", "sons", i]}
+                                            name={[
+                                              name,
+                                              "children",
+                                              "sons",
+                                              i,
+                                              "age",
+                                            ]}
                                             rules={[
                                               {
                                                 pattern: /^[0-9]*$/,
@@ -1499,12 +1537,25 @@ export default function AddOrganisation() {
                                           key={`daughter-${i}`}
                                         >
                                           <Form.Item
+                                            label={`daughter ${i + 1} Name`}
+                                            name={[
+                                              name,
+                                              "children",
+                                              "daughter",
+                                              i,
+                                              "name",
+                                            ]}
+                                          >
+                                            <Input placeholder="Name" />
+                                          </Form.Item>
+                                          <Form.Item
                                             label={`Daughter ${i + 1}`}
                                             name={[
                                               name,
                                               "children",
                                               "daughters",
                                               i,
+                                              "age",
                                             ]}
                                             rules={[
                                               {
@@ -1830,7 +1881,7 @@ export default function AddOrganisation() {
                       </Form.Item>
                     </Col>
 
-                    <Col xs={24} sm={12} md={4}>
+                    <Col xs={24} sm={12} md={3}>
                       <Form.Item
                         {...restField}
                         label={
@@ -1839,6 +1890,40 @@ export default function AddOrganisation() {
                           </span>
                         }
                         name={[name, "gstDocument"]}
+                        valuePropName="fileList"
+                        getValueFromEvent={normFile}
+                      >
+                        <Upload
+                          beforeUpload={() => false}
+                          onPreview={handlePreview}
+                        >
+                          <Button style={{ borderRadius: "6px" }}>
+                            Upload GST
+                          </Button>
+                        </Upload>
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={12} md={6}>
+                      <Form.Item
+                        {...restField}
+                        label={<span>DIN Number</span>}
+                        name={[name, "dinNumber"]}
+                      >
+                        <Input
+                          placeholder="Enter DIN number"
+                          style={{ borderRadius: "6px" }}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={12} md={6}>
+                      <Form.Item
+                        {...restField}
+                        label={
+                          <span style={{ fontSize: "14px", fontWeight: "500" }}>
+                            DIN Document
+                          </span>
+                        }
+                        name={[name, "dinDocument"]}
                         valuePropName="fileList"
                         getValueFromEvent={normFile}
                       >
@@ -1972,6 +2057,18 @@ export default function AddOrganisation() {
                                     />
                                   </Form.Item>
                                 </Col>
+                                <Col xs={12} sm={8} md={6}>
+                                  <Form.Item
+                                    label="Cancel Cheque"
+                                    name={[bankIndex, "cancelCheque"]}
+                                    valuePropName="fileList"
+                                    getValueFromEvent={normFile}
+                                  >
+                                    <Upload beforeUpload={() => false}>
+                                      <Button>Upload Cheque</Button>
+                                    </Upload>
+                                  </Form.Item>
+                                </Col>
                               </Row>
                             </Card>
                           ),
@@ -2061,7 +2158,7 @@ export default function AddOrganisation() {
                                     <Col xs={24} sm={12} md={6}>
                                       <Form.Item
                                         {...restField}
-                                        label={<span>Registration Number</span>}
+                                        label={<span>CIN Number</span>}
                                         name={[compIndex, "registrationNo"]}
                                       >
                                         <Input
@@ -2070,8 +2167,20 @@ export default function AddOrganisation() {
                                         />
                                       </Form.Item>
                                     </Col>
-
-                                    <Col xs={24} sm={12} md={6}>
+                                    <Col xs={24} sm={12} md={3}>
+                                      <Form.Item
+                                        {...restField}
+                                        name={[compIndex, "cinDocument"]}
+                                        label="CIN Document"
+                                        valuePropName="fileList"
+                                        getValueFromEvent={normFile}
+                                      >
+                                        <Upload beforeUpload={() => false}>
+                                          <Button>Upload CIN</Button>
+                                        </Upload>
+                                      </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={12} md={4}>
                                       <Form.Item
                                         {...restField}
                                         label={<span>Company GST Number</span>}
@@ -2081,6 +2190,19 @@ export default function AddOrganisation() {
                                           placeholder="22AAAAA0000A1Z5"
                                           style={{ borderRadius: "6px" }}
                                         />
+                                      </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={12} md={3}>
+                                      <Form.Item
+                                        {...restField}
+                                        name={[compIndex, "gstDocument"]}
+                                        label="GST Document"
+                                        valuePropName="fileList"
+                                        getValueFromEvent={normFile}
+                                      >
+                                        <Upload beforeUpload={() => false}>
+                                          <Button>Upload GST</Button>
+                                        </Upload>
                                       </Form.Item>
                                     </Col>
                                     {rule.company_website && (
@@ -2106,7 +2228,7 @@ export default function AddOrganisation() {
                                         </Form.Item>
                                       </Col>
                                     )}
-                                    <Col xs={24} sm={12} md={6}>
+                                    <Col xs={24} sm={12} md={4}>
                                       <Form.Item
                                         {...restField}
                                         label="Address Line 1"
@@ -2120,7 +2242,7 @@ export default function AddOrganisation() {
                                       </Form.Item>
                                     </Col>
 
-                                    <Col xs={24} sm={12} md={6}>
+                                    <Col xs={24} sm={12} md={4}>
                                       <Form.Item
                                         {...restField}
                                         label="Address Line 2"
@@ -2133,7 +2255,7 @@ export default function AddOrganisation() {
                                         <Input placeholder="Address line 2" />
                                       </Form.Item>
                                     </Col>
-                                    <Col xs={24} sm={12} md={6}>
+                                    <Col xs={24} sm={12} md={4}>
                                       <Form.Item
                                         {...restField}
                                         label={<span>City</span>}
@@ -2243,16 +2365,21 @@ export default function AddOrganisation() {
                 </Row>
               </Card>
             ))}
-            {rule.askCount && (
-              <Button
-                type="dashed"
-                onClick={() => add({})}
-                icon={<PlusOutlined />}
-                block
-              >
-                Add {rule.label}
-              </Button>
-            )}
+            {rule.askCount &&
+              (() => {
+                const requiredCount = form.getFieldValue("partnersCount") || 0;
+
+                return fields.length < requiredCount ? (
+                  <Button
+                    type="dashed"
+                    onClick={() => add({})}
+                    icon={<PlusOutlined />}
+                    block
+                  >
+                    Add {rule.label}
+                  </Button>
+                ) : null;
+              })()}
           </>
         )}
       </Form.List>
@@ -2427,174 +2554,6 @@ export default function AddOrganisation() {
         }}
       </Form.Item>
     </>
-    // <Row gutter={[16, 8]}>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item label="TIN No" name="tinNo">
-    //       <Input placeholder="Enter TIN" />
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item
-    //       label="TIN Document"
-    //       name="tinDocument"
-    //       valuePropName="fileList"
-    //       getValueFromEvent={normFile}
-    //     >
-    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
-    //         <Button icon={<UploadOutlined />} size="small">
-    //           Upload
-    //         </Button>
-    //       </Upload>
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item label="PAN No" name="panNo">
-    //       <Input placeholder="Enter PAN" />
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item
-    //       label="PAN Document"
-    //       name="panDocument"
-    //       valuePropName="fileList"
-    //       getValueFromEvent={normFile}
-    //     >
-    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
-    //         <Button icon={<UploadOutlined />} size="small">
-    //           Upload
-    //         </Button>
-    //       </Upload>
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item label="GSTIN" name="gstin">
-    //       <Input placeholder="Enter GSTIN" />
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item
-    //       label="GSTIN Document"
-    //       name="gstinDocument"
-    //       valuePropName="fileList"
-    //       getValueFromEvent={normFile}
-    //     >
-    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
-    //         <Button icon={<UploadOutlined />} size="small">
-    //           Upload
-    //         </Button>
-    //       </Upload>
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item label="ET No" name="etNo">
-    //       <Input placeholder="Enter ET No" />
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item
-    //       label="ET Document"
-    //       name="etDocument"
-    //       valuePropName="fileList"
-    //       getValueFromEvent={normFile}
-    //     >
-    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
-    //         <Button icon={<UploadOutlined />} size="small">
-    //           Upload
-    //         </Button>
-    //       </Upload>
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item label="CST No" name="cstNo">
-    //       <Input placeholder="Enter CST" />
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item
-    //       label="CST Document"
-    //       name="cstDocument"
-    //       valuePropName="fileList"
-    //       getValueFromEvent={normFile}
-    //     >
-    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
-    //         <Button icon={<UploadOutlined />} size="small">
-    //           Upload
-    //         </Button>
-    //       </Upload>
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item label="Udyam Certificate No" name="udyamNo">
-    //       <Input placeholder="Udyam No" />
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item
-    //       label="Udyam Document"
-    //       name="udyamDocument"
-    //       valuePropName="fileList"
-    //       getValueFromEvent={normFile}
-    //     >
-    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
-    //         <Button icon={<UploadOutlined />} size="small">
-    //           Upload
-    //         </Button>
-    //       </Upload>
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item label="MSME Certificate No" name="msmeNo">
-    //       <Input placeholder="MSME No" />
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item
-    //       label="MSME Document"
-    //       name="msmeDocument"
-    //       valuePropName="fileList"
-    //       getValueFromEvent={normFile}
-    //     >
-    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
-    //         <Button icon={<UploadOutlined />} size="small">
-    //           Upload
-    //         </Button>
-    //       </Upload>
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item label="Trade License No" name="tradeNo">
-    //       <Input placeholder="Trade No" />
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item
-    //       label="Edible Certificate"
-    //       name="edibleCertificate"
-    //       valuePropName="fileList"
-    //       getValueFromEvent={normFile}
-    //     >
-    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
-    //         <Button icon={<UploadOutlined />} size="small">
-    //           Upload Document
-    //         </Button>
-    //       </Upload>
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item
-    //       label="Startup India Certificate"
-    //       name="startupIndiaCertificate"
-    //       valuePropName="fileList"
-    //       getValueFromEvent={normFile}
-    //     >
-    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
-    //         <Button icon={<UploadOutlined />} size="small">
-    //           Upload Document
-    //         </Button>
-    //       </Upload>
-    //     </Form.Item>
-    //   </Col>
-    // </Row>
   );
 
   // Step 3: Branch Details
