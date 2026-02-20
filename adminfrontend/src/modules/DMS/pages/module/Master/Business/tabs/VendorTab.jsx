@@ -27,6 +27,7 @@ import dayjs from "dayjs";
 import {
   getVendors,
   addvendor,
+  createVendor,
   updateVendor,
   getVendorDetailsByid,
 } from "../../../../../../../api/bussinesspatnr";
@@ -76,45 +77,59 @@ export default function VendorTab() {
 
   /* ================= MAP API → FORM ================= */
   const mapDetailsToForm = (d) => ({
-    name: d.name,
+    name: d.name || d.company_name,
     shortName: d.short_name,
     mobileNo1: d.mobile_no_1,
-    email1: d.email_address,
+    mobileNo2: d.mobile_no_2,
+    phoneNumber: d.phone_number,
+    whatsappNo: d.whatsapp_number,
+    email1: d.email_address || d.primary_email,
+    email2: d.secondary_email,
+    socialLink: d.social_link,
+    websiteUrl: d.company_website,
 
-    contactPerson: d.contact_person,
-    contactMobile: d.contact_person_no,
+    contactPerson: d.contact_person_input?.name || d.contact_person_input?.contact_person_name || d.contact_person,
+    gender: d.contact_person_input?.gender || d.gender,
+    contactMobile: d.contact_person_input?.contact_person_no || d.contact_person_input?.mobile_no || d.contact_person_no || d.mobile_no_1,
+    contactWhatsapp: d.contact_person_input?.contact_person_whats_no || d.contact_person_input?.whatsapp_no || d.whatsapp_no || d.whatsapp_number,
+    contactEmail: d.contact_person_input?.contact_person_email || d.contact_person_input?.email || d.email_address || d.primary_email,
+    aadharNo: d.contact_person_input?.aadhaar_no || d.contact_person_input?.aadhar_no || d.contact_person_input?.aadharNo || d.contact_person_input?.adhara_no || d.aadhar_no || d.aadhaar_no || d.adhara_no,
 
     tinNo: d.business_details?.tin_no,
     tinDate: d.business_details?.tin_date
       ? dayjs(d.business_details.tin_date)
       : null,
-    panNo: d.business_details?.pan,
-    gstIn: d.business_details?.gstin,
+    panNo: d.business_details?.pan || d.business_details?.pan_no,
+    gstIn: d.business_details?.gstin || d.business_details?.gstin_no,
     igstApplicable: d.business_details?.igst_applicable ? "Yes" : "No",
 
-    address1: d.addresses?.[0]?.address_line1,
-    state: d.addresses?.[0]?.state,
-    district: d.addresses?.[0]?.district,
-    city: d.addresses?.[0]?.city,
-    location: d.addresses?.[0]?.location,
-    pinCode: d.addresses?.[0]?.pin,
+    address1: d.addresses?.[0]?.address_line1 || d.addresses?.address_line_1,
+    address2: d.addresses?.[0]?.address_line2 || d.addresses?.address_line_2,
+    state: d.addresses?.[0]?.state || d.addresses?.state,
+    district: d.addresses?.[0]?.district || d.addresses?.district,
+    city: d.addresses?.[0]?.city || d.addresses?.city,
+    location: d.addresses?.[0]?.location || d.addresses?.location,
+    pinCode: d.addresses?.[0]?.pin || d.addresses?.pin_code,
+    transactionType: d.addresses?.[0]?.transaction_type || d.addresses?.transaction_type,
 
-    status: d.is_active ? "Active" : "Inactive",
+    status: (d.is_active !== undefined ? d.is_active : (d.addresses?.[0]?.status === "Active" || d.addresses?.status === "Active")) ? "Active" : "Inactive",
 
     // ✅ FILE PREVIEW
-    panDoc: fileFromUrl(d.business_details?.pan_document),
-    gstDoc: fileFromUrl(d.business_details?.gstin_document),
-    tinDoc: fileFromUrl(d.business_details?.tin_document),
+    panDoc: fileFromUrl(d.pan_document || d.business_details?.pan_document),
+    gstDoc: fileFromUrl(d.gstin_document || d.business_details?.gstin_document),
+    tinDoc: fileFromUrl(d.tin_document || d.business_details?.tin_document),
+    aadharDoc: fileFromUrl(d.aadhaar_documents || d.aadhar_document || d.business_details?.aadhaar_documents),
 
     plants: (d.plants || []).map((p) => ({
-      plantName: p.name,
+      plantName: p.name || p.plant_name,
       address: p.address,
-      phoneNo: p.phone_number,
-      email: p.email_address,
+      phoneNo: p.phone_number || p.phone_no,
+      email: p.email_address || p.email,
       state: p.state,
       district: p.district,
       city: p.city,
       pin: p.pin,
+      faxNo: p.fax_no,
     })),
   });
 
@@ -138,35 +153,47 @@ export default function VendorTab() {
       name: values.name,
       short_name: values.shortName,
       mobile_no_1: values.mobileNo1?.toString(),
+      mobile_no_2: values.mobileNo2?.toString(),
+      phone_number: values.phoneNumber?.toString() || values.mobileNo1?.toString(),
+      whatsapp_number: values.whatsappNo?.toString(),
       email_address: values.email1,
+      secondary_email: values.email2,
+      social_link: values.socialLink,
+      company_website: values.websiteUrl,
       is_active: values.status === "Active",
 
-      // ✅ REQUIRED BY BACKEND
       contact_person_input: {
         name: values.contactPerson || "",
+        gender: values.gender,
         contact_person_no: values.contactMobile?.toString() || "",
+        contact_person_whats_no: values.contactWhatsapp?.toString() || "",
+        contact_person_email: values.contactEmail,
+        aadhaar_no: values.aadharNo,
       },
 
       addresses: [
         {
           address_line1: values.address1,
+          address_line2: values.address2,
           state: values.state,
           district: values.district,
           city: values.city,
           location: values.location,
           pin: values.pinCode?.toString(),
-        },
+          transaction_type: values.transactionType,
+        }
       ],
 
       plants: (values.plants || []).map((p) => ({
         name: p.plantName,
         address: p.address,
+        fax_no: p.faxNo,
+        state: p.state,
+        city: p.city,
+        district: p.district,
+        pin: p.pin?.toString(),
         phone_number: p.phoneNo?.toString(),
         email_address: p.email,
-        state: p.state,
-        district: p.district,
-        city: p.city,
-        pin: p.pin?.toString(),
       })),
 
       business_details: {
@@ -206,7 +233,7 @@ export default function VendorTab() {
         await updateVendor(selected.id, formData);
         message.success("Vendor Updated");
       } else {
-        await addvendor(formData);
+        await createVendor(formData);
         message.success("Vendor Created");
       }
 
@@ -221,14 +248,23 @@ export default function VendorTab() {
 
   /* ================= TABLE ================= */
   const columns = [
-    { title: "Company Name", dataIndex: "name" },
+    {
+      title: "Company Name",
+      render: (_, record) => record.name || record.company_name
+    },
     { title: "Short Name", dataIndex: "short_name" },
     { title: "Mobile", dataIndex: "mobile_no_1" },
-    { title: "Email", dataIndex: "email_address" },
+    {
+      title: "Email",
+      render: (_, record) => record.email_address || record.primary_email
+    },
     {
       title: "Status",
-      dataIndex: "is_active",
-      render: (val) => (val ? "Active" : "Inactive"),
+      render: (_, record) => (
+        record.is_active || record.addresses?.[0]?.status === "Active" || record.addresses?.status === "Active"
+          ? "Active"
+          : "Inactive"
+      ),
     },
     {
       title: "Actions",
@@ -248,7 +284,7 @@ export default function VendorTab() {
   ];
 
   const filteredData = data.filter((v) =>
-    v.name?.toLowerCase().includes(search.toLowerCase()),
+    (v.name || v.company_name)?.toLowerCase().includes(search.toLowerCase()),
   );
 
   /* ================= UI ================= */
@@ -715,12 +751,21 @@ export default function VendorTab() {
                 {/* <Form.Item label="GSTIN Document" name="gstDoc"> */}
                 <Form.Item
                   name="gstDoc"
-                  label="GSTIN  Document"
+                  label="GSTIN Document"
                   valuePropName="fileList"
                   getValueFromEvent={(e) => e?.fileList}
                 >
-                  <Upload beforeUpload={() => false} maxCount={1}>
-                    <Button>Select File</Button>
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                    onPreview={(file) => {
+                      window.open(
+                        file.url || URL.createObjectURL(file.originFileObj),
+                      );
+                    }}
+                  >
+                    <Button disabled={viewMode}>Select File</Button>
                   </Upload>
                 </Form.Item>
               </Col>
@@ -856,10 +901,10 @@ export default function VendorTab() {
                     disabled={viewMode}
                     placeholder="Select Transaction Type"
                   >
-                    <Option value="OWN">OWN</Option>
-                    <Option value="RENT">RENT</Option>
+                    <Option value="Own">Own</Option>
+                    <Option value="Rent">Rent</Option>
                     <Option value="Super Stockist">Super Stockist</Option>
-                    <Option value="Distributor">Distributor</Option>
+                    <Option value="Distributer">Distributer</Option>
                     <Option value="Retailer">Retailer</Option>
                   </Select>
                 </Form.Item>
