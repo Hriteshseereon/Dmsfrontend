@@ -78,7 +78,7 @@ const handleAssignClick = async (id) => {
   vendorName: res.vendor_details?.name,
 vendorContactPerson: res.vendor_details?.contact_person,
 vendorPhoneNumber: res.vendor_details?.contact_person_no,
-
+vendorAddress: res.vendor_addresses?.[0]?.address_line1,
 plantName: res.plant_details?.name,
 plantAddress: res.plant_details?.address,
 plantPhoneNumber: res.plant_details?.phone_number,
@@ -100,23 +100,9 @@ plantPhoneNumber: res.plant_details?.phone_number,
 };
 
 
-  const mapRecordToFormValues = (record) => {
-    if (!record) return {};
-    const dateFields = ["orderDate", "estimateDeliveryDate", "insuranceValidUpto", "puValidUpto", "fitnessValidUpto", "deliveryDate"];
-    const formatted = { ...record };
-    dateFields.forEach(field => {
-       if (record[field] && !dayjs.isDayjs(record[field])) {
-  formatted[field] = dayjs(record[field]);
-}
-   });
-    return formatted;
-  };
+ 
 
-  const openModal = (record, mode) => {
-    setSelectedRecord(record);
-    setModalState({ open: true, mode });
-    form.setFieldsValue(mapRecordToFormValues(record));
-  };
+
 
  const onFinish = async (values) => {
   try {
@@ -337,7 +323,7 @@ plantPhoneNumber: res.plant_details?.phone_number,
           {renderSection("Plant Detail", <>
             <Col span={6}><Form.Item label="Plant Name" name="plantName" ><Input disabled /></Form.Item></Col>
               <Col span={6}><Form.Item label="Address" name="plantAddress" ><Input disabled /></Form.Item></Col>
-            <Col span={6}><Form.Item label="Contact Person" name="plantContactPerson"><Input disabled /></Form.Item></Col>
+            <Col span={6}><Form.Item label="Contact Person" name="vendorContactPerson"><Input disabled /></Form.Item></Col>
              <Col span={6}><Form.Item label="Phone" name="plantPhoneNumber" ><Input disabled /></Form.Item></Col>
          
           </>)}

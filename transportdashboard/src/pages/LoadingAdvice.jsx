@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect} from "react";
 import {
   Table,
   Input,
@@ -20,121 +20,165 @@ import {
   PlusOutlined,
   DeleteOutlined,
 } from "@ant-design/icons";
+import { getLoadingAdvice ,getLoadingAdviceById,} from "../api/loadingAdvice";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
-const loadingAdviceJSON = {
-  initialData: [
-    {
-      key: 1,
-      adviceNo: "LA-2025-001",
-      adviceDate: "2025-11-20",
-      poNo: "PO-2025-001",
-      deliveryAddress: "Plant Gate A, Manufacturing Hub 1",
-      wayBill: "WB123",
-      status: "Approved",
-      vendorName: "Global Suppliers Co.",
-      vendorAddress: "456 Commerce St, NY",
-      vendorGSTIN: "GSTEB001",
-      vendorContactPerson: "Alice Johnson",
-      vendorPhoneNumber: "9876543210",
-      plantName: "Manufacturing Hub 1",
-      plantCode: "P-MH1",
-      plantGSTIN: "GSTMA001",
-      plantAddress: "123 Industrial Rd, CA",
-      plantContactPerson: "Bob Williams",
-      plantPhoneNumber: "0123456789",
-      vehicleNo: "MH12AB4567",
-      driverName: "Ram Singh",
-      driverContact: "9123456789",
-      insuranceValidUpto: "2026-05-20",
-      puValidUpto: "2026-06-01",
-      fitnessValidUpto: "2026-07-15",
-      delivery_date: "2025-11-21",
-     
-      items: [
-        {
-          key: "item-1",
-          slNo: 1,
-          itemName: "Raw Material X",
-          itemCode: "ITEM-001",
-          itemDescription: "Raw Material X",
-          reqQty: 1000,
-          
-          variance: "",
-          uom: "Kgs",
-        },
-        {
-          key: "item-2",
-          slNo: 2,
-          itemName: "Component A",
-          itemCode: "ITEM-002",
-          itemDescription: "Component A",
-          reqQty: 500,
-         
-          variance: "",
-          uom: "Pcs",
-        },
-      ],
-    },
-    {
-      key: 2,
-      adviceNo: "LA-2025-002",
-      adviceDate: "2025-11-22",
-      poNo: "PO-2025-002",
-      deliveryAddress: "Plant Gate B, Manufacturing Hub 1",
-      wayBill: "WB456",
-      status: "In Transit",
-      vendorName: "Local Steel Traders",
-      vendorAddress: "789 Main Ave, TX",
-      vendorGSTIN: "GSTLT002",
-      vendorContactPerson: "Charles Davis",
-      vendorPhoneNumber: "9988776655",
-      plantName: "Assembly Unit 2",
-      plantCode: "P-AU2",
-      plantGSTIN: "GSTAS002",
-      plantAddress: "55 Logistics Pkwy, FL",
-      plantContactPerson: "Diana Prince",
-      plantPhoneNumber: "0987654321",
-      vehicleNo: "DL05CD9876",
-      driverName: "Gopal Varma",
-      driverContact: "9222333444",
-      insuranceValidUpto: "2026-01-01",
-      puValidUpto: "2026-02-01",
-      fitnessValidUpto: "2026-03-01",
-      delivery_date: "2025-11-23",
-      
-      items: [
-        {
-          key: "item-1",
-          slNo: 1,
-          itemName: "Steel Bars",
-          itemCode: "ITEM-003",
-          itemDescription: "Steel Bars",
-          reqQty: 800,
-          actualQty: 800,
-          variance: 0,
-          uom: "Kgs",
-        },
-      ],
-    },
-  ],
-  statusOptions: ["Approved", "In Transit", "Out for Delivery", "Delivered"],
-  uomOptions: ["Kgs", "Pcs", "Ltrs", "Tons", "Meters"],
-};
+
 
 
 export default function LoadingAdvice() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const [data, setData] = useState(loadingAdviceJSON.initialData);
-  const [searchText, setSearchText] = useState("");
+  const [data, setData] = useState([]);const [searchText, setSearchText] = useState("");
   const [items, setItems] = useState([]);
-
+  const uomOptions = ["Kgs", "Liters", "Nos"];
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
+  
+
+useEffect(() => {
+  fetchLoadingAdvice();
+}, []);
+
+const fetchLoadingAdvice = async () => {
+  try {
+   const res = await getLoadingAdvice();
+console.log(res); // 🔥 IMPORTANT
+   const mapped = res.map((item, index) => ({
+      key: item.id,
+
+      adviceNo: item.advice_no,
+      invoice_number:item.invoice_number,
+      adviceDate: item.advice_date,
+      poNo: item.po_no,
+      wayBill: item.way_bill,
+      deliveryAddress: item.delivery_address,
+      status: item.status,
+
+      vendorName: item.vendor_name,
+      vendorAddress: item.vendor_addresses?.[0]?.address_line1,
+      vendorContactPerson: item.vendor_details?.contact_person,
+      vendorPhoneNumber: item.vendor_details?.contact_person_no,
+
+      plantName: item.plant_name,
+      plantAddress: item.plant_details?.address,
+      plantPhoneNumber: item.plant_details?.phone_number,
+
+      vehicleNo: item.vehicle_no,
+      driverName: item.driver_name,
+      driverContact: item.driver_contact,
+
+      insuranceValidUpto: item.insurance_valid_upto,
+      puValidUpto: item.pu_valid_upto,
+      fitnessValidUpto: item.fitness_valid_upto,
+      delivery_date: item.delivery_date,
+
+      vehicleInTime: item.vehicle_in_time,
+      vehicleOutTime: item.vehicle_out_time,
+
+      tareWeights: item.tare_weight_kg,
+      grossWeights: item.gross_weight_kg,
+      netWeight: item.net_weight_kg,
+
+      items: item.items?.map((i, idx) => ({
+        key: i.id,
+        slNo: idx + 1,
+        itemName: i.product_name,
+        itemCode: i.product,
+        reqQty: i.required_qty,
+        actualQty: i.actual_qty,
+        variance: i.variance,
+        uom: i.uom_details?.unit_name,
+      })),
+    }));
+
+    setData(mapped);
+  } catch (err) {
+    console.log(err);
+  }
+};
+const mapApiToForm = (item) => {
+  return {
+    key: item.id,
+
+    adviceNo: item.advice_no,
+    adviceDate: item.advice_date,
+    invoice_number: item.invoice_number,
+    wayBill: item.way_bill,
+    deliveryAddress: item.delivery_address,
+    status: item.status,
+
+    vendorName: item.vendor_name,
+    vendorAddress: item.vendor_addresses?.[0]?.address_line1,
+    vendorContactPerson: item.vendor_details?.contact_person,
+    vendorPhoneNumber: item.vendor_details?.contact_person_no,
+
+    plantName: item.plant_name,
+    plantAddress: item.plant_details?.address,
+    plantPhoneNumber: item.plant_details?.phone_number,
+
+    vehicleNo: item.vehicle_no,
+    driverName: item.driver_name,
+    driverContact: item.driver_contact,
+
+    insuranceValidUpto: item.insurance_valid_upto,
+    puValidUpto: item.pu_valid_upto,
+    fitnessValidUpto: item.fitness_valid_upto,
+    delivery_date: item.delivery_date,
+
+    vehicleInTime: item.vehicle_in_time,
+    vehicleOutTime: item.vehicle_out_time,
+
+    tareWeights: item.tare_weight_kg,
+    grossWeights: item.gross_weight_kg,
+    netWeight: item.net_weight_kg,
+
+    items: item.items?.map((i, idx) => ({
+      key: i.id,
+      slNo: idx + 1,
+      itemName: i.product_name,
+      itemCode: i.product,
+      reqQty: i.required_qty,
+      actualQty: i.actual_qty,
+      variance: i.variance,
+      uom: i.uom_details?.unit_name,
+    })),
+  };
+};
+const handleEdit = async (record) => {
+  try {
+   const res = await getLoadingAdviceById(record.key);
+const data = res; // ✅ FIX
+
+const mapped = mapApiToForm(data);
+
+setSelectedRecord(mapped);
+setItems(mapped.items || []);
+editForm.setFieldsValue(mapRecordToFormValues(mapped));
+
+setIsEditModalOpen(true);
+  } catch (err) {
+    console.log(err);
+  }
+};
+const handleView = async (record) => {
+  try {
+   const res = await getLoadingAdviceById(record.key);
+const data = res; // ✅ FIX
+
+const mapped = mapApiToForm(data);
+
+setSelectedRecord(mapped);
+viewForm.setFieldsValue(mapRecordToFormValues(mapped));
+
+setIsViewModalOpen(true);
+  } catch (err) {
+    console.log(err);
+  }
+};
 
   const filteredData = data.filter(
     (item) =>
@@ -210,29 +254,7 @@ export default function LoadingAdvice() {
     };
   };
 
-  const addNewItem = () => {
-    const newItem = {
-      key: `item-${Date.now()}`,
-      slNo: items.length + 1,
-      itemCode: "",
-      itemDescription: "",
-      reqQty: 0,
-      actualQty: 0,
-      variance: 0,
-      uom: "Kgs",
-    };
-    setItems([...items, newItem]);
-  };
-
-  const deleteItem = (key) => {
-    const updatedItems = items.filter((item) => item.key !== key);
-    // Renumber SL No
-    const renumberedItems = updatedItems.map((item, index) => ({
-      ...item,
-      slNo: index + 1,
-    }));
-    setItems(renumberedItems);
-  };
+ 
 const getAllowedStatusOptions = (currentStatus) => {
   const flow = {
     Approved: ["In Transit", "Out for Delivery", "Delivered"],
@@ -269,8 +291,8 @@ const getAllowedStatusOptions = (currentStatus) => {
       render: (text) => <span className="text-amber-800 font-medium">{text}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Order No</span>,
-      dataIndex: "poNo",
+      title: <span className="text-amber-700 font-semibold">Invoice No</span>,
+      dataIndex: "invoice_number",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     
@@ -288,7 +310,7 @@ const getAllowedStatusOptions = (currentStatus) => {
   title: <span className="text-amber-700 font-semibold">Item</span>,
   render: (record) => (
     <span className="text-amber-800">
-      {record.items?.[0]?.itemName || "-"}
+      {record.items?.map(i => i.itemName).join(", ") }
     </span>
   ),
 }
@@ -307,20 +329,11 @@ const getAllowedStatusOptions = (currentStatus) => {
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500! hover:text-blue-700! text-lg!"
-            onClick={() => {
-              setSelectedRecord(record);
-              viewForm.setFieldsValue(mapRecordToFormValues(record));
-              setIsViewModalOpen(true);
-            }}
+           onClick={() => handleView(record)}
           />
           <EditOutlined
             className="cursor-pointer! text-red-500! hover:text-red-700! text-lg!"
-            onClick={() => {
-              setSelectedRecord(record);
-              setItems(record.items || []);
-              editForm.setFieldsValue(mapRecordToFormValues(record));
-              setIsEditModalOpen(true);
-            }}
+            onClick={() => handleEdit(record)}
           />
         </div>
       ),
@@ -334,7 +347,7 @@ const getAllowedStatusOptions = (currentStatus) => {
           Vendor Details
         </div>
         <Row gutter={24}>
-          <Col span={4}>
+          <Col span={6}>
             <Form.Item
               label="Vendor Name"
               name="vendorName"
@@ -343,7 +356,7 @@ const getAllowedStatusOptions = (currentStatus) => {
               <Input disabled />
             </Form.Item>
           </Col>
-          <Col span={4}>
+          <Col span={6}>
             <Form.Item
               label="Address"
               name="vendorAddress"
@@ -352,16 +365,8 @@ const getAllowedStatusOptions = (currentStatus) => {
               <Input disabled />
             </Form.Item>
           </Col>
-          <Col span={4}>
-            <Form.Item
-              label="GSTIN"
-              name="vendorGSTIN"
-              rules={[{ required: true, message: "Required" }]}
-            >
-              <Input disabled />
-            </Form.Item>
-          </Col>
-          <Col span={4}>
+          
+          <Col span={6}>
             <Form.Item
               label="Contact Person"
               name="vendorContactPerson"
@@ -370,7 +375,7 @@ const getAllowedStatusOptions = (currentStatus) => {
               <Input disabled/>
             </Form.Item>
           </Col>
-          <Col span={4}>
+          <Col span={6}>
             <Form.Item
               label="Phone Number"
               name="vendorPhoneNumber"
@@ -385,7 +390,7 @@ const getAllowedStatusOptions = (currentStatus) => {
           Plant Details
         </div>
         <Row gutter={24}>
-          <Col span={4}>
+          <Col span={6}>
             <Form.Item
               label="Plant Name"
               name="plantName"
@@ -394,25 +399,9 @@ const getAllowedStatusOptions = (currentStatus) => {
               <Input disabled />
             </Form.Item>
           </Col>
-          <Col span={4}>
-            <Form.Item
-              label="Plant Code"
-              name="plantCode"
-              rules={[{ required: true, message: "Required" }]}
-            >
-              <Input disabled />
-            </Form.Item>
-          </Col>
-          <Col span={4}>
-            <Form.Item
-              label="GSTIN"
-              name="plantGSTIN"
-              rules={[{ required: true, message: "Required" }]}
-            >
-              <Input disabled />
-            </Form.Item>
-          </Col>
-          <Col span={4}>
+         
+          
+          <Col span={6}>
             <Form.Item
               label="Address"
               name="plantAddress"
@@ -421,16 +410,16 @@ const getAllowedStatusOptions = (currentStatus) => {
               <Input disabled />
             </Form.Item>
           </Col>
-          <Col span={4}>
+          <Col span={6}>
             <Form.Item
               label="Contact Person"
-              name="plantContactPerson"
+              name="vendorContactPerson"
               rules={[{ required: true, message: "Required" }]}
             >
               <Input disabled />
             </Form.Item>
           </Col>
-          <Col span={4}>
+          <Col span={6}>
             <Form.Item
               label="Phone Number"
               name="plantPhoneNumber"
@@ -639,12 +628,7 @@ const renderLoadingDetails = (disabled = false) => (
       width: 100,
       render: (text) => <span>{text}</span>,
     },
-    {
-      title: "Item Code",
-      dataIndex: "itemCode",
-      width: 100,
-      render: (text) => <span>{text}</span>,
-    },
+   
    
     {
       title: "Required Qty",
@@ -695,10 +679,10 @@ const renderLoadingDetails = (disabled = false) => (
           <Select
             value={text}
             onChange={(value) => updateItem(record.key, "uom", value)}
-            options={loadingAdviceJSON.uomOptions.map((uom) => ({
-              label: uom,
-              value: uom,
-            }))}
+            options={uomOptions.map((uom) => ({
+  label: uom,
+  value: uom,
+}))}
             className="w-full"
           />
         ),
@@ -812,8 +796,9 @@ const renderLoadingDetails = (disabled = false) => (
                 <DatePicker format="DD-MM-YYYY" className="w-full" disabled />
               </Form.Item>
             </Col>
+            
             <Col span={4}>
-              <Form.Item label="PO No" name="poNo">
+              <Form.Item label="Invoice No" name="invoice_number">
                 <Input disabled />
               </Form.Item>
             </Col>
@@ -885,8 +870,8 @@ const renderLoadingDetails = (disabled = false) => (
                 <DatePicker format="DD-MM-YYYY" className="w-full" disabled />
               </Form.Item>
             </Col>
-            <Col span={4}>
-              <Form.Item label="PO No" name="poNo">
+             <Col span={4}>
+              <Form.Item label="Invoice No" name="invoice_number">
                 <Input disabled />
               </Form.Item>
             </Col>

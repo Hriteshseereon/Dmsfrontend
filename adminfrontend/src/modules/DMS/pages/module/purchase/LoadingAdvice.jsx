@@ -245,8 +245,8 @@ const handleExport = async () => {
         status: item.status || "-",
         vendor_name: item.vendor_name,
         plant_name: item.plant_name,
-        vendor_address: item.vendor_address,
-        plant_address: item.plant_address,
+       vendor_address: item.vendor_addresses?.[0]?.address_line1,
+       plant_address: item.plant_details?.address,
         vendor_gstin: item.vendor_gstin,
         plant_gstin: item.plant_gstin,
         // Transport Details ✅ correct fields from API
@@ -287,26 +287,24 @@ itemName: item.items?.[0]?.product_name || "-",
   const handleOpenEdit = async (record) => {
     try {
       const res = await getLoadingAdviceById(record.id);
-
+      console.log("PLANT PHONE:", res.plant_details?.phone_number); // ✅ 
       const item = res;
 form.setFieldsValue({
   invoiceNo: item.invoice_number,
   lodingadvicedate: item.advice_date ? dayjs(item.advice_date) : null,
   status: item.status,
 
-  // ✅ COMPANY DETAILS
+ // ✅ VENDOR (CORRECT)
   companyName: item.vendor_name,
-  companyAddress: item.vendor_address,
-  companyGST: item.vendor_gstin,
-  contactPerson: item.vendor_contact_person,
-  contactNo: item.vendor_phone,
+  companyAddress: item.vendor_addresses?.[0]?.address_line1 || "",
+  contactPerson: item.vendor_details?.contact_person || "",
+  contactNo: item.vendor_details?.contact_person_no || "",
 
-  // ✅ PLANT DETAILS
+  // ✅ PLANT (CORRECT)
   plantName: item.plant_name,
-  plantCode: item.plant_code,
-  plantGST: item.plant_gstin,
-  plantAddress: item.plant_address,
-  plantContactPerson: item.plant_contact_person,
+  plantAddress: item.plant_details?.address || "",
+  plantContactPerson: item.plant_details?.contact_person || "", 
+  plantPhone: item.plant_details?.phone_number || "",
 
   // Transport
   transporter: item.transporter_name,
@@ -351,6 +349,7 @@ form.setFieldsValue({
 
 
   const handleEdit = async (values) => {
+    console.log("PLANT PHONE:", item.plant_details?.phone_number);
     try {
       const payload = {
         advice_date: values.lodingadvicedate
@@ -425,19 +424,17 @@ await updateLoadingAdvice(selectedRecord.id, payload);
         : null,
       status: item.status,
 
-      // Company
-      companyName: item.vendor_name,
-      companyAddress: item.vendor_address,
-      companyGST: item.vendor_gstin,
-      contactPerson: item.vendor_contact_person,
-      contactNo: item.vendor_phone,
+      // ✅ VENDOR (CORRECT)
+  companyName: item.vendor_name,
+  companyAddress: item.vendor_addresses?.[0]?.address_line1 || "",
+  contactPerson: item.vendor_details?.contact_person || "",
+  contactNo: item.vendor_details?.contact_person_no || "",
 
-      // Plant
-      plantName: item.plant_name,
-      plantCode: item.plant_code,
-      plantGST: item.plant_gstin,
-      plantAddress: item.plant_address,
-      plantContactPerson: item.plant_contact_person,
+  // ✅ PLANT (CORRECT)
+  plantName: item.plant_name,
+  plantAddress: item.plant_details?.address || "",
+  plantContactPerson: item.plant_details?.contact_person || "", // 👈 fallback
+  plantPhone: item.plant_details?.phone_number || "",
 
       // Transport
       transporter: item.transporter_name,
@@ -518,7 +515,7 @@ await updateLoadingAdvice(selectedRecord.id, payload);
       title: <span className="text-amber-700 font-semibold">Driver</span>,
       dataIndex: "driverName",
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
-    },
+    },  
     {
       title: <span className="text-amber-700 font-semibold">Assignment</span>,
       dataIndex: "status",
@@ -573,10 +570,9 @@ await updateLoadingAdvice(selectedRecord.id, payload);
                     contactNo: payload.contactNo,
                     plantName: payload.plantName,
                     plantCode: payload.plantCode,
-                    plantGST: payload.plantGST,
                     plantAddress: payload.plantAddress,
                     plantContactPerson: payload.plantContactPerson,
-                    plantContactNo: payload.plantContactNo,
+                    plantPhone: payload.plantPhone,
                     itemCode: payload.itemCode,
                     itemName: payload.itemName,
                     itemDescription: payload.itemDescription,
@@ -624,11 +620,11 @@ await updateLoadingAdvice(selectedRecord.id, payload);
       {/* Company Details */}
       <Row gutter={24}>
         <Col span={24}>
-          <h6 className="text-amber-600 ">Company Details</h6>
+          <h6 className="text-amber-600 ">Vendor Details</h6>
         </Col>
 
         <Col span={6}>
-          <Form.Item label="Company Name" name="companyName" rules={[{ required: true }]}>
+          <Form.Item label="Vendor Name" name="companyName" rules={[{ required: true }]}>
             <Input disabled />
           </Form.Item>
         </Col>
@@ -639,15 +635,15 @@ await updateLoadingAdvice(selectedRecord.id, payload);
           </Form.Item>
         </Col>
 
-        <Col span={6}>
-          <Form.Item label="GSTIN No." name="companyGST">
-            <Input disabled />
+          <Col span={6}>
+         <Form.Item label="Phone" name="contactNo">
+    <Input disabled />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label="Contact Person" name="contactPerson">
-            <Input disabled />
+         <Form.Item label="Contact Person" name="contactPerson">
+    <Input disabled />
           </Form.Item>
         </Col>
       </Row>
@@ -664,17 +660,19 @@ await updateLoadingAdvice(selectedRecord.id, payload);
           </Form.Item>
         </Col>
 
-       
-
-        <Col span={6}>
-          <Form.Item label="GSTIN No." name="plantGST">
-            <Input disabled />
-          </Form.Item>
-        </Col>
-
         <Col span={6}>
           <Form.Item label="Address" name="plantAddress">
             <Input disabled />
+          </Form.Item>
+        </Col>
+          <Col span={6}>
+         <Form.Item label="Contact Person" name="contactPerson">
+
+            <Input disabled />
+          </Form.Item>
+        </Col>
+          <Col span={6}>
+         <Form.Item label="Phone" name="plantPhone">   <Input disabled />
           </Form.Item>
         </Col>
       </Row>
@@ -690,11 +688,7 @@ await updateLoadingAdvice(selectedRecord.id, payload);
     <>
       {fields.map(({ key, name }) => (
         <Row gutter={16} key={key} style={{ width: "100%" }} className="mt-2 ml-2! mr-2! border border-amber-200 rounded-lg p-2">
-          <Col span={6}>
-            <Form.Item label="Item Code" name={[name, "hsn_code"]}>
-              <Input disabled className="w-full!"/>
-            </Form.Item>
-          </Col>
+        
 
           <Col span={6}>
             <Form.Item label="Item Name" name={[name, "product_name"]}>
@@ -710,6 +704,11 @@ await updateLoadingAdvice(selectedRecord.id, payload);
 
           <Col span={6}>
             <Form.Item label="Actual Qty" name={[name, "actual_qty"]}>
+              <Input disabled className="w-full!"/>
+            </Form.Item>
+          </Col>
+            <Col span={6}>
+            <Form.Item label="Variance" name={[name, "variance"]}>
               <Input disabled className="w-full!"/>
             </Form.Item>
           </Col>
