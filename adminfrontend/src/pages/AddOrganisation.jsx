@@ -1516,7 +1516,7 @@ export default function AddOrganisation() {
                                             fontSize: "13px",
                                           }}
                                         >
-                                          👦 Son Details
+                                          Son Details
                                         </span>
                                       }
                                       style={{
@@ -1633,7 +1633,7 @@ export default function AddOrganisation() {
                                             fontSize: "13px",
                                           }}
                                         >
-                                          👧 Daughter Details
+                                          Daughter Details
                                         </span>
                                       }
                                       style={{
@@ -2188,7 +2188,7 @@ export default function AddOrganisation() {
                                     />
                                   </Form.Item>
                                 </Col>
-                                <Col xs={12} sm={8} md={6}>
+                                <Col xs={12} sm={8} md={4}>
                                   <Form.Item
                                     {...restField}
                                     label={<span>Account Number</span>}
@@ -2207,7 +2207,7 @@ export default function AddOrganisation() {
                                   </Form.Item>
                                 </Col>
 
-                                <Col xs={12} sm={8} md={6}>
+                                <Col xs={12} sm={8} md={4}>
                                   <Form.Item
                                     {...restField}
                                     label={<span>IFSC Code</span>}
@@ -2219,7 +2219,7 @@ export default function AddOrganisation() {
                                     />
                                   </Form.Item>
                                 </Col>
-                                <Col xs={12} sm={8} md={6}>
+                                <Col xs={12} sm={8} md={4}>
                                   <Form.Item
                                     label="Cancel Cheque"
                                     name={[bankIndex, "cancelCheque"]}
@@ -2316,80 +2316,6 @@ export default function AddOrganisation() {
                                         />
                                       </Form.Item>
                                     </Col>
-
-                                    <Col xs={24} sm={12} md={6}>
-                                      <Form.Item
-                                        {...restField}
-                                        label={<span>CIN Number</span>}
-                                        name={[compIndex, "registrationNo"]}
-                                      >
-                                        <Input
-                                          placeholder="Enter registration number"
-                                          style={{ borderRadius: "6px" }}
-                                        />
-                                      </Form.Item>
-                                    </Col>
-                                    <Col xs={24} sm={12} md={3}>
-                                      <Form.Item
-                                        {...restField}
-                                        name={[compIndex, "cinDocument"]}
-                                        label="CIN Document"
-                                        valuePropName="fileList"
-                                        getValueFromEvent={normFile}
-                                      >
-                                        <Upload beforeUpload={() => false}>
-                                          <Button>Upload CIN</Button>
-                                        </Upload>
-                                      </Form.Item>
-                                    </Col>
-                                    <Col xs={24} sm={12} md={4}>
-                                      <Form.Item
-                                        {...restField}
-                                        label={<span>Company GST Number</span>}
-                                        name={[compIndex, "gstNo"]}
-                                      >
-                                        <Input
-                                          placeholder="22AAAAA0000A1Z5"
-                                          style={{ borderRadius: "6px" }}
-                                        />
-                                      </Form.Item>
-                                    </Col>
-                                    <Col xs={24} sm={12} md={3}>
-                                      <Form.Item
-                                        {...restField}
-                                        name={[compIndex, "gstDocument"]}
-                                        label="GST Document"
-                                        valuePropName="fileList"
-                                        getValueFromEvent={normFile}
-                                      >
-                                        <Upload beforeUpload={() => false}>
-                                          <Button>Upload GST</Button>
-                                        </Upload>
-                                      </Form.Item>
-                                    </Col>
-                                    {rule.company_website && (
-                                      <Col xs={24} sm={6}>
-                                        <Form.Item
-                                          {...restField}
-                                          label={
-                                            <span
-                                              style={{
-                                                fontSize: "14px",
-                                                fontWeight: "500",
-                                              }}
-                                            >
-                                              Company Website
-                                            </span>
-                                          }
-                                          name={[compIndex, "companyWebsite"]}
-                                        >
-                                          <Input
-                                            placeholder="https://www.example.com"
-                                            style={{ borderRadius: "6px" }}
-                                          />
-                                        </Form.Item>
-                                      </Col>
-                                    )}
                                     <Col xs={24} sm={12} md={4}>
                                       <Form.Item
                                         {...restField}
@@ -2448,7 +2374,7 @@ export default function AddOrganisation() {
                                       </Form.Item>
                                     </Col>
 
-                                    <Col xs={24} sm={12} md={6}>
+                                    <Col xs={24} sm={12} md={4}>
                                       <Form.Item
                                         {...restField}
                                         label={<span>State</span>}
@@ -2495,7 +2421,29 @@ export default function AddOrganisation() {
                                         />
                                       </Form.Item>
                                     </Col>
-
+                                    {rule.company_website && (
+                                      <Col xs={24} sm={6}>
+                                        <Form.Item
+                                          {...restField}
+                                          label={
+                                            <span
+                                              style={{
+                                                fontSize: "14px",
+                                                fontWeight: "500",
+                                              }}
+                                            >
+                                              Company Website
+                                            </span>
+                                          }
+                                          name={[compIndex, "companyWebsite"]}
+                                        >
+                                          <Input
+                                            placeholder="https://www.example.com"
+                                            style={{ borderRadius: "6px" }}
+                                          />
+                                        </Form.Item>
+                                      </Col>
+                                    )}
                                     <Col xs={24} sm={12} md={4}>
                                       <Form.Item
                                         {...restField}
@@ -2514,6 +2462,56 @@ export default function AddOrganisation() {
                                           placeholder="123456"
                                           style={{ borderRadius: "6px" }}
                                         />
+                                      </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={12} md={4}>
+                                      <Form.Item
+                                        {...restField}
+                                        label={<span>CIN Number</span>}
+                                        name={[compIndex, "registrationNo"]}
+                                      >
+                                        <Input
+                                          placeholder="Enter registration number"
+                                          style={{ borderRadius: "6px" }}
+                                        />
+                                      </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={12} md={3}>
+                                      <Form.Item
+                                        {...restField}
+                                        name={[compIndex, "cinDocument"]}
+                                        label="CIN Document"
+                                        valuePropName="fileList"
+                                        getValueFromEvent={normFile}
+                                      >
+                                        <Upload beforeUpload={() => false}>
+                                          <Button>Upload CIN</Button>
+                                        </Upload>
+                                      </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={12} md={4}>
+                                      <Form.Item
+                                        {...restField}
+                                        label={<span>Company GST Number</span>}
+                                        name={[compIndex, "gstNo"]}
+                                      >
+                                        <Input
+                                          placeholder="22AAAAA0000A1Z5"
+                                          style={{ borderRadius: "6px" }}
+                                        />
+                                      </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={12} md={3}>
+                                      <Form.Item
+                                        {...restField}
+                                        name={[compIndex, "gstDocument"]}
+                                        label="GST Document"
+                                        valuePropName="fileList"
+                                        getValueFromEvent={normFile}
+                                      >
+                                        <Upload beforeUpload={() => false}>
+                                          <Button>Upload GST</Button>
+                                        </Upload>
                                       </Form.Item>
                                     </Col>
                                   </Row>
