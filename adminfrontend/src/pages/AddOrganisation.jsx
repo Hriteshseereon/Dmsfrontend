@@ -1162,7 +1162,7 @@ export default function AddOrganisation() {
           <Col md={6}>
             <Form.Item label={`Number of ${rule.label}s`} name="partnersCount">
               <InputNumber
-                min={1}
+                min={0}
                 style={{ width: "100%" }}
                 placeholder={`Enter number of ${rule.label}s (optional)`}
               />
