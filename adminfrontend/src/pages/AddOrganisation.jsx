@@ -2094,7 +2094,7 @@ export default function AddOrganisation() {
                           onPreview={handlePreview}
                         >
                           <Button style={{ borderRadius: "6px" }}>
-                            Upload GST
+                            Upload DIN
                           </Button>
                         </Upload>
                       </Form.Item>
