@@ -10,6 +10,7 @@ import {
   Card,
   Select,
   message,
+  Upload,
 } from "antd";
 import {
   PlusOutlined,
@@ -31,6 +32,86 @@ const vendorProductMap = {
   "Ruchi Soya": ["Soybean Oil", "Palm Oil", "Sunflower Oil"],
   "ABC Traders": ["Wheat", "Rice", "Maize"],
   "Tata Commodities": ["Tea", "Coffee"],
+};
+
+/* ================= HELPERS ================= */
+
+/** Convert a URL string from API into Ant Design Upload fileList format */
+const fileFromUrl = (url) => {
+  if (!url) return [];
+  return [
+    {
+      uid: url,
+      name: url.split("/").pop(),
+      status: "done",
+      url,
+    },
+  ];
+};
+
+/** Build FormData exactly like VendorTab:
+ *  - one `data` key containing a JSON string of all non-file fields
+ *  - separate keys for each file
+ */
+const buildFormData = (values) => {
+  const fd = new FormData();
+
+  const payload = {
+    broker_name: values.brokerName || "",
+    phone_number: values.phoneNo || "",
+    alternate_phone: values.altPhoneNo || "",
+    whatsapp_number: values.whatsappNo || "",
+    fax_number: values.faxNo || "",
+    primary_email: values.email || "",
+    secondary_email: values.secondaryEmail || "",
+    status: values.status || "",
+
+    // Permanent Address
+    permanent_address: values.permanent_address || "",
+    permanent_city: values.permanent_city || "",
+    permanent_district: values.permanent_district || "",
+    permanent_state: values.permanent_state || "",
+    permanent_pin: values.permanent_pin || "",
+
+    // Current Address
+    current_address: values.current_address || "",
+    current_city: values.current_city || "",
+    current_district: values.current_district || "",
+    current_state: values.current_state || "",
+    current_pin: values.current_pin || "",
+
+    // KYC numbers (docs are sent as files)
+    pan_no: values.panNo || "",
+    aadhar_no: values.aadharNo || "",
+    bank_details: values.bankDetails || "",
+    gstin: values.gstin || "",
+
+    // Commissions
+    commissions: (values.commissions || []).map((c) => ({
+      vendor: c.vendor || "",
+      product: c.product || "",
+      commission_type: c.type || "",
+      method: c.method || "",
+      amount: c.amount || "",
+    })),
+  };
+
+  // Attach JSON payload
+  fd.append("data", JSON.stringify(payload));
+
+  // Helper to attach a file if a new one was picked
+  const appendFile = (key, fileList) => {
+    if (fileList?.[0]?.originFileObj) {
+      fd.append(key, fileList[0].originFileObj);
+    }
+  };
+
+  appendFile("pan_document", values.panDoc);
+  appendFile("aadhar_document", values.aadharDoc);
+  appendFile("gstin_document", values.gstinDoc);
+  appendFile("passport_photo", values.passportPhoto);
+
+  return fd;
 };
 
 export default function BrokerTab() {
@@ -68,23 +149,33 @@ export default function BrokerTab() {
     email: d.primary_email,
     secondaryEmail: d.secondary_email,
     status: d.status,
+
     // Permanent Address
     permanent_address: d.permanent_address,
     permanent_city: d.permanent_city,
     permanent_district: d.permanent_district,
     permanent_state: d.permanent_state,
     permanent_pin: d.permanent_pin,
+
     // Current Address
     current_address: d.current_address,
     current_city: d.current_city,
     current_district: d.current_district,
     current_state: d.current_state,
     current_pin: d.current_pin,
-    // KYC
+
+    // KYC numbers
     panNo: d.pan_no,
     aadharNo: d.aadhar_no,
     bankDetails: d.bank_details,
     gstin: d.gstin,
+
+    // KYC docs → Upload fileList format
+    panDoc: fileFromUrl(d.pan_document),
+    aadharDoc: fileFromUrl(d.aadhar_document),
+    gstinDoc: fileFromUrl(d.gstin_document),
+    passportPhoto: fileFromUrl(d.passport_photo),
+
     // Commissions
     commissions: (d.commissions || []).map((c) => ({
       vendor: c.vendor,
@@ -95,57 +186,38 @@ export default function BrokerTab() {
     })),
   });
 
+  /* ================= OPEN MODAL ================= */
+  const openBroker = async (record, view = false) => {
+    try {
+      // const details = await getBrokerDetails(record.id);
+      const details = record; // replace with API call
+      form.setFieldsValue(mapDetailsToForm(details));
+      setSelected(details);
+      setViewMode(view);
+      setOpen(true);
+    } catch {
+      message.error("Failed to load broker details");
+    }
+  };
+
   /* ================= SAVE ================= */
   const handleSubmit = async (values) => {
     try {
-      const payload = {
-        broker_name: values.brokerName || "",
-        phone_number: values.phoneNo || "",
-        alternate_phone: values.altPhoneNo || "",
-        whatsapp_number: values.whatsappNo || "",
-        fax_number: values.faxNo || "",
-        primary_email: values.email || "",
-        secondary_email: values.secondaryEmail || "",
-        status: values.status || "",
-        // Permanent Address
-        permanent_address: values.permanent_address || "",
-        permanent_city: values.permanent_city || "",
-        permanent_district: values.permanent_district || "",
-        permanent_state: values.permanent_state || "",
-        permanent_pin: values.permanent_pin || "",
-        // Current Address
-        current_address: values.current_address || "",
-        current_city: values.current_city || "",
-        current_district: values.current_district || "",
-        current_state: values.current_state || "",
-        current_pin: values.current_pin || "",
-        // KYC
-        pan_no: values.panNo || "",
-        aadhar_no: values.aadharNo || "",
-        bank_details: values.bankDetails || "",
-        gstin: values.gstin || "",
-        // Commissions
-        commissions: (values.commissions || []).map((c) => ({
-          vendor: c.vendor || "",
-          product: c.product || "",
-          commission_type: c.type || "",
-          method: c.method || "",
-          amount: c.amount || "",
-        })),
-      };
+      const formData = buildFormData(values);
 
       if (selected) {
-        // await updateBroker(selected.id, payload);
+        // await updateBroker(selected.id, formData);
         message.success("Broker Updated");
       } else {
-        // await addBroker(payload);
+        // await addBroker(formData);
         message.success("Broker Added");
       }
 
       setOpen(false);
       form.resetFields();
       fetchBrokers();
-    } catch {
+    } catch (e) {
+      console.error(e);
       message.error("Save failed");
     }
   };
@@ -163,33 +235,11 @@ export default function BrokerTab() {
         <div className="flex gap-3">
           <EyeOutlined
             className="text-blue-500 cursor-pointer text-base"
-            onClick={async () => {
-              try {
-                // const details = await getBrokerDetails(record.id);
-                const details = record; // replace with API call
-                form.setFieldsValue(mapDetailsToForm(details));
-                setSelected(details);
-                setViewMode(true);
-                setOpen(true);
-              } catch {
-                message.error("Failed to load broker details");
-              }
-            }}
+            onClick={() => openBroker(record, true)}
           />
           <EditOutlined
             className="text-amber-500 cursor-pointer text-base"
-            onClick={async () => {
-              try {
-                // const details = await getBrokerDetails(record.id);
-                const details = record; // replace with API call
-                form.setFieldsValue(mapDetailsToForm(details));
-                setSelected(details);
-                setViewMode(false);
-                setOpen(true);
-              } catch {
-                message.error("Failed to load broker details");
-              }
-            }}
+            onClick={() => openBroker(record, false)}
           />
         </div>
       ),
@@ -205,7 +255,6 @@ export default function BrokerTab() {
     <>
       {/* ===== TOP BAR ===== */}
       <div className="flex justify-between items-center mb-3">
-        {/* Left: Search + Reset */}
         <div className="flex gap-2 items-center">
           <Input
             prefix={<SearchOutlined />}
@@ -227,7 +276,6 @@ export default function BrokerTab() {
           </Button>
         </div>
 
-        {/* Right: Add Broker */}
         <Button
           type="primary"
           icon={<PlusOutlined />}
@@ -297,7 +345,6 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item label="Phone Number" name="phoneNo">
                   <Input
@@ -307,7 +354,6 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item label="Alternate Phone" name="altPhoneNo">
                   <Input
@@ -317,7 +363,6 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item label="WhatsApp Number" name="whatsappNo">
                   <Input
@@ -327,7 +372,6 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item label="Fax Number" name="faxNo">
                   <Input
@@ -337,7 +381,6 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={6}>
                 <Form.Item label="Primary Email" name="email">
                   <Input
@@ -347,7 +390,6 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={6}>
                 <Form.Item label="Secondary Email" name="secondaryEmail">
                   <Input
@@ -357,7 +399,6 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item label="Status" name="status">
                   <Select
@@ -379,7 +420,6 @@ export default function BrokerTab() {
               Address Details
             </h3>
 
-            {/* Permanent Address */}
             <h4 className="text-amber-600 font-medium mb-2">
               Permanent Address
             </h4>
@@ -393,7 +433,6 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item label="City" name="permanent_city">
                   <Input
@@ -403,7 +442,6 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item label="District" name="permanent_district">
                   <Input
@@ -413,7 +451,6 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item label="State" name="permanent_state">
                   <Input
@@ -423,7 +460,6 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item label="Pin Code" name="permanent_pin">
                   <Input
@@ -435,7 +471,6 @@ export default function BrokerTab() {
               </Col>
             </Row>
 
-            {/* Current Address */}
             <h4 className="text-amber-600 font-medium mt-4 mb-2">
               Current Address
             </h4>
@@ -449,7 +484,6 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item label="City" name="current_city">
                   <Input
@@ -459,7 +493,6 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item label="District" name="current_district">
                   <Input
@@ -469,7 +502,6 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item label="State" name="current_state">
                   <Input
@@ -479,7 +511,6 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item label="Pin Code" name="current_pin">
                   <Input
@@ -498,6 +529,7 @@ export default function BrokerTab() {
               Documents & KYC
             </h3>
             <Row gutter={24}>
+              {/* PAN */}
               <Col span={4}>
                 <Form.Item label="PAN Number" name="panNo">
                   <Input
@@ -507,13 +539,29 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={6}>
-                <Form.Item label="PAN Document" name="panDoc">
-                  <Input type="file" disabled={viewMode} />
+                <Form.Item
+                  label="PAN Document"
+                  name="panDoc"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                    onPreview={(file) =>
+                      window.open(
+                        file.url || URL.createObjectURL(file.originFileObj),
+                      )
+                    }
+                  >
+                    <Button disabled={viewMode}>Select File</Button>
+                  </Upload>
                 </Form.Item>
               </Col>
 
+              {/* Aadhar */}
               <Col span={4}>
                 <Form.Item label="Aadhar Number" name="aadharNo">
                   <Input
@@ -523,29 +571,63 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={6}>
-                <Form.Item label="Aadhar Document" name="aadharDoc">
-                  <Input type="file" disabled={viewMode} />
+                <Form.Item
+                  label="Aadhar Document"
+                  name="aadharDoc"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                    onPreview={(file) =>
+                      window.open(
+                        file.url || URL.createObjectURL(file.originFileObj),
+                      )
+                    }
+                  >
+                    <Button disabled={viewMode}>Select File</Button>
+                  </Upload>
                 </Form.Item>
               </Col>
 
+              {/* Bank Details */}
               <Col span={6}>
-                <Form.Item label="Bank Details" name="bankDetails">
+                <Form.Item label="Bank AC number" name="bankDetails">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
-                    placeholder="Enter bank details"
+                    placeholder="Enter bank account number"
                   />
                 </Form.Item>
               </Col>
 
+              {/* Passport Photo */}
               <Col span={6}>
-                <Form.Item label="Passport Photo" name="passportPhoto">
-                  <Input type="file" disabled={viewMode} />
+                <Form.Item
+                  label="Passport Photo"
+                  name="passportPhoto"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                    onPreview={(file) =>
+                      window.open(
+                        file.url || URL.createObjectURL(file.originFileObj),
+                      )
+                    }
+                  >
+                    <Button disabled={viewMode}>Select File</Button>
+                  </Upload>
                 </Form.Item>
               </Col>
 
+              {/* GSTIN */}
               <Col span={4}>
                 <Form.Item label="GSTIN Number" name="gstin">
                   <Input
@@ -555,10 +637,25 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={6}>
-                <Form.Item label="GSTIN Document" name="gstinDoc">
-                  <Input type="file" disabled={viewMode} />
+                <Form.Item
+                  label="GSTIN Document"
+                  name="gstinDoc"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                    onPreview={(file) =>
+                      window.open(
+                        file.url || URL.createObjectURL(file.originFileObj),
+                      )
+                    }
+                  >
+                    <Button disabled={viewMode}>Select File</Button>
+                  </Upload>
                 </Form.Item>
               </Col>
             </Row>
@@ -611,7 +708,6 @@ export default function BrokerTab() {
                             </Select>
                           </Form.Item>
                         </Col>
-
                         <Col span={6}>
                           <Form.Item
                             {...restField}
@@ -625,7 +721,6 @@ export default function BrokerTab() {
                             />
                           </Form.Item>
                         </Col>
-
                         <Col span={4}>
                           <Form.Item
                             {...restField}
@@ -642,7 +737,6 @@ export default function BrokerTab() {
                             </Select>
                           </Form.Item>
                         </Col>
-
                         <Col span={4}>
                           <Form.Item
                             {...restField}
@@ -659,7 +753,6 @@ export default function BrokerTab() {
                             </Select>
                           </Form.Item>
                         </Col>
-
                         <Col span={4}>
                           <Form.Item
                             {...restField}
