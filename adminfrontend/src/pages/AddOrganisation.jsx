@@ -235,32 +235,6 @@ export default function AddOrganisation() {
       .filter(([formKey, apiKey]) => legal?.[apiKey])
       .map(([formKey]) => formKey);
 
-    // const legalDetails = Object.entries(LEGAL_KEY_MAP).reduce(
-    //   (acc, [formKey, apiKey]) => {
-    //     const valueKey = apiKey.replace("_no", "");
-    //     acc[formKey] = {
-    //       number: legal?.[apiKey] ?? null,
-    //     };
-
-    //     const documentKey = apiKey.replace("_no", "_document");
-    //     if (documentKey && legal?.[documentKey]) {
-    //       acc[formKey] = {
-    //         document: createExistingFile(legal?.[documentKey]),
-    //       };
-    //     }
-
-    //     // Handle validity dynamically
-    //     const fromKey = apiKey.replace("_no", "_valid_from");
-    //     const toKey = apiKey.replace("_no", "_valid_to");
-
-    //     if (legal?.[fromKey] && legal?.[toKey]) {
-    //       acc[formKey].validity = [dayjs(legal[fromKey]), dayjs(legal[toKey])];
-    //     }
-
-    //     return acc;
-    //   },
-    //   {},
-    // );
     const legalDetails = Object.entries(LEGAL_KEY_MAP).reduce(
       (acc, [formKey, apiKey]) => {
         acc[formKey] = {
@@ -341,11 +315,11 @@ export default function AddOrganisation() {
           adharNo: p.aadhaar_no,
           panNo: p.pan_no,
           gstNo: p.gst_no,
-
+          dinNumber: p.din_no,
           adharDocument: createExistingFile(p.aadhaar_document),
           panDocument: createExistingFile(p.pan_document),
           gstDocument: createExistingFile(p.gst_document),
-
+          dinDocument: createExistingFile(p.din_document),
           mobileNumber: p.phone_number_1,
           contactNumber: p.phone_number_2,
           whatsappNumber: p.whatsapp_number,
@@ -369,10 +343,15 @@ export default function AddOrganisation() {
           ],
 
           children: {
-            sons: (childrenParsed.sons ?? []).map((s) => s.age),
-            daughters: (childrenParsed.daughters ?? []).map((d) => d.age),
+            sons: (childrenParsed.sons ?? []).map((s) => ({
+              name: s.name || "",
+              age: s.age || "",
+            })),
+            daughters: (childrenParsed.daughters ?? []).map((d) => ({
+              name: d.name || "",
+              age: d.age || "",
+            })),
           },
-
           currentAddress: {
             address1: p.current_address_line_1,
             address2: p.current_address_line_2,
@@ -396,6 +375,7 @@ export default function AddOrganisation() {
             ifsc: b.ifsc_code,
             branchName: b.branch_name,
             accountType: b.account_type,
+            cancelCheque: createExistingFile(b.cancel_cheque),
           })),
 
           companies: (p.company_details ?? []).map((c) => ({
@@ -404,13 +384,17 @@ export default function AddOrganisation() {
             companyWebsite: c.website,
             registrationNo: c.registration_no,
             gstNo: c.gst_no,
+
             address: {
               address1: c.address,
               address2: c.location,
               city: c.city,
               state: c.state,
+              pin: c.pin_code,
             },
             companyCertificate: createExistingFile(c.company_certificate),
+            cinDocument: createExistingFile(c.cin_document),
+            gstDocument: createExistingFile(c.gst_document),
           })),
         };
       }),
@@ -460,6 +444,25 @@ export default function AddOrganisation() {
       setCurrentStep(0);
     }
   }, [orgData, isEdit]);
+  // ✅ Auto create director forms based on count
+  useEffect(() => {
+    const count = form.getFieldValue("partnersCount");
+
+    if (!rule?.askCount) return;
+
+    if (count && count > 0) {
+      const currentPartners = form.getFieldValue("partners") || [];
+
+      // only recreate if length different
+      if (currentPartners.length !== count) {
+        const arr = Array.from({ length: count }, (_, i) => {
+          return currentPartners[i] || {};
+        });
+
+        form.setFieldsValue({ partners: arr });
+      }
+    }
+  }, [form, orgType, form.getFieldValue("partnersCount")]);
 
   const handleOrgTypeChange = (value) => {
     setOrgType(value);
@@ -504,8 +507,28 @@ export default function AddOrganisation() {
           "organisationType",
         ];
         return [];
-      case 1:
-        return orgType ? ["partners"] : [];
+      case 1: {
+        if (!orgType) return [];
+
+        const partners = form.getFieldValue("partners") || [];
+        const count = form.getFieldValue("partnersCount");
+
+        if (rule?.askCount && count && partners.length !== count) {
+          antMessage.error(`Please fill all ${count} ${rule.label} details`);
+          throw new Error("Director count mismatch");
+        }
+        const fields = [];
+
+        partners.forEach((_, index) => {
+          fields.push(
+            ["partners", index, "name"],
+            ["partners", index, "email"],
+            ["partners", index, "mobileNumber"],
+          );
+        });
+
+        return fields;
+      }
       case 2:
         return []; // Legal details are optional
       case 3:
@@ -585,6 +608,7 @@ export default function AddOrganisation() {
         // pan_document: p.panDocument?.[0]?.originFileObj ?? null,
         gst_no: p.gstNo ?? null,
         // gst_document: p.gstDocument?.[0]?.originFileObj ?? null,
+        din_no: p.dinNumber ?? null,
         gender: p.gender ?? null,
         date_of_birth: p.dob ? dayjs(p.dob).format("YYYY-MM-DD") : null,
         percentage_of_interest: p.percentage ?? null,
@@ -607,25 +631,17 @@ export default function AddOrganisation() {
           //   p.childrenCount !== undefined ? String(p.childrenCount) : null,
           children_details: JSON.stringify({
             count: p.childrenCount ?? 0,
-            sons: (p.children?.sons ?? []).map((age) => ({
-              name: null,
-              age: Number(age),
+            sons: (p.children?.sons ?? []).map((c) => ({
+              name: c?.name ?? null,
+              age: Number(c?.age) || null,
             })),
-            daughters: (p.children?.daughters ?? []).map((age) => ({
-              name: null,
-              age: Number(age),
+            daughters: (p.children?.daughters ?? []).map((c) => ({
+              name: c?.name ?? null,
+              age: Number(c?.age) || null,
             })),
           }),
           parents_details: p.fatherName ?? null,
         },
-
-        // bank_details: {
-        //   bank_name: p.bankName ?? null,
-        //   account_holder_name: p.name ?? null,
-        //   account_number: p.accountNo ?? null,
-        //   ifsc_code: p.ifsc ?? null,
-        //   branch_name: p.branchName ?? null,
-        // },
         bank_details: (p.bankDetails ?? []).map((b) => ({
           bank_name: b.bankName ?? null,
           account_holder_name: p.name ?? null,
@@ -644,6 +660,7 @@ export default function AddOrganisation() {
           location: c.address?.address2 ?? null,
           city: c.address?.city ?? null,
           state: c.address?.state ?? null,
+          pin_code: c.address?.pin ?? null,
         })),
       })),
 
@@ -763,6 +780,7 @@ export default function AddOrganisation() {
       appendFile("pan_document", person?.panDocument);
       appendFile("aadhaar_document", person?.adharDocument);
       appendFile("gst_document", person?.gstDocument);
+      appendFile("din_document", person?.dinDocument);
       appendFile("photo", person?.photo);
       // appendFile("company_certificate", person?.companyCertificate);
       const appendNestedFile = (path, fileObj) => {
@@ -783,6 +801,23 @@ export default function AddOrganisation() {
         `persons.${index}.company_details.company_certificate`,
         person?.companyCertificate,
       );
+      (person.companies || []).forEach((c, companyIndex) => {
+        appendNestedFile(
+          `persons.${index}.company_details.${companyIndex}.cin_document`,
+          c?.cinDocument,
+        );
+
+        appendNestedFile(
+          `persons.${index}.company_details.${companyIndex}.gst_document`,
+          c?.gstDocument,
+        );
+      });
+      (person.bankDetails || []).forEach((b, bankIndex) => {
+        appendNestedFile(
+          `persons.${index}.bank_details.${bankIndex}.cancel_cheque`,
+          b?.cancelCheque,
+        );
+      });
     });
 
     if (isEdit) {
@@ -1127,7 +1162,7 @@ export default function AddOrganisation() {
           <Col md={6}>
             <Form.Item label={`Number of ${rule.label}s`} name="partnersCount">
               <InputNumber
-                min={1}
+                min={0}
                 style={{ width: "100%" }}
                 placeholder={`Enter number of ${rule.label}s (optional)`}
               />
@@ -1187,7 +1222,7 @@ export default function AddOrganisation() {
                       {...restField}
                       label={`${rule.label} Name`}
                       name={[name, "name"]}
-                      rules={[{ message: "Please enter name" }]}
+                      rules={[{ required: true, message: "Please enter name" }]}
                     >
                       <Input placeholder="Enter name" />
                     </Form.Item>
@@ -1197,7 +1232,13 @@ export default function AddOrganisation() {
                       {...restField}
                       label="Email"
                       name={[name, "email"]}
-                      rules={[{ type: "email", message: "Invalid email" }]}
+                      rules={[
+                        {
+                          required: true,
+                          type: "email",
+                          message: "Invalid email",
+                        },
+                      ]}
                     >
                       <Input placeholder="Enter email" />
                     </Form.Item>
@@ -1395,13 +1436,11 @@ export default function AddOrganisation() {
                         Number(
                           getFieldValue(["partners", name, "childrenCount"]),
                         ) || 0;
-
                       const types =
                         getFieldValue(["partners", name, "childrenType"]) || [];
 
                       if (!count) return null;
 
-                      // ---- RESET LOGIC (VERY IMPORTANT) ----
                       const partners = getFieldValue("partners") || [];
                       const currentPartner = partners[name] || {};
 
@@ -1412,10 +1451,7 @@ export default function AddOrganisation() {
                         const updated = [...partners];
                         updated[name] = {
                           ...currentPartner,
-                          children: {
-                            ...currentPartner.children,
-                            sons: [],
-                          },
+                          children: { ...currentPartner.children, sons: [] },
                         };
                         setFieldsValue({ partners: updated });
                       }
@@ -1437,91 +1473,268 @@ export default function AddOrganisation() {
 
                       return (
                         <>
-                          {/* ---------- TYPE SELECT ---------- */}
-                          <Row>
-                            <Col>
-                              <Form.Item
-                                label="Children Type"
-                                name={[name, "childrenType"]}
-                              >
-                                <Checkbox.Group>
-                                  <Checkbox value="SON">Son</Checkbox>
-                                  <Checkbox value="DAUGHTER">Daughter</Checkbox>
-                                </Checkbox.Group>
-                              </Form.Item>
-                            </Col>
-                          </Row>
+                          {/* Children Type Checkbox */}
+                          <Col xs={24}>
+                            <Form.Item
+                              label="Children Type"
+                              name={[name, "childrenType"]}
+                            >
+                              <Checkbox.Group>
+                                <Checkbox value="SON">Son</Checkbox>
+                                <Checkbox value="DAUGHTER">Daughter</Checkbox>
+                              </Checkbox.Group>
+                            </Form.Item>
+                          </Col>
 
-                          {/* ---------- AGE SECTION ---------- */}
                           {types.length > 0 && (
-                            <>
-                              <Divider orientation="left">
-                                Children Age Details
+                            <Col xs={24}>
+                              <Divider
+                                orientation="left"
+                                style={{
+                                  fontSize: "14px",
+                                  fontWeight: 600,
+                                  color: "#374151",
+                                }}
+                              >
+                                Children Details
                               </Divider>
 
-                              {/* ===== SON ===== */}
-                              {types.includes("SON") && (
-                                <>
-                                  <h4>Son Age</h4>
-                                  <Row gutter={12}>
-                                    {Array.from({ length: count }).map(
-                                      (_, i) => (
-                                        <Col xs={12} md={6} key={`son-${i}`}>
-                                          <Form.Item
-                                            label={`Son ${i + 1}`}
-                                            name={[name, "children", "sons", i]}
-                                            rules={[
-                                              {
-                                                pattern: /^[0-9]*$/,
-                                                message: "Only numbers allowed",
-                                              },
-                                            ]}
-                                          >
-                                            <Input placeholder="Age" />
-                                          </Form.Item>
-                                        </Col>
-                                      ),
-                                    )}
-                                  </Row>
-                                </>
-                              )}
-
-                              {/* ===== DAUGHTER ===== */}
-                              {types.includes("DAUGHTER") && (
-                                <>
-                                  <h4>Daughter Age</h4>
-                                  <Row gutter={12}>
-                                    {Array.from({ length: count }).map(
-                                      (_, i) => (
-                                        <Col
-                                          xs={12}
-                                          md={6}
-                                          key={`daughter-${i}`}
+                              <Row gutter={[16, 16]}>
+                                {/* SON SECTION */}
+                                {types.includes("SON") && (
+                                  <Col
+                                    xs={24}
+                                    md={types.includes("DAUGHTER") ? 12 : 24}
+                                  >
+                                    <Card
+                                      size="small"
+                                      title={
+                                        <span
+                                          style={{
+                                            color: "#2563eb",
+                                            fontWeight: 600,
+                                            fontSize: "13px",
+                                          }}
                                         >
-                                          <Form.Item
-                                            label={`Daughter ${i + 1}`}
-                                            name={[
-                                              name,
-                                              "children",
-                                              "daughters",
-                                              i,
-                                            ]}
-                                            rules={[
-                                              {
-                                                pattern: /^[0-9]*$/,
-                                                message: "Only numbers allowed",
-                                              },
-                                            ]}
+                                          Son Details
+                                        </span>
+                                      }
+                                      style={{
+                                        background: "#eff6ff",
+                                        border: "1px solid #bfdbfe",
+                                        borderRadius: "8px",
+                                      }}
+                                      bodyStyle={{ padding: "12px" }}
+                                    >
+                                      {Array.from({ length: count }).map(
+                                        (_, i) => (
+                                          <div
+                                            key={`son-${i}`}
+                                            style={{
+                                              display: "flex",
+                                              gap: "12px",
+                                              alignItems: "flex-start",
+                                              marginBottom:
+                                                i < count - 1 ? "12px" : 0,
+                                              padding: "10px",
+                                              background: "#fff",
+                                              borderRadius: "6px",
+                                              border: "1px solid #dbeafe",
+                                            }}
                                           >
-                                            <Input placeholder="Age" />
-                                          </Form.Item>
-                                        </Col>
-                                      ),
-                                    )}
-                                  </Row>
-                                </>
-                              )}
-                            </>
+                                            {/* Son Number Badge */}
+                                            <div
+                                              style={{
+                                                minWidth: "28px",
+                                                height: "28px",
+                                                borderRadius: "50%",
+                                                background: "#2563eb",
+                                                color: "#fff",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                fontSize: "12px",
+                                                fontWeight: 700,
+                                                marginTop: "4px",
+                                                flexShrink: 0,
+                                              }}
+                                            >
+                                              {i + 1}
+                                            </div>
+
+                                            {/* Name */}
+                                            <Form.Item
+                                              label="Name"
+                                              name={[
+                                                name,
+                                                "children",
+                                                "sons",
+                                                i,
+                                                "name",
+                                              ]}
+                                              style={{
+                                                flex: 1,
+                                                marginBottom: 0,
+                                              }}
+                                            >
+                                              <Input
+                                                placeholder={`Son ${i + 1} name`}
+                                                size="small"
+                                              />
+                                            </Form.Item>
+
+                                            {/* Age */}
+                                            <Form.Item
+                                              label="Age"
+                                              name={[
+                                                name,
+                                                "children",
+                                                "sons",
+                                                i,
+                                                "age",
+                                              ]}
+                                              style={{
+                                                width: "90px",
+                                                marginBottom: 0,
+                                              }}
+                                              rules={[
+                                                {
+                                                  pattern: /^[0-9]*$/,
+                                                  message: "Numbers only",
+                                                },
+                                              ]}
+                                            >
+                                              <Input
+                                                placeholder="Age"
+                                                size="small"
+                                                maxLength={2}
+                                              />
+                                            </Form.Item>
+                                          </div>
+                                        ),
+                                      )}
+                                    </Card>
+                                  </Col>
+                                )}
+
+                                {/* DAUGHTER SECTION */}
+                                {types.includes("DAUGHTER") && (
+                                  <Col
+                                    xs={24}
+                                    md={types.includes("SON") ? 12 : 24}
+                                  >
+                                    <Card
+                                      size="small"
+                                      title={
+                                        <span
+                                          style={{
+                                            color: "#db2777",
+                                            fontWeight: 600,
+                                            fontSize: "13px",
+                                          }}
+                                        >
+                                          Daughter Details
+                                        </span>
+                                      }
+                                      style={{
+                                        background: "#fdf2f8",
+                                        border: "1px solid #fbcfe8",
+                                        borderRadius: "8px",
+                                      }}
+                                      bodyStyle={{ padding: "12px" }}
+                                    >
+                                      {Array.from({ length: count }).map(
+                                        (_, i) => (
+                                          <div
+                                            key={`daughter-${i}`}
+                                            style={{
+                                              display: "flex",
+                                              gap: "12px",
+                                              alignItems: "flex-start",
+                                              marginBottom:
+                                                i < count - 1 ? "12px" : 0,
+                                              padding: "10px",
+                                              background: "#fff",
+                                              borderRadius: "6px",
+                                              border: "1px solid #fce7f3",
+                                            }}
+                                          >
+                                            {/* Daughter Number Badge */}
+                                            <div
+                                              style={{
+                                                minWidth: "28px",
+                                                height: "28px",
+                                                borderRadius: "50%",
+                                                background: "#db2777",
+                                                color: "#fff",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                fontSize: "12px",
+                                                fontWeight: 700,
+                                                marginTop: "4px",
+                                                flexShrink: 0,
+                                              }}
+                                            >
+                                              {i + 1}
+                                            </div>
+
+                                            {/* Name */}
+                                            <Form.Item
+                                              label="Name"
+                                              name={[
+                                                name,
+                                                "children",
+                                                "daughters",
+                                                i,
+                                                "name",
+                                              ]}
+                                              style={{
+                                                flex: 1,
+                                                marginBottom: 0,
+                                              }}
+                                            >
+                                              <Input
+                                                placeholder={`Daughter ${i + 1} name`}
+                                                size="small"
+                                              />
+                                            </Form.Item>
+
+                                            {/* Age */}
+                                            <Form.Item
+                                              label="Age"
+                                              name={[
+                                                name,
+                                                "children",
+                                                "daughters",
+                                                i,
+                                                "age",
+                                              ]}
+                                              style={{
+                                                width: "90px",
+                                                marginBottom: 0,
+                                              }}
+                                              rules={[
+                                                {
+                                                  pattern: /^[0-9]*$/,
+                                                  message: "Numbers only",
+                                                },
+                                              ]}
+                                            >
+                                              <Input
+                                                placeholder="Age"
+                                                size="small"
+                                                maxLength={2}
+                                              />
+                                            </Form.Item>
+                                          </div>
+                                        ),
+                                      )}
+                                    </Card>
+                                  </Col>
+                                )}
+                              </Row>
+                            </Col>
                           )}
                         </>
                       );
@@ -1830,7 +2043,7 @@ export default function AddOrganisation() {
                       </Form.Item>
                     </Col>
 
-                    <Col xs={24} sm={12} md={4}>
+                    <Col xs={24} sm={12} md={3}>
                       <Form.Item
                         {...restField}
                         label={
@@ -1848,6 +2061,40 @@ export default function AddOrganisation() {
                         >
                           <Button style={{ borderRadius: "6px" }}>
                             Upload GST
+                          </Button>
+                        </Upload>
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={12} md={6}>
+                      <Form.Item
+                        {...restField}
+                        label={<span>DIN Number</span>}
+                        name={[name, "dinNumber"]}
+                      >
+                        <Input
+                          placeholder="Enter DIN number"
+                          style={{ borderRadius: "6px" }}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={12} md={6}>
+                      <Form.Item
+                        {...restField}
+                        label={
+                          <span style={{ fontSize: "14px", fontWeight: "500" }}>
+                            DIN Document
+                          </span>
+                        }
+                        name={[name, "dinDocument"]}
+                        valuePropName="fileList"
+                        getValueFromEvent={normFile}
+                      >
+                        <Upload
+                          beforeUpload={() => false}
+                          onPreview={handlePreview}
+                        >
+                          <Button style={{ borderRadius: "6px" }}>
+                            Upload DIN
                           </Button>
                         </Upload>
                       </Form.Item>
@@ -1941,7 +2188,7 @@ export default function AddOrganisation() {
                                     />
                                   </Form.Item>
                                 </Col>
-                                <Col xs={12} sm={8} md={6}>
+                                <Col xs={12} sm={8} md={4}>
                                   <Form.Item
                                     {...restField}
                                     label={<span>Account Number</span>}
@@ -1960,7 +2207,7 @@ export default function AddOrganisation() {
                                   </Form.Item>
                                 </Col>
 
-                                <Col xs={12} sm={8} md={6}>
+                                <Col xs={12} sm={8} md={4}>
                                   <Form.Item
                                     {...restField}
                                     label={<span>IFSC Code</span>}
@@ -1970,6 +2217,18 @@ export default function AddOrganisation() {
                                       placeholder="SBIN0001234"
                                       style={{ borderRadius: "6px" }}
                                     />
+                                  </Form.Item>
+                                </Col>
+                                <Col xs={12} sm={8} md={4}>
+                                  <Form.Item
+                                    label="Cancel Cheque"
+                                    name={[bankIndex, "cancelCheque"]}
+                                    valuePropName="fileList"
+                                    getValueFromEvent={normFile}
+                                  >
+                                    <Upload beforeUpload={() => false}>
+                                      <Button>Upload Cheque</Button>
+                                    </Upload>
                                   </Form.Item>
                                 </Col>
                               </Row>
@@ -2057,56 +2316,7 @@ export default function AddOrganisation() {
                                         />
                                       </Form.Item>
                                     </Col>
-
-                                    <Col xs={24} sm={12} md={6}>
-                                      <Form.Item
-                                        {...restField}
-                                        label={<span>Registration Number</span>}
-                                        name={[compIndex, "registrationNo"]}
-                                      >
-                                        <Input
-                                          placeholder="Enter registration number"
-                                          style={{ borderRadius: "6px" }}
-                                        />
-                                      </Form.Item>
-                                    </Col>
-
-                                    <Col xs={24} sm={12} md={6}>
-                                      <Form.Item
-                                        {...restField}
-                                        label={<span>Company GST Number</span>}
-                                        name={[compIndex, "gstNo"]}
-                                      >
-                                        <Input
-                                          placeholder="22AAAAA0000A1Z5"
-                                          style={{ borderRadius: "6px" }}
-                                        />
-                                      </Form.Item>
-                                    </Col>
-                                    {rule.company_website && (
-                                      <Col xs={24} sm={6}>
-                                        <Form.Item
-                                          {...restField}
-                                          label={
-                                            <span
-                                              style={{
-                                                fontSize: "14px",
-                                                fontWeight: "500",
-                                              }}
-                                            >
-                                              Company Website
-                                            </span>
-                                          }
-                                          name={[compIndex, "companyWebsite"]}
-                                        >
-                                          <Input
-                                            placeholder="https://www.example.com"
-                                            style={{ borderRadius: "6px" }}
-                                          />
-                                        </Form.Item>
-                                      </Col>
-                                    )}
-                                    <Col xs={24} sm={12} md={6}>
+                                    <Col xs={24} sm={12} md={4}>
                                       <Form.Item
                                         {...restField}
                                         label="Address Line 1"
@@ -2120,7 +2330,7 @@ export default function AddOrganisation() {
                                       </Form.Item>
                                     </Col>
 
-                                    <Col xs={24} sm={12} md={6}>
+                                    <Col xs={24} sm={12} md={4}>
                                       <Form.Item
                                         {...restField}
                                         label="Address Line 2"
@@ -2133,7 +2343,7 @@ export default function AddOrganisation() {
                                         <Input placeholder="Address line 2" />
                                       </Form.Item>
                                     </Col>
-                                    <Col xs={24} sm={12} md={6}>
+                                    <Col xs={24} sm={12} md={4}>
                                       <Form.Item
                                         {...restField}
                                         label={<span>City</span>}
@@ -2164,7 +2374,7 @@ export default function AddOrganisation() {
                                       </Form.Item>
                                     </Col>
 
-                                    <Col xs={24} sm={12} md={6}>
+                                    <Col xs={24} sm={12} md={4}>
                                       <Form.Item
                                         {...restField}
                                         label={<span>State</span>}
@@ -2211,26 +2421,99 @@ export default function AddOrganisation() {
                                         />
                                       </Form.Item>
                                     </Col>
-
-                                    {/* <Col xs={24} sm={12} md={4}>
-                          <Form.Item
-                            {...restField}
-                            label={<span>PIN Code</span>}
-                            name={[name, "companyDetails", "address", "pin"]}
-                            rules={[
-                              {
-                                pattern: /^[0-9]{6}$/,
-                                message: "Enter a valid 6-digit PIN code",
-                              },
-                            ]}
-                          >
-                            <Input
-                              maxLength={6}
-                              placeholder="123456"
-                              style={{ borderRadius: "6px" }}
-                            />
-                          </Form.Item>
-                        </Col> */}
+                                    {rule.company_website && (
+                                      <Col xs={24} sm={6}>
+                                        <Form.Item
+                                          {...restField}
+                                          label={
+                                            <span
+                                              style={{
+                                                fontSize: "14px",
+                                                fontWeight: "500",
+                                              }}
+                                            >
+                                              Company Website
+                                            </span>
+                                          }
+                                          name={[compIndex, "companyWebsite"]}
+                                        >
+                                          <Input
+                                            placeholder="https://www.example.com"
+                                            style={{ borderRadius: "6px" }}
+                                          />
+                                        </Form.Item>
+                                      </Col>
+                                    )}
+                                    <Col xs={24} sm={12} md={4}>
+                                      <Form.Item
+                                        {...restField}
+                                        label={<span>PIN Code</span>}
+                                        name={[compIndex, "address", "pin"]}
+                                        rules={[
+                                          {
+                                            pattern: /^[0-9]{6}$/,
+                                            message:
+                                              "Enter a valid 6-digit PIN code",
+                                          },
+                                        ]}
+                                      >
+                                        <Input
+                                          maxLength={6}
+                                          placeholder="123456"
+                                          style={{ borderRadius: "6px" }}
+                                        />
+                                      </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={12} md={4}>
+                                      <Form.Item
+                                        {...restField}
+                                        label={<span>CIN Number</span>}
+                                        name={[compIndex, "registrationNo"]}
+                                      >
+                                        <Input
+                                          placeholder="Enter registration number"
+                                          style={{ borderRadius: "6px" }}
+                                        />
+                                      </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={12} md={3}>
+                                      <Form.Item
+                                        {...restField}
+                                        name={[compIndex, "cinDocument"]}
+                                        label="CIN Document"
+                                        valuePropName="fileList"
+                                        getValueFromEvent={normFile}
+                                      >
+                                        <Upload beforeUpload={() => false}>
+                                          <Button>Upload CIN</Button>
+                                        </Upload>
+                                      </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={12} md={4}>
+                                      <Form.Item
+                                        {...restField}
+                                        label={<span>Company GST Number</span>}
+                                        name={[compIndex, "gstNo"]}
+                                      >
+                                        <Input
+                                          placeholder="22AAAAA0000A1Z5"
+                                          style={{ borderRadius: "6px" }}
+                                        />
+                                      </Form.Item>
+                                    </Col>
+                                    <Col xs={24} sm={12} md={3}>
+                                      <Form.Item
+                                        {...restField}
+                                        name={[compIndex, "gstDocument"]}
+                                        label="GST Document"
+                                        valuePropName="fileList"
+                                        getValueFromEvent={normFile}
+                                      >
+                                        <Upload beforeUpload={() => false}>
+                                          <Button>Upload GST</Button>
+                                        </Upload>
+                                      </Form.Item>
+                                    </Col>
                                   </Row>
                                 </Card>
                               ),
@@ -2243,16 +2526,21 @@ export default function AddOrganisation() {
                 </Row>
               </Card>
             ))}
-            {rule.askCount && (
-              <Button
-                type="dashed"
-                onClick={() => add({})}
-                icon={<PlusOutlined />}
-                block
-              >
-                Add {rule.label}
-              </Button>
-            )}
+            {rule.askCount &&
+              (() => {
+                const requiredCount = form.getFieldValue("partnersCount") || 0;
+
+                return fields.length < requiredCount ? (
+                  <Button
+                    type="dashed"
+                    onClick={() => add({})}
+                    icon={<PlusOutlined />}
+                    block
+                  >
+                    Add {rule.label}
+                  </Button>
+                ) : null;
+              })()}
           </>
         )}
       </Form.List>
@@ -2341,7 +2629,12 @@ export default function AddOrganisation() {
                       label="Validity Period"
                       name={[name, "validity"]}
                     >
-                      <DatePicker.RangePicker style={{ width: "100%" }} />
+                      <DatePicker.RangePicker
+                        style={{ width: "100%" }}
+                        format="DD-MM-YYYY"
+                        placeholder={["DD-MM-YYYY", "DD-MM-YYYY"]}
+                        inputReadOnly={false}
+                      />
                     </Form.Item>
                   </Col>
                 </Row>
@@ -2416,7 +2709,12 @@ export default function AddOrganisation() {
                         label="Validity Period"
                         name={["legalDetails", doc.key, "validity"]}
                       >
-                        <DatePicker.RangePicker style={{ width: "100%" }} />
+                        <DatePicker.RangePicker
+                          style={{ width: "100%" }}
+                          format="DD-MM-YYYY"
+                          placeholder={["DD-MM-YYYY", "DD-MM-YYYY"]}
+                          inputReadOnly={false}
+                        />
                       </Form.Item>
                     </Col>
                   )}
@@ -2427,174 +2725,6 @@ export default function AddOrganisation() {
         }}
       </Form.Item>
     </>
-    // <Row gutter={[16, 8]}>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item label="TIN No" name="tinNo">
-    //       <Input placeholder="Enter TIN" />
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item
-    //       label="TIN Document"
-    //       name="tinDocument"
-    //       valuePropName="fileList"
-    //       getValueFromEvent={normFile}
-    //     >
-    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
-    //         <Button icon={<UploadOutlined />} size="small">
-    //           Upload
-    //         </Button>
-    //       </Upload>
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item label="PAN No" name="panNo">
-    //       <Input placeholder="Enter PAN" />
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item
-    //       label="PAN Document"
-    //       name="panDocument"
-    //       valuePropName="fileList"
-    //       getValueFromEvent={normFile}
-    //     >
-    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
-    //         <Button icon={<UploadOutlined />} size="small">
-    //           Upload
-    //         </Button>
-    //       </Upload>
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item label="GSTIN" name="gstin">
-    //       <Input placeholder="Enter GSTIN" />
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item
-    //       label="GSTIN Document"
-    //       name="gstinDocument"
-    //       valuePropName="fileList"
-    //       getValueFromEvent={normFile}
-    //     >
-    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
-    //         <Button icon={<UploadOutlined />} size="small">
-    //           Upload
-    //         </Button>
-    //       </Upload>
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item label="ET No" name="etNo">
-    //       <Input placeholder="Enter ET No" />
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item
-    //       label="ET Document"
-    //       name="etDocument"
-    //       valuePropName="fileList"
-    //       getValueFromEvent={normFile}
-    //     >
-    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
-    //         <Button icon={<UploadOutlined />} size="small">
-    //           Upload
-    //         </Button>
-    //       </Upload>
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item label="CST No" name="cstNo">
-    //       <Input placeholder="Enter CST" />
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item
-    //       label="CST Document"
-    //       name="cstDocument"
-    //       valuePropName="fileList"
-    //       getValueFromEvent={normFile}
-    //     >
-    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
-    //         <Button icon={<UploadOutlined />} size="small">
-    //           Upload
-    //         </Button>
-    //       </Upload>
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item label="Udyam Certificate No" name="udyamNo">
-    //       <Input placeholder="Udyam No" />
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item
-    //       label="Udyam Document"
-    //       name="udyamDocument"
-    //       valuePropName="fileList"
-    //       getValueFromEvent={normFile}
-    //     >
-    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
-    //         <Button icon={<UploadOutlined />} size="small">
-    //           Upload
-    //         </Button>
-    //       </Upload>
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item label="MSME Certificate No" name="msmeNo">
-    //       <Input placeholder="MSME No" />
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item
-    //       label="MSME Document"
-    //       name="msmeDocument"
-    //       valuePropName="fileList"
-    //       getValueFromEvent={normFile}
-    //     >
-    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
-    //         <Button icon={<UploadOutlined />} size="small">
-    //           Upload
-    //         </Button>
-    //       </Upload>
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item label="Trade License No" name="tradeNo">
-    //       <Input placeholder="Trade No" />
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item
-    //       label="Edible Certificate"
-    //       name="edibleCertificate"
-    //       valuePropName="fileList"
-    //       getValueFromEvent={normFile}
-    //     >
-    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
-    //         <Button icon={<UploadOutlined />} size="small">
-    //           Upload Document
-    //         </Button>
-    //       </Upload>
-    //     </Form.Item>
-    //   </Col>
-    //   <Col xs={24} sm={12} md={6}>
-    //     <Form.Item
-    //       label="Startup India Certificate"
-    //       name="startupIndiaCertificate"
-    //       valuePropName="fileList"
-    //       getValueFromEvent={normFile}
-    //     >
-    //       <Upload beforeUpload={() => false} onPreview={handlePreview}>
-    //         <Button icon={<UploadOutlined />} size="small">
-    //           Upload Document
-    //         </Button>
-    //       </Upload>
-    //     </Form.Item>
-    //   </Col>
-    // </Row>
   );
 
   // Step 3: Branch Details
