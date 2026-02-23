@@ -99,3 +99,15 @@ export const setDisplayUnit = async (conversionId) => {
 
   return res.data;
 };
+
+
+// product price update api 
+
+export const productPriceUpdate = async (payload) =>{
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await  api.post(`/price-update/price-updates/update-by-product/`,payload , {
+     params: { organisation: currentOrgId },
+  })
+ return res.data;
+
+}
