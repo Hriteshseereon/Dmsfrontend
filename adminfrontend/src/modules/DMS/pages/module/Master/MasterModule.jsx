@@ -6,7 +6,7 @@ import MasterTab from "./MasterTab";
 // actual components for each tab
 
 import Product from "./Product";
-import Business from "./Business";
+import Business from "./Business/Business.jsx";
 import ProductGroupMaster from "./ProductGroupMaster";
 import InventoryForm from "./InventoryForm";
 import HsnSacManager from "./HsnSacManager";

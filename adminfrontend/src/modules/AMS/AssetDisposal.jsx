@@ -330,6 +330,7 @@ export default function AssetDisposal() {
         disposal_date: values.disposalDate
           ? values.disposalDate.format("YYYY-MM-DD")
           : null,
+        approval_document_path: values.approvalDocument || null,
         remarks: values.remarks || "",
       };
 
@@ -361,6 +362,7 @@ export default function AssetDisposal() {
         disposal_date: values.disposalDate
           ? values.disposalDate.format("YYYY-MM-DD")
           : null,
+        approval_document_path: values.approvalDocument || null,
         remarks: values.remarks || "",
       };
 
@@ -390,7 +392,7 @@ export default function AssetDisposal() {
             name="assetId"
             rules={[{ required: true, message: "Please enter Asset ID" }]}
           >
-            <Select placeholder="Select asset">
+            <Select placeholder="Select asset" disabled={disabled}>
               {assets.map((a) => (
                 <Select.Option key={a.id} value={a.id}>
                   {a.asset_name} ({a.asset_code})

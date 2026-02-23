@@ -27,6 +27,7 @@ import {
   getAssetAllocations,
   getAllAssets,
   getAssetAllocationById,
+  updateAssetAllocation,
 } from "../../api/assets";
 import useSessionStore from "../../store/sessionStore";
 
@@ -223,7 +224,7 @@ export default function AssetAllocation() {
 
       const data = await getAssetAllocationById(record.id);
 
-      setSelectedRecord(data);
+      setSelectedRecord({ ...data, id: record.id });
 
       editForm.setFieldsValue({
         asset: data.asset,

@@ -181,14 +181,13 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
               label="Mobile No 2"
               name="mobileNo2"
               rules={[
-                { message: "Mobile number is required" },
                 {
                   pattern: /^[6-9]\d{9}$/,
                   message: "Enter a valid 10-digit mobile number",
                 },
               ]}
             >
-              <InputNumber
+              <Input
                 className={inputClass}
                 disabled={disabled}
                 placeholder="7984568331"
@@ -381,10 +380,11 @@ export default function VendorForm({ disabled = false, form, onSuccess }) {
                 },
               ]}
             >
-              <InputNumber
+              <Input
                 className={inputClass}
                 disabled={disabled}
                 placeholder="123456789012"
+                maxLength={14}
               />
             </Form.Item>
           </Col>
