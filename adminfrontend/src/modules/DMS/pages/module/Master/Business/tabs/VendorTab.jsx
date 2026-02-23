@@ -35,7 +35,7 @@ import {
 const { Option } = Select;
 
 const inputClass = "border-amber-400 h-8";
-const selectClass = "border-amber-400 h-10 w-full";
+const selectClass = "border-amber-400 h-8 w-full";
 
 export default function VendorTab() {
   const [data, setData] = useState([]);
@@ -88,12 +88,34 @@ export default function VendorTab() {
     socialLink: d.social_link,
     websiteUrl: d.company_website,
 
-    contactPerson: d.contact_person_input?.name || d.contact_person_input?.contact_person_name || d.contact_person,
+    contactPerson:
+      d.contact_person_input?.name ||
+      d.contact_person_input?.contact_person_name ||
+      d.contact_person,
     gender: d.contact_person_input?.gender || d.gender,
-    contactMobile: d.contact_person_input?.contact_person_no || d.contact_person_input?.mobile_no || d.contact_person_no || d.mobile_no_1,
-    contactWhatsapp: d.contact_person_input?.contact_person_whats_no || d.contact_person_input?.whatsapp_no || d.whatsapp_no || d.whatsapp_number,
-    contactEmail: d.contact_person_input?.contact_person_email || d.contact_person_input?.email || d.email_address || d.primary_email,
-    aadharNo: d.contact_person_input?.aadhaar_no || d.contact_person_input?.aadhar_no || d.contact_person_input?.aadharNo || d.contact_person_input?.adhara_no || d.aadhar_no || d.aadhaar_no || d.adhara_no,
+    contactMobile:
+      d.contact_person_input?.contact_person_no ||
+      d.contact_person_input?.mobile_no ||
+      d.contact_person_no ||
+      d.mobile_no_1,
+    contactWhatsapp:
+      d.contact_person_input?.contact_person_whats_no ||
+      d.contact_person_input?.whatsapp_no ||
+      d.whatsapp_no ||
+      d.whatsapp_number,
+    contactEmail:
+      d.contact_person_input?.contact_person_email ||
+      d.contact_person_input?.email ||
+      d.email_address ||
+      d.primary_email,
+    aadharNo:
+      d.contact_person_input?.aadhaar_no ||
+      d.contact_person_input?.aadhar_no ||
+      d.contact_person_input?.aadharNo ||
+      d.contact_person_input?.adhara_no ||
+      d.aadhar_no ||
+      d.aadhaar_no ||
+      d.adhara_no,
 
     tinNo: d.business_details?.tin_no,
     tinDate: d.business_details?.tin_date
@@ -110,15 +132,27 @@ export default function VendorTab() {
     city: d.addresses?.[0]?.city || d.addresses?.city,
     location: d.addresses?.[0]?.location || d.addresses?.location,
     pinCode: d.addresses?.[0]?.pin || d.addresses?.pin_code,
-    transactionType: d.addresses?.[0]?.transaction_type || d.addresses?.transaction_type,
+    transactionType:
+      d.addresses?.[0]?.transaction_type || d.addresses?.transaction_type,
 
-    status: (d.is_active !== undefined ? d.is_active : (d.addresses?.[0]?.status === "Active" || d.addresses?.status === "Active")) ? "Active" : "Inactive",
+    status: (
+      d.is_active !== undefined
+        ? d.is_active
+        : d.addresses?.[0]?.status === "Active" ||
+          d.addresses?.status === "Active"
+    )
+      ? "Active"
+      : "Inactive",
 
     // ✅ FILE PREVIEW
     panDoc: fileFromUrl(d.pan_document || d.business_details?.pan_document),
     gstDoc: fileFromUrl(d.gstin_document || d.business_details?.gstin_document),
     tinDoc: fileFromUrl(d.tin_document || d.business_details?.tin_document),
-    aadharDoc: fileFromUrl(d.aadhaar_documents || d.aadhar_document || d.business_details?.aadhaar_documents),
+    aadharDoc: fileFromUrl(
+      d.aadhaar_documents ||
+        d.aadhar_document ||
+        d.business_details?.aadhaar_documents,
+    ),
 
     plants: (d.plants || []).map((p) => ({
       plantName: p.name || p.plant_name,
@@ -154,7 +188,8 @@ export default function VendorTab() {
       short_name: values.shortName,
       mobile_no_1: values.mobileNo1?.toString(),
       mobile_no_2: values.mobileNo2?.toString(),
-      phone_number: values.phoneNumber?.toString() || values.mobileNo1?.toString(),
+      phone_number:
+        values.phoneNumber?.toString() || values.mobileNo1?.toString(),
       whatsapp_number: values.whatsappNo?.toString(),
       email_address: values.email1,
       secondary_email: values.email2,
@@ -181,7 +216,7 @@ export default function VendorTab() {
           location: values.location,
           pin: values.pinCode?.toString(),
           transaction_type: values.transactionType,
-        }
+        },
       ],
 
       plants: (values.plants || []).map((p) => ({
@@ -249,33 +284,53 @@ export default function VendorTab() {
   /* ================= TABLE ================= */
   const columns = [
     {
-      title: "Company Name",
-      render: (_, record) => record.name || record.company_name
-    },
-    { title: "Short Name", dataIndex: "short_name" },
-    { title: "Mobile", dataIndex: "mobile_no_1" },
-    {
-      title: "Email",
-      render: (_, record) => record.email_address || record.primary_email
-    },
-    {
-      title: "Status",
+      title: <span className="text-amber-700 font-semibold">Company Name</span>,
       render: (_, record) => (
-        record.is_active || record.addresses?.[0]?.status === "Active" || record.addresses?.status === "Active"
-          ? "Active"
-          : "Inactive"
+        <span className="text-amber-800">
+          {record.name || record.company_name}
+        </span>
       ),
     },
     {
-      title: "Actions",
+      title: <span className="text-amber-700 font-semibold">Short Name</span>,
+      dataIndex: "short_name",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Mobile</span>,
+      dataIndex: "mobile_no_1",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Email</span>,
+      render: (_, record) => (
+        <span className="text-amber-800">
+          {record.email_address || record.primary_email}
+        </span>
+      ),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Status</span>,
+      render: (_, record) => (
+        <span className="text-amber-800">
+          {record.is_active ||
+          record.addresses?.[0]?.status === "Active" ||
+          record.addresses?.status === "Active"
+            ? "Active"
+            : "Inactive"}
+        </span>
+      ),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Actions</span>,
       render: (_, record) => (
         <div className="flex gap-3">
           <EyeOutlined
-            className="!text-blue-500 !cursor-pointer !text-base"
+            className="text-red-500! cursor-pointer! text-base! hover:text-red-600!"
             onClick={() => openVendor(record, true)}
           />
           <EditOutlined
-            className="!text-red-500 !cursor-pointer !text-base"
+            className="text-blue-500! cursor-pointer! text-base! hover:text-blue-600!"
             onClick={() => openVendor(record, false)}
           />
         </div>
@@ -295,11 +350,11 @@ export default function VendorTab() {
         {/* Left: Search + Reset */}
         <div className="flex gap-2 items-center">
           <Input
-            prefix={<SearchOutlined />}
+            prefix={<SearchOutlined className="text-amber-500" />}
             placeholder="Search vendor..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-64 border-amber-300"
+            className="w-64! border-amber-400! focus:border-amber-600! text-amber-700! placeholder:text-amber-400!"
             allowClear
           />
           <Button
@@ -308,7 +363,7 @@ export default function VendorTab() {
               setSearch("");
               fetchVendors();
             }}
-            className="border-amber-400 text-amber-600"
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Reset
           </Button>
@@ -318,7 +373,7 @@ export default function VendorTab() {
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          className="bg-amber-500 border-none"
+          className="bg-amber-500! hover:bg-amber-600! border-none!"
           onClick={() => {
             setSelected(null);
             setViewMode(false);
@@ -330,14 +385,22 @@ export default function VendorTab() {
         </Button>
       </div>
 
-      {/* ===== TABLE ===== */}
-      <Table
-        columns={columns}
-        dataSource={filteredData}
-        rowKey="id"
-        size="small"
-        bordered
-      />
+      {/* ===== TABLE CONTAINER ===== */}
+      <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
+        <h2 className="text-lg font-semibold text-amber-700 mb-0">
+          Vendor Records
+        </h2>
+        <p className="text-amber-600 mb-3">Manage your vendor data</p>
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          rowKey="id"
+          size="small"
+          bordered
+          pagination={false}
+          rowClassName="hover:bg-amber-50"
+        />
+      </div>
 
       {/* ===== MODAL ===== */}
       <Modal
@@ -349,7 +412,7 @@ export default function VendorTab() {
           form.resetFields();
         }}
         title={
-          <span className="text-amber-700 font-semibold text-base">
+          <span className="text-amber-700 font-semibold text-lg">
             {viewMode ? "View Vendor" : selected ? "Edit Vendor" : "Add Vendor"}
           </span>
         }

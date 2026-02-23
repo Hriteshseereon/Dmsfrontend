@@ -21,7 +21,7 @@ import {
 // import { getTransporters, addTransporter, updateTransporter, getTransporterDetails } from "../../../../../../../api/transporter";
 
 const inputClass = "border-amber-400 h-8";
-const passwordClass = "h-8";
+const passwordClass = "border-amber-400 h-8";
 
 export default function TransportTab() {
   const [data, setData] = useState([]);
@@ -108,17 +108,37 @@ export default function TransportTab() {
 
   /* ================= TABLE ================= */
   const columns = [
-    { title: "Agency Name", dataIndex: "agency_name" },
-    { title: "Mobile", dataIndex: "mobile_number" },
-    { title: "Email", dataIndex: "primary_email" },
-    { title: "City", dataIndex: "city" },
-    { title: "State", dataIndex: "state" },
     {
-      title: "Actions",
+      title: <span className="text-amber-700 font-semibold">Agency Name</span>,
+      dataIndex: "agency_name",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Mobile</span>,
+      dataIndex: "mobile_number",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Email</span>,
+      dataIndex: "primary_email",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">City</span>,
+      dataIndex: "city",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">State</span>,
+      dataIndex: "state",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Actions</span>,
       render: (_, record) => (
         <div className="flex gap-3">
           <EyeOutlined
-            className="text-blue-500 cursor-pointer text-base"
+            className="text-red-500! cursor-pointer! text-base! hover:text-red-600!"
             onClick={async () => {
               try {
                 // const details = await getTransporterDetails(record.id);
@@ -133,7 +153,7 @@ export default function TransportTab() {
             }}
           />
           <EditOutlined
-            className="text-amber-500 cursor-pointer text-base"
+            className="text-blue-500! cursor-pointer! text-base! hover:text-blue-600!"
             onClick={async () => {
               try {
                 // const details = await getTransporterDetails(record.id);
@@ -164,11 +184,11 @@ export default function TransportTab() {
         {/* Left: Search + Reset */}
         <div className="flex gap-2 items-center">
           <Input
-            prefix={<SearchOutlined />}
+            prefix={<SearchOutlined className="text-amber-500" />}
             placeholder="Search transporter..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-64 border-amber-300"
+            className="w-64! border-amber-400! focus:border-amber-600! text-amber-700! placeholder:text-amber-400!"
             allowClear
           />
           <Button
@@ -177,7 +197,7 @@ export default function TransportTab() {
               setSearch("");
               fetchTransporters();
             }}
-            className="border-amber-400 text-amber-600"
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Reset
           </Button>
@@ -187,7 +207,7 @@ export default function TransportTab() {
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          className="bg-amber-500 border-none"
+          className="bg-amber-500! hover:bg-amber-600! border-none!"
           onClick={() => {
             setSelected(null);
             setViewMode(false);
@@ -199,14 +219,22 @@ export default function TransportTab() {
         </Button>
       </div>
 
-      {/* ===== TABLE ===== */}
-      <Table
-        columns={columns}
-        dataSource={filteredData}
-        rowKey="id"
-        size="small"
-        bordered
-      />
+      {/* ===== TABLE CONTAINER ===== */}
+      <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
+        <h2 className="text-lg font-semibold text-amber-700 mb-0">
+          Transport Records
+        </h2>
+        <p className="text-amber-600 mb-3">Manage your transport data</p>
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          rowKey="id"
+          size="small"
+          bordered
+          pagination={false}
+          rowClassName="hover:bg-amber-50"
+        />
+      </div>
 
       {/* ===== MODAL ===== */}
       <Modal
@@ -218,7 +246,7 @@ export default function TransportTab() {
           form.resetFields();
         }}
         title={
-          <span className="text-amber-700 font-semibold text-base">
+          <span className="text-amber-700 font-semibold text-lg">
             {viewMode
               ? "View Transporter"
               : selected

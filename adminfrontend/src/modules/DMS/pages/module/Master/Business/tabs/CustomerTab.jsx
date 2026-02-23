@@ -38,17 +38,33 @@ export default function CustomerTab() {
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const [form] = Form.useForm();
+
+  const fileFromUrl = (url) => {
+    if (!url) return [];
+    return [
+      {
+        uid: url,
+        name: url.split("/").pop(),
+        status: "done",
+        url: url,
+      },
+    ];
+  };
 
   /* ================= FETCH ================= */
   const fetchCustomers = async () => {
     try {
+      setLoading(true);
       const res = await getAdminCustomers();
       const list = Array.isArray(res) ? res : res?.results || [];
       setData(list);
     } catch {
       message.error("Failed to fetch customers");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -75,25 +91,46 @@ export default function CustomerTab() {
     pinCode: details.pin_code,
     location: details.location,
     creditFacility: details.credit_facility,
-    securityForCreditFacility: details.security_for_credit_facility,
-    advCheque: details.adv_cheque,
+    securityForCreditFacility:
+      details.security_for_credit || details.security_for_credit_facility,
+    advCheque: details.advance_cheque_no || details.adv_cheque,
     amountLimit: details.amount_limit,
-    noDaysLimit: details.no_days_limit,
-    noInvoiceLimit: details.no_invoice_limit,
-    soudaLimit: details.souda_limit,
-    gstNo: details.gst_no,
-    tinNo: details.tin_no,
-    panNo: details.pan_no,
-    aadharNo: details.aadhar_no,
-    fssaiNo: details.fssai_no,
-    licenseNo: details.license_no,
-    tdsApplicable: details.tds_applicable,
+    noDaysLimit: details.days_limit || details.no_days_limit,
+    noInvoiceLimit: details.invoice_limit || details.no_invoice_limit,
+    soudaLimit: details.souda_limit_ton || details.souda_limit,
+    gstNo: details.gst_number || details.gst_no,
+    tinNo: details.tin_number || details.tin_no,
+    panNo: details.pan_number || details.pan_no,
+    aadharNo: details.aadhaar_number || details.aadhar_no,
+    fssaiNo: details.fssai_number || details.fssai_no,
+    licenseNo: details.license_number || details.license_no,
+    tdsApplicable: details.tds_applicable ? "Yes" : "No",
     billingType: details.billing_type,
+
+    // File mappings
+    gstDoc: fileFromUrl(details.gst_document || details.gst_doc),
+    panDoc: fileFromUrl(details.pan_document || details.pan_doc),
+    aadharDoc: fileFromUrl(details.aadhaar_document || details.aadhar_doc),
   });
+
+  const openCustomer = async (record, view = false) => {
+    try {
+      const id = record.customer_id || record.id;
+      const details = await getAdminCustomerDetails(id);
+      form.setFieldsValue(mapDetailsToForm(details));
+      setSelected(details);
+      setViewMode(view);
+      setOpen(true);
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to load customer details");
+    }
+  };
 
   /* ================= SAVE ================= */
   const handleSubmit = async (values) => {
     try {
+      setLoading(true);
       const payload = {
         customer_name: values.name,
         business_name: values.branchName,
@@ -111,24 +148,45 @@ export default function CustomerTab() {
         pin_code: values.pinCode,
         location: values.location,
         credit_facility: values.creditFacility,
-        security_for_credit_facility: values.securityForCreditFacility,
-        adv_cheque: values.advCheque,
-        amount_limit: values.amountLimit,
-        no_days_limit: values.noDaysLimit,
-        no_invoice_limit: values.noInvoiceLimit,
-        souda_limit: values.soudaLimit,
-        gst_no: values.gstNo,
-        tin_no: values.tinNo,
-        pan_no: values.panNo,
-        aadhar_no: values.aadharNo,
-        fssai_no: values.fssaiNo,
-        license_no: values.licenseNo,
-        tds_applicable: values.tdsApplicable,
+        security_for_credit: values.securityForCreditFacility,
+        advance_cheque_no: values.advCheque,
+        amount_limit: Number(values.amountLimit) || 0,
+        days_limit: Number(values.noDaysLimit) || 0,
+        invoice_limit: Number(values.noInvoiceLimit) || 0,
+        souda_limit_ton: Number(values.soudaLimit) || 0,
+        gst_number: values.gstNo,
+        tin_number: values.tinNo,
+        pan_number: values.panNo,
+        aadhaar_number: values.aadharNo,
+        fssai_number: values.fssaiNo,
+        license_number: values.licenseNo,
+        tds_applicable: values.tdsApplicable === "Yes",
         billing_type: values.billingType,
       };
 
+      // Extract ID resiliently
+      const id =
+        selected?.customer_id || selected?.id || selected?.customerCode;
+
+      // Add ID to payload if updating (some APIs need it in body)
       if (selected) {
-        await updateAdminCustomer(selected.id, payload);
+        payload.id = id;
+        payload.customer_id = id;
+      }
+
+      // Handle File Uploads
+      if (values.gstDoc?.[0]?.originFileObj) {
+        payload.gst_document = values.gstDoc[0].originFileObj;
+      }
+      if (values.panDoc?.[0]?.originFileObj) {
+        payload.pan_document = values.panDoc[0].originFileObj;
+      }
+      if (values.aadharDoc?.[0]?.originFileObj) {
+        payload.aadhaar_document = values.aadharDoc[0].originFileObj;
+      }
+
+      if (selected) {
+        await updateAdminCustomer(id, payload);
         message.success("Customer Updated");
       } else {
         await addAdminCustomer(payload);
@@ -136,52 +194,64 @@ export default function CustomerTab() {
       }
 
       setOpen(false);
+      setSelected(null);
       form.resetFields();
       fetchCustomers();
-    } catch {
-      message.error("Save failed");
+    } catch (err) {
+      console.error(err);
+      const errorMsg =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        "Save failed";
+      message.error(errorMsg);
+    } finally {
+      setLoading(false);
     }
   };
 
   /* ================= TABLE ================= */
   const columns = [
-    { title: "Code", dataIndex: "customer_code" },
-    { title: "Name", dataIndex: "customer_name" },
-    { title: "Email", dataIndex: "email_address" },
-    { title: "Mobile", dataIndex: "mobile_number" },
-    { title: "Type", dataIndex: "customer_type" },
-    { title: "Status", dataIndex: "status" },
     {
-      title: "Actions",
+      title: <span className="text-amber-700 font-semibold">Code</span>,
+      dataIndex: "customer_code",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Name</span>,
+      dataIndex: "customer_name",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Email</span>,
+      dataIndex: "email_address",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Mobile</span>,
+      dataIndex: "mobile_number",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Type</span>,
+      dataIndex: "customer_type",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Status</span>,
+      dataIndex: "status",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Actions</span>,
       render: (_, record) => (
         <div className="flex gap-3">
           <EyeOutlined
-            className="text-blue-500 cursor-pointer text-base"
-            onClick={async () => {
-              try {
-                const details = await getAdminCustomerDetails(record.id);
-                form.setFieldsValue(mapDetailsToForm(details));
-                setSelected(details);
-                setViewMode(true);
-                setOpen(true);
-              } catch {
-                message.error("Failed to load customer details");
-              }
-            }}
+            className="text-red-500! cursor-pointer! text-base! hover:text-red-600!"
+            onClick={() => openCustomer(record, true)}
           />
           <EditOutlined
-            className="text-amber-500 cursor-pointer text-base"
-            onClick={async () => {
-              try {
-                const details = await getAdminCustomerDetails(record.id);
-                form.setFieldsValue(mapDetailsToForm(details));
-                setSelected(details);
-                setViewMode(false);
-                setOpen(true);
-              } catch {
-                message.error("Failed to load customer details");
-              }
-            }}
+            className="text-blue-500! cursor-pointer! text-base! hover:text-blue-600!"
+            onClick={() => openCustomer(record, false)}
           />
         </div>
       ),
@@ -200,11 +270,11 @@ export default function CustomerTab() {
         {/* Left: Search + Reset */}
         <div className="flex gap-2 items-center">
           <Input
-            prefix={<SearchOutlined />}
+            prefix={<SearchOutlined className="text-amber-500" />}
             placeholder="Search customer..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-64 border-amber-300"
+            className="w-64! border-amber-400! focus:border-amber-600! text-amber-700! placeholder:text-amber-400!"
             allowClear
           />
           <Button
@@ -213,7 +283,7 @@ export default function CustomerTab() {
               setSearch("");
               fetchCustomers();
             }}
-            className="border-amber-400 text-amber-600"
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Reset
           </Button>
@@ -223,7 +293,7 @@ export default function CustomerTab() {
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          className="bg-amber-500 border-none"
+          className="bg-amber-500! hover:bg-amber-600! border-none!"
           onClick={() => {
             setSelected(null);
             setViewMode(false);
@@ -235,14 +305,23 @@ export default function CustomerTab() {
         </Button>
       </div>
 
-      {/* ===== TABLE ===== */}
-      <Table
-        columns={columns}
-        dataSource={filteredData}
-        rowKey="id"
-        size="small"
-        bordered
-      />
+      {/* ===== TABLE CONTAINER ===== */}
+      <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
+        <h2 className="text-lg font-semibold text-amber-700 mb-0">
+          Customer Records
+        </h2>
+        <p className="text-amber-600 mb-3">Manage your customer data</p>
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          rowKey={(record) => record.customer_id || record.id}
+          size="small"
+          bordered
+          pagination={false}
+          rowClassName="hover:bg-amber-50"
+          loading={loading}
+        />
+      </div>
 
       {/* ===== MODAL ===== */}
       <Modal
@@ -254,7 +333,7 @@ export default function CustomerTab() {
           form.resetFields();
         }}
         title={
-          <span className="text-amber-700 font-semibold text-base">
+          <span className="text-amber-700 font-semibold text-lg">
             {viewMode
               ? "View Customer"
               : selected
@@ -624,6 +703,7 @@ export default function CustomerTab() {
                 <Form.Item
                   label="GST Document"
                   name="gstDoc"
+                  valuePropName="fileList"
                   getValueFromEvent={(e) =>
                     Array.isArray(e) ? e : e?.fileList
                   }
@@ -632,6 +712,12 @@ export default function CustomerTab() {
                     beforeUpload={() => false}
                     maxCount={1}
                     disabled={viewMode}
+                    listType="picture"
+                    onPreview={(file) => {
+                      window.open(
+                        file.url || URL.createObjectURL(file.originFileObj),
+                      );
+                    }}
                   >
                     <Button
                       className="w-full text-left bg-white border-amber-400"
@@ -676,6 +762,7 @@ export default function CustomerTab() {
                 <Form.Item
                   label="PAN Document"
                   name="panDoc"
+                  valuePropName="fileList"
                   getValueFromEvent={(e) =>
                     Array.isArray(e) ? e : e?.fileList
                   }
@@ -684,6 +771,12 @@ export default function CustomerTab() {
                     beforeUpload={() => false}
                     maxCount={1}
                     disabled={viewMode}
+                    listType="picture"
+                    onPreview={(file) => {
+                      window.open(
+                        file.url || URL.createObjectURL(file.originFileObj),
+                      );
+                    }}
                   >
                     <Button
                       className="w-full text-left bg-white border-amber-400"
@@ -709,6 +802,7 @@ export default function CustomerTab() {
                 <Form.Item
                   label="Aadhar Document"
                   name="aadharDoc"
+                  valuePropName="fileList"
                   getValueFromEvent={(e) =>
                     Array.isArray(e) ? e : e?.fileList
                   }
@@ -717,6 +811,12 @@ export default function CustomerTab() {
                     beforeUpload={() => false}
                     maxCount={1}
                     disabled={viewMode}
+                    listType="picture"
+                    onPreview={(file) => {
+                      window.open(
+                        file.url || URL.createObjectURL(file.originFileObj),
+                      );
+                    }}
                   >
                     <Button
                       className="w-full text-left bg-white border-amber-400"
@@ -784,13 +884,15 @@ export default function CustomerTab() {
                   setOpen(false);
                   form.resetFields();
                 }}
+                className="border-amber-500! text-amber-700! hover:bg-amber-100!"
               >
                 Cancel
               </Button>
               <Button
                 htmlType="submit"
                 type="primary"
-                className="bg-amber-500 border-none"
+                className="bg-amber-600! hover:bg-amber-700! border-none! text-white!"
+                loading={loading}
               >
                 {selected ? "Update" : "Save"}
               </Button>
