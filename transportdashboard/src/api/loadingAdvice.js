@@ -12,3 +12,10 @@ export const getLoadingAdviceById = async (loadingdId) => {
   const res = await api.get(`/transport/portal/loading-advices/${loadingdId}/`);
   return res.data;
 }
+
+ //update assigned order
+export const updateLoadingAdvice = async (loadingAdviceId, payload) => {
+  const res = await api.patch(`/transport/portal/loading-advices/${loadingAdviceId}/reached_plant/`,payload, {
+  });
+  return res.data;
+};

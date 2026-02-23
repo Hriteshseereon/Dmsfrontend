@@ -53,12 +53,12 @@ const fetchAssignedOrders = async () => {
     console.error("Error fetching assigned orders:", error);
   }
 };
-const handleAssignClick = async (id) => {
+const handleAssignClick = async (id,mode) => {
   try {
     const res = await getAssignedOrderById(id);
 
     setSelectedRecord(res);
-    setModalState({ open: true, mode: "assign" });
+    setModalState({ open: true, mode });
 
   form.setFieldsValue({
   vehicleNo: res.vehicle_number,
@@ -72,7 +72,7 @@ const handleAssignClick = async (id) => {
 
   invoice_number: res.invoice_number,
   wayBill: res.way_bill,
-  status: res.status,
+  status: res.status === "Pending" ? "Pending Approval" : res.status,
   deliveryAddress: res.delivery_address,
 
   vendorName: res.vendor_details?.name,
@@ -131,9 +131,9 @@ plantPhoneNumber: res.plant_details?.phone_number,
 
   const getStatusClasses = (status) => {
     const base = "px-3 py-1 rounded-full font-semibold text-sm inline-block";
-    if (status === "Pending Approval") return `${base} bg-orange-100 text-orange-700`;
-    if (status === "Approved") return `${base} bg-green-100 text-green-700`;
-    return `${base} bg-yellow-100 text-yellow-700`;
+  if (status === "Pending Approval" || status === "Pending"  )return `${base} bg-green-100! text-green-700!`
+      if (status === "Approved") return `${base} bg-green-100! text-green-700!`;
+    return `${base} bg-yellow-100! text-yellow-700!`;
   };
 
   const columns = [
@@ -156,16 +156,24 @@ plantPhoneNumber: res.plant_details?.phone_number,
   ),
 },
  { title: <span className="text-amber-700 font-semibold">Delivery Address</span>, dataIndex: "deliveryAddress", render: (d) => <span className="text-amber-800">{d}</span> },
-    { title: <span className="text-amber-700 font-semibold">Status</span>, dataIndex: "status", width:100, render: (s) => <span className={getStatusClasses(s)}>{s}</span> },
+    { title: <span className="text-amber-700 font-semibold">Status</span>,width:180, dataIndex: "status", 
+      render: (s) => {
+  const displayStatus = s === "Pending" ? "Pending Approval" : s;
+  return <span className={getStatusClasses(displayStatus)}>{displayStatus}</span>;
+} },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
 
       render: (record) => (
         <div className="flex gap-3">
-          <EyeOutlined className="cursor-pointer! text-blue-500! text-lg!"  onClick={() => handleAssignClick(record.id)}/>
-          {record.status !== "Approved" && (
-            <EditOutlined className="cursor-pointer! text-red-500! text-lg!" onClick={() => handleAssignClick(record.id)} />
-          )}
+        <EyeOutlined
+  className="cursor-pointer! text-blue-500! text-lg!"
+  onClick={() => handleAssignClick(record.id, "view")}
+/>  {record.status !== "Approved" && (
+          <EditOutlined
+  className="cursor-pointer! text-red-500! text-lg!"
+  onClick={() => handleAssignClick(record.id, "assign")}
+/>   )}
         </div>
       ),
     },
@@ -173,7 +181,7 @@ plantPhoneNumber: res.plant_details?.phone_number,
       title: <span className="text-amber-700 font-semibold">Assign</span>,
       render: (record) => (
         record.status === "Assigned" ? (
-          <Button icon={<TruckOutlined />} size="small" className="text-amber-500! border-amber-500! hover:bg-amber-500! hover:text-white!" onClick={() => handleAssignClick(record.id)}
+          <Button icon={<TruckOutlined />} size="small" className="text-amber-500! border-amber-500! hover:bg-amber-500! hover:text-white!" onClick={() => handleAssignClick(record.id, "assign")}
 >Assign</Button>
         ) : record.status === "Approved" ? null : <span className="text-orange-600 font-semibold">Assigned</span>
       )
@@ -203,6 +211,13 @@ plantPhoneNumber: res.plant_details?.phone_number,
           value={searchText} 
           onChange={e => setSearchText(e.target.value)} 
         />
+         <Button
+                    icon={<FilterOutlined />}
+                    onClick={() => setSearchText("")}
+                    className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+                  >
+                    Reset
+                  </Button>
       </div>
 
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
@@ -218,8 +233,18 @@ plantPhoneNumber: res.plant_details?.phone_number,
         title={<span className="text-amber-700 font-semibold">{modalState.mode?.toUpperCase()} Order</span>} 
         open={modalState.open} 
         onCancel={() => setModalState({ open: false, mode: null })} 
-        footer={isReadonly ? null : [<Button key="1" onClick={() => setModalState({ open: false, mode: null })}>Cancel</Button>, <Button key="2" type="primary" className="bg-amber-600" onClick={() => form.submit()}>Submit</Button>]} 
-        width={1000}
+      footer={
+  isReadonly
+    ? null
+    : [
+        <Button key="1" onClick={() => setModalState({ open: false, mode: null })}>
+          Cancel
+        </Button>,
+        <Button key="2" type="primary" className="bg-amber-600" onClick={() => form.submit()}>
+          Submit
+        </Button>,
+      ]
+}   width={1000}
       >
         <Form form={form} layout="vertical" onFinish={onFinish}>
           
@@ -309,7 +334,7 @@ plantPhoneNumber: res.plant_details?.phone_number,
           {renderSection("Order Details", <>
             <Col span={6}><Form.Item label="Invoice No" name="invoice_number"><Input disabled /></Form.Item></Col>
              <Col span={6}><Form.Item label="Way Bill" name="wayBill"><Input disabled/></Form.Item></Col>
-            <Col span={6}><Form.Item label="Status" name="status"><Select disabled={isReadonly || isAssigning} options={[{label: 'Pending', value: 'Pending'}, {label: 'Pending Approval', value: 'Pending Approval'}]} /></Form.Item></Col>
+            <Col span={6}><Form.Item label="Status" name="status"><Select disabled={isReadonly || isAssigning} options={[{label: 'Pending', value: 'Pending'}, ]} /></Form.Item></Col>
             <Col span={6}><Form.Item label="Delivery Address" name="deliveryAddress"><Input disabled /></Form.Item></Col>
           </>)}
 

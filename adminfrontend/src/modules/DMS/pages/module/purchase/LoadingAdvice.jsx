@@ -91,51 +91,22 @@ const invoiceData = {
   },
 };
 
-const loadingAdviceJSON = {
-  records: [
-    {
-      key: 1,
-      lodingadvicedate: dayjs().format("YYYY-MM-DD"),
-      invoiceNo: "ORD001",
-      companyName: "ABC Pvt Ltd",
-      companyAddress: "Bhubaneswar, Odisha",
-      companyGST: "21ABCDE1234F1Z5",
-      contactPerson: "Rakesh Sharma",
-      contactNo: "9876543210",
+const ALL_STATUS = [
 
-      plantName: "Plant A",
-      plantCode: "PLT001",
-      plantGST: "21PLT1234F1Z9",
-      plantAddress: "Cuttack, Odisha",
-      plantContactPerson: "Suresh Kumar",
-      plantContactNo: "9090909090",
+  "Approved",
+  "In-Transit",
+  "Out for delivery",
+  "Delivered",
+];
 
-      transporter: "Tata Logistics",
-      vehicleNo: "OD-05-AB-1234",
-      driverName: "Rajesh Kumar",
-      driverContact: "9876543211",
-      insuranceValidUpto: "2025-12-30",
-      puValidUpto: "2025-12-30",
-      fitnessValidUpto: "2025-12-30",
-
-      vehicleInTime: "08:30 AM",
-      vehicleOutTime: "10:45 AM",
-      tareWeight: 12000,
-      netWeight: 25000,
-      grossWeight: 37000,
-
-      itemCode: "ITM001",
-      itemName: "Palm Oil",
-      itemDescription: "Edible Palm Oil",
-      reqQty: 1000,
-      actualQty: 950,
-      variance: 50,
-      // statuses: Unassigned | Assigned | Pending Approval | Approved
-      status: "Pending",
-    },
-  ],
+const statusFlow = {
+ Pending: ["Pending", ], 
+ 
+  Approved: ["Approved", "In-Transit"],
+  "In-Transit": ["In-Transit", "Out for delivery"],
+  "Out for delivery": ["Out for delivery", "Delivered"],
+  Delivered: ["Delivered"],
 };
-
 export default function LoadingAdvice() {
   const [data, setData] = useState([]);
 
@@ -149,20 +120,21 @@ export default function LoadingAdvice() {
   useEffect(() => {
     fetchLoadingAdvice();
   }, []);
+ 
   const handleSearch = (value) => {
-    setSearchText(value);
-    if (!value) {
-      setData(loadingAdviceJSON.records);
-      return;
-    }
-    const filtered = loadingAdviceJSON.records.filter((item) =>
-      Object.values(item)
-        .join(" ")
-        .toLowerCase()
-        .includes(value.toLowerCase())
-    );
-    setData(filtered);
-  };
+  setSearchText(value);
+
+  if (!value) {
+    fetchLoadingAdvice();
+    return;
+  }
+
+  const filtered = data.filter((item) =>
+    JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
+  );
+
+  setData(filtered);
+};
 const handleExport = async () => {
   try {
     const res = await getLoadingAdvice();
@@ -181,21 +153,18 @@ const handleExport = async () => {
           "Status": detail.status,
 
           // Company Details
-          "Company Name": detail.vendor_name,
-          "Company Address": detail.vendor_address,
-          "Company GSTIN": detail.vendor_gstin,
+          "Vendor Name": detail.vendor_name,
+          "Vendor Address": detail.vendor_address,
           "Contact Person": detail.vendor_contact_person,
-          "Company Phone": detail.vendor_phone,
+          "Vendor Phone": detail.vendor_phone,
 
           // Plant Details
           "Plant Name": detail.plant_name,
-          "Plant Code": detail.plant_code,
-          "Plant GSTIN": detail.plant_gstin,
           "Plant Address": detail.plant_address,
           "Plant Contact Person": detail.plant_contact_person,
 
           // Item Details
-          "Item Code": item.hsn_code,
+         
           "Item Name": item.product_name,
           "Required Qty": item.required_qty,
           "Actual Qty": item.actual_qty,
@@ -276,7 +245,7 @@ itemName: item.items?.[0]?.product_name || "-",
         original: item,
       }));
 
-      setData(formatted);
+      setData(formatted.reverse());
     } catch (error) {
       console.error("Failed to fetch loading advice:", error);
     }
@@ -303,8 +272,7 @@ form.setFieldsValue({
   // ✅ PLANT (CORRECT)
   plantName: item.plant_name,
   plantAddress: item.plant_details?.address || "",
-  plantContactPerson: item.plant_details?.contact_person || "", 
-  plantPhone: item.plant_details?.phone_number || "",
+ plantContactPerson: item.vendor_details?.contact_person || "", plantPhone: item.plant_details?.phone_number || "",
 
   // Transport
   transporter: item.transporter_name,
@@ -349,7 +317,6 @@ form.setFieldsValue({
 
 
   const handleEdit = async (values) => {
-    console.log("PLANT PHONE:", item.plant_details?.phone_number);
     try {
       const payload = {
         advice_date: values.lodingadvicedate
@@ -433,7 +400,7 @@ await updateLoadingAdvice(selectedRecord.id, payload);
   // ✅ PLANT (CORRECT)
   plantName: item.plant_name,
   plantAddress: item.plant_details?.address || "",
-  plantContactPerson: item.plant_details?.contact_person || "", // 👈 fallback
+  plantContactPerson: item.vendor_details?.contact_person || "",
   plantPhone: item.plant_details?.phone_number || "",
 
       // Transport
@@ -481,7 +448,7 @@ await updateLoadingAdvice(selectedRecord.id, payload);
   // Columns - removed Assign button; Admin can only approve pending ones
   const columns = [
     {
-       title: <span className="text-amber-700 font-semibold">Invoice No</span>,
+       title: <span className="text-amber-700 font-semibold">Advice No</span>,
       dataIndex: "advice_no",
       render: (t) => <span className="text-amber-800">{t}</span>,
 
@@ -518,15 +485,20 @@ await updateLoadingAdvice(selectedRecord.id, payload);
     },  
     {
       title: <span className="text-amber-700 font-semibold">Assignment</span>,
+      width:150,
       dataIndex: "status",
       key: "status",
       render: (status) => {
         const colorMap = {
           Pending: "bg-yellow-100 text-yellow-700",
-          Unassigned: "bg-gray-100 text-gray-700",
-          Assigned: "bg-blue-100 text-blue-700",
+         
           "Pending Approval": "bg-orange-100 text-orange-700",
           Approved: "bg-green-100 text-green-700",
+          Delivered:" bg-green-100 text-green-700",
+          "In-Transit":"bg-orange-100 text-orange-700",
+         "Out for delivery":"bg-blue-100 text-blue-700"
+
+
         };
 
         return (
@@ -540,15 +512,59 @@ await updateLoadingAdvice(selectedRecord.id, payload);
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       key: "actions",
-      render: (_, record) => (
-        <div className="flex gap-3">
-          <EyeOutlined className="cursor-pointer! text-blue-500!" onClick={() => handleOpenView(record)} />
-          <EditOutlined className="cursor-pointer! text-red-500!" onClick={() => handleOpenEdit(record)} />
-        </div>
-      ),
+       render: (_, record) => {
+    const showEdit =
+      record.driverName && record.vehicleNo && record.driverName !== "-" && record.vehicleNo !== "-";
+
+    return (
+      <div className="flex gap-3">
+        <EyeOutlined
+          className="cursor-pointer! text-blue-500!"
+          onClick={() => handleOpenView(record)}
+        />
+
+        {showEdit && (
+          <EditOutlined
+            className="cursor-pointer! text-red-500!"
+            onClick={() => handleOpenEdit(record)}
+          />
+        )}
+      </div>
+    );
+  },
     },
   ];
+const getAllowedStatus = (formInstance) => {
+  const currentStatus = formInstance.getFieldValue("status");
+  const driver = formInstance.getFieldValue("driverName");
+  const vehicle = formInstance.getFieldValue("vehicleNo");
+  const items = formInstance.getFieldValue("items") || [];
 
+  const hasDriverVehicle =
+    driver && vehicle && driver !== "-" && vehicle !== "-";
+
+  const hasActualQty = items.some(
+    (itm) => Number(itm.actual_qty) > 0
+  );
+
+  // ❌ No driver/vehicle → restrict
+  if (!hasDriverVehicle) {
+    return ["Pending"];
+  }
+
+  // ❌ Driver present but no actual qty → only till Approved
+  if (hasDriverVehicle && !hasActualQty) {
+    return [ "Approved"];
+  }
+
+  // ✅ ⭐ SPECIAL CASE (your requirement)
+  if (currentStatus === "Approved" && hasActualQty) {
+    return ALL_STATUS; // allow everything
+  }
+
+  // ✅ Default flow
+  return statusFlow[currentStatus] || [];
+};
   const renderFormFields = (disabled = false, formInstance) => (
     <>
       {/* Date and Order */}
@@ -601,19 +617,17 @@ await updateLoadingAdvice(selectedRecord.id, payload);
         </Col>
 
         <Col span={6}>
-          <Form.Item label="Status" name="status" rules={[{ required: true }]}>
-            <Select
-              placeholder="Select Status"
-              // disabled when NOT in edit mode (i.e. view) OR if the form is rendered as disabled
-              disabled={disabled && !isEditModalOpen}
-            >
-              {/* adjust these options to your allowed statuses */}
-              <Option value="Unassigned">Unassigned</Option>
-              <Option value="Assigned">Assigned</Option>
-              <Option value="Pending Approval">Pending Approval</Option>
-              <Option value="Approved">Approved</Option>
-            </Select>
-          </Form.Item>
+        <Form.Item label="Status" name="status" rules={[{ required: true }]}>
+  <Select
+    placeholder="Select Status"
+    disabled={disabled && !isEditModalOpen}
+  >
+   {getAllowedStatus(formInstance).map((status) => (   <Option key={status} value={status}>
+        {status}
+      </Option>
+    ))}
+  </Select>
+</Form.Item>
         </Col>
       </Row>
 
@@ -665,16 +679,16 @@ await updateLoadingAdvice(selectedRecord.id, payload);
             <Input disabled />
           </Form.Item>
         </Col>
-          <Col span={6}>
-         <Form.Item label="Contact Person" name="contactPerson">
-
-            <Input disabled />
-          </Form.Item>
-        </Col>
-          <Col span={6}>
-         <Form.Item label="Phone" name="plantPhone">   <Input disabled />
-          </Form.Item>
-        </Col>
+        <Col span={6}>
+          <Form.Item label="Contact Person" name="plantContactPerson">
+  <Input disabled />
+</Form.Item>
+</Col>
+<Col span={6}>
+<Form.Item label="Phone" name="plantPhone">
+  <Input disabled />
+</Form.Item>
+</Col>
       </Row>
 
       {/* Item Details */}

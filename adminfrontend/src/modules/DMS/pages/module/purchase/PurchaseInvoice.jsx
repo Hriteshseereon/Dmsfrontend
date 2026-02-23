@@ -242,7 +242,7 @@ const fetchPurchaseInvoices = async () => {
       transport: item.transport_name,            
     }));
 
-    setData(formatted);
+    setData(formatted.reverse());
   } catch (err) {
     message.error("Failed to load purchase invoices");
     console.error(err);
@@ -271,11 +271,7 @@ const fetchPurchaseOrders = async () => {
   }
 };
 
-const openAddModal = async () => {
-  addForm.resetFields();
-  setIsAddModalOpen(true);
-  await fetchPurchaseOrders();
-};
+
 const handleOrderSelect = async (orderId) => {
   try {
     const order = await getPurchaseOrderById(orderId);

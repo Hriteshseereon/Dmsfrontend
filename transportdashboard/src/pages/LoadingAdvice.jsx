@@ -20,11 +20,11 @@ import {
   PlusOutlined,
   DeleteOutlined,
 } from "@ant-design/icons";
-import { getLoadingAdvice ,getLoadingAdviceById,} from "../api/loadingAdvice";
+import { getLoadingAdvice ,getLoadingAdviceById,updateLoadingAdvice} from "../api/loadingAdvice";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
-const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/;
 
 
 
@@ -88,10 +88,9 @@ console.log(res); // 🔥 IMPORTANT
         slNo: idx + 1,
         itemName: i.product_name,
         itemCode: i.product,
-        reqQty: i.required_qty,
-        actualQty: i.actual_qty,
-        variance: i.variance,
-        uom: i.uom_details?.unit_name,
+        actualQty: parseFloat(i.actual_qty) || 0,
+reqQty: parseFloat(i.required_qty) || 0,
+variance: parseFloat(i.variance) || 0, uom: i.uom_details?.unit_name,
       })),
     }));
 
@@ -141,10 +140,9 @@ const mapApiToForm = (item) => {
       slNo: idx + 1,
       itemName: i.product_name,
       itemCode: i.product,
-      reqQty: i.required_qty,
-      actualQty: i.actual_qty,
-      variance: i.variance,
-      uom: i.uom_details?.unit_name,
+     actualQty: parseFloat(i.actual_qty) || 0,
+reqQty: parseFloat(i.required_qty) || 0,
+variance: parseFloat(i.variance) || 0, uom: i.uom_details?.unit_name,
     })),
   };
 };
@@ -156,7 +154,7 @@ const data = res; // ✅ FIX
 const mapped = mapApiToForm(data);
 
 setSelectedRecord(mapped);
-setItems(mapped.items || []);
+ setItems([...mapped.items]);
 editForm.setFieldsValue(mapRecordToFormValues(mapped));
 
 setIsEditModalOpen(true);
@@ -189,46 +187,73 @@ setIsViewModalOpen(true);
       item.status?.toLowerCase().includes(searchText.toLowerCase())
   );
 
-  const handleFormSubmit = () => {
-    editForm.validateFields().then((values) => {
-      const currentRecord = selectedRecord;
+ const handleFormSubmit = async () => {
+  try {
+    const values = await editForm.validateFields();
+    console.log("FINAL ITEMS BEFORE PATCH", items); // ✅ HERE
+    const currentRecord = selectedRecord;
 
-      const payload = {
-        ...currentRecord,
-        ...values,
-        items: items,
-        adviceDate: values.adviceDate?.format("YYYY-MM-DD"),
-        insuranceValidUpto: values.insuranceValidUpto?.format("YYYY-MM-DD"),
-        puValidUpto: values.puValidUpto?.format("YYYY-MM-DD"),
-        fitnessValidUpto: values.fitnessValidUpto?.format("YYYY-MM-DD"),
-        delivery_date: values.delivery_date?.format("YYYY-MM-DD"),
-      };
+    const payload = {
+      // 🔥 map UI → API fields
+      advice_date: values.adviceDate?.format("YYYY-MM-DD"),
+      way_bill: values.wayBill,
+      delivery_address: values.deliveryAddress,
 
-      setData((prev) =>
-        prev.map((item) =>
-          item.key === currentRecord.key ? { ...payload, key: item.key } : item
-        )
-      );
+      vehicle_no: values.vehicleNo,
+      driver_name: values.driverName,
+      driver_contact: values.driverContact,
 
-      setIsEditModalOpen(false);
-      setSelectedRecord(null);
-      setItems([]);
-    });
-  };
+      insurance_valid_upto: values.insuranceValidUpto?.format("YYYY-MM-DD"),
+      pu_valid_upto: values.puValidUpto?.format("YYYY-MM-DD"),
+      fitness_valid_upto: values.fitnessValidUpto?.format("YYYY-MM-DD"),
+      delivery_date: values.delivery_date?.format("YYYY-MM-DD"),
 
+      vehicle_in_time: values.vehicleInTime,
+      vehicle_out_time: values.vehicleOutTime,
+
+      tare_weight_kg: values.tareWeights,
+      gross_weight_kg: values.grossWeights,
+      net_weight_kg: values.netWeight,
+
+      status: values.status,
+
+      // 🔥 IMPORTANT: items mapping
+     items: items.map((i) => ({
+  id: i.key,
+  actual_qty: Number(i.actualQty) || 0,
+  required_qty: Number(i.reqQty) || 0,
+})),
+    };
+
+    console.log("PATCH PAYLOAD", payload);
+
+    // ✅ API CALL
+    await updateLoadingAdvice(currentRecord.key, payload);
+
+    // ✅ refresh table
+    await fetchLoadingAdvice();
+
+    setIsEditModalOpen(false);
+    setSelectedRecord(null);
+    setItems([]);
+
+  } catch (err) {
+    console.log(err);
+  }
+};
   const getStatusClasses = (status) => {
     const base = "px-3 py-1 rounded-full font-semibold inline-block text-sm";
 
     switch (status) {
       
-      case "In Transit":
-        return `${base} bg-blue-100 text-blue-700`;
-      case "Out for Delivery":
-        return `${base} bg-yellow-100 text-yellow-700`;
+      case "In-Transit":
+        return `${base} bg-blue-100! text-blue-700!`;
+      case "Out for delivery":
+        return `${base} bg-yellow-100! text-yellow-700!`;
       case "Delivered":
-        return `${base} bg-green-100 text-green-700`;
+        return `${base} bg-green-100! text-green-700!`;
       default:
-        return `${base} bg-red-100 text-red-700`;
+        return `${base} bg-orange-100! text-orange-700!`;
     }
   };
 
@@ -257,32 +282,40 @@ setIsViewModalOpen(true);
  
 const getAllowedStatusOptions = (currentStatus) => {
   const flow = {
-    Approved: ["In Transit", "Out for Delivery", "Delivered"],
-    "In Transit": ["Out for Delivery", "Delivered"],
-    "Out for Delivery": ["Delivered"],
+    Approved: ["In-Transit", "Out for delivery", "Delivered"],
+    "In-Transit": ["Out for delivery", "Delivered"],
+    "Out for delivery": ["Delivered"],
     Delivered: ["Delivered"],
   };
 
   return flow[currentStatus] || [];
 };
 
-  const updateItem = (key, field, value) => {
-    const updatedItems = items.map((item) => {
+ const updateItem = (key, field, value) => {
+  setItems((prev) =>
+    prev.map((item) => {
       if (item.key === key) {
-        const updatedItem = { ...item, [field]: value };
-        
-        if (field === "actualQty" || field === "reqQty") {
-          const actualQty = field === "actualQty" ? parseFloat(value) || 0 : parseFloat(item.actualQty) || 0;
-          const reqQty = field === "reqQty" ? parseFloat(value) || 0 : parseFloat(item.reqQty) || 0;
-          updatedItem.variance = actualQty - reqQty;
-        }
-        
+        const newValue = Number(value) || 0;
+
+        const updatedItem = {
+          ...item,
+          [field]: newValue,
+        };
+
+        const actualQty =
+          field === "actualQty" ? newValue : Number(item.actualQty) || 0;
+
+        const reqQty =
+          field === "reqQty" ? newValue : Number(item.reqQty) || 0;
+
+        updatedItem.variance = actualQty - reqQty;
+
         return updatedItem;
       }
       return item;
-    });
-    setItems(updatedItems);
-  };
+    })
+  );
+};
 
   const columns = [
     {
@@ -600,6 +633,7 @@ const renderLoadingDetails = (disabled = false) => (
                 rules={[{ required: true, message: "Required" }]}
               >
                <Select
+                 disabled={disabled} 
   options={getAllowedStatusOptions(editForm.getFieldValue("status")).map(
     (status) => ({
       label: status,
@@ -640,19 +674,17 @@ const renderLoadingDetails = (disabled = false) => (
       title: "Actual Qty",
       dataIndex: "actualQty",
       width: 50,
-      render: (text, record) =>
-        disabled ? (
-          <span>{text}</span>
-        ) : (
-          <Input
-            type="number"
-            value={text}
-            onChange={(e) =>
-              updateItem(record.key, "actualQty", e.target.value)
-            }
-            placeholder="0"
-          />
-        ),
+    render: (_, record) => (
+  <Input
+    type="number"
+    value={record.actualQty}
+      disabled={disabled} 
+    onChange={(e) =>
+      updateItem(record.key, "actualQty", e.target.value)
+    }
+    placeholder="0"
+  />
+)
     },
     {
       title: "Variance",
@@ -854,7 +886,7 @@ const renderLoadingDetails = (disabled = false) => (
           </span>
         }
         open={isViewModalOpen}
-        onCancel={() => setIsViewModalOpen(false)}
+       onCancel={() => setIsViewModalOpen(false)} 
         footer={null}
         width={1000}
       >
@@ -880,17 +912,12 @@ const renderLoadingDetails = (disabled = false) => (
                 <Input disabled />
               </Form.Item>
             </Col>
-            <Col span={4}>
-              <Form.Item label="Status" name="status">
-                <Input disabled />
-              </Form.Item>
-            </Col>
+            
           </Row>
-
-         {renderLoadingDetails(false)}
+{renderLoadingDetails(true)}
 {renderItemsTable(true)}
-{renderTransportDetails(false)}
-{renderVendorPlantDetails(false)}
+{renderTransportDetails(true)}
+{renderVendorPlantDetails(true)}
 
         </Form>
       </Modal>
