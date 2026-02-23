@@ -111,3 +111,21 @@ export const productPriceUpdate = async (payload) =>{
  return res.data;
 
 }
+
+// get the product price 
+
+export const getProductPrice = async (id) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get(
+    "price-update/price-updates/by-product/",
+    {
+      params: {
+        product: id,          // ?product={{product_id}}
+        org: currentOrgId     // optional (only if your API needs it)
+      }
+    }
+  );
+
+  return res.data;
+};

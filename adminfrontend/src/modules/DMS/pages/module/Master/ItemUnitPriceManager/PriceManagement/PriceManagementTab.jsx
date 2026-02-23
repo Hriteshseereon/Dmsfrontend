@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Card,
   Select,
@@ -9,99 +9,154 @@ import {
   Space,
   message,
 } from "antd";
-import { productPriceUpdate } from "@/api/product";
+import { ReloadOutlined } from "@ant-design/icons";
+
+import { useProductPrice } from "@/queries/useProductPrice";
 
 export default function PriceManagementTab({
   items,
   selectedItem,
   setSelectedItem,
-  unitConversions,
-  prices,
-  setPrices,
 }) {
-  const [price, setPrice] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const { priceData, isLoading, updatePrice, isUpdating } = useProductPrice(
+    selectedItem?.id,
+  );
 
-  /* ================= PRICE SUBMIT ================= */
-  const handlePriceSubmit = async () => {
+  const [price, setPrice] = useState(null);
+
+  /* ================= SYNC PRICE ================= */
+  useEffect(() => {
+    if (!priceData) return;
+    setPrice(Number(priceData.rate));
+  }, [priceData]);
+
+  /* ================= UPDATE PRICE ================= */
+  const handlePriceSubmit = () => {
     if (!price) {
       message.error("Please enter price");
       return;
     }
 
-    try {
-      setLoading(true);
-
-      const payload = {
+    updatePrice(
+      {
         product: selectedItem.id,
         rate: price,
-      };
-
-      await productPriceUpdate(payload);
-
-      message.success("Price updated successfully ✅");
-    } catch (error) {
-      console.error("❌ Price update failed:", error);
-      message.error("Failed to update price");
-    } finally {
-      setLoading(false);
-    }
+      },
+      {
+        onSuccess: () => {
+          message.success("Price updated successfully ✅");
+        },
+        onError: () => {
+          message.error("Failed to update price");
+        },
+      },
+    );
   };
 
-  /* ================= ITEM SELECT ================= */
-  if (!selectedItem) {
-    return (
-      <Select
-        style={{ width: 300 }}
-        placeholder="Select item"
-        showSearch
-        optionFilterProp="label"
-        onChange={(id) => setSelectedItem(items.find((i) => i.id === id))}
-        options={items.map((i) => ({
-          value: i.id,
-          label: `${i.name} (${i.vendor_name || "No Vendor"})`,
-        }))}
-      />
-    );
-  }
+  /* ================= TABLE DATA ================= */
+  const tableData =
+    priceData?.uom_prices?.map((u, index) => ({
+      key: index,
+      unit_name: u.unit_name,
+      price: Number(u.price),
+      is_display: u.uom_id === null,
+    })) || [];
 
-  /* ================= MAIN UI ================= */
   return (
-    <Card title={`Pricing for ${selectedItem.name}`}>
-      {/* PRICE INPUT + SUBMIT */}
-      <Space>
-        <InputNumber
-          prefix="₹"
-          style={{ width: 220 }}
-          placeholder="Base Unit Price"
-          value={price}
-          min={0}
-          onChange={(v) => setPrice(v)}
-        />
+    <Card
+      title="Price Management"
+      extra={
+        <Space>
+          {/* PRODUCT SEARCH */}
+          <Select
+            style={{ width: 320 }}
+            placeholder="Search & select product"
+            showSearch
+            allowClear
+            optionFilterProp="label"
+            value={selectedItem?.id}
+            onChange={(id) => {
+              const item = items.find((i) => i.id === id);
+              setSelectedItem(item || null);
+            }}
+            options={items.map((i) => ({
+              value: i.id,
+              label: `${i.name} (${i.vendor_name || "No Vendor"})`,
+            }))}
+          />
 
-        <Button type="primary" loading={loading} onClick={handlePriceSubmit}>
-          Submit
-        </Button>
-      </Space>
+          {/* RESET BUTTON */}
+          {selectedItem && (
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => setSelectedItem(null)}
+            >
+              Reset
+            </Button>
+          )}
+        </Space>
+      }
+      loading={isLoading}
+    >
+      {/* ================= EMPTY STATE ================= */}
+      {!selectedItem ? (
+        <div
+          style={{
+            padding: 40,
+            textAlign: "center",
+            color: "#888",
+          }}
+        >
+          Select a product to manage pricing
+        </div>
+      ) : (
+        <>
+          {/* BASE PRICE SECTION */}
+          <Space>
+            <InputNumber
+              prefix="₹"
+              style={{ width: 220 }}
+              placeholder="Base Unit Price"
+              value={price}
+              min={0}
+              onChange={setPrice}
+            />
 
-      {/* UNIT TABLE */}
-      <Table
-        style={{ marginTop: 24 }}
-        columns={[
-          { title: "Unit", dataIndex: "unit_name" },
-          {
-            title: "Display",
-            render: (_, r) =>
-              r.set_as_display ? (
-                <Tag color="green">Customer</Tag>
-              ) : (
-                <Tag>Internal</Tag>
-              ),
-          },
-        ]}
-        dataSource={unitConversions}
-        rowKey="id"
-      />
+            <Button
+              type="primary"
+              loading={isUpdating}
+              onClick={handlePriceSubmit}
+            >
+              Update Price
+            </Button>
+          </Space>
+
+          {/* UNIT PRICE TABLE */}
+          <Table
+            style={{ marginTop: 24 }}
+            pagination={false}
+            rowKey="key"
+            dataSource={tableData}
+            columns={[
+              { title: "Unit", dataIndex: "unit_name" },
+              {
+                title: "Type",
+                render: (_, r) =>
+                  r.is_display ? (
+                    <Tag color="green">Base</Tag>
+                  ) : (
+                    <Tag>Converted</Tag>
+                  ),
+              },
+              {
+                title: "Calculated Price",
+                dataIndex: "price",
+                render: (v) => `₹ ${v}`,
+              },
+            ]}
+          />
+        </>
+      )}
     </Card>
   );
 }
