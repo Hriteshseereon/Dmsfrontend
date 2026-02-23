@@ -17,7 +17,7 @@ export default function PriceManagementTab({
         onChange={(id) => setSelectedItem(items.find((i) => i.id === id))}
         options={items.map((i) => ({
           value: i.id,
-          label: i.name,
+          label: `${i.name} (${i.vendor_name})`,
         }))}
       />
     );

@@ -195,7 +195,7 @@ export default function UnitConversionTab({ items }) {
         }}
         options={items.map((i) => ({
           value: i.id,
-          label: i.name,
+          label: `${i.name} (${i.vendor_name})`,
         }))}
       />
 
