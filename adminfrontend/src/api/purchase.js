@@ -20,7 +20,7 @@ export const getAllVendor = async () => {
 
 // fetch plants for a specific vendor
 export const getPlantsByVendor = async (vendorId) => {
-  const res = await api.get("vendors/vendor-plants-by-vendor/", {
+  const res = await api.get("vendors/vendor-plants/", {
     params: { vendor_id: vendorId },
   });
   return res.data; // expected: array of plants for this vendor
@@ -62,7 +62,7 @@ export const getPurchaseOrder = async () => {
 //fetch all purchase souda
 export const getSoudaByContractId = async (contractId) => {
   const currentOrgId = useSessionStore.getState();
-  const res = await api.get(`/purchase/orders/fetch-souda-details/${contractId}/`, {
+  const res = await api.get(`/purchase/contracts/${contractId}/`, {
     params: { organisation: currentOrgId }
   });
   return res.data;

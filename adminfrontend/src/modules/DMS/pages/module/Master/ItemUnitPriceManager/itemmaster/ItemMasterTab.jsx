@@ -19,6 +19,8 @@ import {
   getVendors,
   addproduct,
   getProducts, // ✅ FIX 1
+  getProductById,
+  updateProductById,
 } from "../../../../../../../api/product";
 
 const { Option } = Select;
@@ -47,7 +49,7 @@ export default function ItemMasterTab({ items, setItems }) {
   const [groups, setGroups] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [hsnSacCodes, setHsnSacCodes] = useState([]);
-
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     gstPercent: 0,
     cgstPercent: 0,
@@ -77,23 +79,36 @@ export default function ItemMasterTab({ items, setItems }) {
   };
 
   /* ================= SAFE EDIT MAPPING ================= */
-  const openEdit = (record, view = false) => {
-    setFormData({
-      itemName: record.name,
-      itemType: record.product_type,
-      company: record.vendor,
-      product_group: record.product_group,
-      itemCategory: record.category,
-      hsn_code: record.hsn_code,
-      sac_code: record.sac_code || null,
-      baseUnit: record.base_unit?.toUpperCase(),
-      gstPercent: record.gst_percentage,
-      cgstPercent: record.gst_percentage / 2,
-      sgstPercent: record.gst_percentage / 2,
-      currentStock: record.current_stock,
-    });
-    setViewMode(view);
-    setOpen(true);
+  const openEdit = async (record, view = false) => {
+    try {
+      setLoading(true);
+
+      const data = await getProductById(record.id);
+
+      setEditingId(record.id);
+
+      setFormData({
+        itemName: data.name,
+        itemType: data.product_type,
+        company: data.vendor,
+        product_group: data.product_group,
+        itemCategory: data.category,
+        hsn_code: data.hsn_code,
+        sac_code: data.sac_code || null,
+        baseUnit: data.base_unit?.toUpperCase(),
+        gstPercent: Number(data.gst_percentage),
+        cgstPercent: Number(data.gst_percentage) / 2,
+        sgstPercent: Number(data.gst_percentage) / 2,
+        currentStock: Number(data.current_stock),
+      });
+
+      setViewMode(view);
+      setOpen(true);
+    } catch (err) {
+      message.error("Failed to load product");
+    } finally {
+      setLoading(false);
+    }
   };
 
   /* ================= SAVE ================= */
@@ -108,11 +123,6 @@ export default function ItemMasterTab({ items, setItems }) {
       !formData.company
     ) {
       message.error("Please fill all required fields");
-      return;
-    }
-
-    if (formData.itemCategory === "SERVICE" && !formData.sac_code) {
-      message.error("SAC Code is required for Service");
       return;
     }
 
@@ -133,14 +143,23 @@ export default function ItemMasterTab({ items, setItems }) {
 
     try {
       setLoading(true);
-      await addproduct(payload);
+
+      if (editingId) {
+        // ✅ UPDATE
+        await updateProductById(payload, editingId);
+        message.success("Product updated successfully");
+      } else {
+        // ✅ ADD
+        await addproduct(payload);
+        message.success("Product added successfully");
+      }
 
       const updated = await getProducts();
       setItems(updated);
 
-      message.success("Product saved successfully");
       setOpen(false);
       setFormData({});
+      setEditingId(null);
     } catch (err) {
       console.error(err);
       message.error("Failed to save product");
@@ -159,8 +178,11 @@ export default function ItemMasterTab({ items, setItems }) {
       title: "Action",
       render: (_, r) => (
         <Space>
-          <EyeOutlined onClick={() => openEdit(r, true)} />
-          <EditOutlined onClick={() => openEdit(r)} />
+          <EyeOutlined
+            className="action-view"
+            onClick={() => openEdit(r, true)}
+          />
+          <EditOutlined className="action-edit" onClick={() => openEdit(r)} />
         </Space>
       ),
     },
@@ -168,11 +190,82 @@ export default function ItemMasterTab({ items, setItems }) {
 
   return (
     <>
+      <style>
+        {`
+/* ===== TABLE BORDER ===== */
+// .amber-table .ant-table {
+//   border: 1px solid #f59e0b;
+//   border-radius: 8px;
+//   overflow: hidden;
+// }
+
+/* header */
+.amber-table .ant-table-thead > tr > th {
+  background: #fffbeb;
+  color: #92400e;
+  // border-bottom: 2px solid #f59e0b;
+  font-weight: 600;
+}
+
+/* body cells */
+.amber-table .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #fde68a;
+  color: #78350f;
+}
+
+/* row hover */
+.amber-table .ant-table-tbody > tr:hover > td {
+  background: #fffbeb;
+}
+
+/* pagination active */
+.amber-table .ant-pagination-item-active {
+  border-color: #f59e0b;
+}
+.amber-table .ant-pagination-item-active a {
+  color: #f59e0b;
+}
+
+/* ===== ADD BUTTON ===== */
+.amber-add-btn {
+  background-color: #f59e0b !important;
+  border-color: #f59e0b !important;
+}
+
+.amber-add-btn:hover {
+  background-color: #d97706 !important;
+  border-color: #d97706 !important;
+}
+
+/* ===== ACTION ICONS ===== */
+.action-view {
+  color: #2151f0;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.action-view:hover {
+  color: #15803d;
+}
+
+.action-edit {
+  color: #ed0b0b;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.action-edit:hover {
+  color: #1d4ed8;
+}
+`}
+      </style>
       <Button
+        className="amber-add-btn"
         type="primary"
         icon={<PlusOutlined />}
         onClick={() => {
           setFormData({});
+          setEditingId(null);
           setViewMode(false);
           setOpen(true);
         }}
@@ -181,6 +274,7 @@ export default function ItemMasterTab({ items, setItems }) {
       </Button>
 
       <Table
+        className="amber-table"
         rowKey="id"
         columns={columns}
         dataSource={items}
@@ -314,7 +408,7 @@ export default function ItemMasterTab({ items, setItems }) {
                 />
               </FormField>
 
-              {formData.itemCategory === "Service" && (
+              {formData.itemCategory === "services" && (
                 <FormField label="SAC Code" required>
                   <Select
                     showSearch

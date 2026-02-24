@@ -1095,7 +1095,7 @@ export default function Contract() {
             </Form.Item>
           </Col>
 
-          <Col span={6}>
+          {/* <Col span={6}>
             <Form.Item label="Depo">
               <Input value={selectedRecord?.depoName} disabled />
             </Form.Item>
@@ -1119,7 +1119,7 @@ export default function Contract() {
             <Form.Item label="Delivery Address">
               <Input value={selectedRecord?.deliveryAddress} disabled />
             </Form.Item>
-          </Col>
+          </Col> */}
           <Col span={6}>
             <Form.Item label="Status">
               <Input value={selectedRecord?.status} disabled />

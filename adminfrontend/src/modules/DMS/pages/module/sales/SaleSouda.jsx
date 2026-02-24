@@ -31,7 +31,11 @@ import {
   getVendors,
   getSalescontractGroups,
   approvedSalesContract,
+  getCustomersByOrganisation,
+  getSalesContractById,
+  updateSalesContract,
 } from "../../../../../api/sales";
+import { getAdminCustomerDetails } from "../../../../../api/customer";
 /** trimmed/embedded seed data (same as you provided) */
 const salesSoudaJSONModified2 = {
   statusOptions: ["Approved", "Pending", "Rejected"],
@@ -70,7 +74,7 @@ export default function SalesSouda() {
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        const res = await getCustomers();
+        const res = await getCustomersByOrganisation();
         // assume response = [{ id, name }]
         console.log("Fetched customers:", res);
         setCustomers(res || []);
@@ -127,6 +131,8 @@ export default function SalesSouda() {
           key: contract.sale_contract_id,
           saleContractNumber: contract.sale_contract_number,
           customer: contract.customer_name,
+          customerEmail: contract.customer_email, // Map email
+          customerMobile: contract.customer_mobile, // Map mobile
           startDate: contract.from_date,
           endDate: contract.to_date,
           status: contract.status,
@@ -309,7 +315,8 @@ export default function SalesSouda() {
   const mapApiRecordToForm = (record) => {
     return {
       saleContractNumber: record.saleContractNumber,
-      customer: record.customer,
+      customer: record.customer_name,
+      customerEmail: record.customerEmail,
       status: record.status,
 
       soudaDate: record.created_at ? dayjs(record.created_at) : undefined,
@@ -322,8 +329,8 @@ export default function SalesSouda() {
         vendorId: it.vendor_id,
         vendorName: it.vendor_name,
 
-        item: it.product_id,
-        itemName: it.product_name,
+        item: it.product?.product_id || it.product_id,
+        itemName: it.product?.product_name || it.product_name,
 
         uom: it.uom?.unit_name || "",
         qty: Number(it.net_qty),
@@ -360,20 +367,174 @@ export default function SalesSouda() {
     };
   };
 
-  const openView = (record) => {
-    const mapped = mapApiRecordToForm(record);
+  const openView = async (record) => {
+    try {
+      const contract = await getSalesContractById(record.key);
+      const mapped = {
+        saleContractNumber: contract.sale_contract_number,
+        customer: contract.customer_name,
+        customerEmail: contract.customer_email,
+        status: contract.status,
 
-    setSelectedRecord(record);
-    viewForm.setFieldsValue(mapped);
-    setIsViewModalOpen(true);
+        soudaDate: contract.created_at ? dayjs(contract.created_at) : undefined,
+        startDate: contract.from_date ? dayjs(contract.from_date) : undefined,
+        endDate: contract.to_date ? dayjs(contract.to_date) : undefined,
+
+        items: (contract.items || []).map((it, idx) => ({
+          lineKey: it.id || idx + 1,
+
+          vendorId: it.vendor_id,
+          vendorName: it.vendor_name,
+
+          item: it.product?.product_id || it.product_id,
+          itemName: it.product?.product_name || it.product_name,
+          itemCode: it.hsn_code,
+
+          uom: it.uom?.unit_name || "",
+          qty: Number(it.net_qty),
+          freeQty: Number(it.free_qty),
+          totalQty: Number(it.gross_qty),
+
+          rate: Number(it.mrp),
+          discountPercent: Number(it.discount_percent),
+          discountAmt: Number(it.discount_amount),
+
+          grossAmount: Number(it.line_total),
+          grossWt: 0,
+          totalGrossWt: 0,
+        })),
+
+        orderTaxAndTotals: {
+          sgstPercent: Number(contract.sgst),
+          cgstPercent: Number(contract.cgst),
+          igstPercent: Number(contract.igst),
+          tcsAmt: Number(contract.tcs_amount),
+
+          grossAmountTotal: Number(contract.total_amount),
+          discountTotal: Number(
+            (contract.items || []).reduce(
+              (s, i) => s + Number(i.discount_amount || 0),
+              0,
+            )
+          ),
+          totalGST:
+            Number(contract.sgst) + Number(contract.cgst) + Number(contract.igst),
+
+          grandTotal: Number(contract.grand_total),
+        },
+      };
+
+      // Set record to full contract so View Modal can read fields from it (like `items` array manually rendered)
+      // Note: The View Modal JSX reads `selectedRecord.items`, `selectedRecord`.
+      // So I must set `selectedRecord` to the MAPPED object OR the RAW object?
+      // View Modal JSX:
+      // defaultValue={selectedRecord?.orderTaxAndTotals?.sgstPercent}
+      // It reads from `selectedRecord` directly for some fields?
+      // Actually `Form` initialValues or setFieldsValue sets the inputs.
+      // But look at View Modal JSX:
+      // Line 1487: `(selectedRecord?.items || []).map(...)`
+      // Line 1516: `value={selectedRecord?.orderTaxAndTotals?.sgstPercent}`
+      // So `selectedRecord` MUST be the MAPPED object (or consistent with form structure).
+      // `mapApiRecordToForm` returned the same structure as `mapped` here.
+      // So setting `setSelectedRecord(mapped)` is correct.
+      // EXCEPT `record` passed to `openView` has `key`. `mapped` doesn't have `key`.
+      // I should add `key` to `mapped`.
+      mapped.key = contract.sale_contract_id;
+
+      setSelectedRecord(mapped);
+      viewForm.setFieldsValue(mapped);
+      setIsViewModalOpen(true);
+    } catch (err) {
+      console.error("Failed to fetch contract details", err);
+    }
   };
 
-  const openEdit = (record) => {
-    const mapped = mapApiRecordToForm(record);
+  const openEdit = async (record) => {
+    try {
+      const contract = await getSalesContractById(record.key);
+      const mapped = {
+        key: contract.sale_contract_id,
+        saleContractNumber: contract.sale_contract_number,
+        customer: contract.customer_name,
+        customerId: contract.customer_id,
+        customerEmail: contract.customer_email,
+        status: contract.status,
 
-    setSelectedRecord(record);
-    editForm.setFieldsValue(mapped);
-    setIsEditModalOpen(true);
+        soudaDate: contract.created_at ? dayjs(contract.created_at) : undefined,
+        startDate: contract.from_date ? dayjs(contract.from_date) : undefined,
+        endDate: contract.to_date ? dayjs(contract.to_date) : undefined,
+
+        items: (contract.items || []).map((it, idx) => ({
+          lineKey: it.id || idx + 1,
+          vendorId: it.vendor_id,
+          vendorName: it.vendor_name,
+          item: it.product?.product_id || it.product_id,
+          itemName: it.product?.product_name || it.product_name,
+          itemCode: it.hsn_code,
+
+          uom: it.uom?.unit_name || "",
+          qty: Number(it.net_qty),
+          freeQty: Number(it.free_qty),
+          totalQty: Number(it.gross_qty),
+          rate: Number(it.mrp),
+          discountPercent: Number(it.discount_percent),
+          discountAmt: Number(it.discount_amount),
+          grossAmount: Number(it.line_total),
+          grossWt: 0,
+          totalGrossWt: 0,
+        })),
+
+        orderTaxAndTotals: {
+          sgstPercent: Number(contract.sgst),
+          cgstPercent: Number(contract.cgst),
+          igstPercent: Number(contract.igst),
+          tcsAmt: Number(contract.tcs_amount),
+          grossAmountTotal: Number(contract.total_amount),
+          discountTotal: Number(
+            (contract.items || []).reduce(
+              (s, i) => s + Number(i.discount_amount || 0),
+              0,
+            )
+          ),
+          totalGST:
+            Number(contract.sgst) + Number(contract.cgst) + Number(contract.igst),
+          grandTotal: Number(contract.grand_total),
+        },
+      };
+
+      // Fetch products for all vendors in the items to populate Select options
+      const uniqueVendorIds = [
+        ...new Set(
+          (contract.items || []).map((it) => it.vendor_id).filter(Boolean)
+        ),
+      ];
+
+      if (uniqueVendorIds.length > 0) {
+        try {
+          // Fetch all simultaneously
+          const responses = await Promise.all(
+            uniqueVendorIds.map((vid) => getproductbyVendor(vid))
+          );
+
+          setVendorProductsMap((prev) => {
+            const newMap = { ...prev };
+            uniqueVendorIds.forEach((vid, index) => {
+              const res = responses[index];
+              newMap[vid] = Array.isArray(res?.products) ? res.products : [];
+            });
+            return newMap;
+          });
+        } catch (vendorErr) {
+          console.error("Failed to fetch products for vendors", vendorErr);
+        }
+      }
+
+      setSelectedRecord(mapped);
+      editForm.setFieldsValue(mapped);
+      setIsEditModalOpen(true);
+    } catch (err) {
+      console.error("Failed to fetch contract details", err);
+    }
   };
   // CONTRACT APPROVER
   const handleApprove = async (record) => {
@@ -436,7 +597,11 @@ export default function SalesSouda() {
       width: 100,
       render: (items = []) => (
         <span className="text-amber-800">
-          {items.length ? items.map((i) => i.product_name).join(" • ") : "-"}
+          {items.length
+            ? items
+              .map((i) => i.product?.product_name || i.product_name)
+              .join(" • ")
+            : "-"}
         </span>
       ),
     },
@@ -471,7 +636,11 @@ export default function SalesSouda() {
       render: (record) => (
         <div className="flex gap-3">
           <EyeOutlined onClick={() => openView(record)} />
-          <EditOutlined onClick={() => openEdit(record)} />
+          {record.status === "Approved" ? (
+            <EditOutlined className="text-gray-300! cursor-not-allowed!" />
+          ) : (
+            <EditOutlined onClick={() => openEdit(record)} />
+          )}
           {record.status === "Fresh" && (
             <Button
               size="small"
@@ -803,29 +972,89 @@ export default function SalesSouda() {
       console.error("Error response:", error.response?.data);
     }
   };
-  const handleEditFinish = (values) => {
-    const computed = computeFromFormValues(values);
-    const payload = {
-      ...values,
-      items: computed.items,
-      orderTaxAndTotals: computed.orderTaxAndTotals,
-      orderTotals: computed.orderTotals,
-      key: selectedRecord.key,
-      soudaDate: values.soudaDate
-        ? dayjs(values.soudaDate).format("YYYY-MM-DD")
-        : undefined,
-      startDate: values.startDate
-        ? dayjs(values.startDate).format("YYYY-MM-DD")
-        : undefined,
-      endDate: values.endDate
-        ? dayjs(values.endDate).format("YYYY-MM-DD")
-        : undefined,
-    };
+  const handleEditFinish = async (values) => {
+    try {
+      // Re-calculate item totals to be safe
+      const items = (values.items || []).map((it) => {
+        const netQty = Number(it.qty || 0);
+        const freeQty = Number(it.freeQty || 0);
+        const grossQty = netQty + freeQty;
+        const mrp = Number(it.rate || 0); // rate is MRP
+        const discountPercent = Number(it.discountPercent || 0);
 
-    setData((prev) => prev.map((d) => (d.key === payload.key ? payload : d)));
-    setIsEditModalOpen(false);
-    editForm.resetFields();
-    setSelectedRecord(null);
+        const grossAmount = netQty * mrp;
+        const discountAmount = (grossAmount * discountPercent) / 100;
+        const lineTotal = grossAmount - discountAmount;
+
+        return {
+          vendor_id: it.vendorId,
+          product_id: it.item, // Using item as product_id
+          uom: it.uom ? it.uom.toLowerCase() : null,
+          mrp,
+          gross_qty: grossQty,
+          free_qty: freeQty,
+          net_qty: netQty,
+          discount_percent: discountPercent,
+          discount_amount: Number(discountAmount.toFixed(2)),
+          line_total: Number(lineTotal.toFixed(2)),
+        };
+      });
+
+      const payload = {
+        customer_id: selectedRecord.customerId, // Use ID from record
+        customer_email: values.customerEmail,
+        customer_mobile: values.customerMobile,
+        from_date: values.startDate
+          ? dayjs(values.startDate).format("YYYY-MM-DD")
+          : null,
+        to_date: values.endDate
+          ? dayjs(values.endDate).format("YYYY-MM-DD")
+          : null,
+
+        cash_discount: 0,
+        round_off_amount: 0,
+        narration: "Admin updated contract",
+
+        cgst: Number(values.orderTaxAndTotals?.cgstPercent || 0),
+        sgst: Number(values.orderTaxAndTotals?.sgstPercent || 0),
+        igst: Number(values.orderTaxAndTotals?.igstPercent || 0),
+        tcs_amount: Number(values.orderTaxAndTotals?.tcsAmt || 0),
+
+        items,
+      };
+
+      console.log("Update Payload:", payload);
+
+      const res = await updateSalesContract(selectedRecord.key, payload);
+
+      // Update local state
+      setData((prev) =>
+        prev.map((d) =>
+          d.key === selectedRecord.key
+            ? {
+              ...d,
+              ...mapApiRecordToForm(res || {}), // reuse mapper if possible or manually map
+              key: d.key,
+              // Manually update core fields if mapper return structure differs slightly for table
+              saleContractNumber: res.sale_contract_number,
+              customer: res.customer_name,
+              startDate: res.from_date,
+              endDate: res.to_date,
+              status: res.status,
+              grandTotal: res.grand_total,
+              items: res.items,
+            }
+            : d
+        )
+      );
+
+      setIsEditModalOpen(false);
+      editForm.resetFields();
+      setSelectedRecord(null);
+      // message.success("Contract updated successfully"); // Optional
+    } catch (err) {
+      console.error("Failed to update contract", err);
+    }
   };
 
   // reactive updates for both add and edit forms
@@ -1020,23 +1249,45 @@ export default function SalesSouda() {
               >
                 <Select
                   placeholder="Select Customer"
-                  onChange={(value, option) => {
+                  onChange={async (value, option) => {
                     // store vendor/customer id
                     setSelectedVendorId(value);
 
-                    // OPTIONAL: also store customer name if needed
-                    addForm.setFieldsValue({
-                      customer: option.label,
-                    });
+                    // 1. Immediate fill from list (if available)
+                    const selectedCustomer = customers.find((c) => c.customer_id === value);
+                    if (selectedCustomer) {
+                      console.log("Selected Customer (Local):", selectedCustomer);
+                      addForm.setFieldsValue({
+                        customer: selectedCustomer.customer_name,
+                        customerEmail: selectedCustomer.email_address || selectedCustomer.email || "",
+                        customerMobile: selectedCustomer.mobile_number || selectedCustomer.mobile || selectedCustomer.phone_number || "",
+                      });
+                    }
+
+                    // 2. Fetch full details (async) to be sure
+                    try {
+                      console.log("Fetching details for:", value);
+                      const details = await getAdminCustomerDetails(value);
+                      console.log("Received details:", details);
+                      if (details) {
+                        addForm.setFieldsValue({
+                          customer: details.customer_name || details.name,
+                          customerEmail: details.email_address || details.email,
+                          customerMobile: details.mobile_number || details.mobile || details.phone_number,
+                        });
+                      }
+                    } catch (err) {
+                      console.error("Failed to fetch customer details for auto-fill", err);
+                    }
                   }}
                 >
                   {customers.map((c) => (
                     <Select.Option
                       key={c.id}
                       value={c.customer_id}
-                      label={c.name}
+                      label={c.customer_name}
                     >
-                      {c.name}
+                      {c.customer_name}
                     </Select.Option>
                   ))}
                 </Select>
@@ -1273,7 +1524,7 @@ export default function SalesSouda() {
             <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">Customer Email</span>}
-                name="customer_email"
+                name="customerEmail"
               >
                 <Input placeholder="Customer Email" />
               </Form.Item>
@@ -1445,7 +1696,7 @@ export default function SalesSouda() {
             <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">Customer Name</span>}
-                name="customerEmail"
+                name="customer"
               >
                 <Input disabled />
               </Form.Item>
@@ -1454,7 +1705,7 @@ export default function SalesSouda() {
             <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">Customer Email</span>}
-                name="customer_email"
+                name="customerEmail"
               >
                 <Input disabled />
               </Form.Item>
@@ -1474,8 +1725,9 @@ export default function SalesSouda() {
 
           <h6 className="text-amber-500">Items</h6>
           <div className="mb-2 text-sm font-semibold text-amber-700 grid grid-cols-12 gap-2">
-            <div className="col-span-3">Company</div>
+            <div className="col-span-2">Company</div>
             <div className="col-span-3">Item</div>
+            <div className="col-span-1">Code</div>
             <div className="col-span-1">UOM</div>
             <div className="col-span-1">Qty</div>
             <div className="col-span-1">Free</div>
@@ -1489,15 +1741,20 @@ export default function SalesSouda() {
               key={it.lineKey}
               className="grid grid-cols-12 gap-2 items-center py-2 border-b"
             >
-              <div className="col-span-3 text-amber-800">{it.vendor_name}</div>
-              <div className="col-span-3 text-amber-800">{it.product_name}</div>
-              <div className="col-span-1 text-amber-800">
-                {it.uom?.unit_name || "-"}
+              <div className="col-span-2 text-amber-800">{it.vendorName}</div>
+              <div className="col-span-3 text-amber-800">
+                {it.itemName}
               </div>
-              <div className="col-span-1 text-amber-800">{it.net_qty}</div>
-              <div className="col-span-1 text-amber-800">{it.free_qty}</div>
-              <div className="col-span-1 text-amber-800">{it.gross_qty}</div>
-              <div className="col-span-1 text-amber-800">{it.mrp}</div>
+              <div className="col-span-1 text-amber-800">
+                {it.itemCode || "-"}
+              </div>
+              <div className="col-span-1 text-amber-800">
+                {it.uom || "-"}
+              </div>
+              <div className="col-span-1 text-amber-800">{it.qty}</div>
+              <div className="col-span-1 text-amber-800">{it.freeQty}</div>
+              <div className="col-span-1 text-amber-800">{it.totalQty}</div>
+              <div className="col-span-1 text-amber-800">{it.rate}</div>
               <div className="col-span-1 text-amber-800">{it.grossAmount}</div>
             </div>
           ))}
@@ -1533,7 +1790,7 @@ export default function SalesSouda() {
             <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">IGST %</span>}
-                name={["igst"]}
+                name={["orderTaxAndTotals", "igstPercent"]}
               >
                 <Input
                   disabled

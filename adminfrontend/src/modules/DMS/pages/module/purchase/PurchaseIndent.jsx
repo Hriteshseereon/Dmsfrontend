@@ -32,34 +32,7 @@ import dayjs from "dayjs";
 
 const { Option } = Select;
 
-// -----------------------
-// Sample SOUDA master data (maps soudaNo -> list of items + basic info)
-// In real app this will come from backend when soudaNo is selected.
-const soudaMaster = {
-  "SOUDA-001": {
-    soudaNo: "SOUDA-001",
-    plantName: "Kalinga Oils Pvt. Ltd.",
-    plantCode: "PC1",
-    companyName: "Jay Traders",
-    depoName: "Bhubaneswar Depot",
-    deliveryAddress: "Plot 12, Industrial Area, Bhubaneswar",
-    items: [
-      { item: "Mustard Oil", itemCode: "ITM-MUST-1", uom: "Litre", rate: 120 },
-      { item: "Sunflower Oil", itemCode: "ITM-SUN-1", uom: "Litre", rate: 110 },
-    ],
-  },
-  "SOUDA-002": {
-    soudaNo: "SOUDA-002",
-    plantName: "Oils Pvt. Ltd.",
-    plantCode: "PC2",
-    companyName: "Saheree Traders",
-    depoName: "Aul Depot",
-    deliveryAddress: "Sector 4, Aul Industrial, Jagatsinghpur",
-    items: [
-      { item: "Coconut Oil", itemCode: "ITM-COC-1", uom: "Litre", rate: 140 },
-    ],
-  },
-};
+
 
 const purchaseIndentJSON = {
   records: [
@@ -144,7 +117,7 @@ const formattedData = list.map((item, index) => ({
 
 
 
-    setData(formattedData);
+   setData(formattedData.reverse());
    
 
   } catch (error) {
@@ -722,7 +695,7 @@ setTimeout(() => {
             name="deliveryAddress"
             rules={[{ required: true }]}
           >
-            <Input.TextArea rows={2} disabled />
+            <Input.TextArea rows={2} />
           </Form.Item>
         </Col>
 

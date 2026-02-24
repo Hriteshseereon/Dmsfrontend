@@ -27,13 +27,33 @@ export default function ItemUnitPriceManager() {
   }, []);
 
   return (
-    <div style={{ padding: 24, background: "#f0f2f5", minHeight: "100vh" }}>
-      <Card bodyStyle={{ background: "#fffaf0" }}>
+    <div className="p-6 bg-gray-100 min-h-screen">
+      {/* ✅ Scoped Amber Tabs Styling */}
+      <style>
+        {`
+          .amber-tabs .ant-tabs-tab:hover {
+            color: #f59e0b !important;
+          }
+
+          .amber-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+            color: #f59e0b !important;
+            font-weight: 600;
+          }
+
+          .amber-tabs .ant-tabs-ink-bar {
+            background-color: #f59e0b !important;
+            height: 3px;
+          }
+        `}
+      </style>
+
+      <Card className="bg-amber-50">
         <Tabs
+          className="amber-tabs"
           items={[
             {
               key: "1",
-              label: "📦 Item Master",
+              label: "Item Master",
               children: (
                 <ItemMasterTab
                   items={items}
@@ -44,7 +64,7 @@ export default function ItemUnitPriceManager() {
             },
             {
               key: "2",
-              label: "🔄 Unit Conversions",
+              label: "Unit Conversions",
               children: (
                 <UnitConversionTab
                   items={items}
@@ -57,7 +77,7 @@ export default function ItemUnitPriceManager() {
             },
             {
               key: "3",
-              label: "💰 Price Management",
+              label: "Price Management",
               children: (
                 <PriceManagementTab
                   items={items}
