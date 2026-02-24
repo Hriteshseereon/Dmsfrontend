@@ -238,11 +238,11 @@ const fetchPurchaseInvoices = async () => {
     const formatted = res.map((item, index) => ({
       key: index + 1,
       ...item,
-      assigned: item.is_transport_assigned,      // ✅ map correctly
-      transport: item.transport_name,            // ✅ show name not ID
+      assigned: item.is_transport_assigned,      
+      transport: item.transport_name,            
     }));
 
-    setData(formatted);
+    setData(formatted.reverse());
   } catch (err) {
     message.error("Failed to load purchase invoices");
     console.error(err);
@@ -271,11 +271,7 @@ const fetchPurchaseOrders = async () => {
   }
 };
 
-const openAddModal = async () => {
-  addForm.resetFields();
-  setIsAddModalOpen(true);
-  await fetchPurchaseOrders();
-};
+
 const handleOrderSelect = async (orderId) => {
   try {
     const order = await getPurchaseOrderById(orderId);
@@ -322,6 +318,7 @@ addForm.setFieldsValue({
     totalQty: Number(item.total_qty),
   })),
 });
+console.log("ORDER RESPONSE:", order);
 
 
    
@@ -361,10 +358,10 @@ addForm.setFieldsValue({
    
     {
       title: <span className="text-amber-700 font-semibold">Transporter</span>,
-      dataIndex: "transport",
+      dataIndex: "transporter_name",
       width: 100,
       render: (_, record) => (
-        <span className="text-amber-800">{record.transport || "-"}</span>
+        <span className="text-amber-800">{record.transporter_name || "-"}</span>
       ),
     },
    {
@@ -637,17 +634,7 @@ const handleAssignSubmit = async (values) => {
 
     message.success("Transport assigned successfully");
 
-    setData((prev) =>
-      prev.map((item) =>
-        item.id === recordToAssign.id
-          ? {
-              ...item,
-              assigned: true,
-              transport: selectedTransport.registered_name,
-            }
-          : item
-      )
-    );
+   await fetchPurchaseInvoices();
 
     setIsAssignModalOpen(false);
   } catch (error) {
@@ -668,6 +655,9 @@ const payload = {
   vendor: isAddModalOpen
     ? selectedOrder?.vendor
     : selectedRecord?.vendor,
+     plant: isAddModalOpen
+    ? selectedOrder?.plant    
+    : selectedRecord?.plant,   
 
   invoice_date: values.invoiceDate
     ? dayjs(values.invoiceDate).format("YYYY-MM-DD")
@@ -713,6 +703,8 @@ const payload = {
 }))
 
 };
+console.log("PAYLOAD:", payload);
+
 
 
     // 🔹 ADD INVOICE
