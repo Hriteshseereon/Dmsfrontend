@@ -182,6 +182,109 @@ export default function UnitConversionTab({ items }) {
 
   return (
     <>
+      <style>
+        {`
+/* ================= CARD ================= */
+.amber-card .ant-card-head {
+  // background: #fffbeb;
+  color: #92400e;
+  // border-bottom: 2px solid #f59e0b;
+}
+
+/* ================= TABLE ================= */
+.amber-table .ant-table {
+  // border: 1px solid #f59e0b;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.amber-table .ant-table-thead > tr > th {
+  background: #fffbeb;
+  color: #92400e;
+  // border-bottom: 2px solid #f59e0b;
+  font-weight: 600;
+}
+
+.amber-table .ant-table-tbody > tr > td {
+  color: #78350f;
+  border-bottom: 1px solid #fde68a;
+}
+
+.amber-table .ant-table-tbody > tr:hover > td {
+  background: #fffbeb;
+}
+
+/* ================= ADD BUTTON ================= */
+.amber-btn {
+  background-color: #f59e0b !important;
+  border-color: #f59e0b !important;
+}
+
+.amber-btn:hover {
+  background-color: #d97706 !important;
+  border-color: #d97706 !important;
+}
+
+/* ================= DISPLAY BUTTON ================= */
+.display-btn {
+  color: #16a34a !important;
+  font-weight: 500;
+}
+
+.display-btn:hover {
+  color: #15803d !important;
+}
+
+/* ================= SELECT FOCUS ================= */
+.ant-select-focused .ant-select-selector {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 2px rgba(245,158,11,0.2) !important;
+}
+/* ================= MODAL HEADER ================= */
+.amber-modal .ant-modal-header {
+  // background: #fffbeb;
+  // border-bottom: 2px solid #f59e0b;
+}
+
+.amber-modal .ant-modal-title {
+  color: #92400e;
+  font-weight: 600;
+}
+
+/* ================= MODAL BODY ================= */
+.amber-modal .ant-modal-content {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* ================= OK BUTTON ================= */
+.amber-modal .ant-btn-primary {
+  background-color: #f59e0b;
+  border-color: #f59e0b;
+}
+
+.amber-modal .ant-btn-primary:hover {
+  background-color: #d97706;
+  border-color: #d97706;
+}
+
+/* ================= CANCEL BUTTON ================= */
+.amber-modal .ant-btn-default:hover {
+  color: #92400e;
+  border-color: #f59e0b;
+}
+
+/* ================= INPUT FOCUS ================= */
+.amber-modal .ant-input:focus,
+.amber-modal .ant-input-focused,
+.amber-modal .ant-input-number-focused,
+.amber-modal .ant-select-focused .ant-select-selector {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 2px rgba(245,158,11,0.2) !important;
+}
+
+`}
+      </style>
       {/* ================= ITEM SEARCH ================= */}
       <Select
         showSearch
@@ -201,9 +304,11 @@ export default function UnitConversionTab({ items }) {
 
       {selectedItem && (
         <Card
+          className="amber-card"
           title={`Units for ${selectedItem.name}`}
           extra={
             <Button
+              className="amber-btn"
               type="primary"
               icon={<PlusOutlined />}
               onClick={() => setOpen(true)}
@@ -214,6 +319,7 @@ export default function UnitConversionTab({ items }) {
         >
           {/* ================= TABLE ================= */}
           <Table
+            className="amber-table"
             rowKey="id"
             pagination={false}
             dataSource={unitConversions?.units || []}
@@ -227,11 +333,12 @@ export default function UnitConversionTab({ items }) {
                 dataIndex: "is_display_unit",
                 render: (isDisplay, record) =>
                   isDisplay ? (
-                    <strong>Yes</strong>
+                    <strong style={{ color: "#16a34a" }}>Yes</strong>
                   ) : (
                     <Button
                       size="small"
                       type="link"
+                      className="display-btn"
                       onClick={() => handleSetDisplay(record.conversion_id)}
                     >
                       Set Display
@@ -248,6 +355,7 @@ export default function UnitConversionTab({ items }) {
 
           {/* ================= MODAL ================= */}
           <Modal
+            className="amber-modal"
             title="Add Unit"
             open={open}
             onOk={handleSave}
