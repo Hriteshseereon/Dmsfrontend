@@ -178,8 +178,11 @@ export default function ItemMasterTab({ items, setItems }) {
       title: "Action",
       render: (_, r) => (
         <Space>
-          <EyeOutlined onClick={() => openEdit(r, true)} />
-          <EditOutlined onClick={() => openEdit(r)} />
+          <EyeOutlined
+            className="action-view"
+            onClick={() => openEdit(r, true)}
+          />
+          <EditOutlined className="action-edit" onClick={() => openEdit(r)} />
         </Space>
       ),
     },
@@ -187,7 +190,77 @@ export default function ItemMasterTab({ items, setItems }) {
 
   return (
     <>
+      <style>
+        {`
+/* ===== TABLE BORDER ===== */
+// .amber-table .ant-table {
+//   border: 1px solid #f59e0b;
+//   border-radius: 8px;
+//   overflow: hidden;
+// }
+
+/* header */
+.amber-table .ant-table-thead > tr > th {
+  background: #fffbeb;
+  color: #92400e;
+  // border-bottom: 2px solid #f59e0b;
+  font-weight: 600;
+}
+
+/* body cells */
+.amber-table .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #fde68a;
+  color: #78350f;
+}
+
+/* row hover */
+.amber-table .ant-table-tbody > tr:hover > td {
+  background: #fffbeb;
+}
+
+/* pagination active */
+.amber-table .ant-pagination-item-active {
+  border-color: #f59e0b;
+}
+.amber-table .ant-pagination-item-active a {
+  color: #f59e0b;
+}
+
+/* ===== ADD BUTTON ===== */
+.amber-add-btn {
+  background-color: #f59e0b !important;
+  border-color: #f59e0b !important;
+}
+
+.amber-add-btn:hover {
+  background-color: #d97706 !important;
+  border-color: #d97706 !important;
+}
+
+/* ===== ACTION ICONS ===== */
+.action-view {
+  color: #2151f0;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.action-view:hover {
+  color: #15803d;
+}
+
+.action-edit {
+  color: #ed0b0b;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.action-edit:hover {
+  color: #1d4ed8;
+}
+`}
+      </style>
       <Button
+        className="amber-add-btn"
         type="primary"
         icon={<PlusOutlined />}
         onClick={() => {
@@ -201,6 +274,7 @@ export default function ItemMasterTab({ items, setItems }) {
       </Button>
 
       <Table
+        className="amber-table"
         rowKey="id"
         columns={columns}
         dataSource={items}

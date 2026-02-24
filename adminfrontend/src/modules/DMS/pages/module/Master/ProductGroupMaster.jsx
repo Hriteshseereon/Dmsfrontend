@@ -99,10 +99,10 @@ export default function ProductGroupMaster() {
               setIsEditModalOpen(true);
             }}
           />
-          <DeleteOutlined
+          {/* <DeleteOutlined
             className="cursor-pointer text-gray-600 hover:text-red-600"
             onClick={() => handleDelete(record)}
-          />
+          /> */}
         </div>
       ),
     },
