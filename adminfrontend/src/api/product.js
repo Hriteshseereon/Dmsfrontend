@@ -38,6 +38,21 @@ export const getProducts = async () => {
   return Array.isArray(res.data) ? res.data : res.data?.results || [];
 };
 
+export const getProductById = async (id) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res =  await api.get(`/product/products/${id}`,{
+    params: { organisation: currentOrgId },
+  })
+  return res.data;
+}
+
+
+export const updateProductById = async (payload,id) =>{
+    const { currentOrgId } = useSessionStore.getState();
+  const res = await api.put(`/product/products/${id}/`,payload,{
+    params: { organisation: currentOrgId },
+  })
+}
 export const getVendors = async () => {
   const { currentOrgId } = useSessionStore.getState();
   const res = await api.get("/vendors/vendors/", {
