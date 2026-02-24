@@ -132,17 +132,17 @@ const fetchPurchaseReturns = async () => {
 
     const records = res.data || res;
 
-    setData(
-  records.map((item, index) => ({
-    key: item.id,
-    return_number: item.return_number,
-    return_date: item.return_date,
-   status: item.status || "Pending",
-    item_name: item.items?.[0]?.item_name,
-     quantity: item.items?.[0]?.quantity,  
-    item_return_reason: item.items?.[0]?.item_return_reason,
-  }))
-);
+ const formattedData = records.map((item, index) => ({
+  key: item.id,
+  return_number: item.return_number,
+  return_date: item.return_date,
+  status: item.status || "Pending",
+  item_name: item.items?.[0]?.item_name,
+  quantity: item.items?.[0]?.quantity,
+  item_return_reason: item.items?.[0]?.item_return_reason,
+}));
+
+setData(formattedData.reverse());
 
   } catch (error) {
     console.error("Failed to fetch purchase returns", error);
@@ -182,7 +182,7 @@ const handleExport = async () => {
       detail.items?.forEach((item) => {
         exportRows.push({
           "Return No": detail.return_number,
-         "Company": detail.vendor_name,
+         "Vendor": detail.vendor_name,
           "Return Date": detail.return_date,
           "Status": detail.status,
 

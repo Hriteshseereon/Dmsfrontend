@@ -167,10 +167,7 @@ export default function PurchaseSouda() {
       setLoading(true);
       const res = await getPurchaseContract();
 
-      /**
-       * Adjust mapping based on backend response structure
-       * Assuming API returns array of purchase contracts
-       */
+     
       const formattedData = res.map((item, index) => ({
         key: item.id || index + 1,
         name: item.name,
@@ -183,7 +180,7 @@ export default function PurchaseSouda() {
         status: item.status,
       }));
 
-      setData(formattedData);
+      setData(formattedData.reverse());
     } catch (error) {
       console.error("Failed to fetch purchase contracts", error);
     } finally {
@@ -397,13 +394,6 @@ const handleViewClick = async (record) => {
       width: 100,
     },
 
-
-    // {
-    //   title: <span className="text-amber-700 font-semibold">Souda Date</span>,
-    //   dataIndex: "soudaDate",
-    //   width: 110,
-    //   render: (t) => <span className="text-amber-800">{t}</span>,
-    // },
     {
       title: <span className="text-amber-700 font-semibold">Start Date</span>,
       dataIndex: "from_date",
@@ -693,8 +683,7 @@ const handleExport = async () => {
                   >
                     <Select
                       placeholder={!selectedVendor ? "Select vendor first" : "Select Item"}
-                      disabled={!selectedVendor || products.length === 0 || isEditModalOpen || isViewModalOpen}
-                      
+                     disabled={!selectedVendor || products.length === 0 || disabled} 
                       onChange={(productId) => {
                         const selected = products.find(p => p.id === productId);
 
