@@ -334,7 +334,7 @@ export default function ItemMasterTab({ items, setItems }) {
                 />
               </FormField>
 
-              {formData.itemCategory === "SERVICE" && (
+              {formData.itemCategory === "services" && (
                 <FormField label="SAC Code" required>
                   <Select
                     showSearch
