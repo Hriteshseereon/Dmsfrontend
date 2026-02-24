@@ -1931,7 +1931,7 @@ export default function Order() {
               min={0}
               max={100}
               className="w-full"
-              disabled={disabled}
+              disabled
               onChange={() => onFormValuesChange(form, form.getFieldsValue())}
             />
           </Form.Item>
@@ -1945,7 +1945,7 @@ export default function Order() {
               min={0}
               max={100}
               className="w-full"
-              disabled={disabled}
+              disabled
               onChange={() => onFormValuesChange(form, form.getFieldsValue())}
             />
           </Form.Item>
@@ -1959,7 +1959,7 @@ export default function Order() {
               min={0}
               max={100}
               className="w-full"
-              disabled={disabled}
+              disabled
               onChange={() => onFormValuesChange(form, form.getFieldsValue())}
             />
           </Form.Item>
@@ -1972,7 +1972,7 @@ export default function Order() {
             <InputNumber
               min={0}
               className="w-full"
-              disabled={disabled}
+              disabled
               onChange={() => onFormValuesChange(form, form.getFieldsValue())}
             />
           </Form.Item>

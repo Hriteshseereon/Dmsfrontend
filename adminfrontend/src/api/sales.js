@@ -13,13 +13,37 @@ export const getSalescontractGroups = async () => {
 //   });
 //   return res.data;
 // }  
+export const getAllSalesContracts = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/sales/contracts/`, {
+    params: { organisation: currentOrgId }
+  });
+  return res.data;
+}
+
 export const createsalesContract = async (payload) => {
   const currentOrgId = useSessionStore.getState();
-  const res = await api.post(`/sales/contracts/`, payload, {   
+  const res = await api.post(`/sales/contracts/`, payload, {
     params: { organisation: currentOrgId.currentOrgId }
   });
   return res.data;
-}  
+}
+
+export const updateSalesContract = async (id, payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.patch(`/sales/contracts/${id}/`, payload, {
+    params: { organisation: currentOrgId }
+  });
+  return res.data;
+}
+
+export const getSalesContractById = async (contractId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/sales/contracts/${contractId}`, {
+    params: { organisation: currentOrgId }
+  });
+  return res.data;
+}
 
 export const getproductbyVendor = async (vendorId) => {
   const res = await api.get(`/product/products/by-vendor`, {
@@ -28,13 +52,21 @@ export const getproductbyVendor = async (vendorId) => {
   return res.data;
 }
 export const getCustomers = async () => {
-    const { currentOrgId } = useSessionStore.getState();
-  const res = await api.get("/sales/orders/customers/", {params: {organisation: currentOrgId}});
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("/sales/orders/customers/", { params: { organisation: currentOrgId } });
+  return res.data;
+}
+
+export const getCustomersByOrganisation = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("/customers/admin/by-organisation/", {
+    params: { organisation: currentOrgId }
+  });
   return res.data;
 }
 export const getVendors = async () => {
-    const { currentOrgId } = useSessionStore.getState();
-  const res = await api.get("/vendors/vendors/", {params: {organisation: currentOrgId}});
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("/vendors/vendors/", { params: { organisation: currentOrgId } });
   return res.data;
 }
 export const approvedSalesContract = async (contractId) => {
@@ -79,7 +111,23 @@ export const createSalesOrder = async (payload) => {
 
 export const getSalesOrders = async () => {
   const { currentOrgId } = useSessionStore.getState();
-  const res = await api.get(`/sales/orders/`, { 
+  const res = await api.get(`/sales/orders/`, {
+    params: { organisation: currentOrgId }
+  });
+  return res.data;
+}
+
+export const getSalesOrderById = async (id) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/sales/orders/${id}/`, {
+    params: { organisation: currentOrgId }
+  });
+  return res.data;
+}
+
+export const updateSalesOrder = async (id, payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.put(`/sales/orders/${id}/`, payload, {
     params: { organisation: currentOrgId }
   });
   return res.data;
