@@ -1084,31 +1084,7 @@ export default function Contract() {
             </Form.Item>
           </Col>
 
-          {/* <Col span={6}>
-            <Form.Item label="Depo">
-              <Input value={selectedRecord?.depoName} disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Location">
-              <Input value={selectedRecord?.location} disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Broker">
-              <Input value={selectedRecord?.brokerName} disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Type">
-              <Input value={selectedRecord?.type} disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Delivery Address">
-              <Input value={selectedRecord?.deliveryAddress} disabled />
-            </Form.Item>
-          </Col> */}
+         
           <Col span={6}>
             <Form.Item label="Status">
               <Input value={selectedRecord?.status} disabled />
@@ -1128,48 +1104,51 @@ export default function Contract() {
       <h3 className="text-xl font-semibold text-amber-600 my-4">Item & Quantity Details</h3>
       <div className="border! p-2! rounded! mb-2! border-amber-300! relative!">
         {(selectedRecord?.items || []).map((it, idx) => (
-          <Row gutter={16} key={idx} className="mb-2 border-b border-dashed pb-2">
-            <Col span={4}>
-              <Form.Item label={`Vendor ${idx + 1}`}>
-                <Input value={it.companyName} disabled />
-              </Form.Item>
-            </Col>
-            <Col span={4}>
-              <Form.Item label={`Item ${idx + 1}`}>
-                <Input value={it.item} disabled />
-              </Form.Item>
-            </Col>
-            <Col span={4}>
-              <Form.Item label={`Item Code`}>
-                <Input value={it.itemCode} disabled />
-              </Form.Item>
-            </Col>
-            <Col span={3}>
-              <Form.Item label="UOM">
-                <Input value={it.uom} disabled />
-              </Form.Item>
-            </Col>
-            <Col span={3}>
-              <Form.Item label="Qty">
-                <Input value={it.qty} disabled />
-              </Form.Item>
-            </Col>
-            <Col span={3}>
-              <Form.Item label="Rate (per UOM)">
-                <Input value={it.rate} disabled />
-              </Form.Item>
-            </Col>
-            <Col span={3}>
-              <Form.Item label="Item Total Amount">
-                <Input value={it.totalAmount} disabled />
-              </Form.Item>
-            </Col>
-            <Col span={4}>
-              <Form.Item label="Free Qty">
-                <Input value={it.freeQty} disabled />
-              </Form.Item>
-            </Col>
-          </Row>
+         <Row gutter={16} key={idx} className="mb-2 border-b border-dashed pb-2">
+  
+  <Col span={6}>
+    <Form.Item label={`Vendor ${idx + 1}`}>
+      <Input value={it.companyName} disabled />
+    </Form.Item>
+  </Col>
+
+  <Col span={6}>
+    <Form.Item label={`Item ${idx + 1}`}>
+      <Input value={it.item} disabled />
+    </Form.Item>
+  </Col>
+
+  <Col span={6}>
+    <Form.Item label="UOM">
+      <Input value={it.uom} disabled />
+    </Form.Item>
+  </Col>
+
+  <Col span={6}>
+    <Form.Item label="Qty">
+      <Input value={it.qty} disabled />
+    </Form.Item>
+  </Col>
+
+  <Col span={6}>
+    <Form.Item label="Rate (per UOM)">
+      <Input value={it.rate} disabled />
+    </Form.Item>
+  </Col>
+
+  <Col span={6}>
+    <Form.Item label="Item Total Amount">
+      <Input value={it.totalAmount} disabled />
+    </Form.Item>
+  </Col>
+
+  <Col span={6}>
+    <Form.Item label="Free Qty">
+      <Input value={it.freeQty} disabled />
+    </Form.Item>
+  </Col>
+
+</Row>
         ))}
 
       </div>

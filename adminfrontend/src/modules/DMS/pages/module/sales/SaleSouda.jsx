@@ -204,7 +204,6 @@ export default function SalesSouda() {
     };
   };
 
-  // derive company options (from seed and existing data)
   // const companyOptions = useMemo(() => {
   //   const fromData = Array.from(
   //     new Set(
@@ -424,21 +423,8 @@ export default function SalesSouda() {
         },
       };
 
-      // Set record to full contract so View Modal can read fields from it (like `items` array manually rendered)
-      // Note: The View Modal JSX reads `selectedRecord.items`, `selectedRecord`.
-      // So I must set `selectedRecord` to the MAPPED object OR the RAW object?
-      // View Modal JSX:
-      // defaultValue={selectedRecord?.orderTaxAndTotals?.sgstPercent}
-      // It reads from `selectedRecord` directly for some fields?
-      // Actually `Form` initialValues or setFieldsValue sets the inputs.
-      // But look at View Modal JSX:
-      // Line 1487: `(selectedRecord?.items || []).map(...)`
-      // Line 1516: `value={selectedRecord?.orderTaxAndTotals?.sgstPercent}`
-      // So `selectedRecord` MUST be the MAPPED object (or consistent with form structure).
-      // `mapApiRecordToForm` returned the same structure as `mapped` here.
-      // So setting `setSelectedRecord(mapped)` is correct.
-      // EXCEPT `record` passed to `openView` has `key`. `mapped` doesn't have `key`.
-      // I should add `key` to `mapped`.
+     
+    
       mapped.key = contract.sale_contract_id;
 
       setSelectedRecord(mapped);
@@ -577,12 +563,7 @@ export default function SalesSouda() {
       ),
     },
 
-    // {
-    //   title: <span className="text-amber-700 font-semibold">End Date</span>,
-    //   dataIndex: "endDate",
-    //   width: 110,
-    //   render: (date) => dayjs(date).format("YYYY-MM-DD"),
-    // },
+  
 
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
@@ -635,22 +616,13 @@ export default function SalesSouda() {
       width: 120,
       render: (record) => (
         <div className="flex gap-3">
-          <EyeOutlined onClick={() => openView(record)} />
+          <EyeOutlined className="text-green-700!" onClick={() => openView(record)} />
           {record.status === "Approved" ? (
-            <EditOutlined className="text-gray-300! cursor-not-allowed!" />
+            <EditOutlined className="text-blue-700! cursor-not-allowed!"  />
           ) : (
-            <EditOutlined onClick={() => openEdit(record)} />
+            <EditOutlined className="text-gray-300! " onClick={() => openEdit(record)} />
           )}
-          {record.status === "Fresh" && (
-            <Button
-              size="small"
-              type="primary"
-              className="bg-green-500 hover:bg-green-600"
-              onClick={() => handleApprove(record)}
-            >
-              Approve
-            </Button>
-          )}
+         
         </div>
       ),
     },
@@ -795,6 +767,10 @@ export default function SalesSouda() {
                                 name: ["items", field.name, "uom"],
                                 value: selected?.base_unit,
                               },
+                              {
+          name: ["items", field.name, "rate"],
+          value: Number(selected.default_rate), // ✅ Auto fill Rate
+        },
                             ]);
                           }}
                         >
@@ -867,7 +843,7 @@ export default function SalesSouda() {
                         name={[field.name, "rate"]}
                         rules={[{ required: true }]}
                       >
-                        <InputNumber min={0} className="w-full" />
+                       <InputNumber min={0} className="w-full" disabled />
                       </Form.Item>
                     </Col>
 
@@ -1082,26 +1058,7 @@ export default function SalesSouda() {
     });
   };
 
-  // when opening edit modal, preload startDate/endDate (dayjs) + items
-  // useEffect(() => {
-  //   if (isEditModalOpen && selectedRecord) {
-  //     const preloaded = {
-  //       ...selectedRecord,
-  //       soudaDate: selectedRecord.soudaDate
-  //         ? dayjs(selectedRecord.soudaDate)
-  //         : undefined,
-  //       startDate: selectedRecord.startDate
-  //         ? dayjs(selectedRecord.startDate)
-  //         : undefined,
-  //       endDate: selectedRecord.endDate
-  //         ? dayjs(selectedRecord.endDate)
-  //         : undefined,
-  //     };
-  //     editForm.setFieldsValue(preloaded);
-  //   }
-  //   // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, [isEditModalOpen, selectedRecord]);
-
+  
   return (
     <div>
       <div className="flex justify-between items-center mb-2">
@@ -1235,13 +1192,7 @@ export default function SalesSouda() {
             </Col>
 
             <Col span={6}>
-              {/* <Form.Item
-                label={<span className="text-amber-700">Customer Name</span>}
-                name="customer"
-                rules={[{ required: true }]}
-              >
-                <Input placeholder="Enter Customer Name" />
-              </Form.Item> */}
+             
               <Form.Item
                 label={<span className="text-amber-700">Customer Name</span>}
                 name="customerId"
@@ -1326,20 +1277,8 @@ export default function SalesSouda() {
               </Form.Item>
             </Col>
 
-            {/* <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Location</span>}
-                name="location"
-              >
-                <Select placeholder="Select Location">
-                  {salesSoudaJSONModified2.locationOptions.map((s) => (
-                    <Select.Option key={s} value={s}>
-                      {s}
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col> */}
+         
+           
 
             <Col span={6}>
               <Form.Item

@@ -334,7 +334,19 @@ export default function SaleOrdersInvoice() {
       orderTotals,
     });
   };
+const handleStatusChange = async (value, form) => {
+  // call API
+  const res = await getTaxByStatus(value); // your API
 
+  form.setFieldsValue({
+    orderTaxAndTotals: {
+      sgstPercent: res.sgst,
+      cgstPercent: res.cgst,
+      igstPercent: res.igst,
+      tcsAmt: res.tcs,
+    },
+  });
+};
   /* ---------- Add handlers ---------- */
   const openAddModal = () => {
     addForm.resetFields();
@@ -824,25 +836,13 @@ export default function SaleOrdersInvoice() {
         </span>
       ),
     },
-    // {
-    //   title: <span className="text-amber-700 font-semibold">Company</span>,
-    //   dataIndex: "companyName",
-    //   render: (t) => <span className="text-amber-800">{t}</span>,
-    // },
+
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
       dataIndex: "customerName",
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
-    // {
-    //   title: <span className="text-amber-700 font-semibold">Contracts</span>,
-    //   dataIndex: "contracts",
-    //   render: (contracts = []) => (
-    //     <span className="text-amber-800">
-    //       {(contracts || []).map((c) => c.contractNo).join(", ")}
-    //     </span>
-    //   ),
-    // },
+   
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
@@ -1284,35 +1284,7 @@ export default function SaleOrdersInvoice() {
                                 />
                               </Form.Item>
                             </Col>
-                            {/* GROSS WT */}
-                            {/* <Col span={3}>
-                              <Form.Item
-                                name={[itf.name, "grossWt"]}
-                                label="Gross Wt"
-                              >
-                                <InputNumber
-                                  className="w-full"
-                                  onChange={() =>
-                                    onFormValuesChange(
-                                      form,
-                                      form.getFieldsValue(),
-                                    )
-                                  }
-                                />
-                              </Form.Item>
-                            </Col> */}
-
-                            {/* TOTAL GROSS WT */}
-                            {/* <Col span={3}>
-                              <Form.Item
-                                name={[itf.name, "totalGrossWt"]}
-                                label="Total Gross Wt"
-                              >
-                                <InputNumber className="w-full" disabled />
-                              </Form.Item>
-                            </Col> */}
-
-                            {/* DELETE BUTTON */}
+                           
                           </Row>
                           {!disabled && (
                             <Button
@@ -1390,11 +1362,7 @@ export default function SaleOrdersInvoice() {
                   });
                 }
 
-                // fetch contracts for this customer
-                // const contracts = await getContractDetailsbyPerson(customerId);
-                // setContractOptions(contracts);
-
-                // reset downstream data
+              
                 setContractItems([]);
                 form.setFieldsValue({ contract_id: undefined });
               }}
@@ -1429,15 +1397,7 @@ export default function SaleOrdersInvoice() {
           </Form.Item>
         </Col>
 
-        {/* <Col span={6}>
-          <Form.Item
-            label={<span className="text-amber-700">Company</span>}
-            name="companyName"
-            rules={[{ required: true }]}
-          >
-            <Input placeholder="Company" disabled={disabled} />
-          </Form.Item>
-        </Col> */}
+       
         <Col span={6}>
           <Form.Item
             label={<span className="text-amber-700">Customer Email</span>}
@@ -1456,28 +1416,16 @@ export default function SaleOrdersInvoice() {
           </Form.Item>
         </Col>
 
-        {/* <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Depo Name</span>} name="depoName">
-            <Select placeholder="Depo" disabled={disabled}>
-              {salesOrderJSON.depoOptions.map((d) => <Select.Option key={d} value={d}>{d}</Select.Option>)}
-            </Select>
-          </Form.Item>
-        </Col> */}
+       
 
-        {/* <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Broker Name</span>} name="brokerName">
-            <Select placeholder="Broker" disabled={disabled}>
-              {salesOrderJSON.brokerOptions.map((b) => <Select.Option key={b} value={b}>{b}</Select.Option>)}
-            </Select>
-          </Form.Item>
-        </Col> */}
         <Col span={6}>
-          <Form.Item
-            label={<span className="text-amber-700">Status</span>}
-            name="status"
-          >
-            <Select placeholder="pending" disabled={disabled}></Select>
-          </Form.Item>
+          <Form.Item name="status" label="Status">
+  <Select onChange={(val) => handleStatusChange(val, form)}>
+    <Select.Option value="Approved">Approved</Select.Option>
+    <Select.Option value="Pending">Pending</Select.Option>
+     <Select.Option value="Rejected">Pending</Select.Option>
+  </Select>
+</Form.Item>
         </Col>
       </Row>
 
