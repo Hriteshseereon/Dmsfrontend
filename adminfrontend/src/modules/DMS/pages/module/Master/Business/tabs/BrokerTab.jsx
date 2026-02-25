@@ -20,6 +20,7 @@ import {
   ReloadOutlined,
   MinusCircleOutlined,
 } from "@ant-design/icons";
+import { API_BASE_URL } from "@/utils/config";
 
 // import { getBrokers, addBroker, updateBroker, getBrokerDetails } from "../../../../../../../api/broker";
 import {
@@ -46,12 +47,16 @@ const vendorProductMap = {
 /** Convert a URL string from API into Ant Design Upload fileList format */
 const fileFromUrl = (url) => {
   if (!url) return [];
+
+  // if backend already returns full URL → use it
+  const finalUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+
   return [
     {
-      uid: url,
-      name: url.split("/").pop(),
+      uid: finalUrl,
+      name: finalUrl.split("/").pop(),
       status: "done",
-      url,
+      url: finalUrl,
     },
   ];
 };

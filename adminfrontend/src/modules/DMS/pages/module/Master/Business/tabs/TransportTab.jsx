@@ -25,6 +25,7 @@ import {
   getTransportById,
 } from "@/api/transport.js";
 // import { getTransporters, addTransporter, updateTransporter, getTransporterDetails } from "../../../../../../../api/transporter";
+import { API_BASE_URL } from "@/utils/config";
 
 const inputClass = "border-amber-400 h-8";
 const passwordClass = "border-amber-400 h-8";
@@ -56,12 +57,15 @@ export default function TransportTab() {
   const fileFromUrl = (url) => {
     if (!url) return [];
 
+    // if backend already returns full URL → use it
+    const finalUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+
     return [
       {
-        uid: url,
-        name: url.split("/").pop(),
+        uid: finalUrl,
+        name: finalUrl.split("/").pop(),
         status: "done",
-        url,
+        url: finalUrl,
       },
     ];
   };

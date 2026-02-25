@@ -19,7 +19,7 @@ import {
   SearchOutlined,
   ReloadOutlined,
 } from "@ant-design/icons";
-
+import { API_BASE_URL } from "@/utils/config";
 import {
   getAdminCustomerDetails,
   addAdminCustomer,
@@ -44,12 +44,16 @@ export default function CustomerTab() {
 
   const fileFromUrl = (url) => {
     if (!url) return [];
+
+    // if backend already returns full URL → use it
+    const finalUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+
     return [
       {
-        uid: url,
-        name: url.split("/").pop(),
+        uid: finalUrl,
+        name: finalUrl.split("/").pop(),
         status: "done",
-        url: url,
+        url: finalUrl,
       },
     ];
   };
