@@ -33,10 +33,28 @@ import {
 } from "../../../../../../../api/bussinesspatnr";
 
 const { Option } = Select;
-
+import { API_BASE_URL } from "@/utils/config";
 const inputClass = "border-amber-400 h-8";
 const selectClass = "border-amber-400 h-8 w-full";
 
+// /* ================= PHONE VALIDATOR ================= */
+export const phoneValidator = (_, value) => {
+  if (!value) return Promise.resolve(); // allow empty if not required
+
+  const phone = value.toString().trim();
+
+  // E.164 format:
+  // optional +
+  // first digit 1–9
+  // total digits max 15
+  const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+
+  if (!phoneRegex.test(phone)) {
+    return Promise.reject(new Error("Enter valid number "));
+  }
+
+  return Promise.resolve();
+};
 export default function VendorTab() {
   const [data, setData] = useState([]);
   const [search, setSearch] = useState("");
@@ -65,12 +83,15 @@ export default function VendorTab() {
   const fileFromUrl = (url) => {
     if (!url) return [];
 
+    // if backend already returns full URL → use it
+    const finalUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+
     return [
       {
-        uid: url,
-        name: url.split("/").pop(),
+        uid: finalUrl,
+        name: finalUrl.split("/").pop(),
         status: "done",
-        url,
+        url: finalUrl,
       },
     ];
   };
@@ -468,17 +489,14 @@ export default function VendorTab() {
                   name="mobileNo1"
                   rules={[
                     { required: true, message: "Mobile number is required" },
-                    {
-                      pattern: /^[6-9]\d{9}$/,
-                      message: "Enter a valid 10-digit mobile number",
-                    },
+                    { validator: phoneValidator },
                   ]}
                 >
-                  <InputNumber
+                  <Input
                     className={inputClass}
                     disabled={viewMode}
-                    placeholder="9984568331"
-                    style={{ width: "100%" }}
+                    placeholder="+917833242424"
+                    maxLength={16} // + + 15 digits
                   />
                 </Form.Item>
               </Col>
@@ -489,9 +507,9 @@ export default function VendorTab() {
                   name="mobileNo2"
                   rules={[
                     {
-                      pattern: /^[6-9]\d{9}$/,
                       message: "Enter a valid 10-digit mobile number",
                     },
+                    { validator: phoneValidator },
                   ]}
                 >
                   <Input
@@ -499,6 +517,7 @@ export default function VendorTab() {
                     disabled={viewMode}
                     placeholder="7984568331"
                     style={{ width: "100%" }}
+                    maxLength={16}
                   />
                 </Form.Item>
               </Col>
@@ -548,9 +567,9 @@ export default function VendorTab() {
                   name="whatsappNo"
                   rules={[
                     {
-                      pattern: /^[6-9]\d{9}$/,
                       message: "Enter a valid 10-digit mobile number",
                     },
+                    { validator: phoneValidator },
                   ]}
                 >
                   <InputNumber
@@ -558,6 +577,7 @@ export default function VendorTab() {
                     disabled={viewMode}
                     placeholder="9984568331"
                     style={{ width: "100%" }}
+                    maxLength={16}
                   />
                 </Form.Item>
               </Col>
@@ -619,9 +639,9 @@ export default function VendorTab() {
                   rules={[
                     { required: true, message: "Mobile number is required" },
                     {
-                      pattern: /^[6-9]\d{9}$/,
                       message: "Enter a valid 10-digit mobile number",
                     },
+                    { validator: phoneValidator },
                   ]}
                 >
                   <InputNumber
@@ -629,17 +649,23 @@ export default function VendorTab() {
                     disabled={viewMode}
                     placeholder="9984568331"
                     style={{ width: "100%" }}
+                    maxLength={16}
                   />
                 </Form.Item>
               </Col>
 
               <Col span={4}>
-                <Form.Item label="WhatsApp No" name="contactWhatsapp">
+                <Form.Item
+                  label="WhatsApp No"
+                  name="contactWhatsapp"
+                  rules={[{ validator: phoneValidator }]}
+                >
                   <InputNumber
                     className={inputClass}
                     disabled={viewMode}
                     placeholder="9984568331"
                     style={{ width: "100%" }}
+                    maxLength={16}
                   />
                 </Form.Item>
               </Col>
@@ -1042,10 +1068,8 @@ export default function VendorTab() {
                                 required: true,
                                 message: "Mobile number is required",
                               },
-                              {
-                                pattern: /^[6-9]\d{9}$/,
-                                message: "Enter a valid 10-digit mobile number",
-                              },
+
+                              { validator: phoneValidator },
                             ]}
                           >
                             <InputNumber

@@ -547,47 +547,46 @@ export default function Contract() {
 
 
   // Logic to handle item selection change for auto-fill (Rate and Item Code)
-  const handleItemSelect = (form, vendorId, productId, rowIndex) => {
-    const products = vendorProducts[vendorId] || [];
-    // Ensure we match either product_id or id
-    const product = products.find(p => (p.product_id || p.id) === productId);
+ const handleItemSelect = (form, vendorId, productId, rowIndex) => {
+  const products = vendorProducts[vendorId] || [];
+  const product = products.find(p => (p.product_id || p.id) === productId);
 
-    if (!product) return;
+  if (!product) return;
 
-    // Get current items from form
-    const items = [...(form.getFieldValue('items') || [])];
+  const items = [...(form.getFieldValue('items') || [])];
 
-    // Find base UOM from uoms array or fallback to base_unit
-    const baseUomObj = product.uoms?.find(u => u.type === 'base') || product.uoms?.[0];
-    const baseUomName = baseUomObj?.unit_name || product.base_unit || "KG";
-    const baseUomId = baseUomObj?.uom_id !== undefined ? baseUomObj.uom_id : null;
+  // ✅ Get BASE UOM
+  const baseUomObj =
+    product.uoms?.find(u => u.type === "base") || product.uoms?.[0];
 
-    // Base rate is the rate in the smallest/base UOM
-    const baseRate = product.mrp || 0;
+  const baseUomName = baseUomObj?.unit_name || product.base_unit;
+  const baseUomId = baseUomObj?.uom_id ?? null;
 
-    // Update only selected row with the new data
-    items[rowIndex] = {
-      ...items[rowIndex],
-      item: product.product_name,
-      product_id: productId, // Use the value from event to ensure accuracy
-      itemCode: product.product_code || product.product_id || product.id,
-      uom: baseUomName,
-      baseRate: baseRate,
-      rate: baseRate,
-      qty: items[rowIndex].qty || 0,
-      uom_id: baseUomId,
-    };
+  // ✅ Get BASE PRICE from default_price
+  const baseRate = Number(product.default_price?.base_price || 0);
 
-    // Push updated list back to form
-    form.setFieldsValue({ items });
+  // ✅ Update row
+  items[rowIndex] = {
+    ...items[rowIndex],
+    item: product.product_name,
+    product_id: productId,
+    itemCode: product.product_code || product.product_id,
 
-    // Explicitly validate this field to clear any error message
-    form.validateFields([['items', rowIndex, 'product_id']]);
+    // 🔥 AUTO FILL
+    uom: baseUomName,
+    uom_id: baseUomId,
+    baseRate: baseRate,
+    rate: baseRate, // initial same as base
 
-    // Recalculate amount
-    updateItemCalculations(form, rowIndex);
+    qty: items[rowIndex]?.qty || 0,
+    totalAmount: 0,
   };
 
+  form.setFieldsValue({ items });
+
+  // 🔥 Calculate total
+  updateItemCalculations(form, rowIndex);
+};
   const handleCompanyChange = async (form, vendorId, fieldName) => {
     const vendor = vendors.find(v => v.id === vendorId);
     if (!vendor) return;
@@ -898,26 +897,16 @@ export default function Contract() {
         {/* UOM - 🌟 MADE SELECTABLE 🌟 */}
         <Col span={4}>
           <label>UOM</label>
-          <Form.Item
-            {...field}
-            name={[field.name, "uom"]}
-            fieldKey={[field.fieldKey, "uom"]}
-            rules={[{ required: true, message: "Select UOM" }]}
-          >
-            <Select
-              placeholder="UOM"
-              disabled={disabled || !selectedItemName}
-              onChange={() => updateItemCalculations(formInstance, field.name)}
-            >
-              {(product?.uoms || []).map((u) => (
-                <Select.Option key={u.unit_name} value={u.unit_name}>{u.unit_name}</Select.Option>
-              ))}
-              {/* Fallback to legacy options if no product uoms but item name exists */}
-              {(!product?.uoms || product.uoms.length === 0) && finalUomOptions.map((uom) => (
-                <Select.Option key={uom} value={uom}>{uom}</Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
+         <Form.Item
+  {...field}
+  name={[field.name, "uom"]}
+  fieldKey={[field.fieldKey, "uom"]}
+>
+  <Select
+    disabled
+    value={formInstance.getFieldValue(["items", field.name, "uom"])}
+  />
+</Form.Item>
         </Col>
 
         {/* Quantity */}
