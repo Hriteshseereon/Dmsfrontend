@@ -40,25 +40,47 @@ const { TextArea } = Input;
 
 const ORG_RULES = {
   PRIVATE_LIMITED: {
-    label: "Director",
+    roleLabel: "Director",
+    idLabel: "DIN Number",
+    showDIN: true,
     askCount: true,
     showPercent: true,
     company_website: true,
   },
+
   LLP: {
-    label: "Partner",
+    roleLabel: "Partner",
+    idLabel: "DPIN Number",
+    showDIN: true,
     askCount: true,
     showPercent: true,
     company_website: true,
   },
+
+  OPC: {
+    roleLabel: "Director", // OPC uses Director
+    idLabel: null,
+    showDIN: false,
+    askCount: false,
+    showPercent: false,
+  },
+
   Partnership: {
-    label: "Partner",
+    roleLabel: "Partner",
+    idLabel: null,
+    showDIN: false,
     askCount: true,
     showPercent: true,
     company_website: true,
   },
-  Proprietorship: { label: "Proprietor", askCount: false, showPercent: false },
-  OPC: { label: "One Person Company", askCount: false, showPercent: false },
+
+  PROPRIETORSHIP: {
+    roleLabel: "Proprietor",
+    idLabel: null,
+    showDIN: false,
+    askCount: false,
+    showPercent: false,
+  },
 };
 
 const SHOW_COMPANY_DETAILS_FOR = ["PRIVATE_LIMITED", "LLP", "Partnership"];
@@ -1154,17 +1176,20 @@ export default function AddOrganisation() {
               <Option value="LLP">LLP</Option>
               <Option value="OPC">OPC</Option>
               <Option value="Partnership">Partnership</Option>
-              <Option value="Proprietorship">Proprietor</Option>
+              <Option value="PROPRIETORSHIP">Proprietor</Option>
             </Select>
           </Form.Item>
         </Col>
         {rule?.askCount && (
           <Col md={6}>
-            <Form.Item label={`Number of ${rule.label}s`} name="partnersCount">
+            <Form.Item
+              label={`Number of ${rule.roleLabel}s`}
+              name="partnersCount"
+            >
               <InputNumber
                 min={0}
                 style={{ width: "100%" }}
-                placeholder={`Enter number of ${rule.label}s (optional)`}
+                placeholder={`Enter number of ${rule.roleLabel}s (optional)`}
               />
             </Form.Item>
           </Col>
@@ -1194,7 +1219,7 @@ export default function AddOrganisation() {
                 key={key}
                 size="small"
                 style={{ marginBottom: 16, border: "1px solid #fef3c7" }}
-                title={`${rule.label} ${name + 1}`}
+                title={`${rule.roleLabel} ${name + 1}`}
                 extra={
                   rule.askCount &&
                   fields.length > 1 && (
@@ -1214,13 +1239,13 @@ export default function AddOrganisation() {
                     marginTop: 0,
                   }}
                 >
-                  Director Personal Details
+                  {rule.roleLabel} Personal Details
                 </Divider>
                 <Row gutter={[16, 8]}>
                   <Col xs={24} sm={12} md={6}>
                     <Form.Item
                       {...restField}
-                      label={`${rule.label} Name`}
+                      label={`${rule.roleLabel} Name`}
                       name={[name, "name"]}
                       rules={[{ required: true, message: "Please enter name" }]}
                     >
@@ -1749,7 +1774,7 @@ export default function AddOrganisation() {
                       marginTop: 0,
                     }}
                   >
-                    Director Address
+                    {rule.roleLabel} Address
                   </Divider>
                   <Col xs={24}>
                     <Divider orientation="left" plain>
@@ -1932,7 +1957,7 @@ export default function AddOrganisation() {
                       marginTop: 0,
                     }}
                   >
-                    Director Documents
+                    {rule.roleLabel} Documents
                   </Divider>
 
                   <Row gutter={[16, 16]}>
@@ -2065,40 +2090,38 @@ export default function AddOrganisation() {
                         </Upload>
                       </Form.Item>
                     </Col>
-                    <Col xs={24} sm={12} md={6}>
-                      <Form.Item
-                        {...restField}
-                        label={<span>DIN Number</span>}
-                        name={[name, "dinNumber"]}
-                      >
-                        <Input
-                          placeholder="Enter DIN number"
-                          style={{ borderRadius: "6px" }}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12} md={6}>
-                      <Form.Item
-                        {...restField}
-                        label={
-                          <span style={{ fontSize: "14px", fontWeight: "500" }}>
-                            DIN Document
-                          </span>
-                        }
-                        name={[name, "dinDocument"]}
-                        valuePropName="fileList"
-                        getValueFromEvent={normFile}
-                      >
-                        <Upload
-                          beforeUpload={() => false}
-                          onPreview={handlePreview}
+                    {rule.showDIN && (
+                      <Col xs={24} sm={12} md={6}>
+                        <Form.Item
+                          {...restField}
+                          label={rule.idLabel}
+                          name={[name, "dinNumber"]}
                         >
-                          <Button style={{ borderRadius: "6px" }}>
-                            Upload DIN
-                          </Button>
-                        </Upload>
-                      </Form.Item>
-                    </Col>
+                          <Input
+                            placeholder={`Enter ${rule.idLabel}`}
+                            style={{ borderRadius: "6px" }}
+                          />
+                        </Form.Item>
+                      </Col>
+                    )}
+                    {rule.showDIN && (
+                      <Col xs={24} sm={12} md={6}>
+                        <Form.Item
+                          {...restField}
+                          label={`${rule.idLabel} Document`}
+                          name={[name, "dinDocument"]}
+                          valuePropName="fileList"
+                          getValueFromEvent={normFile}
+                        >
+                          <Upload
+                            beforeUpload={() => false}
+                            onPreview={handlePreview}
+                          >
+                            <Button>Upload {rule.idLabel}</Button>
+                          </Upload>
+                        </Form.Item>
+                      </Col>
+                    )}
                   </Row>
 
                   <Form.List name={[name, "bankDetails"]} initialValue={[{}]}>
@@ -2258,7 +2281,7 @@ export default function AddOrganisation() {
                                   flex: 1,
                                 }}
                               >
-                                Director Associate Company Details
+                                {rule.roleLabel} Associate Company Details
                               </Divider>
                               <Button
                                 type="dashed"
