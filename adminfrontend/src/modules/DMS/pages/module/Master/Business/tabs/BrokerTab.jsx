@@ -808,11 +808,12 @@ export default function BrokerTab() {
                               disabled={viewMode}
                               placeholder="Select type"
                             >
-                              <Option value="basic">Basic</Option>
-                              <Option value="scheme">Scheme</Option>
+                              <Option value="Percentage">Percentage</Option>
+                              <Option value="FixedAmount">Fixed Amount</Option>
                             </Select>
                           </Form.Item>
                         </Col>
+
                         <Col span={4}>
                           <Form.Item
                             {...restField}
@@ -824,8 +825,11 @@ export default function BrokerTab() {
                               disabled={viewMode}
                               placeholder="Select method"
                             >
-                              <Option value="percentage">Percentage</Option>
-                              <Option value="fixed">Fixed</Option>
+                              <Option value="PerUnit">Per Unit</Option>
+                              <Option value="PerValue">Per Value</Option>
+                              <Option value="PerTransaction">
+                                Per Transaction
+                              </Option>
                             </Select>
                           </Form.Item>
                         </Col>
