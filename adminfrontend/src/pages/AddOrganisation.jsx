@@ -34,6 +34,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useGetOrganization } from "../queries/useGetOrganization.js";
 import { useUpdateOrganization } from "../queries/useUpdateOrganization.js";
 import dayjs from "dayjs";
+import { useFormStore } from "../store/formStore.js";
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -121,11 +122,20 @@ export default function AddOrganisation() {
   const normFile = (e) => (Array.isArray(e) ? e : e?.fileList);
   const navigate = useNavigate();
 
+  const { createForm, values, loadValues, setValues, reset } = useFormStore();
+
   // validation for mobile number: starts with 6-9 and has total 10 digits
   const handleTenDigitNumber = (fieldPath) => (e) => {
     const value = e.target.value.replace(/\D/g, "").slice(0, 15);
     form.setFieldValue(fieldPath, value);
   };
+
+  useEffect(() => {
+    const id = createForm()  // generates a unique formId
+    loadValues(id)            // load if anything exists
+    form.setFieldsValue(values)
+  }, [])
+
   const handlePhoneFormat = (fieldPath) => (e) => {
     let value = e.target.value;
 
@@ -966,6 +976,10 @@ export default function AddOrganisation() {
       window.open(fileURL, "_blank");
     }
   };
+
+  const handleFormValueChange = (_, allValues) => {
+    setValues(allValues);
+  }
 
   // Step 0: Organisation Details
   const renderOrganisationDetails = () => (
@@ -2927,7 +2941,7 @@ export default function AddOrganisation() {
             <Steps current={currentStep} size="small" items={steps} />
           </div>
 
-          <Form form={form} layout="vertical" autoComplete="off" size="middle">
+          <Form form={form} layout="vertical" onValuesChange={handleFormValueChange} autoComplete="off" size="middle">
             {/* Step Content */}
 
             {isEdit && isLoading ? (
