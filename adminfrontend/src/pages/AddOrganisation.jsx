@@ -286,10 +286,7 @@ export default function AddOrganisation() {
       },
       {},
     );
-    // const childrenParsed =
-    //   typeof p.family_details?.children_details === "string"
-    //     ? JSON.parse(p.family_details.children_details)
-    //     : {};
+
     return {
       // ================= ORG CORE =================
       registeredName: org.registered_name,
@@ -325,7 +322,10 @@ export default function AddOrganisation() {
         } catch {
           childrenParsed = {};
         }
+        const sons = childrenParsed.sons ?? [];
+        const daughters = childrenParsed.daughters ?? [];
 
+        const calculatedChildrenCount = sons.length + daughters.length;
         return {
           id: p.id,
           familyId: p.family_details?.id,
@@ -357,19 +357,20 @@ export default function AddOrganisation() {
           spouseName: p.family_details?.spouse_name,
 
           // ✅ CHILDREN (EDIT MODE FIX)
-          childrenCount: Number(childrenParsed.count ?? 0),
+          childrenCount: calculatedChildrenCount,
 
           childrenType: [
-            ...(childrenParsed.sons?.length ? ["SON"] : []),
-            ...(childrenParsed.daughters?.length ? ["DAUGHTER"] : []),
+            ...(sons.length ? ["SON"] : []),
+            ...(daughters.length ? ["DAUGHTER"] : []),
           ],
-
+          sonsCount: sons.length,
+          daughtersCount: daughters.length,
           children: {
-            sons: (childrenParsed.sons ?? []).map((s) => ({
+            sons: sons.map((s) => ({
               name: s.name || "",
               age: s.age || "",
             })),
-            daughters: (childrenParsed.daughters ?? []).map((d) => ({
+            daughters: daughters.map((d) => ({
               name: d.name || "",
               age: d.age || "",
             })),
@@ -652,7 +653,9 @@ export default function AddOrganisation() {
           // children_details:
           //   p.childrenCount !== undefined ? String(p.childrenCount) : null,
           children_details: JSON.stringify({
-            count: p.childrenCount ?? 0,
+            count:
+              (p.children?.sons?.length || 0) +
+              (p.children?.daughters?.length || 0),
             sons: (p.children?.sons ?? []).map((c) => ({
               name: c?.name ?? null,
               age: Number(c?.age) || null,
@@ -1437,329 +1440,89 @@ export default function AddOrganisation() {
                   </Col>
                   <Col xs={24} sm={12} md={6}>
                     <Form.Item
-                      {...restField}
-                      label="Number of Children"
-                      name={[name, "childrenCount"]}
-                      rules={[
-                        {
-                          pattern: /^[0-9]*$/,
-                          message: "Only numbers are allowed",
-                        },
-                      ]}
+                      label="Number of Sons"
+                      name={[name, "sonsCount"]}
                     >
-                      <Input
-                        min={0}
-                        placeholder="0"
-                        style={{ width: "100%" }}
-                      />
+                      <InputNumber min={0} style={{ width: "100%" }} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col xs={24} sm={12} md={6}>
+                    <Form.Item
+                      label="Number of Daughters"
+                      name={[name, "daughtersCount"]}
+                    >
+                      <InputNumber min={0} style={{ width: "100%" }} />
                     </Form.Item>
                   </Col>
 
                   <Form.Item noStyle shouldUpdate>
-                    {({ getFieldValue, setFieldsValue }) => {
-                      const count =
-                        Number(
-                          getFieldValue(["partners", name, "childrenCount"]),
-                        ) || 0;
-                      const types =
-                        getFieldValue(["partners", name, "childrenType"]) || [];
+                    {({ getFieldValue }) => {
+                      const sons =
+                        getFieldValue(["partners", name, "sonsCount"]) || 0;
 
-                      if (!count) return null;
-
-                      const partners = getFieldValue("partners") || [];
-                      const currentPartner = partners[name] || {};
-
-                      if (
-                        !types.includes("SON") &&
-                        currentPartner?.children?.sons?.length
-                      ) {
-                        const updated = [...partners];
-                        updated[name] = {
-                          ...currentPartner,
-                          children: { ...currentPartner.children, sons: [] },
-                        };
-                        setFieldsValue({ partners: updated });
-                      }
-
-                      if (
-                        !types.includes("DAUGHTER") &&
-                        currentPartner?.children?.daughters?.length
-                      ) {
-                        const updated = [...partners];
-                        updated[name] = {
-                          ...currentPartner,
-                          children: {
-                            ...currentPartner.children,
-                            daughters: [],
-                          },
-                        };
-                        setFieldsValue({ partners: updated });
-                      }
+                      const daughters =
+                        getFieldValue(["partners", name, "daughtersCount"]) ||
+                        0;
 
                       return (
                         <>
-                          {/* Children Type Checkbox */}
-                          <Col xs={24}>
-                            <Form.Item
-                              label="Children Type"
-                              name={[name, "childrenType"]}
-                            >
-                              <Checkbox.Group>
-                                <Checkbox value="SON">Son</Checkbox>
-                                <Checkbox value="DAUGHTER">Daughter</Checkbox>
-                              </Checkbox.Group>
-                            </Form.Item>
-                          </Col>
-
-                          {types.length > 0 && (
-                            <Col xs={24}>
-                              <Divider
-                                orientation="left"
-                                style={{
-                                  fontSize: "14px",
-                                  fontWeight: 600,
-                                  color: "#374151",
-                                }}
-                              >
-                                Children Details
-                              </Divider>
-
-                              <Row gutter={[16, 16]}>
-                                {/* SON SECTION */}
-                                {types.includes("SON") && (
-                                  <Col
-                                    xs={24}
-                                    md={types.includes("DAUGHTER") ? 12 : 24}
+                          {/* SON SECTION */}
+                          {sons > 0 && (
+                            <Card title="Son Details">
+                              {Array.from({ length: sons }).map((_, i) => (
+                                <Row key={i}>
+                                  <Form.Item
+                                    name={[name, "children", "sons", i, "name"]}
+                                    label="Name"
                                   >
-                                    <Card
-                                      size="small"
-                                      title={
-                                        <span
-                                          style={{
-                                            color: "#2563eb",
-                                            fontWeight: 600,
-                                            fontSize: "13px",
-                                          }}
-                                        >
-                                          Son Details
-                                        </span>
-                                      }
-                                      style={{
-                                        background: "#eff6ff",
-                                        border: "1px solid #bfdbfe",
-                                        borderRadius: "8px",
-                                      }}
-                                      bodyStyle={{ padding: "12px" }}
-                                    >
-                                      {Array.from({ length: count }).map(
-                                        (_, i) => (
-                                          <div
-                                            key={`son-${i}`}
-                                            style={{
-                                              display: "flex",
-                                              gap: "12px",
-                                              alignItems: "flex-start",
-                                              marginBottom:
-                                                i < count - 1 ? "12px" : 0,
-                                              padding: "10px",
-                                              background: "#fff",
-                                              borderRadius: "6px",
-                                              border: "1px solid #dbeafe",
-                                            }}
-                                          >
-                                            {/* Son Number Badge */}
-                                            <div
-                                              style={{
-                                                minWidth: "28px",
-                                                height: "28px",
-                                                borderRadius: "50%",
-                                                background: "#2563eb",
-                                                color: "#fff",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                fontSize: "12px",
-                                                fontWeight: 700,
-                                                marginTop: "4px",
-                                                flexShrink: 0,
-                                              }}
-                                            >
-                                              {i + 1}
-                                            </div>
+                                    <Input />
+                                  </Form.Item>
 
-                                            {/* Name */}
-                                            <Form.Item
-                                              label="Name"
-                                              name={[
-                                                name,
-                                                "children",
-                                                "sons",
-                                                i,
-                                                "name",
-                                              ]}
-                                              style={{
-                                                flex: 1,
-                                                marginBottom: 0,
-                                              }}
-                                            >
-                                              <Input
-                                                placeholder={`Son ${i + 1} name`}
-                                                size="small"
-                                              />
-                                            </Form.Item>
-
-                                            {/* Age */}
-                                            <Form.Item
-                                              label="Age"
-                                              name={[
-                                                name,
-                                                "children",
-                                                "sons",
-                                                i,
-                                                "age",
-                                              ]}
-                                              style={{
-                                                width: "90px",
-                                                marginBottom: 0,
-                                              }}
-                                              rules={[
-                                                {
-                                                  pattern: /^[0-9]*$/,
-                                                  message: "Numbers only",
-                                                },
-                                              ]}
-                                            >
-                                              <Input
-                                                placeholder="Age"
-                                                size="small"
-                                                maxLength={2}
-                                              />
-                                            </Form.Item>
-                                          </div>
-                                        ),
-                                      )}
-                                    </Card>
-                                  </Col>
-                                )}
-
-                                {/* DAUGHTER SECTION */}
-                                {types.includes("DAUGHTER") && (
-                                  <Col
-                                    xs={24}
-                                    md={types.includes("SON") ? 12 : 24}
+                                  <Form.Item
+                                    name={[name, "children", "sons", i, "age"]}
+                                    label="Age"
                                   >
-                                    <Card
-                                      size="small"
-                                      title={
-                                        <span
-                                          style={{
-                                            color: "#db2777",
-                                            fontWeight: 600,
-                                            fontSize: "13px",
-                                          }}
-                                        >
-                                          Daughter Details
-                                        </span>
-                                      }
-                                      style={{
-                                        background: "#fdf2f8",
-                                        border: "1px solid #fbcfe8",
-                                        borderRadius: "8px",
-                                      }}
-                                      bodyStyle={{ padding: "12px" }}
-                                    >
-                                      {Array.from({ length: count }).map(
-                                        (_, i) => (
-                                          <div
-                                            key={`daughter-${i}`}
-                                            style={{
-                                              display: "flex",
-                                              gap: "12px",
-                                              alignItems: "flex-start",
-                                              marginBottom:
-                                                i < count - 1 ? "12px" : 0,
-                                              padding: "10px",
-                                              background: "#fff",
-                                              borderRadius: "6px",
-                                              border: "1px solid #fce7f3",
-                                            }}
-                                          >
-                                            {/* Daughter Number Badge */}
-                                            <div
-                                              style={{
-                                                minWidth: "28px",
-                                                height: "28px",
-                                                borderRadius: "50%",
-                                                background: "#db2777",
-                                                color: "#fff",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                fontSize: "12px",
-                                                fontWeight: 700,
-                                                marginTop: "4px",
-                                                flexShrink: 0,
-                                              }}
-                                            >
-                                              {i + 1}
-                                            </div>
+                                    <Input />
+                                  </Form.Item>
+                                </Row>
+                              ))}
+                            </Card>
+                          )}
 
-                                            {/* Name */}
-                                            <Form.Item
-                                              label="Name"
-                                              name={[
-                                                name,
-                                                "children",
-                                                "daughters",
-                                                i,
-                                                "name",
-                                              ]}
-                                              style={{
-                                                flex: 1,
-                                                marginBottom: 0,
-                                              }}
-                                            >
-                                              <Input
-                                                placeholder={`Daughter ${i + 1} name`}
-                                                size="small"
-                                              />
-                                            </Form.Item>
+                          {/* DAUGHTER SECTION */}
+                          {daughters > 0 && (
+                            <Card title="Daughter Details">
+                              {Array.from({ length: daughters }).map((_, i) => (
+                                <Row key={i}>
+                                  <Form.Item
+                                    name={[
+                                      name,
+                                      "children",
+                                      "daughters",
+                                      i,
+                                      "name",
+                                    ]}
+                                    label="Name"
+                                  >
+                                    <Input />
+                                  </Form.Item>
 
-                                            {/* Age */}
-                                            <Form.Item
-                                              label="Age"
-                                              name={[
-                                                name,
-                                                "children",
-                                                "daughters",
-                                                i,
-                                                "age",
-                                              ]}
-                                              style={{
-                                                width: "90px",
-                                                marginBottom: 0,
-                                              }}
-                                              rules={[
-                                                {
-                                                  pattern: /^[0-9]*$/,
-                                                  message: "Numbers only",
-                                                },
-                                              ]}
-                                            >
-                                              <Input
-                                                placeholder="Age"
-                                                size="small"
-                                                maxLength={2}
-                                              />
-                                            </Form.Item>
-                                          </div>
-                                        ),
-                                      )}
-                                    </Card>
-                                  </Col>
-                                )}
-                              </Row>
-                            </Col>
+                                  <Form.Item
+                                    name={[
+                                      name,
+                                      "children",
+                                      "daughters",
+                                      i,
+                                      "age",
+                                    ]}
+                                    label="Age"
+                                  >
+                                    <Input />
+                                  </Form.Item>
+                                </Row>
+                              ))}
+                            </Card>
                           )}
                         </>
                       );
