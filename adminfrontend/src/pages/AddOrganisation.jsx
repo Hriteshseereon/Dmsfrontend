@@ -131,9 +131,12 @@ export default function AddOrganisation() {
   };
 
   useEffect(() => {
-    const id = createForm()  // generates a unique formId
-    loadValues(id)            // load if anything exists
-    form.setFieldsValue(values)
+    let draftId = new URLSearchParams(window.location.search).get("draft");
+    if (!draftId) {
+      draftId = createForm();
+    }
+    const loadedValues = loadValues(draftId)  
+    form.setFieldsValue(loadedValues)
   }, [])
 
   const handlePhoneFormat = (fieldPath) => (e) => {

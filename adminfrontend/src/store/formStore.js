@@ -11,8 +11,16 @@ export const useFormStore = create((set, get) => ({
   },
   loadValues: (id) => {
     const saved = localStorage.getItem(`form-${id}`);
-    if (saved) set({ formId: id, values: JSON.parse(saved) });
-    else set({ formId: id, values: {} });
+    let parsed = {};
+    if (saved) {
+      try {
+        parsed = JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved form values", e);
+      }
+    }
+    set({ formId: id, values: parsed });
+    return parsed;
   },
   setValues: (values) => {
     const { formId } = get();
