@@ -19,7 +19,7 @@ import {
   SearchOutlined,
   ReloadOutlined,
 } from "@ant-design/icons";
-
+import { API_BASE_URL } from "@/utils/config";
 import {
   getAdminCustomerDetails,
   addAdminCustomer,
@@ -44,12 +44,16 @@ export default function CustomerTab() {
 
   const fileFromUrl = (url) => {
     if (!url) return [];
+
+    // if backend already returns full URL → use it
+    const finalUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+
     return [
       {
-        uid: url,
-        name: url.split("/").pop(),
+        uid: finalUrl,
+        name: finalUrl.split("/").pop(),
         status: "done",
-        url: url,
+        url: finalUrl,
       },
     ];
   };
@@ -685,8 +689,6 @@ export default function CustomerTab() {
                   name="gstNo"
                   rules={[
                     {
-                      pattern:
-                        /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
                       message: "Enter a valid GST number",
                     },
                   ]}
@@ -745,7 +747,6 @@ export default function CustomerTab() {
                   name="panNo"
                   rules={[
                     {
-                      pattern: /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/,
                       message: "Enter a valid PAN number",
                     },
                   ]}
