@@ -12,6 +12,7 @@ import {
   ArrowRight,
   Edit,
   Download,
+  Trash2,
 } from "lucide-react";
 import { useOrganizations } from "../queries/useOrganizations";
 import useSessionStore from "../store/sessionStore";
@@ -57,6 +58,13 @@ export default function OrganizationList() {
     navigate(`/organisation/add?draft=${draftFormId}`);
   }
 
+  const handleDraftDelete = (draftFormId) => {
+    if (window.confirm("Are you sure you want to delete this draft?")) {
+      localStorage.removeItem(`form-${draftFormId}`);
+      setCurrentOrgId((prev) => prev); // Trigger re-render
+    }
+  }
+
   const draftOrganizations = getAllDraftOrganizations();
   
 
@@ -83,6 +91,7 @@ export default function OrganizationList() {
                   org={org}
                   isDraft={true}
                   onEdit={handleDraftEdit}
+                  onDelete={handleDraftDelete}
                 />
               ))}
             </div>
@@ -112,11 +121,11 @@ const OrganizationCard = ({
   onDownload,
   onEdit,
   onOpen,
-  styles,
+  onDelete
 }) => {
   const headerStyles = isDraft
     ? "bg-gradient-to-r from-gray-400 to-gray-600 h-2"
-    : styles?.header || "bg-gradient-to-r from-amber-500 to-orange-500 h-2";
+    : "bg-gradient-to-r from-amber-500 to-orange-500 h-2";
 
   return (
     <div
@@ -133,12 +142,22 @@ const OrganizationCard = ({
             <p className="text-xs text-gray-400 font-mono">ID: {org.id}</p>
           </div>
           {isDraft ? (
+            <>
+              <div className="flex gap-2">
             <button
               onClick={() => onEdit(org.id)}
               className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors cursor-pointer"
             >
               <Edit className="text-gray-600" size={24} />
             </button>
+            <button
+              onClick={() => onDelete(org.id)}
+              className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center hover:bg-red-200 transition-colors cursor-pointer"
+            >
+              <Trash2 className="text-red-600" size={24} />
+            </button>
+            </div>
+            </>
           ) : (
             <>
               <div className="flex gap-2">
