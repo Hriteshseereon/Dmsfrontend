@@ -587,16 +587,30 @@ export default function SalesSouda() {
       ),
     },
 
-    {
-      title: <span className="text-amber-700 font-semibold">Status</span>,
-      dataIndex: "status",
-      width: 120,
-      render: (status) => (
-        <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700">
-          {status}
-        </span>
-      ),
-    },
+   {
+  title: <span className="text-amber-700 font-semibold">Status</span>,
+  dataIndex: "status",
+  width: 120,
+  render: (status) => {
+    let colorClass = "";
+
+    if (status === "Approved") {
+      colorClass = "bg-green-100 text-green-700";
+    } else if (status === "Pending") {
+      colorClass = "bg-yellow-100 text-yellow-700";
+    } else if (status === "Rejected") {
+      colorClass = "bg-red-100 text-red-700";
+    } else {
+      colorClass = "bg-gray-100 text-gray-700";
+    }
+
+    return (
+      <span className={`px-3 py-1 rounded-full font-semibold ${colorClass}`}>
+        {status}
+      </span>
+    );
+  },
+},
 
     {
       title: <span className="text-amber-700 font-semibold">Total (₹)</span>,
@@ -618,9 +632,9 @@ export default function SalesSouda() {
         <div className="flex gap-3">
           <EyeOutlined className="text-green-700!" onClick={() => openView(record)} />
           {record.status === "Approved" ? (
-            <EditOutlined className="text-blue-700! cursor-not-allowed!"  />
+            <EditOutlined className="text-grey-100! cursor-not-allowed!"  />
           ) : (
-            <EditOutlined className="text-gray-300! " onClick={() => openEdit(record)} />
+            <EditOutlined className="text-blue-700! " onClick={() => openEdit(record)} />
           )}
          
         </div>
@@ -957,7 +971,7 @@ export default function SalesSouda() {
         const grossQty = netQty + freeQty;
         const mrp = Number(it.rate || 0); // rate is MRP
         const discountPercent = Number(it.discountPercent || 0);
-
+        
         const grossAmount = netQty * mrp;
         const discountAmount = (grossAmount * discountPercent) / 100;
         const lineTotal = grossAmount - discountAmount;
@@ -980,6 +994,7 @@ export default function SalesSouda() {
         customer_id: selectedRecord.customerId, // Use ID from record
         customer_email: values.customerEmail,
         customer_mobile: values.customerMobile,
+         status: values.status,  
         from_date: values.startDate
           ? dayjs(values.startDate).format("YYYY-MM-DD")
           : null,

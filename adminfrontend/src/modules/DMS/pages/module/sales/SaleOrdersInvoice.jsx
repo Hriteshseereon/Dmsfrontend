@@ -1,4 +1,5 @@
-// SaleOrdersInvoice.jsx
+
+  // SaleOrdersInvoice.jsx 
 import React, { useState, useEffect } from "react";
 import {
   Table,
@@ -26,8 +27,7 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import {
-  getContractpersonName,
-  getContractDetailsbyPerson,
+ 
   salesContractItems,
   createSalesOrder,
   getSalesOrders,
@@ -188,13 +188,13 @@ const salesOrderJSON = {
 
 /* ------------------ component ------------------ */
 export default function SaleOrdersInvoice() {
-  const [data, setData] = useState(salesOrderJSON.initialData);
+  const [data, setData] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
-
+  const [formMode, setFormMode] = useState(null); 
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
@@ -239,101 +239,75 @@ export default function SaleOrdersInvoice() {
   );
 
   /* ---------- utilities: compute item and order totals ---------- */
-  const computeOrderTotalsFromContracts = (contracts = [], orderTax = {}) => {
-    const allItems = [];
-    contracts.forEach((c) => {
-      (c.items || []).forEach((it) => allItems.push(it));
-    });
+ const computeOrderTotalsFromContracts = (contracts = []) => {
+  const allItems = [];
 
-    const grossAmountTotal = allItems.reduce(
-      (s, it) => s + Number(it.amount || 0),
-      0,
-    );
-    const discountTotal = allItems.reduce(
-      (s, it) => s + Number(it.discountAmt || 0),
-      0,
-    );
-    const taxableAmount = grossAmountTotal - discountTotal;
+  contracts.forEach((c) => {
+    (c.items || []).forEach((it) => allItems.push(it));
+  });
 
-    const sgstPercent = Number(orderTax.sgstPercent || 0);
-    const cgstPercent = Number(orderTax.cgstPercent || 0);
-    const igstPercent = Number(orderTax.igstPercent || 0);
-    const tcsAmt = Number(orderTax.tcsAmt || 0);
+  const grossAmountTotal = allItems.reduce(
+    (s, it) => s + Number(it.amount || 0),
+    0
+  );
 
-    const sgst = Math.round((taxableAmount * sgstPercent) / 100);
-    const cgst = Math.round((taxableAmount * cgstPercent) / 100);
-    const igst = Math.round((taxableAmount * igstPercent) / 100);
-    const totalGST = sgst + cgst + igst;
-    const grandTotal = Math.round(taxableAmount + totalGST + tcsAmt);
+  const discountTotal = allItems.reduce(
+    (s, it) => s + Number(it.discountAmt || 0),
+    0
+  );
 
-    const qtyTotal = allItems.reduce((s, it) => s + Number(it.qty || 0), 0);
-    const freeQtyTotal = allItems.reduce(
-      (s, it) => s + Number(it.freeQty || 0),
-      0,
-    );
-
-    return {
-      orderTaxAndTotals: {
-        grossAmountTotal,
-        discountTotal,
-        taxableAmount,
-        sgstPercent,
-        cgstPercent,
-        igstPercent,
-        sgst,
-        cgst,
-        igst,
-        totalGST,
-        tcsAmt,
-        grandTotal,
-      },
-      orderTotals: {
-        qtyTotal,
-        freeQtyTotal,
-        totalQty: qtyTotal + freeQtyTotal,
-      },
-      items: allItems,
-    };
+  return {
+    orderTaxAndTotals: {
+      grossAmountTotal,
+      discountTotal,
+      grandTotal: grossAmountTotal - discountTotal,
+    },
   };
+};
 
   /* ---------- when form values change (add/edit) ---------- */
-  const onFormValuesChange = (form, allValues) => {
-    // compute per-item fields for any item changed
-    const contracts = (allValues.contracts || []).map((c, ci) => {
-      const items = (c.items || []).map((it, ii) => {
-        const qty = Number(it.qty || 0);
-        const freeQty = Number(it.freeQty || 0);
-        const rate = Number(it.rate || 0);
-        const discountPercent = Number(it.discountPercent || 0);
-        const amount = Math.round(qty * rate);
-        const discountAmt = Math.round((amount * discountPercent) / 100);
-        const totalAmount = Math.round(amount - discountAmt);
-        const totalQty = qty + freeQty;
-        const totalGrossWt = Number(it.grossWt || 0);
+const onFormValuesChange = (form, allValues) => {
+  const contracts = (allValues.contracts || []).map((c) => {
+    const items = (c.items || []).map((it) => {
+      const orderQty = Number(it.orderQuantity || 0);
+      const rate = Number(it.rate || 0);
+      const discountPercent = Number(it.discountPercent || 0);
+
+      if (!orderQty || !rate) {
         return {
           ...it,
-          amount,
-          discountAmt,
-          totalAmount,
-          totalQty,
-          totalGrossWt,
+          amount: 0,
+          discountAmt: 0,
+          totalAmount: 0,
         };
-      });
-      return { ...c, items };
+      }
+
+      const amount = Math.round(orderQty * rate);
+      const discountAmt = Math.round(
+        (amount * discountPercent) / 100
+      );
+      const totalAmount = amount - discountAmt;
+
+      return {
+        ...it,
+        amount,
+        discountAmt,
+        totalAmount,
+      };
     });
 
-    const { orderTaxAndTotals, orderTotals } = computeOrderTotalsFromContracts(
-      contracts,
-      allValues.orderTaxAndTotals || {},
-    );
+    return { ...c, items };
+  });
 
-    // set computed fields back into the form
-    form.setFieldsValue({
-      contracts,
-      orderTaxAndTotals,
-      orderTotals,
-    });
-  };
+  const { orderTaxAndTotals } =
+    computeOrderTotalsFromContracts(contracts);
+
+  form.setFieldsValue({
+    contracts,
+    orderTaxAndTotals,
+  });
+};
+
 const handleStatusChange = async (value, form) => {
   // call API
   const res = await getTaxByStatus(value); // your API
@@ -346,10 +320,14 @@ const handleStatusChange = async (value, form) => {
       tcsAmt: res.tcs,
     },
   });
+ 
 };
+
   /* ---------- Add handlers ---------- */
   const openAddModal = () => {
+     setFormMode("add"); 
     addForm.resetFields();
+
     // initialize with one contract + one item row to help user
     addForm.setFieldsValue({
       contracts: [
@@ -425,15 +403,23 @@ const handleStatusChange = async (value, form) => {
         });
 
         const contracts = Object.values(contractsMap);
-
+        const { orderTaxAndTotals, orderTotals } =
+  computeOrderTotalsFromContracts(contracts, {
+    sgstPercent: Number(order.sgst || 0),
+    cgstPercent: Number(order.cgst || 0),
+    igstPercent: Number(order.igst || 0),
+    tcsAmt: Number(order.tcs_amount || 0),
+  });
         return {
-          key: order.sales_order_id, // REQUIRED by antd table
-
-          orderNumber: order.order_number,
-          orderDate: order.order_date,
-          deliveryDate: order.expected_receiving_date,
-
-          customerName: order.customer?.name || "-",
+  key: order.sales_order_id,
+  orderNumber: order.order_number,
+  orderDate: order.order_date,
+  deliveryDate: order.expected_receiving_date,
+  customerName: order.customer?.name || "-",
+  status: order.status,
+  contracts,
+  orderTaxAndTotals,
+  orderTotals,
           customerId: order.customer?.customer_id,
           customer_id: order.customer?.customer_id,
           customerEmail: order.customer?.email_id,
@@ -443,18 +429,7 @@ const handleStatusChange = async (value, form) => {
           billMode: order.bill_mode,
           purchaseType: order.purchase_type,
 
-          totalAmount: order.total_amount,
-          grandTotal: order.grand_total,
-
-          contracts,
-          orderTaxAndTotals: {
-            sgstPercent: Number(order.sgst || 0),
-            cgstPercent: Number(order.cgst || 0),
-            igstPercent: Number(order.igst || 0),
-            tcsAmt: Number(order.tcs_amount || 0),
-            grandTotal: Number(order.grand_total || 0),
-            grossAmountTotal: Number(order.total_amount || 0),
-          },
+         
 
           createdAt: order.created_at,
           companyName: "-",
@@ -472,8 +447,9 @@ const handleStatusChange = async (value, form) => {
     const { orderTaxAndTotals } = values;
 
     return {
-      customer_id: values.customerName || values.customer_id,
-      order_date: values.orderDate
+customer_id: values.customer_id,
+status: values.status, 
+ order_date: values.orderDate
         ? dayjs(values.orderDate).format("YYYY-MM-DD")
         : null,
       expected_receiving_date: values.deliveryDate
@@ -551,26 +527,10 @@ const handleStatusChange = async (value, form) => {
     }
   };
 
-  /* ---------- Edit handlers ---------- */
-  // useEffect(() => {
-  //   if (isEditModalOpen && selectedRecord) {
-  //     // prepare values with dayjs dates
-  //     const pre = {
-  //       ...selectedRecord,
-  //       customerName: selectedRecord.customer_id, // Ensure select shows correct value
-  //       orderDate: selectedRecord.orderDate
-  //         ? dayjs(selectedRecord.orderDate)
-  //         : undefined,
-  //       deliveryDate: selectedRecord.deliveryDate
-  //         ? dayjs(selectedRecord.deliveryDate)
-  //         : undefined,
-  //     };
-  //     editForm.setFieldsValue(pre);
-  //   }
-  //   // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, [isEditModalOpen, selectedRecord]);
+
 
   const openEdit = async (record) => {
+     setFormMode("edit");
     try {
       const order = await getSalesOrderById(record.key);
 
@@ -630,18 +590,16 @@ const handleStatusChange = async (value, form) => {
       const mappedData = {
         key: order.sales_order_id,
         orderNumber: order.order_number,
+      status: order.status,
         orderDate: order.order_date ? dayjs(order.order_date) : undefined,
         deliveryDate: order.expected_receiving_date
           ? dayjs(order.expected_receiving_date)
           : undefined,
 
-        customerName: order.customer?.customer_id, // For Select to show name
-        customerId: order.customer?.customer_id,
-        customer_id: order.customer?.customer_id,
+      customer_id: order.customer?.customer_id,
         customerEmail: order.customer?.email_id,
         deliveryAddress: order.customer?.address_line1,
 
-        status: order.status,
         billMode: order.bill_mode,
         purchaseType: order.purchase_type,
 
@@ -698,6 +656,7 @@ const handleStatusChange = async (value, form) => {
 
   /* ---------- View ---------- */
   const openView = async (record) => {
+    setFormMode("view"); 
     try {
       const order = await getSalesOrderById(record.key);
 
@@ -764,8 +723,11 @@ const handleStatusChange = async (value, form) => {
           ? dayjs(order.expected_receiving_date)
           : undefined,
 
-        customerName: order.customer?.name || "-",
-        customerId: order.customer?.customer_id,
+       customerName:
+  order.customer?.name ||
+  order.customer_name ||
+ 
+  "-", customerId: order.customer?.customer_id,
         customer_id: order.customer?.customer_id,
         customerEmail: order.customer?.email_id,
         deliveryAddress: order.customer?.address_line1,
@@ -940,62 +902,63 @@ const handleStatusChange = async (value, form) => {
                     <Select
                       placeholder="Select Contract"
                       disabled={disabled}
-                      onChange={async (contractId) => {
-                        let items = [];
+                     onChange={async (contractId) => {
+  let items = [];
 
-                        // Try to find items locally first
-                        const selectedContract = contractOptions.find(
-                          (c) => c.sale_contract_id === contractId,
-                        );
-                        console.log("Selected Contract:", selectedContract);
+  const selectedContract = contractOptions.find(
+    (c) => c.sale_contract_id === contractId
+  );
 
-                        if (
-                          selectedContract &&
-                          selectedContract.items &&
-                          selectedContract.items.length > 0
-                        ) {
-                          items = selectedContract.items;
-                        } else {
-                          // Fallback to API
-                          items = await salesContractItems(contractId);
-                        }
+  if (selectedContract && selectedContract.items?.length > 0) {
+    items = selectedContract.items;
+  } else {
+    items = await salesContractItems(contractId);
+  }
 
-                        console.log("Contract Items for Dropdown:", items);
+  // ✅ SET TAX VALUES FROM CONTRACT (NO CALCULATION)
+  if (selectedContract) {
+    form.setFieldsValue({
+      orderTaxAndTotals: {
+        sgstPercent: Number(selectedContract.sgst || 0),
+        cgstPercent: Number(selectedContract.cgst || 0),
+        igstPercent: Number(selectedContract.igst || 0),
+        tcsAmt: Number(selectedContract.tcs_amount || 0),
+      },
+    });
+  }
 
-                        // Update options for this specific contract row (using stable key)
-                        setContractItemsMap((prev) => ({
-                          ...prev,
-                          [cf.key]: items,
-                        }));
+  // update items dropdown
+  setContractItemsMap((prev) => ({
+    ...prev,
+    [cf.key]: items,
+  }));
 
-                        // Reset items to a single empty row to allow user to select
-                        const contracts = form.getFieldValue("contracts") || [];
-                        contracts[ci] = {
-                          ...(contracts[ci] || {}),
-                          contract_id: contractId,
-                          items: [
-                            {
-                              lineKey: Date.now(),
-                              item: undefined,
-                              itemCode: undefined,
-                              uom: undefined,
-                              qty: 0,
-                              freeQty: 0,
-                              totalQty: 0,
-                              grossWt: 0,
-                              totalGrossWt: 0,
-                              rate: 0,
-                              amount: 0,
-                              discountPercent: 0,
-                              discountAmt: 0,
-                              totalAmount: 0,
-                            },
-                          ],
-                        };
+  // reset contract row items
+  const contracts = form.getFieldValue("contracts") || [];
+  contracts[ci] = {
+    ...(contracts[ci] || {}),
+    contract_id: contractId,
+    items: [
+      {
+        lineKey: Date.now(),
+        item: undefined,
+        itemCode: undefined,
+        uom: undefined,
+        qty: 0,
+        freeQty: 0,
+        totalQty: 0,
+        rate: 0,
+        amount: 0,
+        discountPercent: 0,
+        discountAmt: 0,
+        totalAmount: 0,
+      },
+    ],
+  };
 
-                        form.setFieldsValue({ contracts });
-                        onFormValuesChange(form, form.getFieldsValue());
-                      }}
+  form.setFieldsValue({ contracts });
+
+}}
                     >
                       {contractOptions.map((c) => (
                         <Select.Option
@@ -1256,15 +1219,7 @@ const handleStatusChange = async (value, form) => {
                               </Form.Item>
                             </Col>
 
-                            {/* TOTAL QTY */}
-                            <Col span={3}>
-                              <Form.Item
-                                name={[itf.name, "totalQty"]}
-                                label="Total Qty"
-                              >
-                                <InputNumber className="w-full" disabled />
-                              </Form.Item>
-                            </Col>
+                           
 
                             <Col span={3}>
                               <Form.Item
@@ -1292,8 +1247,7 @@ const handleStatusChange = async (value, form) => {
                               icon={<DeleteOutlined />}
                               onClick={() => {
                                 removeItem(itf.name);
-                                onFormValuesChange(form, form.getFieldsValue());
-                              }}
+                                  }}
                             />
                           )}
                         </div>
@@ -1343,38 +1297,27 @@ const handleStatusChange = async (value, form) => {
       <h6 className="text-amber-500">Header</h6>
       <Row gutter={16}>
         <Col span={6}>
-          <Form.Item label="Customer Name" name="customerName">
-            <Select
-              placeholder="Select Customer"
-              onChange={async (customerId) => {
-                const customer = contractPersonOptions.find(
-                  (c) => c.customer_id === customerId,
-                );
-
-                if (customer) {
-                  console.log("Selected User for Autofill:", customer);
-                  form.setFieldsValue({
-                    customerName: customer.name,
-                    customerEmail:
-                      customer.email_address || customer.email || "",
-                    customerMobile:
-                      customer.mobile_number || customer.mobile || "",
-                  });
-                }
-
-              
-                setContractItems([]);
-                form.setFieldsValue({ contract_id: undefined });
-              }}
-              disabled={disabled}
-            >
-              {contractPersonOptions.map((c) => (
-                <Select.Option key={c.customer_id} value={c.customer_id}>
-                  {c.name}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
+ <Form.Item
+  label="Customer"
+name="customer_id"
+  rules={[{ required: true, message: "Please select customer" }]}
+>
+  <Select
+    placeholder="Select Customer"
+    showSearch
+    optionFilterProp="label"
+  >
+   {contractPersonOptions.map((c) => (
+  <Select.Option
+    key={c.customer_id}
+    value={c.customer_id}   // ✅ correct ID
+    label={c.customer_name}
+  >
+    {c.customer_name}
+  </Select.Option>
+))}
+  </Select>
+</Form.Item>
         </Col>
 
         <Col span={6}>
@@ -1423,7 +1366,7 @@ const handleStatusChange = async (value, form) => {
   <Select onChange={(val) => handleStatusChange(val, form)}>
     <Select.Option value="Approved">Approved</Select.Option>
     <Select.Option value="Pending">Pending</Select.Option>
-     <Select.Option value="Rejected">Pending</Select.Option>
+     <Select.Option value="Rejected">Rejected</Select.Option>
   </Select>
 </Form.Item>
         </Col>
@@ -1448,9 +1391,7 @@ const handleStatusChange = async (value, form) => {
               min={0}
               max={100}
               className="w-full"
-              disabled={disabled}
-              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
-            />
+             disabled  />
           </Form.Item>
         </Col>
         <Col span={6}>
@@ -1462,9 +1403,7 @@ const handleStatusChange = async (value, form) => {
               min={0}
               max={100}
               className="w-full"
-              disabled={disabled}
-              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
-            />
+             disabled  />
           </Form.Item>
         </Col>
         <Col span={6}>
@@ -1476,9 +1415,7 @@ const handleStatusChange = async (value, form) => {
               min={0}
               max={100}
               className="w-full"
-              disabled={disabled}
-              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
-            />
+             disabled    />
           </Form.Item>
         </Col>
         <Col span={6}>
@@ -1489,9 +1426,8 @@ const handleStatusChange = async (value, form) => {
             <InputNumber
               min={0}
               className="w-full"
-              disabled={disabled}
-              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
-            />
+              disabled
+                  />
           </Form.Item>
         </Col>
 
@@ -1513,14 +1449,7 @@ const handleStatusChange = async (value, form) => {
           </Form.Item>
         </Col>
 
-        <Col span={6}>
-          <Form.Item
-            label={<span className="text-amber-700">Total GST (₹)</span>}
-            name={["orderTaxAndTotals", "totalGST"]}
-          >
-            <InputNumber className="w-full" disabled />
-          </Form.Item>
-        </Col>
+        
 
         <Col span={6}>
           <Form.Item
@@ -1534,61 +1463,7 @@ const handleStatusChange = async (value, form) => {
 
       <Divider />
 
-      {/* <h6 className="text-amber-500">Transport & Status</h6>
-      <Row gutter={16}>
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Transporter</span>} name="transporter">
-            <Select disabled={disabled}>
-              {salesOrderJSON.transporterOptions.map((t) => <Select.Option key={t} value={t}>{t}</Select.Option>)}
-            </Select>
-          </Form.Item>
-        </Col>
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Vehicle No</span>} name="vehicleNo">
-            <Input disabled={disabled} />
-          </Form.Item>
-        </Col>
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Driver Name</span>} name="driverName">
-            <Input disabled={disabled} />
-          </Form.Item>
-        </Col>
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Phone No</span>} name="phoneNo">
-            <Input disabled={disabled} />
-          </Form.Item>
-        </Col>
-
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Route</span>} name="route">
-            <Select disabled={disabled}>
-              {salesOrderJSON.routeOptions.map((r) => <Select.Option key={r} value={r}>{r}</Select.Option>)}
-            </Select>
-          </Form.Item>
-        </Col>
-
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Bill Type</span>} name="billType">
-            <Select disabled={disabled}>
-              {salesOrderJSON.billTypeOptions.map((b) => <Select.Option key={b} value={b}>{b}</Select.Option>)}
-            </Select>
-          </Form.Item>
-        </Col>
-
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Waybill No</span>} name="waybillNo">
-            <Input disabled={disabled} />
-          </Form.Item>
-        </Col>
-
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Status</span>} name="status">
-            <Select disabled={disabled}>
-              {salesOrderJSON.statusOptions.map((s) => <Select.Option key={s} value={s}>{s}</Select.Option>)}
-            </Select>
-          </Form.Item>
-        </Col>
-      </Row> */}
+     
     </>
   );
 
@@ -1666,9 +1541,11 @@ const handleStatusChange = async (value, form) => {
           layout="vertical"
           form={addForm}
           onFinish={handleAddFinish}
-          onValuesChange={() =>
-            onFormValuesChange(addForm, addForm.getFieldsValue())
-          }
+           onValuesChange={(_, allValues) => {
+    if (formMode === "add") {
+      onFormValuesChange(addForm, allValues);
+    }
+  }}
         >
           {renderFormFields(addForm)}
           <div className="flex justify-end gap-2 mt-4">
@@ -1712,9 +1589,11 @@ const handleStatusChange = async (value, form) => {
           layout="vertical"
           form={editForm}
           onFinish={handleEditFinish}
-          onValuesChange={() =>
-            onFormValuesChange(editForm, editForm.getFieldsValue())
-          }
+           onValuesChange={(_, allValues) => {
+    if (formMode === "edit") {
+      onFormValuesChange(editForm, allValues);
+    }
+  }}
         >
           {renderFormFields(editForm)}
           <div className="flex justify-end gap-2 mt-4">
@@ -1760,4 +1639,5 @@ const handleStatusChange = async (value, form) => {
       </Modal>
     </div>
   );
-}
+    }
+  
