@@ -131,13 +131,14 @@ export default function AddOrganisation() {
   };
 
   useEffect(() => {
+    if (isEdit && orgData) return;
     let draftId = new URLSearchParams(window.location.search).get("draft");
     if (!draftId) {
       draftId = createForm();
     }
-    const loadedValues = loadValues(draftId)  
-    form.setFieldsValue(loadedValues)
-  }, [])
+    const loadedValues = loadValues(draftId);
+    form.setFieldsValue(loadedValues);
+  }, []);
 
   const handlePhoneFormat = (fieldPath) => (e) => {
     let value = e.target.value;
@@ -885,6 +886,7 @@ export default function AddOrganisation() {
     } else {
       createOrg(formData, {
         onSuccess: () => {
+          reset(); // resetting form store after successful creation
           antMessage.success("Organisation created successfully");
           navigate("/organizations");
         },
@@ -982,7 +984,7 @@ export default function AddOrganisation() {
 
   const handleFormValueChange = (_, allValues) => {
     setValues(allValues);
-  }
+  };
 
   // Step 0: Organisation Details
   const renderOrganisationDetails = () => (
@@ -2944,7 +2946,13 @@ export default function AddOrganisation() {
             <Steps current={currentStep} size="small" items={steps} />
           </div>
 
-          <Form form={form} layout="vertical" onValuesChange={handleFormValueChange} autoComplete="off" size="middle">
+          <Form
+            form={form}
+            layout="vertical"
+            onValuesChange={handleFormValueChange}
+            autoComplete="off"
+            size="middle"
+          >
             {/* Step Content */}
 
             {isEdit && isLoading ? (
