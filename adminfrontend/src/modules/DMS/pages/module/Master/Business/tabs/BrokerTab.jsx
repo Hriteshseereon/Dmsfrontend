@@ -428,7 +428,7 @@ export default function BrokerTab() {
                 <Form.Item
                   label="Phone Number"
                   name="phoneNo"
-                  rules={[{ validator: phoneValidator }]}
+                  rules={[{ required: true }, { validator: phoneValidator }]}
                 >
                   <Input
                     className={inputClass}
@@ -476,7 +476,11 @@ export default function BrokerTab() {
                 </Form.Item>
               </Col>
               <Col span={6}>
-                <Form.Item label="Primary Email" name="email">
+                <Form.Item
+                  label="Primary Email"
+                  name="email"
+                  rules={[{ required: true }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -788,6 +792,12 @@ export default function BrokerTab() {
                             {...restField}
                             label="Vendor"
                             name={[name, "vendor"]}
+                            rules={[
+                              {
+                                required: true,
+                                message: "vendor name is required",
+                              },
+                            ]}
                           >
                             <Select
                               className={selectClass}
@@ -808,6 +818,12 @@ export default function BrokerTab() {
                             {...restField}
                             label="Product"
                             name={[name, "product"]}
+                            rules={[
+                              {
+                                required: true,
+                                message: "Product is required",
+                              },
+                            ]}
                           >
                             <Select
                               className={selectClass}
@@ -835,6 +851,12 @@ export default function BrokerTab() {
                             {...restField}
                             label="Commission Type"
                             name={[name, "type"]}
+                            rules={[
+                              {
+                                required: true,
+                                message: "comission type is required",
+                              },
+                            ]}
                           >
                             <Select
                               className={selectClass}
@@ -852,6 +874,12 @@ export default function BrokerTab() {
                             {...restField}
                             label="Method"
                             name={[name, "method"]}
+                            rules={[
+                              {
+                                required: true,
+                                message: "commision method is required",
+                              },
+                            ]}
                           >
                             <Select
                               className={selectClass}
@@ -871,6 +899,12 @@ export default function BrokerTab() {
                             {...restField}
                             label="Amount"
                             name={[name, "amount"]}
+                            rules={[
+                              {
+                                required: true,
+                                message: "amount is required",
+                              },
+                            ]}
                           >
                             <Input
                               className={inputClass}

@@ -565,12 +565,7 @@ export default function VendorTab() {
                 <Form.Item
                   label="WhatsApp No"
                   name="whatsappNo"
-                  rules={[
-                    {
-                      message: "Enter a valid 10-digit mobile number",
-                    },
-                    { validator: phoneValidator },
-                  ]}
+                  rules={[{ validator: phoneValidator }]}
                 >
                   <InputNumber
                     className={inputClass}
@@ -636,13 +631,7 @@ export default function VendorTab() {
                 <Form.Item
                   label="Mobile No"
                   name="contactMobile"
-                  rules={[
-                    { required: true, message: "Mobile number is required" },
-                    {
-                      message: "Enter a valid 10-digit mobile number",
-                    },
-                    { validator: phoneValidator },
-                  ]}
+                  rules={[{ required: true }, { validator: phoneValidator }]}
                 >
                   <InputNumber
                     className={inputClass}
