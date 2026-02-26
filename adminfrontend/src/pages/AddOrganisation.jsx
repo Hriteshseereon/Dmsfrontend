@@ -46,6 +46,8 @@ const ORG_RULES = {
     askCount: true,
     showPercent: true,
     company_website: true,
+    showPan: true,
+    showGst: true,
   },
 
   LLP: {
@@ -55,6 +57,8 @@ const ORG_RULES = {
     askCount: true,
     showPercent: true,
     company_website: true,
+    showPan: true,
+    showGst: true,
   },
 
   OPC: {
@@ -63,6 +67,8 @@ const ORG_RULES = {
     showDIN: false,
     askCount: false,
     showPercent: false,
+    showPan: false,
+    showGst: false,
   },
 
   Partnership: {
@@ -72,6 +78,8 @@ const ORG_RULES = {
     askCount: true,
     showPercent: true,
     company_website: true,
+    showPan: true,
+    showGst: true,
   },
 
   PROPRIETORSHIP: {
@@ -80,6 +88,8 @@ const ORG_RULES = {
     showDIN: false,
     askCount: false,
     showPercent: false,
+    showPan: true,
+    showGst: true,
   },
 };
 
@@ -1783,73 +1793,67 @@ export default function AddOrganisation() {
                       </Form.Item>
                     </Col>
 
-                    <Col xs={24} sm={12} md={6}>
-                      <Form.Item
-                        {...restField}
-                        label={<span>PAN Number</span>}
-                        name={[name, "panNo"]}
-                      >
-                        <Input
-                          placeholder="ABCDE1234F"
-                          style={{ borderRadius: "6px" }}
-                        />
-                      </Form.Item>
-                    </Col>
+                    {rule.showPan && (
+                      <>
+                        <Col xs={24} sm={12} md={6}>
+                          <Form.Item
+                            {...restField}
+                            label="PAN Number"
+                            name={[name, "panNo"]}
+                          >
+                            <Input placeholder="ABCDE1234F" />
+                          </Form.Item>
+                        </Col>
 
-                    <Col xs={24} sm={12} md={6}>
-                      <Form.Item
-                        {...restField}
-                        label={<span>PAN Document</span>}
-                        name={[name, "panDocument"]}
-                        valuePropName="fileList"
-                        getValueFromEvent={normFile}
-                      >
-                        <Upload
-                          beforeUpload={() => false}
-                          onPreview={handlePreview}
-                        >
-                          <Button style={{ borderRadius: "6px" }}>
-                            Upload PAN
-                          </Button>
-                        </Upload>
-                      </Form.Item>
-                    </Col>
+                        <Col xs={24} sm={12} md={6}>
+                          <Form.Item
+                            {...restField}
+                            label="PAN Document"
+                            name={[name, "panDocument"]}
+                            valuePropName="fileList"
+                            getValueFromEvent={normFile}
+                          >
+                            <Upload
+                              beforeUpload={() => false}
+                              onPreview={handlePreview}
+                            >
+                              <Button>Upload PAN</Button>
+                            </Upload>
+                          </Form.Item>
+                        </Col>
+                      </>
+                    )}
 
-                    <Col xs={24} sm={12} md={6}>
-                      <Form.Item
-                        {...restField}
-                        label={<span>GST Number</span>}
-                        name={[name, "gstNo"]}
-                      >
-                        <Input
-                          placeholder="22AAAAA0000A1Z5"
-                          style={{ borderRadius: "6px" }}
-                        />
-                      </Form.Item>
-                    </Col>
+                    {rule.showGst && (
+                      <>
+                        <Col xs={24} sm={12} md={6}>
+                          <Form.Item
+                            {...restField}
+                            label="GST Number"
+                            name={[name, "gstNo"]}
+                          >
+                            <Input placeholder="22AAAAA0000A1Z5" />
+                          </Form.Item>
+                        </Col>
 
-                    <Col xs={24} sm={12} md={3}>
-                      <Form.Item
-                        {...restField}
-                        label={
-                          <span style={{ fontSize: "14px", fontWeight: "500" }}>
-                            GST Document
-                          </span>
-                        }
-                        name={[name, "gstDocument"]}
-                        valuePropName="fileList"
-                        getValueFromEvent={normFile}
-                      >
-                        <Upload
-                          beforeUpload={() => false}
-                          onPreview={handlePreview}
-                        >
-                          <Button style={{ borderRadius: "6px" }}>
-                            Upload GST
-                          </Button>
-                        </Upload>
-                      </Form.Item>
-                    </Col>
+                        <Col xs={24} sm={12} md={3}>
+                          <Form.Item
+                            {...restField}
+                            label="GST Document"
+                            name={[name, "gstDocument"]}
+                            valuePropName="fileList"
+                            getValueFromEvent={normFile}
+                          >
+                            <Upload
+                              beforeUpload={() => false}
+                              onPreview={handlePreview}
+                            >
+                              <Button>Upload GST</Button>
+                            </Upload>
+                          </Form.Item>
+                        </Col>
+                      </>
+                    )}
                     {rule.showDIN && (
                       <Col xs={24} sm={12} md={6}>
                         <Form.Item
