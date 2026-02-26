@@ -348,7 +348,13 @@ export default function TransportTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="Mobile Number" name="mobileNo">
+                <Form.Item
+                  label="Mobile Number"
+                  name="mobileNo"
+                  rules={[
+                    { required: true, message: "mobile number is required" },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -390,7 +396,11 @@ export default function TransportTab() {
               </Col>
 
               <Col span={6}>
-                <Form.Item label="Primary Email" name="email">
+                <Form.Item
+                  label="Primary Email"
+                  name="email"
+                  rules={[{ required: true, message: "Email id is required" }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -517,7 +527,11 @@ export default function TransportTab() {
             </h3>
             <Row gutter={24}>
               <Col span={8}>
-                <Form.Item label="Address Line 1" name="address1">
+                <Form.Item
+                  label="Address Line 1"
+                  name="address1"
+                  rules={[{ required: true, message: "Address1 is required" }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -537,7 +551,11 @@ export default function TransportTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="City" name="city">
+                <Form.Item
+                  label="City"
+                  name="city"
+                  rules={[{ required: true, message: "City name is required" }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -547,7 +565,13 @@ export default function TransportTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="State" name="state">
+                <Form.Item
+                  label="State"
+                  name="state"
+                  rules={[
+                    { required: true, message: "state name is required" },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -557,7 +581,13 @@ export default function TransportTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="District" name="district">
+                <Form.Item
+                  label="District"
+                  name="district"
+                  rules={[
+                    { required: true, message: "District name is required" },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -567,7 +597,11 @@ export default function TransportTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="Pin Code" name="pinCode">
+                <Form.Item
+                  label="Pin Code"
+                  name="pinCode"
+                  rules={[{ required: true, message: "pincode is required" }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
