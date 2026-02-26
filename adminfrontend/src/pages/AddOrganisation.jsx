@@ -1387,7 +1387,7 @@ export default function AddOrganisation() {
                   </Col>
 
                   {rule.showPercent && (
-                    <Col xs={24} sm={12} md={6}>
+                    <Col xs={24} sm={12} md={3}>
                       <Form.Item
                         {...restField}
                         label="% of Interest"
@@ -1438,18 +1438,15 @@ export default function AddOrganisation() {
                       <Input placeholder="Enter spouse name" />
                     </Form.Item>
                   </Col>
-                  <Col xs={24} sm={12} md={6}>
-                    <Form.Item
-                      label="Number of Sons"
-                      name={[name, "sonsCount"]}
-                    >
+                  <Col xs={24} sm={12} md={3}>
+                    <Form.Item label="No of Sons" name={[name, "sonsCount"]}>
                       <InputNumber min={0} style={{ width: "100%" }} />
                     </Form.Item>
                   </Col>
 
-                  <Col xs={24} sm={12} md={6}>
+                  <Col xs={24} sm={12} md={3}>
                     <Form.Item
-                      label="Number of Daughters"
+                      label="No of Daughters"
                       name={[name, "daughtersCount"]}
                     >
                       <InputNumber min={0} style={{ width: "100%" }} />
