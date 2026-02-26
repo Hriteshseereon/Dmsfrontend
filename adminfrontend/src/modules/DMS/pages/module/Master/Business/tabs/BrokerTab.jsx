@@ -31,6 +31,24 @@ import {
   getAllVendor,
   getproductbyVendor,
 } from "@/api/broker";
+
+export const phoneValidator = (_, value) => {
+  if (!value) return Promise.resolve(); // allow empty if not required
+
+  const phone = value.toString().trim();
+
+  // E.164 format:
+  // optional +
+  // first digit 1–9
+  // total digits max 15
+  const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+
+  if (!phoneRegex.test(phone)) {
+    return Promise.reject(new Error("Enter valid number "));
+  }
+
+  return Promise.resolve();
+};
 const { Option } = Select;
 
 const inputClass = "border-amber-400 h-8";
@@ -407,29 +425,44 @@ export default function BrokerTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="Phone Number" name="phoneNo">
+                <Form.Item
+                  label="Phone Number"
+                  name="phoneNo"
+                  rules={[{ validator: phoneValidator }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
                     placeholder="Enter phone number"
+                    maxLength={16}
                   />
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="Alternate Phone" name="altPhoneNo">
+                <Form.Item
+                  label="Alternate Phone"
+                  name="altPhoneNo"
+                  rules={[{ validator: phoneValidator }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
                     placeholder="Enter alternate phone"
+                    maxLength={16}
                   />
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="WhatsApp Number" name="whatsappNo">
+                <Form.Item
+                  label="WhatsApp Number"
+                  name="whatsappNo"
+                  rules={[{ validator: phoneValidator }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
                     placeholder="Enter WhatsApp number"
+                    maxLength={16}
                   />
                 </Form.Item>
               </Col>
