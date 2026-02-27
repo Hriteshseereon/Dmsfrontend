@@ -20,9 +20,35 @@ import {
   ReloadOutlined,
   MinusCircleOutlined,
 } from "@ant-design/icons";
+import { API_BASE_URL } from "@/utils/config";
 
 // import { getBrokers, addBroker, updateBroker, getBrokerDetails } from "../../../../../../../api/broker";
+import {
+  getBrokerAll,
+  getBrokerById,
+  addBrokerPtnr,
+  updateBrokerById,
+  getAllVendor,
+  getproductbyVendor,
+} from "@/api/broker";
 
+export const phoneValidator = (_, value) => {
+  if (!value) return Promise.resolve(); // allow empty if not required
+
+  const phone = value.toString().trim();
+
+  // E.164 format:
+  // optional +
+  // first digit 1–9
+  // total digits max 15
+  const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+
+  if (!phoneRegex.test(phone)) {
+    return Promise.reject(new Error("Enter valid number "));
+  }
+
+  return Promise.resolve();
+};
 const { Option } = Select;
 
 const inputClass = "border-amber-400 h-8";
@@ -39,12 +65,16 @@ const vendorProductMap = {
 /** Convert a URL string from API into Ant Design Upload fileList format */
 const fileFromUrl = (url) => {
   if (!url) return [];
+
+  // if backend already returns full URL → use it
+  const finalUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+
   return [
     {
-      uid: url,
-      name: url.split("/").pop(),
+      uid: finalUrl,
+      name: finalUrl.split("/").pop(),
       status: "done",
-      url,
+      url: finalUrl,
     },
   ];
 };
@@ -56,60 +86,58 @@ const fileFromUrl = (url) => {
 const buildFormData = (values) => {
   const fd = new FormData();
 
-  const payload = {
-    broker_name: values.brokerName || "",
-    phone_number: values.phoneNo || "",
-    alternate_phone: values.altPhoneNo || "",
-    whatsapp_number: values.whatsappNo || "",
-    fax_number: values.faxNo || "",
-    primary_email: values.email || "",
-    secondary_email: values.secondaryEmail || "",
-    status: values.status || "",
+  fd.append("name", values.brokerName || "");
+  fd.append("phone_number", values.phoneNo || "");
+  fd.append("alternate_phone", values.altPhoneNo || "");
+  fd.append("whatsapp_number", values.whatsappNo || "");
+  fd.append("fax_number", values.faxNo || "");
+  fd.append("primary_email", values.email || "");
+  fd.append("secondary_email", values.secondaryEmail || "");
+  fd.append("bank_details", values.bankDetails || "");
+  fd.append("gstin", values.gstin || "");
+  fd.append("pan", values.panNo || "");
+  fd.append("aadhar_number", values.aadharNo || "");
 
-    // Permanent Address
-    permanent_address: values.permanent_address || "",
-    permanent_city: values.permanent_city || "",
-    permanent_district: values.permanent_district || "",
-    permanent_state: values.permanent_state || "",
-    permanent_pin: values.permanent_pin || "",
+  fd.append("permanent_address_line1", values.permanent_address || "");
+  fd.append("permanent_city", values.permanent_city || "");
+  fd.append("permanent_district", values.permanent_district || "");
+  fd.append("permanent_state", values.permanent_state || "");
+  fd.append("permanent_pin", values.permanent_pin || "");
 
-    // Current Address
-    current_address: values.current_address || "",
-    current_city: values.current_city || "",
-    current_district: values.current_district || "",
-    current_state: values.current_state || "",
-    current_pin: values.current_pin || "",
+  fd.append("temporary_address_line1", values.current_address || "");
+  fd.append("temporary_city", values.current_city || "");
+  fd.append("temporary_district", values.current_district || "");
+  fd.append("temporary_state", values.current_state || "");
+  fd.append("temporary_pin", values.current_pin || "");
 
-    // KYC numbers (docs are sent as files)
-    pan_no: values.panNo || "",
-    aadhar_no: values.aadharNo || "",
-    bank_details: values.bankDetails || "",
-    gstin: values.gstin || "",
+  fd.append("is_active", values.status === "Active");
 
-    // Commissions
-    commissions: (values.commissions || []).map((c) => ({
-      vendor: c.vendor || "",
-      product: c.product || "",
-      commission_type: c.type || "",
-      method: c.method || "",
-      amount: c.amount || "",
-    })),
-  };
+  // ✅ commissions (stringified)
+  fd.append(
+    "commission_setups",
+    JSON.stringify(
+      (values.commissions || []).map((c) => ({
+        vendor: c.vendor,
+        product: c.product,
+        commission_type: c.type,
+        commission_method: c.method,
+        commission_amount: c.amount,
+        on_sale: true,
+        on_purchase: false,
+      })),
+    ),
+  );
 
-  // Attach JSON payload
-  fd.append("data", JSON.stringify(payload));
-
-  // Helper to attach a file if a new one was picked
-  const appendFile = (key, fileList) => {
-    if (fileList?.[0]?.originFileObj) {
-      fd.append(key, fileList[0].originFileObj);
+  const appendFile = (key, list) => {
+    if (list?.[0]?.originFileObj) {
+      fd.append(key, list[0].originFileObj);
     }
   };
 
   appendFile("pan_document", values.panDoc);
   appendFile("aadhar_document", values.aadharDoc);
   appendFile("gstin_document", values.gstinDoc);
-  appendFile("passport_photo", values.passportPhoto);
+  appendFile("passport_document", values.passportPhoto);
 
   return fd;
 };
@@ -120,77 +148,97 @@ export default function BrokerTab() {
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState(false);
   const [selected, setSelected] = useState(null);
-
+  const [vendors, setVendors] = useState([]);
+  const [productsMap, setProductsMap] = useState({});
   const [form] = Form.useForm();
 
   /* ================= FETCH ================= */
   const fetchBrokers = async () => {
     try {
-      // const res = await getBrokers();
-      // const list = Array.isArray(res) ? res : res?.results || [];
-      // setData(list);
-      setData([]); // replace with API call
+      const res = await getBrokerAll();
+      console.log("BROKER LIST:", res);
+      const list = Array.isArray(res) ? res : res.results || [];
+      setData(list);
     } catch {
       message.error("Failed to fetch brokers");
     }
   };
-
+  const fetchVendors = async () => {
+    try {
+      const res = await getAllVendor();
+      setVendors(res);
+    } catch {
+      message.error("Failed to load vendors");
+    }
+  };
   useEffect(() => {
     fetchBrokers();
+    fetchVendors();
   }, []);
 
+  const handleVendorChange = async (vendorId) => {
+    try {
+      if (productsMap[vendorId]) return; // already loaded
+
+      const res = await getproductbyVendor(vendorId);
+
+      setProductsMap((prev) => ({
+        ...prev,
+        [vendorId]: res.products || [],
+      }));
+    } catch {
+      message.error("Failed to load products");
+    }
+  };
   /* ================= MAP API → FORM ================= */
   const mapDetailsToForm = (d) => ({
-    brokerName: d.broker_name,
+    brokerName: d.name,
     phoneNo: d.phone_number,
     altPhoneNo: d.alternate_phone,
     whatsappNo: d.whatsapp_number,
     faxNo: d.fax_number,
     email: d.primary_email,
     secondaryEmail: d.secondary_email,
-    status: d.status,
+    status: d.is_active ? "Active" : "Inactive",
 
-    // Permanent Address
-    permanent_address: d.permanent_address,
+    permanent_address: d.permanent_address_line1,
     permanent_city: d.permanent_city,
     permanent_district: d.permanent_district,
     permanent_state: d.permanent_state,
     permanent_pin: d.permanent_pin,
 
-    // Current Address
-    current_address: d.current_address,
-    current_city: d.current_city,
-    current_district: d.current_district,
-    current_state: d.current_state,
-    current_pin: d.current_pin,
+    current_address: d.temporary_address_line1,
+    current_city: d.temporary_city,
+    current_district: d.temporary_district,
+    current_state: d.temporary_state,
+    current_pin: d.temporary_pin,
 
-    // KYC numbers
-    panNo: d.pan_no,
-    aadharNo: d.aadhar_no,
+    panNo: d.pan,
+    aadharNo: d.aadhar_number,
     bankDetails: d.bank_details,
     gstin: d.gstin,
 
-    // KYC docs → Upload fileList format
     panDoc: fileFromUrl(d.pan_document),
     aadharDoc: fileFromUrl(d.aadhar_document),
     gstinDoc: fileFromUrl(d.gstin_document),
-    passportPhoto: fileFromUrl(d.passport_photo),
+    passportPhoto: fileFromUrl(d.passport_document),
 
-    // Commissions
     commissions: (d.commissions || []).map((c) => ({
       vendor: c.vendor,
       product: c.product,
       type: c.commission_type,
-      method: c.method,
-      amount: c.amount,
+      method: c.commission_method,
+      amount: c.commission_amount,
     })),
   });
 
-  /* ================= OPEN MODAL ================= */
   const openBroker = async (record, view = false) => {
     try {
-      // const details = await getBrokerDetails(record.id);
-      const details = record; // replace with API call
+      const details = await getBrokerById(record.id);
+      // preload products for existing commissions
+      for (const c of details.commissions || []) {
+        await handleVendorChange(c.vendor);
+      }
       form.setFieldsValue(mapDetailsToForm(details));
       setSelected(details);
       setViewMode(view);
@@ -206,10 +254,10 @@ export default function BrokerTab() {
       const formData = buildFormData(values);
 
       if (selected) {
-        // await updateBroker(selected.id, formData);
+        await updateBrokerById(selected.id, formData);
         message.success("Broker Updated");
       } else {
-        // await addBroker(formData);
+        await addBrokerPtnr(formData);
         message.success("Broker Added");
       }
 
@@ -226,7 +274,7 @@ export default function BrokerTab() {
   const columns = [
     {
       title: <span className="text-amber-700 font-semibold">Broker Name</span>,
-      dataIndex: "broker_name",
+      dataIndex: "name",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
@@ -246,8 +294,11 @@ export default function BrokerTab() {
     },
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
-      dataIndex: "status",
-      render: (text) => <span className="text-amber-800">{text}</span>,
+      render: (_, record) => (
+        <span className="text-amber-800">
+          {record.is_active ? "Active" : "Inactive"}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
@@ -255,33 +306,11 @@ export default function BrokerTab() {
         <div className="flex gap-3">
           <EyeOutlined
             className="text-red-500! cursor-pointer! text-base! hover:text-red-600!"
-            onClick={async () => {
-              try {
-                // const details = await getBrokerDetails(record.id);
-                const details = record; // replace with API call
-                form.setFieldsValue(mapDetailsToForm(details));
-                setSelected(details);
-                setViewMode(true);
-                setOpen(true);
-              } catch {
-                message.error("Failed to load broker details");
-              }
-            }}
+            onClick={() => openBroker(record, true)}
           />
           <EditOutlined
             className="text-blue-500! cursor-pointer! text-base! hover:text-blue-600!"
-            onClick={async () => {
-              try {
-                // const details = await getBrokerDetails(record.id);
-                const details = record; // replace with API call
-                form.setFieldsValue(mapDetailsToForm(details));
-                setSelected(details);
-                setViewMode(false);
-                setOpen(true);
-              } catch {
-                message.error("Failed to load broker details");
-              }
-            }}
+            onClick={() => openBroker(record, false)}
           />
         </div>
       ),
@@ -289,7 +318,7 @@ export default function BrokerTab() {
   ];
 
   const filteredData = data.filter((b) =>
-    b.broker_name?.toLowerCase().includes(search.toLowerCase()),
+    b.name?.toLowerCase().includes(search.toLowerCase()),
   );
 
   /* ================= UI ================= */
@@ -396,29 +425,44 @@ export default function BrokerTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="Phone Number" name="phoneNo">
+                <Form.Item
+                  label="Phone Number"
+                  name="phoneNo"
+                  rules={[{ required: true }, { validator: phoneValidator }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
                     placeholder="Enter phone number"
+                    maxLength={16}
                   />
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="Alternate Phone" name="altPhoneNo">
+                <Form.Item
+                  label="Alternate Phone"
+                  name="altPhoneNo"
+                  rules={[{ validator: phoneValidator }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
                     placeholder="Enter alternate phone"
+                    maxLength={16}
                   />
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="WhatsApp Number" name="whatsappNo">
+                <Form.Item
+                  label="WhatsApp Number"
+                  name="whatsappNo"
+                  rules={[{ validator: phoneValidator }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
                     placeholder="Enter WhatsApp number"
+                    maxLength={16}
                   />
                 </Form.Item>
               </Col>
@@ -432,7 +476,11 @@ export default function BrokerTab() {
                 </Form.Item>
               </Col>
               <Col span={6}>
-                <Form.Item label="Primary Email" name="email">
+                <Form.Item
+                  label="Primary Email"
+                  name="email"
+                  rules={[{ required: true }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -744,15 +792,22 @@ export default function BrokerTab() {
                             {...restField}
                             label="Vendor"
                             name={[name, "vendor"]}
+                            rules={[
+                              {
+                                required: true,
+                                message: "vendor name is required",
+                              },
+                            ]}
                           >
                             <Select
                               className={selectClass}
                               disabled={viewMode}
                               placeholder="Select vendor"
+                              onChange={(value) => handleVendorChange(value)}
                             >
-                              {Object.keys(vendorProductMap).map((v) => (
-                                <Option key={v} value={v}>
-                                  {v}
+                              {vendors.map((v) => (
+                                <Option key={v.id} value={v.id}>
+                                  {v.name}
                                 </Option>
                               ))}
                             </Select>
@@ -763,12 +818,32 @@ export default function BrokerTab() {
                             {...restField}
                             label="Product"
                             name={[name, "product"]}
+                            rules={[
+                              {
+                                required: true,
+                                message: "Product is required",
+                              },
+                            ]}
                           >
-                            <Input
-                              className={inputClass}
+                            <Select
+                              className={selectClass}
                               disabled={viewMode}
-                              placeholder="Enter product"
-                            />
+                              placeholder="Select product"
+                            >
+                              {(
+                                productsMap[
+                                  form.getFieldValue([
+                                    "commissions",
+                                    name,
+                                    "vendor",
+                                  ])
+                                ] || []
+                              ).map((p) => (
+                                <Option key={p.id} value={p.id}>
+                                  {p.name}
+                                </Option>
+                              ))}
+                            </Select>
                           </Form.Item>
                         </Col>
                         <Col span={4}>
@@ -776,30 +851,46 @@ export default function BrokerTab() {
                             {...restField}
                             label="Commission Type"
                             name={[name, "type"]}
+                            rules={[
+                              {
+                                required: true,
+                                message: "comission type is required",
+                              },
+                            ]}
                           >
                             <Select
                               className={selectClass}
                               disabled={viewMode}
                               placeholder="Select type"
                             >
-                              <Option value="basic">Basic</Option>
-                              <Option value="scheme">Scheme</Option>
+                              <Option value="Percentage">Percentage</Option>
+                              <Option value="FixedAmount">Fixed Amount</Option>
                             </Select>
                           </Form.Item>
                         </Col>
+
                         <Col span={4}>
                           <Form.Item
                             {...restField}
                             label="Method"
                             name={[name, "method"]}
+                            rules={[
+                              {
+                                required: true,
+                                message: "commision method is required",
+                              },
+                            ]}
                           >
                             <Select
                               className={selectClass}
                               disabled={viewMode}
                               placeholder="Select method"
                             >
-                              <Option value="percentage">Percentage</Option>
-                              <Option value="fixed">Fixed</Option>
+                              <Option value="PerUnit">Per Unit</Option>
+                              <Option value="PerValue">Per Value</Option>
+                              <Option value="PerTransaction">
+                                Per Transaction
+                              </Option>
                             </Select>
                           </Form.Item>
                         </Col>
@@ -808,6 +899,12 @@ export default function BrokerTab() {
                             {...restField}
                             label="Amount"
                             name={[name, "amount"]}
+                            rules={[
+                              {
+                                required: true,
+                                message: "amount is required",
+                              },
+                            ]}
                           >
                             <Input
                               className={inputClass}

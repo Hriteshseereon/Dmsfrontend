@@ -9,6 +9,7 @@ import {
   Col,
   Card,
   message,
+  Upload,
 } from "antd";
 import {
   PlusOutlined,
@@ -17,12 +18,35 @@ import {
   SearchOutlined,
   ReloadOutlined,
 } from "@ant-design/icons";
-
+import {
+  getAllTransport,
+  createTransport,
+  updateTransport,
+  getTransportById,
+} from "@/api/transport.js";
 // import { getTransporters, addTransporter, updateTransporter, getTransporterDetails } from "../../../../../../../api/transporter";
+import { API_BASE_URL } from "@/utils/config";
 
 const inputClass = "border-amber-400 h-8";
 const passwordClass = "border-amber-400 h-8";
 
+export const phoneValidator = (_, value) => {
+  if (!value) return Promise.resolve(); // allow empty if not required
+
+  const phone = value.toString().trim();
+
+  // E.164 format:
+  // optional +
+  // first digit 1–9
+  // total digits max 15
+  const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+
+  if (!phoneRegex.test(phone)) {
+    return Promise.reject(new Error("Enter valid number "));
+  }
+
+  return Promise.resolve();
+};
 export default function TransportTab() {
   const [data, setData] = useState([]);
   const [search, setSearch] = useState("");
@@ -35,10 +59,9 @@ export default function TransportTab() {
   /* ================= FETCH ================= */
   const fetchTransporters = async () => {
     try {
-      // const res = await getTransporters();
-      // const list = Array.isArray(res) ? res : res?.results || [];
-      // setData(list);
-      setData([]); // replace with API call
+      const res = await getAllTransport();
+      const list = Array.isArray(res) ? res : res?.results || [];
+      setData(list);
     } catch {
       message.error("Failed to fetch transporters");
     }
@@ -48,60 +71,94 @@ export default function TransportTab() {
     fetchTransporters();
   }, []);
 
+  const fileFromUrl = (url) => {
+    if (!url) return [];
+
+    // if backend already returns full URL → use it
+    const finalUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
+
+    return [
+      {
+        uid: finalUrl,
+        name: finalUrl.split("/").pop(),
+        status: "done",
+        url: finalUrl,
+      },
+    ];
+  };
   /* ================= MAP API → FORM ================= */
   const mapDetailsToForm = (d) => ({
-    agencyName: d.agency_name,
-    mobileNo: d.mobile_number,
+    agencyName: d.registered_name,
+    contactPersonName: d.contact_person_name,
+    mobileNo: d.phone_number,
     altMobileNo: d.alternate_mobile_no,
     whatsappNo: d.whatsapp_number,
-    email: d.primary_email,
+    email: d.email_id,
     secondaryEmail: d.secondary_email,
-    // password intentionally not pre-filled
-    panNo: d.pan_no,
+    panNo: d.pan,
     gstin: d.gstin,
-    ownerAadharNo: d.owner_aadhar_no,
-    address1: d.address_line1,
-    address2: d.address_line2,
+    ownerAadharNo: d.owner_aadhar_number,
+    address1: d.address_1,
+    address2: d.address_2,
     city: d.city,
     state: d.state,
     district: d.district,
-    pinCode: d.pin_code,
+    pinCode: d.pin,
+    // ✅ FILE PREVIEW DATA
+    panDoc: fileFromUrl(d.pan_document),
+    gstDoc: fileFromUrl(d.gstin_document),
+    aadharDoc: fileFromUrl(d.aadhar_document),
   });
+  const buildFormData = (values) => {
+    const fd = new FormData();
 
+    fd.append("registered_name", values.agencyName || "");
+    fd.append("contact_person_name", values.contactPersonName || "");
+    fd.append("email_id", values.email || "");
+    fd.append("secondary_email", values.secondaryEmail || "");
+    fd.append("password", values.password || "");
+    fd.append("phone_number", values.mobileNo || "");
+    fd.append("alternate_mobile_no", values.altMobileNo || "");
+    fd.append("whatsapp_number", values.whatsappNo || "");
+    fd.append("pan", values.panNo || "");
+    fd.append("gstin", values.gstin || "");
+    fd.append("owner_aadhar_number", values.ownerAadharNo || "");
+    fd.append("address_1", values.address1 || "");
+    fd.append("address_2", values.address2 || "");
+    fd.append("city", values.city || "");
+    fd.append("state", values.state || "");
+    fd.append("district", values.district || "");
+    fd.append("pin", values.pinCode || "");
+
+    // FILES
+    if (values.panDoc?.[0]?.originFileObj)
+      fd.append("pan_document", values.panDoc[0].originFileObj);
+
+    if (values.gstDoc?.[0]?.originFileObj)
+      fd.append("gstin_document", values.gstDoc[0].originFileObj);
+
+    if (values.aadharDoc?.[0]?.originFileObj)
+      fd.append("aadhar_document", values.aadharDoc[0].originFileObj);
+
+    return fd;
+  };
   /* ================= SAVE ================= */
   const handleSubmit = async (values) => {
     try {
-      const payload = {
-        agency_name: values.agencyName || "",
-        mobile_number: values.mobileNo || "",
-        alternate_mobile_no: values.altMobileNo || "",
-        whatsapp_number: values.whatsappNo || "",
-        primary_email: values.email || "",
-        secondary_email: values.secondaryEmail || "",
-        password: values.password || "",
-        pan_no: values.panNo || "",
-        gstin: values.gstin || "",
-        owner_aadhar_no: values.ownerAadharNo || "",
-        address_line1: values.address1 || "",
-        address_line2: values.address2 || "",
-        city: values.city || "",
-        state: values.state || "",
-        district: values.district || "",
-        pin_code: values.pinCode || "",
-      };
+      const formData = buildFormData(values);
 
       if (selected) {
-        // await updateTransporter(selected.id, payload);
+        await updateTransport(selected.id, formData);
         message.success("Transporter Updated");
       } else {
-        // await addTransporter(payload);
+        await createTransport(formData);
         message.success("Transporter Added");
       }
 
       setOpen(false);
       form.resetFields();
       fetchTransporters();
-    } catch {
+    } catch (e) {
       message.error("Save failed");
     }
   };
@@ -110,17 +167,17 @@ export default function TransportTab() {
   const columns = [
     {
       title: <span className="text-amber-700 font-semibold">Agency Name</span>,
-      dataIndex: "agency_name",
+      dataIndex: "registered_name",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Mobile</span>,
-      dataIndex: "mobile_number",
+      dataIndex: "phone_number",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Email</span>,
-      dataIndex: "primary_email",
+      dataIndex: "email_id",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
@@ -140,31 +197,23 @@ export default function TransportTab() {
           <EyeOutlined
             className="text-red-500! cursor-pointer! text-base! hover:text-red-600!"
             onClick={async () => {
-              try {
-                // const details = await getTransporterDetails(record.id);
-                const details = record; // replace with API call
-                form.setFieldsValue(mapDetailsToForm(details));
-                setSelected(details);
-                setViewMode(true);
-                setOpen(true);
-              } catch {
-                message.error("Failed to load transporter details");
-              }
+              const details = await getTransportById(record.id);
+
+              form.setFieldsValue(mapDetailsToForm(details));
+              setSelected(details);
+              setViewMode(true);
+              setOpen(true);
             }}
           />
           <EditOutlined
             className="text-blue-500! cursor-pointer! text-base! hover:text-blue-600!"
             onClick={async () => {
-              try {
-                // const details = await getTransporterDetails(record.id);
-                const details = record; // replace with API call
-                form.setFieldsValue(mapDetailsToForm(details));
-                setSelected(details);
-                setViewMode(false);
-                setOpen(true);
-              } catch {
-                message.error("Failed to load transporter details");
-              }
+              const details = await getTransportById(record.id);
+
+              form.setFieldsValue(mapDetailsToForm(details));
+              setSelected(details);
+              setViewMode(false);
+              setOpen(true);
             }}
           />
         </div>
@@ -173,7 +222,7 @@ export default function TransportTab() {
   ];
 
   const filteredData = data.filter((t) =>
-    t.agency_name?.toLowerCase().includes(search.toLowerCase()),
+    t.registered_name?.toLowerCase().includes(search.toLowerCase()),
   );
 
   /* ================= UI ================= */
@@ -280,39 +329,78 @@ export default function TransportTab() {
                   />
                 </Form.Item>
               </Col>
-
+              <Col span={6}>
+                <Form.Item
+                  label="Contact Person Name"
+                  name="contactPersonName"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Contact person name is required",
+                    },
+                  ]}
+                >
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter contact person name"
+                  />
+                </Form.Item>
+              </Col>
               <Col span={4}>
-                <Form.Item label="Mobile Number" name="mobileNo">
+                <Form.Item
+                  label="Mobile Number"
+                  name="mobileNo"
+                  rules={[
+                    { required: true, message: "mobile number is required" },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
                     placeholder="Enter mobile number"
+                    rules={[{ validator: phoneValidator }]}
+                    maxLength={16}
                   />
                 </Form.Item>
               </Col>
 
               <Col span={4}>
-                <Form.Item label="Alternate Mobile No" name="altMobileNo">
+                <Form.Item
+                  label="Alternate Mobile No"
+                  name="altMobileNo"
+                  rules={[{ validator: phoneValidator }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
                     placeholder="Enter alternate mobile number"
+                    maxLength={16}
                   />
                 </Form.Item>
               </Col>
 
               <Col span={4}>
-                <Form.Item label="WhatsApp Number" name="whatsappNo">
+                <Form.Item
+                  label="WhatsApp Number"
+                  name="whatsappNo"
+                  rules={[{ validator: phoneValidator }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
                     placeholder="Enter WhatsApp number"
+                    maxLength={16}
                   />
                 </Form.Item>
               </Col>
 
               <Col span={6}>
-                <Form.Item label="Primary Email" name="email">
+                <Form.Item
+                  label="Primary Email"
+                  name="email"
+                  rules={[{ required: true, message: "Email id is required" }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -360,8 +448,19 @@ export default function TransportTab() {
               </Col>
 
               <Col span={6}>
-                <Form.Item label="PAN Document" name="panDoc">
-                  <Input type="file" disabled={viewMode} />
+                <Form.Item
+                  label="PAN Document"
+                  name="panDoc"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                  >
+                    <Button disabled={viewMode}>Upload</Button>
+                  </Upload>
                 </Form.Item>
               </Col>
 
@@ -376,8 +475,19 @@ export default function TransportTab() {
               </Col>
 
               <Col span={6}>
-                <Form.Item label="GSTIN Document" name="gstDoc">
-                  <Input type="file" disabled={viewMode} />
+                <Form.Item
+                  label="GST Document"
+                  name="gstDoc"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                  >
+                    <Button disabled={viewMode}>Upload</Button>
+                  </Upload>
                 </Form.Item>
               </Col>
 
@@ -392,8 +502,19 @@ export default function TransportTab() {
               </Col>
 
               <Col span={6}>
-                <Form.Item label="Aadhar Document" name="aadharDoc">
-                  <Input type="file" disabled={viewMode} />
+                <Form.Item
+                  label="Adhar Document"
+                  name="aadharDoc"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                  >
+                    <Button disabled={viewMode}>Upload</Button>
+                  </Upload>
                 </Form.Item>
               </Col>
             </Row>
@@ -406,7 +527,11 @@ export default function TransportTab() {
             </h3>
             <Row gutter={24}>
               <Col span={8}>
-                <Form.Item label="Address Line 1" name="address1">
+                <Form.Item
+                  label="Address Line 1"
+                  name="address1"
+                  rules={[{ required: true, message: "Address1 is required" }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -426,7 +551,11 @@ export default function TransportTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="City" name="city">
+                <Form.Item
+                  label="City"
+                  name="city"
+                  rules={[{ required: true, message: "City name is required" }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -436,7 +565,13 @@ export default function TransportTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="State" name="state">
+                <Form.Item
+                  label="State"
+                  name="state"
+                  rules={[
+                    { required: true, message: "state name is required" },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -446,7 +581,13 @@ export default function TransportTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="District" name="district">
+                <Form.Item
+                  label="District"
+                  name="district"
+                  rules={[
+                    { required: true, message: "District name is required" },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -456,7 +597,11 @@ export default function TransportTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="Pin Code" name="pinCode">
+                <Form.Item
+                  label="Pin Code"
+                  name="pinCode"
+                  rules={[{ required: true, message: "pincode is required" }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
