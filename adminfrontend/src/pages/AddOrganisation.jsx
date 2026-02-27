@@ -1322,15 +1322,15 @@ export default function AddOrganisation() {
                 size="small"
                 style={{ marginBottom: 16, border: "1px solid #fef3c7" }}
                 title={`${rule.roleLabel} ${name + 1}`}
-                extra={
-                  rule.askCount &&
-                  fields.length > 1 && (
-                    <MinusCircleOutlined
-                      onClick={() => remove(name)}
-                      style={{ color: "#ef4444", cursor: "pointer" }}
-                    />
-                  )
-                }
+                // extra={
+                //   rule.askCount &&
+                //   fields.length > 1 && (
+                //     <MinusCircleOutlined
+                //       onClick={() => remove(name)}
+                //       style={{ color: "#ef4444", cursor: "pointer" }}
+                //     />
+                //   )
+                // }
               >
                 <Divider
                   orientation="left"
