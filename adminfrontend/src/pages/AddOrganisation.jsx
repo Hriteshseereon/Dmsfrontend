@@ -141,7 +141,7 @@ export default function AddOrganisation() {
     form.setFieldsValue(formData);
     setCurrentStep(loadedValues.currentStep || 0);
     if(formData.organisationType) {
-      handleOrgTypeChange(formData.organisationType);
+      handleOrgTypeChange(formData.organisationType, formData.partners || [{}]);
     }
   }, []);
 
@@ -516,12 +516,12 @@ export default function AddOrganisation() {
     }
   }, [form, orgType, form.getFieldValue("partnersCount")]);
 
-  const handleOrgTypeChange = (value) => {
+  const handleOrgTypeChange = (value, partnerList = [{}]) => {
     setOrgType(value);
     if (ORG_RULES[value].askCount) {
       form.setFieldsValue({ partners: [] });
     } else {
-      form.setFieldsValue({ partners: [{}] });
+      form.setFieldsValue({ partners: partnerList });
     }
   };
 
