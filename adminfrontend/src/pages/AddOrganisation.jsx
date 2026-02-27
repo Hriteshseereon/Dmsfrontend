@@ -34,31 +34,64 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useGetOrganization } from "../queries/useGetOrganization.js";
 import { useUpdateOrganization } from "../queries/useUpdateOrganization.js";
 import dayjs from "dayjs";
+import { useFormStore } from "../store/formStore.js";
 
 const { Option } = Select;
 const { TextArea } = Input;
 
 const ORG_RULES = {
   PRIVATE_LIMITED: {
-    label: "Director",
+    roleLabel: "Director",
+    idLabel: "DIN Number",
+    showDIN: true,
     askCount: true,
     showPercent: true,
     company_website: true,
+    showPan: true,
+    showGst: true,
   },
+
   LLP: {
-    label: "Partner",
+    roleLabel: "Partner",
+    idLabel: "DPIN Number",
+    showDIN: true,
     askCount: true,
     showPercent: true,
     company_website: true,
+    showPan: true,
+    showGst: true,
   },
+
+  OPC: {
+    roleLabel: "Director", // OPC uses Director
+    idLabel: null,
+    showDIN: false,
+    askCount: false,
+    showPercent: false,
+    showPan: false,
+    showGst: false,
+  },
+
   Partnership: {
-    label: "Partner",
+    roleLabel: "Partner",
+    idLabel: null,
+    showDIN: false,
     askCount: true,
     showPercent: true,
     company_website: true,
+    showPan: true,
+    showGst: true,
   },
-  Proprietorship: { label: "Proprietor", askCount: false, showPercent: false },
-  OPC: { label: "One Person Company", askCount: false, showPercent: false },
+
+  PROPRIETORSHIP: {
+    roleLabel: "Proprietor",
+    idLabel: null,
+    showDIN: false,
+    askCount: false,
+    showPercent: false,
+    showPan: true,
+    showGst: true,
+  },
 };
 
 const SHOW_COMPANY_DETAILS_FOR = ["PRIVATE_LIMITED", "LLP", "Partnership"];
@@ -89,11 +122,74 @@ export default function AddOrganisation() {
   const normFile = (e) => (Array.isArray(e) ? e : e?.fileList);
   const navigate = useNavigate();
 
+  const { createForm, values, loadValues, setValues, reset } = useFormStore();
+
   // validation for mobile number: starts with 6-9 and has total 10 digits
   const handleTenDigitNumber = (fieldPath) => (e) => {
     const value = e.target.value.replace(/\D/g, "").slice(0, 15);
     form.setFieldValue(fieldPath, value);
   };
+
+  const hydrateDates = (data) => {
+    const cloned = structuredClone(data || {});
+
+    // ---------- Partner DOB ----------
+    if (cloned.partners) {
+      cloned.partners = cloned.partners.map((p) => ({
+        ...p,
+        dob: p?.dob ? dayjs(p.dob) : null,
+      }));
+    }
+
+    // ---------- Legal Details ----------
+    if (cloned.legalDetails) {
+      Object.keys(cloned.legalDetails).forEach((key) => {
+        const validity = cloned.legalDetails[key]?.validity;
+
+        if (Array.isArray(validity)) {
+          cloned.legalDetails[key].validity = [
+            validity[0] ? dayjs(validity[0]) : null,
+            validity[1] ? dayjs(validity[1]) : null,
+          ];
+        }
+      });
+    }
+
+    // ---------- Custom Docs ----------
+    if (cloned.customLegalDocs) {
+      cloned.customLegalDocs = cloned.customLegalDocs.map((doc) => ({
+        ...doc,
+        validity: doc.validity
+          ? [dayjs(doc.validity[0]), dayjs(doc.validity[1])]
+          : undefined,
+      }));
+    }
+
+    return cloned;
+  };
+  useEffect(() => {
+    if (isEdit && orgData) return;
+    let draftId = new URLSearchParams(window.location.search).get("draft");
+    if (!draftId) {
+      draftId = createForm();
+    }
+    const loadedValues = loadValues(draftId);
+    // const formData = loadedValues.formData || {};
+    // form.setFieldsValue(formData);
+    const rawData = loadedValues.formData || {};
+    const formData = hydrateDates(rawData);
+
+    form.setFieldsValue(formData);
+    setCurrentStep(loadedValues.currentStep || 0);
+    if (formData.organisationType) {
+      handleOrgTypeChange(
+        formData.organisationType,
+        formData.partners || [{}],
+        true,
+      );
+    }
+  }, []);
+
   const handlePhoneFormat = (fieldPath) => (e) => {
     let value = e.target.value;
 
@@ -264,10 +360,7 @@ export default function AddOrganisation() {
       },
       {},
     );
-    // const childrenParsed =
-    //   typeof p.family_details?.children_details === "string"
-    //     ? JSON.parse(p.family_details.children_details)
-    //     : {};
+
     return {
       // ================= ORG CORE =================
       registeredName: org.registered_name,
@@ -303,7 +396,10 @@ export default function AddOrganisation() {
         } catch {
           childrenParsed = {};
         }
+        const sons = childrenParsed.sons ?? [];
+        const daughters = childrenParsed.daughters ?? [];
 
+        const calculatedChildrenCount = sons.length + daughters.length;
         return {
           id: p.id,
           familyId: p.family_details?.id,
@@ -335,19 +431,20 @@ export default function AddOrganisation() {
           spouseName: p.family_details?.spouse_name,
 
           // ✅ CHILDREN (EDIT MODE FIX)
-          childrenCount: Number(childrenParsed.count ?? 0),
+          childrenCount: calculatedChildrenCount,
 
           childrenType: [
-            ...(childrenParsed.sons?.length ? ["SON"] : []),
-            ...(childrenParsed.daughters?.length ? ["DAUGHTER"] : []),
+            ...(sons.length ? ["SON"] : []),
+            ...(daughters.length ? ["DAUGHTER"] : []),
           ],
-
+          sonsCount: sons.length,
+          daughtersCount: daughters.length,
           children: {
-            sons: (childrenParsed.sons ?? []).map((s) => ({
+            sons: sons.map((s) => ({
               name: s.name || "",
               age: s.age || "",
             })),
-            daughters: (childrenParsed.daughters ?? []).map((d) => ({
+            daughters: daughters.map((d) => ({
               name: d.name || "",
               age: d.age || "",
             })),
@@ -464,15 +561,34 @@ export default function AddOrganisation() {
     }
   }, [form, orgType, form.getFieldValue("partnersCount")]);
 
-  const handleOrgTypeChange = (value) => {
+  // const handleOrgTypeChange = (value, partnerList = [{}]) => {
+  //   setOrgType(value);
+  //   if (ORG_RULES[value].askCount) {
+  //     form.setFieldsValue({ partners: [] });
+  //   } else {
+  //     form.setFieldsValue({ partners: partnerList });
+  //   }
+  // };
+  const handleOrgTypeChange = (
+    value,
+    partnerList = null,
+    isRestore = false,
+  ) => {
     setOrgType(value);
-    if (ORG_RULES[value].askCount) {
-      form.setFieldsValue({ partners: [] });
+
+    const rule = ORG_RULES[value];
+
+    if (rule.askCount) {
+      // ✅ only clear when user manually changes type
+      if (!isRestore) {
+        form.setFieldsValue({ partners: [] });
+      }
     } else {
-      form.setFieldsValue({ partners: [{}] });
+      form.setFieldsValue({
+        partners: partnerList ?? [{}],
+      });
     }
   };
-
   const nextStep = async () => {
     try {
       // Validate current step fields
@@ -630,7 +746,9 @@ export default function AddOrganisation() {
           // children_details:
           //   p.childrenCount !== undefined ? String(p.childrenCount) : null,
           children_details: JSON.stringify({
-            count: p.childrenCount ?? 0,
+            count:
+              (p.children?.sons?.length || 0) +
+              (p.children?.daughters?.length || 0),
             sons: (p.children?.sons ?? []).map((c) => ({
               name: c?.name ?? null,
               age: Number(c?.age) || null,
@@ -837,6 +955,7 @@ export default function AddOrganisation() {
     } else {
       createOrg(formData, {
         onSuccess: () => {
+          reset(); // resetting form store after successful creation
           antMessage.success("Organisation created successfully");
           navigate("/organizations");
         },
@@ -930,6 +1049,11 @@ export default function AddOrganisation() {
     if (fileURL) {
       window.open(fileURL, "_blank");
     }
+  };
+
+  const handleFormValueChange = async () => {
+    const allValues = form.getFieldsValue(true);
+    setValues({ currentStep, formData: allValues });
   };
 
   // Step 0: Organisation Details
@@ -1154,17 +1278,20 @@ export default function AddOrganisation() {
               <Option value="LLP">LLP</Option>
               <Option value="OPC">OPC</Option>
               <Option value="Partnership">Partnership</Option>
-              <Option value="Proprietorship">Proprietor</Option>
+              <Option value="PROPRIETORSHIP">Proprietor</Option>
             </Select>
           </Form.Item>
         </Col>
         {rule?.askCount && (
           <Col md={6}>
-            <Form.Item label={`Number of ${rule.label}s`} name="partnersCount">
+            <Form.Item
+              label={`Number of ${rule.roleLabel}s`}
+              name="partnersCount"
+            >
               <InputNumber
                 min={0}
                 style={{ width: "100%" }}
-                placeholder={`Enter number of ${rule.label}s (optional)`}
+                placeholder={`Enter number of ${rule.roleLabel}s (optional)`}
               />
             </Form.Item>
           </Col>
@@ -1194,16 +1321,16 @@ export default function AddOrganisation() {
                 key={key}
                 size="small"
                 style={{ marginBottom: 16, border: "1px solid #fef3c7" }}
-                title={`${rule.label} ${name + 1}`}
-                extra={
-                  rule.askCount &&
-                  fields.length > 1 && (
-                    <MinusCircleOutlined
-                      onClick={() => remove(name)}
-                      style={{ color: "#ef4444", cursor: "pointer" }}
-                    />
-                  )
-                }
+                title={`${rule.roleLabel} ${name + 1}`}
+                // extra={
+                //   rule.askCount &&
+                //   fields.length > 1 && (
+                //     <MinusCircleOutlined
+                //       onClick={() => remove(name)}
+                //       style={{ color: "#ef4444", cursor: "pointer" }}
+                //     />
+                //   )
+                // }
               >
                 <Divider
                   orientation="left"
@@ -1214,13 +1341,13 @@ export default function AddOrganisation() {
                     marginTop: 0,
                   }}
                 >
-                  Director Personal Details
+                  {rule.roleLabel} Personal Details
                 </Divider>
                 <Row gutter={[16, 8]}>
                   <Col xs={24} sm={12} md={6}>
                     <Form.Item
                       {...restField}
-                      label={`${rule.label} Name`}
+                      label={`${rule.roleLabel} Name`}
                       name={[name, "name"]}
                       rules={[{ required: true, message: "Please enter name" }]}
                     >
@@ -1359,7 +1486,7 @@ export default function AddOrganisation() {
                   </Col>
 
                   {rule.showPercent && (
-                    <Col xs={24} sm={12} md={6}>
+                    <Col xs={24} sm={12} md={3}>
                       <Form.Item
                         {...restField}
                         label="% of Interest"
@@ -1410,331 +1537,88 @@ export default function AddOrganisation() {
                       <Input placeholder="Enter spouse name" />
                     </Form.Item>
                   </Col>
-                  <Col xs={24} sm={12} md={6}>
+                  <Col xs={24} sm={12} md={3}>
+                    <Form.Item label="No of Sons" name={[name, "sonsCount"]}>
+                      <InputNumber min={0} style={{ width: "100%" }} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col xs={24} sm={12} md={3}>
                     <Form.Item
-                      {...restField}
-                      label="Number of Children"
-                      name={[name, "childrenCount"]}
-                      rules={[
-                        {
-                          pattern: /^[0-9]*$/,
-                          message: "Only numbers are allowed",
-                        },
-                      ]}
+                      label="No of Daughters"
+                      name={[name, "daughtersCount"]}
                     >
-                      <Input
-                        min={0}
-                        placeholder="0"
-                        style={{ width: "100%" }}
-                      />
+                      <InputNumber min={0} style={{ width: "100%" }} />
                     </Form.Item>
                   </Col>
 
                   <Form.Item noStyle shouldUpdate>
-                    {({ getFieldValue, setFieldsValue }) => {
-                      const count =
-                        Number(
-                          getFieldValue(["partners", name, "childrenCount"]),
-                        ) || 0;
-                      const types =
-                        getFieldValue(["partners", name, "childrenType"]) || [];
+                    {({ getFieldValue }) => {
+                      const sons =
+                        getFieldValue(["partners", name, "sonsCount"]) || 0;
 
-                      if (!count) return null;
-
-                      const partners = getFieldValue("partners") || [];
-                      const currentPartner = partners[name] || {};
-
-                      if (
-                        !types.includes("SON") &&
-                        currentPartner?.children?.sons?.length
-                      ) {
-                        const updated = [...partners];
-                        updated[name] = {
-                          ...currentPartner,
-                          children: { ...currentPartner.children, sons: [] },
-                        };
-                        setFieldsValue({ partners: updated });
-                      }
-
-                      if (
-                        !types.includes("DAUGHTER") &&
-                        currentPartner?.children?.daughters?.length
-                      ) {
-                        const updated = [...partners];
-                        updated[name] = {
-                          ...currentPartner,
-                          children: {
-                            ...currentPartner.children,
-                            daughters: [],
-                          },
-                        };
-                        setFieldsValue({ partners: updated });
-                      }
+                      const daughters =
+                        getFieldValue(["partners", name, "daughtersCount"]) ||
+                        0;
 
                       return (
                         <>
-                          {/* Children Type Checkbox */}
-                          <Col xs={24}>
-                            <Form.Item
-                              label="Children Type"
-                              name={[name, "childrenType"]}
-                            >
-                              <Checkbox.Group>
-                                <Checkbox value="SON">Son</Checkbox>
-                                <Checkbox value="DAUGHTER">Daughter</Checkbox>
-                              </Checkbox.Group>
-                            </Form.Item>
-                          </Col>
-
-                          {types.length > 0 && (
-                            <Col xs={24}>
-                              <Divider
-                                orientation="left"
-                                style={{
-                                  fontSize: "14px",
-                                  fontWeight: 600,
-                                  color: "#374151",
-                                }}
-                              >
-                                Children Details
-                              </Divider>
-
-                              <Row gutter={[16, 16]}>
-                                {/* SON SECTION */}
-                                {types.includes("SON") && (
-                                  <Col
-                                    xs={24}
-                                    md={types.includes("DAUGHTER") ? 12 : 24}
+                          {/* SON SECTION */}
+                          {sons > 0 && (
+                            <Card title="Son Details">
+                              {Array.from({ length: sons }).map((_, i) => (
+                                <Row key={i}>
+                                  <Form.Item
+                                    name={[name, "children", "sons", i, "name"]}
+                                    label="Name"
                                   >
-                                    <Card
-                                      size="small"
-                                      title={
-                                        <span
-                                          style={{
-                                            color: "#2563eb",
-                                            fontWeight: 600,
-                                            fontSize: "13px",
-                                          }}
-                                        >
-                                          Son Details
-                                        </span>
-                                      }
-                                      style={{
-                                        background: "#eff6ff",
-                                        border: "1px solid #bfdbfe",
-                                        borderRadius: "8px",
-                                      }}
-                                      bodyStyle={{ padding: "12px" }}
-                                    >
-                                      {Array.from({ length: count }).map(
-                                        (_, i) => (
-                                          <div
-                                            key={`son-${i}`}
-                                            style={{
-                                              display: "flex",
-                                              gap: "12px",
-                                              alignItems: "flex-start",
-                                              marginBottom:
-                                                i < count - 1 ? "12px" : 0,
-                                              padding: "10px",
-                                              background: "#fff",
-                                              borderRadius: "6px",
-                                              border: "1px solid #dbeafe",
-                                            }}
-                                          >
-                                            {/* Son Number Badge */}
-                                            <div
-                                              style={{
-                                                minWidth: "28px",
-                                                height: "28px",
-                                                borderRadius: "50%",
-                                                background: "#2563eb",
-                                                color: "#fff",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                fontSize: "12px",
-                                                fontWeight: 700,
-                                                marginTop: "4px",
-                                                flexShrink: 0,
-                                              }}
-                                            >
-                                              {i + 1}
-                                            </div>
+                                    <Input />
+                                  </Form.Item>
 
-                                            {/* Name */}
-                                            <Form.Item
-                                              label="Name"
-                                              name={[
-                                                name,
-                                                "children",
-                                                "sons",
-                                                i,
-                                                "name",
-                                              ]}
-                                              style={{
-                                                flex: 1,
-                                                marginBottom: 0,
-                                              }}
-                                            >
-                                              <Input
-                                                placeholder={`Son ${i + 1} name`}
-                                                size="small"
-                                              />
-                                            </Form.Item>
-
-                                            {/* Age */}
-                                            <Form.Item
-                                              label="Age"
-                                              name={[
-                                                name,
-                                                "children",
-                                                "sons",
-                                                i,
-                                                "age",
-                                              ]}
-                                              style={{
-                                                width: "90px",
-                                                marginBottom: 0,
-                                              }}
-                                              rules={[
-                                                {
-                                                  pattern: /^[0-9]*$/,
-                                                  message: "Numbers only",
-                                                },
-                                              ]}
-                                            >
-                                              <Input
-                                                placeholder="Age"
-                                                size="small"
-                                                maxLength={2}
-                                              />
-                                            </Form.Item>
-                                          </div>
-                                        ),
-                                      )}
-                                    </Card>
-                                  </Col>
-                                )}
-
-                                {/* DAUGHTER SECTION */}
-                                {types.includes("DAUGHTER") && (
-                                  <Col
-                                    xs={24}
-                                    md={types.includes("SON") ? 12 : 24}
+                                  <Form.Item
+                                    name={[name, "children", "sons", i, "age"]}
+                                    label="Age"
                                   >
-                                    <Card
-                                      size="small"
-                                      title={
-                                        <span
-                                          style={{
-                                            color: "#db2777",
-                                            fontWeight: 600,
-                                            fontSize: "13px",
-                                          }}
-                                        >
-                                          Daughter Details
-                                        </span>
-                                      }
-                                      style={{
-                                        background: "#fdf2f8",
-                                        border: "1px solid #fbcfe8",
-                                        borderRadius: "8px",
-                                      }}
-                                      bodyStyle={{ padding: "12px" }}
-                                    >
-                                      {Array.from({ length: count }).map(
-                                        (_, i) => (
-                                          <div
-                                            key={`daughter-${i}`}
-                                            style={{
-                                              display: "flex",
-                                              gap: "12px",
-                                              alignItems: "flex-start",
-                                              marginBottom:
-                                                i < count - 1 ? "12px" : 0,
-                                              padding: "10px",
-                                              background: "#fff",
-                                              borderRadius: "6px",
-                                              border: "1px solid #fce7f3",
-                                            }}
-                                          >
-                                            {/* Daughter Number Badge */}
-                                            <div
-                                              style={{
-                                                minWidth: "28px",
-                                                height: "28px",
-                                                borderRadius: "50%",
-                                                background: "#db2777",
-                                                color: "#fff",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                fontSize: "12px",
-                                                fontWeight: 700,
-                                                marginTop: "4px",
-                                                flexShrink: 0,
-                                              }}
-                                            >
-                                              {i + 1}
-                                            </div>
+                                    <Input />
+                                  </Form.Item>
+                                </Row>
+                              ))}
+                            </Card>
+                          )}
 
-                                            {/* Name */}
-                                            <Form.Item
-                                              label="Name"
-                                              name={[
-                                                name,
-                                                "children",
-                                                "daughters",
-                                                i,
-                                                "name",
-                                              ]}
-                                              style={{
-                                                flex: 1,
-                                                marginBottom: 0,
-                                              }}
-                                            >
-                                              <Input
-                                                placeholder={`Daughter ${i + 1} name`}
-                                                size="small"
-                                              />
-                                            </Form.Item>
+                          {/* DAUGHTER SECTION */}
+                          {daughters > 0 && (
+                            <Card title="Daughter Details">
+                              {Array.from({ length: daughters }).map((_, i) => (
+                                <Row key={i}>
+                                  <Form.Item
+                                    name={[
+                                      name,
+                                      "children",
+                                      "daughters",
+                                      i,
+                                      "name",
+                                    ]}
+                                    label="Name"
+                                  >
+                                    <Input />
+                                  </Form.Item>
 
-                                            {/* Age */}
-                                            <Form.Item
-                                              label="Age"
-                                              name={[
-                                                name,
-                                                "children",
-                                                "daughters",
-                                                i,
-                                                "age",
-                                              ]}
-                                              style={{
-                                                width: "90px",
-                                                marginBottom: 0,
-                                              }}
-                                              rules={[
-                                                {
-                                                  pattern: /^[0-9]*$/,
-                                                  message: "Numbers only",
-                                                },
-                                              ]}
-                                            >
-                                              <Input
-                                                placeholder="Age"
-                                                size="small"
-                                                maxLength={2}
-                                              />
-                                            </Form.Item>
-                                          </div>
-                                        ),
-                                      )}
-                                    </Card>
-                                  </Col>
-                                )}
-                              </Row>
-                            </Col>
+                                  <Form.Item
+                                    name={[
+                                      name,
+                                      "children",
+                                      "daughters",
+                                      i,
+                                      "age",
+                                    ]}
+                                    label="Age"
+                                  >
+                                    <Input />
+                                  </Form.Item>
+                                </Row>
+                              ))}
+                            </Card>
                           )}
                         </>
                       );
@@ -1749,7 +1633,7 @@ export default function AddOrganisation() {
                       marginTop: 0,
                     }}
                   >
-                    Director Address
+                    {rule.roleLabel} Address
                   </Divider>
                   <Col xs={24}>
                     <Divider orientation="left" plain>
@@ -1932,7 +1816,7 @@ export default function AddOrganisation() {
                       marginTop: 0,
                     }}
                   >
-                    Director Documents
+                    {rule.roleLabel} Documents
                   </Divider>
 
                   <Row gutter={[16, 16]}>
@@ -1998,107 +1882,99 @@ export default function AddOrganisation() {
                       </Form.Item>
                     </Col>
 
-                    <Col xs={24} sm={12} md={6}>
-                      <Form.Item
-                        {...restField}
-                        label={<span>PAN Number</span>}
-                        name={[name, "panNo"]}
-                      >
-                        <Input
-                          placeholder="ABCDE1234F"
-                          style={{ borderRadius: "6px" }}
-                        />
-                      </Form.Item>
-                    </Col>
+                    {rule.showPan && (
+                      <>
+                        <Col xs={24} sm={12} md={6}>
+                          <Form.Item
+                            {...restField}
+                            label="PAN Number"
+                            name={[name, "panNo"]}
+                          >
+                            <Input placeholder="ABCDE1234F" />
+                          </Form.Item>
+                        </Col>
 
-                    <Col xs={24} sm={12} md={6}>
-                      <Form.Item
-                        {...restField}
-                        label={<span>PAN Document</span>}
-                        name={[name, "panDocument"]}
-                        valuePropName="fileList"
-                        getValueFromEvent={normFile}
-                      >
-                        <Upload
-                          beforeUpload={() => false}
-                          onPreview={handlePreview}
-                        >
-                          <Button style={{ borderRadius: "6px" }}>
-                            Upload PAN
-                          </Button>
-                        </Upload>
-                      </Form.Item>
-                    </Col>
+                        <Col xs={24} sm={12} md={6}>
+                          <Form.Item
+                            {...restField}
+                            label="PAN Document"
+                            name={[name, "panDocument"]}
+                            valuePropName="fileList"
+                            getValueFromEvent={normFile}
+                          >
+                            <Upload
+                              beforeUpload={() => false}
+                              onPreview={handlePreview}
+                            >
+                              <Button>Upload PAN</Button>
+                            </Upload>
+                          </Form.Item>
+                        </Col>
+                      </>
+                    )}
 
-                    <Col xs={24} sm={12} md={6}>
-                      <Form.Item
-                        {...restField}
-                        label={<span>GST Number</span>}
-                        name={[name, "gstNo"]}
-                      >
-                        <Input
-                          placeholder="22AAAAA0000A1Z5"
-                          style={{ borderRadius: "6px" }}
-                        />
-                      </Form.Item>
-                    </Col>
+                    {rule.showGst && (
+                      <>
+                        <Col xs={24} sm={12} md={6}>
+                          <Form.Item
+                            {...restField}
+                            label="GST Number"
+                            name={[name, "gstNo"]}
+                          >
+                            <Input placeholder="22AAAAA0000A1Z5" />
+                          </Form.Item>
+                        </Col>
 
-                    <Col xs={24} sm={12} md={3}>
-                      <Form.Item
-                        {...restField}
-                        label={
-                          <span style={{ fontSize: "14px", fontWeight: "500" }}>
-                            GST Document
-                          </span>
-                        }
-                        name={[name, "gstDocument"]}
-                        valuePropName="fileList"
-                        getValueFromEvent={normFile}
-                      >
-                        <Upload
-                          beforeUpload={() => false}
-                          onPreview={handlePreview}
+                        <Col xs={24} sm={12} md={3}>
+                          <Form.Item
+                            {...restField}
+                            label="GST Document"
+                            name={[name, "gstDocument"]}
+                            valuePropName="fileList"
+                            getValueFromEvent={normFile}
+                          >
+                            <Upload
+                              beforeUpload={() => false}
+                              onPreview={handlePreview}
+                            >
+                              <Button>Upload GST</Button>
+                            </Upload>
+                          </Form.Item>
+                        </Col>
+                      </>
+                    )}
+                    {rule.showDIN && (
+                      <Col xs={24} sm={12} md={6}>
+                        <Form.Item
+                          {...restField}
+                          label={rule.idLabel}
+                          name={[name, "dinNumber"]}
                         >
-                          <Button style={{ borderRadius: "6px" }}>
-                            Upload GST
-                          </Button>
-                        </Upload>
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12} md={6}>
-                      <Form.Item
-                        {...restField}
-                        label={<span>DIN Number</span>}
-                        name={[name, "dinNumber"]}
-                      >
-                        <Input
-                          placeholder="Enter DIN number"
-                          style={{ borderRadius: "6px" }}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12} md={6}>
-                      <Form.Item
-                        {...restField}
-                        label={
-                          <span style={{ fontSize: "14px", fontWeight: "500" }}>
-                            DIN Document
-                          </span>
-                        }
-                        name={[name, "dinDocument"]}
-                        valuePropName="fileList"
-                        getValueFromEvent={normFile}
-                      >
-                        <Upload
-                          beforeUpload={() => false}
-                          onPreview={handlePreview}
+                          <Input
+                            placeholder={`Enter ${rule.idLabel}`}
+                            style={{ borderRadius: "6px" }}
+                          />
+                        </Form.Item>
+                      </Col>
+                    )}
+                    {rule.showDIN && (
+                      <Col xs={24} sm={12} md={6}>
+                        <Form.Item
+                          {...restField}
+                          label={`${rule.idLabel} Document`}
+                          name={[name, "dinDocument"]}
+                          valuePropName="fileList"
+                          getValueFromEvent={normFile}
                         >
-                          <Button style={{ borderRadius: "6px" }}>
-                            Upload DIN
-                          </Button>
-                        </Upload>
-                      </Form.Item>
-                    </Col>
+                          <Upload
+                            beforeUpload={() => false}
+                            onPreview={handlePreview}
+                          >
+                            <Button>Upload {rule.idLabel}</Button>
+                          </Upload>
+                        </Form.Item>
+                      </Col>
+                    )}
                   </Row>
 
                   <Form.List name={[name, "bankDetails"]} initialValue={[{}]}>
@@ -2258,7 +2134,7 @@ export default function AddOrganisation() {
                                   flex: 1,
                                 }}
                               >
-                                Director Associate Company Details
+                                {rule.roleLabel} Associate Company Details
                               </Divider>
                               <Button
                                 type="dashed"
@@ -2803,6 +2679,12 @@ export default function AddOrganisation() {
                             {...restField}
                             label="State"
                             name={[name, "state"]}
+                            rules={[
+                              {
+                                pattern: /^[A-Za-z\s]+$/,
+                                message: "Only letters are allowed",
+                              },
+                            ]}
                           >
                             <Input placeholder="State" />
                           </Form.Item>
@@ -2812,6 +2694,12 @@ export default function AddOrganisation() {
                             {...restField}
                             label="PIN No"
                             name={[name, "pinNo"]}
+                            rules={[
+                              {
+                                pattern: /^[0-9]{6}$/,
+                                message: "Enter a valid 6-digit PIN code",
+                              },
+                            ]}
                           >
                             <Input placeholder="PIN" />
                           </Form.Item>
@@ -3140,7 +3028,13 @@ export default function AddOrganisation() {
             <Steps current={currentStep} size="small" items={steps} />
           </div>
 
-          <Form form={form} layout="vertical" autoComplete="off" size="middle">
+          <Form
+            form={form}
+            layout="vertical"
+            onValuesChange={handleFormValueChange}
+            autoComplete="off"
+            size="middle"
+          >
             {/* Step Content */}
 
             {isEdit && isLoading ? (
