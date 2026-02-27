@@ -5,7 +5,7 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
   headers: {
     "Content-Type": "application/json",
-    // "ngrok-skip-browser-warning": "true", // TODO: remove later, only use for ngrok backend tunneling
+    //"ngrok-skip-browser-warning": "true", // TODO: remove later, only use for ngrok backend tunneling
   },
 });
 
@@ -25,22 +25,22 @@ api.interceptors.request.use((config) => {
   if (config.url.endsWith("/auth/login/")) {
     return config;
   }
-  
+
   const { accessToken, currentOrgId } = useSessionStore.getState();
-  
+
   // Add authorization token
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
-  
+
   // Add organization parameter to GET requests
-  if (config.method === 'get' && currentOrgId) {
+  if (config.method === "get" && currentOrgId) {
     config.params = {
       ...config.params,
-      organisation: currentOrgId
+      organisation: currentOrgId,
     };
   }
-  
+
   return config;
 });
 api.interceptors.response.use(
