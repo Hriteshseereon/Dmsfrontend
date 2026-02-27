@@ -982,7 +982,8 @@ export default function AddOrganisation() {
     }
   };
 
-  const handleFormValueChange = (_, allValues) => {
+  const handleFormValueChange = async () => {
+    const allValues = form.getFieldsValue(true);
     setValues(allValues);
   };
 
