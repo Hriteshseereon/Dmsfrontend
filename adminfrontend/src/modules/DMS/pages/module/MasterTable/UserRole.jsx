@@ -291,7 +291,34 @@ const USER_TYPES = [
   "Operations",
   "Transport",
 ];
+// converts flat permissions → nested payload
+const buildPermissionPayload = (permissions = []) => {
+  const result = {};
 
+  permissions.forEach((perm) => {
+    const parts = perm.split(".");
+    const action = parts.pop(); // last = action
+
+    let current = result;
+
+    parts.forEach((part, index) => {
+      const isLastNode = index === parts.length - 1;
+
+      if (isLastNode) {
+        if (!current[part]) current[part] = [];
+
+        if (!current[part].includes(action)) {
+          current[part].push(action);
+        }
+      } else {
+        if (!current[part]) current[part] = {};
+        current = current[part];
+      }
+    });
+  });
+
+  return result;
+};
 // ─────────────────────────────────────────────────────────────────
 //  PERMISSION SELECTOR COMPONENT
 // ─────────────────────────────────────────────────────────────────
@@ -448,7 +475,8 @@ export default function UserRoleMaster() {
         privilegeType === "Temporary" && values.endDate
           ? values.endDate.format("YYYY-MM-DD")
           : null,
-      permissions: values.permissions || [],
+
+      permissions: buildPermissionPayload(values.permissions || []),
       password:
         isEdit && !values.password ? selectedRecord.password : values.password,
     };
