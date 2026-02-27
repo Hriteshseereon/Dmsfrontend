@@ -137,7 +137,12 @@ export default function AddOrganisation() {
       draftId = createForm();
     }
     const loadedValues = loadValues(draftId);
-    form.setFieldsValue(loadedValues);
+    const formData = loadedValues.formData || {};
+    form.setFieldsValue(formData);
+    setCurrentStep(loadedValues.currentStep || 0);
+    if(formData.organisationType) {
+      handleOrgTypeChange(formData.organisationType);
+    }
   }, []);
 
   const handlePhoneFormat = (fieldPath) => (e) => {
@@ -984,7 +989,7 @@ export default function AddOrganisation() {
 
   const handleFormValueChange = async () => {
     const allValues = form.getFieldsValue(true);
-    setValues(allValues);
+    setValues({ currentStep, formData: allValues });
   };
 
   // Step 0: Organisation Details

@@ -5,10 +5,10 @@ export const getAllDraftOrganizations = () => {
     if (key.startsWith("form-")) {
       try {
         const value = JSON.parse(localStorage.getItem(key));
-        if (value && value.registeredName) {
+        if (value && value.formData.registeredName) {
           result.push({
             id: key.replace("form-", ""),
-            registered_name: value.registeredName,
+            registered_name: value.formData.registeredName,
           });
         }
       } catch (e) {}
