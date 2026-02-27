@@ -2679,6 +2679,12 @@ export default function AddOrganisation() {
                             {...restField}
                             label="State"
                             name={[name, "state"]}
+                            rules={[
+                              {
+                                pattern: /^[A-Za-z\s]+$/,
+                                message: "Only letters are allowed",
+                              },
+                            ]}
                           >
                             <Input placeholder="State" />
                           </Form.Item>
@@ -2688,6 +2694,12 @@ export default function AddOrganisation() {
                             {...restField}
                             label="PIN No"
                             name={[name, "pinNo"]}
+                            rules={[
+                              {
+                                pattern: /^[0-9]{6}$/,
+                                message: "Enter a valid 6-digit PIN code",
+                              },
+                            ]}
                           >
                             <Input placeholder="PIN" />
                           </Form.Item>
