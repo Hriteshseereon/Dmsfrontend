@@ -6,13 +6,7 @@ export const getSalescontractGroups = async () => {
   const res = await api.get(`/sales/contracts/`, { params: { organisation: currentOrgId.currentOrgId } });
   return res.data;
 }
-// export const createSalesGroup = async (data) => {
-//   const currentOrgId = useSessionStore.getState();
-//   const res = await api.post(`/sales/contracts/`, data, {   
-//     params: { organization: currentOrgId.organizationId }
-//   });
-//   return res.data;
-// }  
+
 export const getAllSalesContracts = async () => {
   const { currentOrgId } = useSessionStore.getState();
   const res = await api.get(`/sales/contracts/`, {
@@ -130,5 +124,31 @@ export const updateSalesOrder = async (id, payload) => {
   const res = await api.put(`/sales/orders/${id}/`, payload, {
     params: { organisation: currentOrgId }
   });
+  return res.data;
+}
+
+
+//get all loading Advices
+export const getLoadingAdvice = async () => 
+  {const res = await api.get("/transport/loading-advices/"); 
+    return res.data; 
+  }
+//get loading advice by id
+export const getLoadingAdviceById = async (adviceId) => {
+  const res = await api.get(`/transport/loading-advices/${adviceId}/`);
+  return res.data;
+}
+//update loading advice
+export const updateLoadingAdvice = async (adviceId, payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.put(
+    `/transport/loading-advices/${adviceId}/`,
+    payload,
+    {
+      params: {
+        organisation: currentOrgId,
+      },
+    }
+  );
   return res.data;
 }

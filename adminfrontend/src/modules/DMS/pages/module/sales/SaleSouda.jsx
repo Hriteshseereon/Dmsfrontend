@@ -444,6 +444,7 @@ export default function SalesSouda() {
         customer: contract.customer_name,
         customerId: contract.customer_id,
         customerEmail: contract.customer_email,
+        customerMobile:contract.customer_mobile,
         status: contract.status,
 
         soudaDate: contract.created_at ? dayjs(contract.created_at) : undefined,
@@ -634,7 +635,7 @@ export default function SalesSouda() {
           {record.status === "Approved" ? (
             <EditOutlined className="text-grey-100! cursor-not-allowed!"  />
           ) : (
-            <EditOutlined className="text-blue-700! " onClick={() => openEdit(record)} />
+            <EditOutlined className="text-blue-700!" onClick={() => openEdit(record)} />
           )}
          
         </div>
@@ -1215,41 +1216,50 @@ export default function SalesSouda() {
               >
                 <Select
                   placeholder="Select Customer"
-                  onChange={async (value, option) => {
-                    // store vendor/customer id
-                    setSelectedVendorId(value);
+               onChange={async (customerId) => {
 
-                    // 1. Immediate fill from list (if available)
-                    const selectedCustomer = customers.find((c) => c.customer_id === value);
-                    if (selectedCustomer) {
-                      console.log("Selected Customer (Local):", selectedCustomer);
-                      addForm.setFieldsValue({
-                        customer: selectedCustomer.customer_name,
-                        customerEmail: selectedCustomer.email_address || selectedCustomer.email || "",
-                        customerMobile: selectedCustomer.mobile_number || selectedCustomer.mobile || selectedCustomer.phone_number || "",
-                      });
-                    }
+  // ✅ 1. Instant fill from already loaded list
+  const selectedCustomer = customers.find(
+    (c) => c.customer_id === customerId
+  );
 
-                    // 2. Fetch full details (async) to be sure
-                    try {
-                      console.log("Fetching details for:", value);
-                      const details = await getAdminCustomerDetails(value);
-                      console.log("Received details:", details);
-                      if (details) {
-                        addForm.setFieldsValue({
-                          customer: details.customer_name || details.name,
-                          customerEmail: details.email_address || details.email,
-                          customerMobile: details.mobile_number || details.mobile || details.phone_number,
-                        });
-                      }
-                    } catch (err) {
-                      console.error("Failed to fetch customer details for auto-fill", err);
-                    }
-                  }}
+  if (selectedCustomer) {
+    addForm.setFieldsValue({
+      customerEmail:
+        selectedCustomer.email_address ||
+        selectedCustomer.email ||
+        "",
+      customerMobile:
+        selectedCustomer.mobile_number ||
+        selectedCustomer.mobile ||
+        selectedCustomer.phone_number ||
+        "",
+    });
+  }
+
+  // ✅ 2. Fetch latest details (optional but best practice)
+  try {
+    const details = await getAdminCustomerDetails(customerId);
+
+    if (details) {
+      addForm.setFieldsValue({
+        customerEmail:
+          details.email_address || details.email || "",
+        customerMobile:
+          details.mobile_number ||
+          details.mobile ||
+          details.phone_number ||
+          "",
+      });
+    }
+  } catch (err) {
+    console.error("Customer auto-fill failed", err);
+  }
+}}
                 >
                   {customers.map((c) => (
                     <Select.Option
-                      key={c.id}
+                      key={c.customer_id}
                       value={c.customer_id}
                       label={c.customer_name}
                     >
@@ -1265,7 +1275,7 @@ export default function SalesSouda() {
                 label={<span className="text-amber-700">Customer Email</span>}
                 name="customerEmail"
               >
-                <Input placeholder="Customer Email" />
+                <Input placeholder="Customer Email" disabled />
               </Form.Item>
             </Col>
             <Col span={6}>
@@ -1273,7 +1283,7 @@ export default function SalesSouda() {
                 label={<span className="text-amber-700">Customer Mobile</span>}
                 name="customerMobile"
               >
-                <Input placeholder="Customer Mobile" />
+                <Input placeholder="Customer Mobile" disabled />
               </Form.Item>
             </Col>
             <Col span={6}>
@@ -1466,24 +1476,81 @@ export default function SalesSouda() {
             </Col>
 
             <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Customer Name</span>}
-                name="customer"
-                rules={[{ required: true }]}
-              >
-                <Input placeholder="Enter Customer Name" />
-              </Form.Item>
+             <Form.Item
+  label={<span className="text-amber-700">Customer Name</span>}
+  name="customerId"
+  rules={[{ required: true, message: "Select customer" }]}
+>
+  <Select
+    placeholder="Select Customer"
+    onChange={async (value) => {
+
+      // ✅ 1. Instant fill from local list
+      const selectedCustomer = customers.find(
+        (c) => c.customer_id === value
+      );
+
+      if (selectedCustomer) {
+        editForm.setFieldsValue({
+          customerId: value,
+          customerEmail:
+            selectedCustomer.email_address ||
+            selectedCustomer.email ||
+            "",
+          customerMobile:
+            selectedCustomer.mobile_number ||
+            selectedCustomer.mobile ||
+            selectedCustomer.phone_number ||
+            "",
+        });
+      }
+
+      // ✅ 2. Fetch latest data from API (optional but recommended)
+      try {
+        const details = await getAdminCustomerDetails(value);
+
+        if (details) {
+          editForm.setFieldsValue({
+            customerId: value,
+            customerEmail:
+              details.email_address || details.email || "",
+            customerMobile:
+              details.mobile_number ||
+              details.mobile ||
+              details.phone_number ||
+              "",
+          });
+        }
+      } catch (err) {
+        console.error("Auto-fill failed", err);
+      }
+    }}
+  >
+    {customers.map((c) => (
+      <Select.Option key={c.id} value={c.customer_id}>
+        {c.customer_name}
+      </Select.Option>
+    ))}
+  </Select>
+</Form.Item>
             </Col>
 
             <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Customer Email</span>}
-                name="customerEmail"
-              >
-                <Input placeholder="Customer Email" />
-              </Form.Item>
+<Form.Item
+  label={<span className="text-amber-700">Customer Email</span>}
+  name="customerEmail"
+>
+  <Input disabled />
+</Form.Item>
             </Col>
-
+           <Col span={6}>
+             <Form.Item
+  label={<span className="text-amber-700">Customer Mobile</span>}
+  name="customerMobile"
+>
+  <Input disabled />
+</Form.Item>
+            </Col>
             <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">Status</span>}

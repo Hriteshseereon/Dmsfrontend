@@ -426,7 +426,7 @@ const handleStatusChange = async (value, form) => {
           deliveryAddress: order.customer?.address_line1,
 
           status: order.status,
-          billMode: order.bill_mode,
+          bill_mode: order.bill_mode,
           purchaseType: order.purchase_type,
 
          
@@ -449,6 +449,9 @@ const handleStatusChange = async (value, form) => {
     return {
 customer_id: values.customer_id,
 status: values.status, 
+ purchase_type: values.purchaseType,   // ✅ NEW
+  bill_mode: values.bill_mode || null,          // ✅ NEW
+  narration: values.narration || "", 
  order_date: values.orderDate
         ? dayjs(values.orderDate).format("YYYY-MM-DD")
         : null,
@@ -505,6 +508,7 @@ status: values.status,
 
       setIsAddModalOpen(false);
       addForm.resetFields();
+      console.log("FORM VALUES 🔍", values);
     } catch (error) {
       console.error("❌ Sales Order API Error");
 
@@ -598,10 +602,13 @@ status: values.status,
 
       customer_id: order.customer?.customer_id,
         customerEmail: order.customer?.email_id,
+        customerPhone: order.customer?.phone_number,
         deliveryAddress: order.customer?.address_line1,
 
-        billMode: order.bill_mode,
-        purchaseType: order.purchase_type,
+       bill_mode: order.bill_mode || undefined,
+purchaseType: order.purchase_type,
+ // NEW
+narration: order.narration,      // NEW
 
         contracts,
         orderTaxAndTotals: {
@@ -730,11 +737,13 @@ status: values.status,
   "-", customerId: order.customer?.customer_id,
         customer_id: order.customer?.customer_id,
         customerEmail: order.customer?.email_id,
+         customerPhone: order.customer?.phone_number,
         deliveryAddress: order.customer?.address_line1,
 
         status: order.status,
-        billMode: order.bill_mode,
-        purchaseType: order.purchase_type,
+      bill_mode: order.bill_mode || undefined,
+purchaseType: order.purchase_type,
+narration: order.narration,      // NEW
 
         contracts,
         orderTaxAndTotals: {
@@ -1302,11 +1311,29 @@ status: values.status,
 name="customer_id"
   rules={[{ required: true, message: "Please select customer" }]}
 >
-  <Select
-    placeholder="Select Customer"
-    showSearch
-    optionFilterProp="label"
-  >
+<Select
+  placeholder="Select Customer"
+  showSearch
+  optionFilterProp="label"
+  onChange={(value) => {
+    const selectedCustomer = contractPersonOptions.find(
+      (c) => c.customer_id === value
+    );
+
+    if (selectedCustomer) {
+      form.setFieldsValue({
+        customer_id: selectedCustomer.customer_id,
+
+        // ✅ correct fields from your API
+        customerEmail: selectedCustomer.email_address,
+        customerPhone:
+          selectedCustomer.phone_number || selectedCustomer.mobile_number,
+
+        deliveryAddress: selectedCustomer.address,
+      });
+    }
+  }}
+>
    {contractPersonOptions.map((c) => (
   <Select.Option
     key={c.customer_id}
@@ -1346,10 +1373,17 @@ name="customer_id"
             label={<span className="text-amber-700">Customer Email</span>}
             name="customerEmail"
           >
-            <Input placeholder="Email" disabled={disabled} />
+            <Input placeholder="Email" disabled />
           </Form.Item>
         </Col>
-
+          <Col span={6}>
+  <Form.Item
+    label={<span className="text-amber-700">Customer Phone</span>}
+    name="customerPhone"
+  >
+    <Input placeholder="Phone Number" disabled/>
+  </Form.Item>
+</Col>
         <Col span={6}>
           <Form.Item
             label={<span className="text-amber-700">Delivery Address</span>}
@@ -1359,7 +1393,47 @@ name="customer_id"
           </Form.Item>
         </Col>
 
-       
+       <Col span={6}>
+  <Form.Item
+    label="Purchase Type"
+    name="purchaseType"
+    rules={[{ required: true, message: "Select Purchase Type" }]}
+  >
+    <Select disabled={disabled}>
+      <Select.Option value="Transit">Transit</Select.Option>
+      <Select.Option value="Interstate">Interstate</Select.Option>
+      <Select.Option value="Local">Local</Select.Option>
+    </Select>
+  </Form.Item>
+</Col>
+
+<Col span={6}>
+  <Form.Item
+  label="Bill Mode"
+  name="bill_mode"
+  rules={[{ required: true, message: "Select Bill Mode" }]}
+>
+   <Select disabled={disabled}>
+      <Select.Option value="Cash">Cash</Select.Option>
+      <Select.Option value="Credit">Credit</Select.Option>
+      <Select.Option value="Online">Online</Select.Option>
+    </Select>  </Form.Item>
+</Col>
+
+
+
+<Col span={12}>
+  <Form.Item
+    label="Narration"
+    name="narration"
+  >
+    <Input.TextArea
+      rows={2}
+      placeholder="Enter narration"
+      disabled={disabled}
+    />
+  </Form.Item>
+</Col>
 
         <Col span={6}>
           <Form.Item name="status" label="Status">

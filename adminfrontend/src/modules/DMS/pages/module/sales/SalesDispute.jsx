@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Table,
   Input,
@@ -8,35 +8,34 @@ import {
   Select,
   Row,
   Col,
-  Space,
-  Tag,
-  DatePicker,
-  message,
+  InputNumber,
 } from "antd";
 import {
   SearchOutlined,
   DownloadOutlined,
   EyeOutlined,
   EditOutlined,
+  FilterOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 
-const { Option } = Select;
+const reasonsList = [
+  "Quality Issue",
+  "Damaged Packaging",
+  "Expired",
+  "Wrong Item",
+];
 
-// ---------------------------
-// Mock data from Customer Dashboard
-// ---------------------------
-const salesDisputeJSON = {
+const saleReturnJSON = {
   records: [
     {
       key: 1,
       invoiceNo: "INV-001",
       orderNo: "ORD-1001",
       plantName: "Plant1",
-      customerName: "Ramesh Kumar",
       returnDate: "2024-04-01",
       status: "Approved",
-      creditNoteMessage: "CN-001 to be issued for damaged/quality items.",
+      disputeNo: "DISP-20240401-0001",
       items: [
         {
           id: "it-1",
@@ -57,6 +56,7 @@ const salesDisputeJSON = {
           quantity: 20,
           returnQty: 5,
           otherReasonText: "Xyz",
+          returnReason: "Other",
         },
       ],
     },
@@ -65,10 +65,8 @@ const salesDisputeJSON = {
       invoiceNo: "INV-002",
       orderNo: "ORD-1002",
       plantName: "Plant2",
-      customerName: "Suresh Rao",
       returnDate: "2025-05-15",
       status: "Delivered",
-      creditNoteMessage: "",
       items: [
         {
           id: "it-1",
@@ -97,503 +95,489 @@ const salesDisputeJSON = {
       ],
     },
   ],
-  options: {
-    statusOptions: ["Pending", "Approved", "Rejected", "Delivered"],
-  },
+};
+
+// generate dispute number like DISP-20241213-0001
+const generateDisputeNo = (existingRecords) => {
+  const today = dayjs().format("YYYYMMDD");
+  const prefix = `DISP-${today}-`;
+  const todayNos = existingRecords
+    .map((r) => r.disputeNo)
+    .filter((n) => typeof n === "string" && n.startsWith(prefix));
+  const maxSeq =
+    todayNos
+      .map((n) => parseInt(n.replace(prefix, ""), 10))
+      .filter((n) => !isNaN(n))
+      .reduce((m, n) => (n > m ? n : m), 0) || 0;
+  const nextSeq = String(maxSeq + 1).padStart(4, "0");
+  return `${prefix}${nextSeq}`;
 };
 
 export default function SalesDispute() {
-  const [records, setRecords] = useState(salesDisputeJSON.records);
+  const [records, setRecords] = useState(saleReturnJSON.records);
+  const [filteredData, setFilteredData] = useState(records);
   const [searchText, setSearchText] = useState("");
-  const [statusFilter, setStatusFilter] = useState(null);
-  const [selected, setSelected] = useState(null); // selected invoice (one dispute)
-  const [isViewOpen, setIsViewOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [editForm] = Form.useForm();
 
-  const disputedItems = (rec) =>
-    rec.items.filter(
-      (it) => it.returnQty || it.returnReason || it.otherReasonText
-    );
-
-  const disputeSummary = (rec) => {
-    const dItems = disputedItems(rec);
-    if (!dItems.length) return "No dispute lines";
-    const totalReturnQty = dItems.reduce(
-      (acc, it) => acc + (it.returnQty || 0),
-      0
-    );
-    return `${dItems.length} item(s) disputed • Total Dispute Qty: ${totalReturnQty}`;
-  };
-
-  // derived filtered data (one row per invoice / dispute)
-  const filteredData = useMemo(() => {
-    const q = searchText.trim().toLowerCase();
-    return records.filter((r) => {
-      if (statusFilter && r.status !== statusFilter) return false;
-      if (!q) return true;
-
-      const inHeader =
-        r.invoiceNo.toLowerCase().includes(q) ||
-        r.orderNo.toLowerCase().includes(q) ||
-        (r.customerName || "").toLowerCase().includes(q) ||
-        (r.plantName || "").toLowerCase().includes(q);
-
-      const inItems = r.items.some(
-        (it) =>
-          it.item.toLowerCase().includes(q) ||
-          (it.itemCode || "").toLowerCase().includes(q)
-      );
-
-      return inHeader || inItems;
-    });
-  }, [records, searchText, statusFilter]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalRecord, setModalRecord] = useState(null);
+  const [modalMode, setModalMode] = useState("view"); // "view" | "edit" | "dispute"
+  const [form] = Form.useForm();
+  const [isOtherReason, setIsOtherReason] = useState({});
+  const [qtyState, setQtyState] = useState({}); // store live quantities
 
   useEffect(() => {
-    if (!isEditOpen) editForm.resetFields();
-  }, [isEditOpen, editForm]);
+    const val = searchText.toLowerCase();
+    setFilteredData(
+      records.filter((r) =>
+        `${r.invoiceNo} ${r.orderNo} ${r.plantName}`
+          .toLowerCase()
+          .includes(val)
+      )
+    );
+  }, [searchText, records]);
 
-  const statusColor = (s) => {
-    if (s === "Approved") return "green";
-    if (s === "Pending") return "gold";
-    if (s === "Delivered") return "blue";
-    return "red";
+  const openModal = (record, mode = "view") => {
+    setModalRecord(record);
+    setModalMode(mode);
+
+    if (mode !== "view") {
+      const items = (record.itemsReturned || record.items || []).map(
+        (it) => ({
+          ...it,
+          returnQty: it.returnQty || 0,
+          returnReason: it.returnReason || null,
+          otherReasonText: it.otherReasonText || "",
+        })
+      );
+
+      const otherFlag = {};
+      const qtyInit = {};
+      items.forEach((it) => {
+        otherFlag[it.id] = it.returnReason === "Other";
+        qtyInit[it.id] = it.returnQty || 0;
+      });
+
+      form.setFieldsValue(
+        items.reduce((acc, it) => {
+          acc[`qty_${it.id}`] = it.returnQty;
+          acc[`reason_${it.id}`] = it.returnReason;
+          acc[`other_${it.id}`] = it.otherReasonText;
+          
+          return acc;
+        }, {})
+      );
+
+      setIsOtherReason(otherFlag);
+      setQtyState(qtyInit);
+    }
+
+    setIsModalOpen(true);
   };
 
-  const openView = (rec) => {
-    setSelected(rec);
-    setIsViewOpen(true);
+  const updateOtherReason = (id, value) => {
+    setIsOtherReason((prev) => ({ ...prev, [id]: value === "Other" }));
   };
 
-  const openEdit = (rec) => {
-    setSelected(rec);
-    editForm.setFieldsValue({
-      ...rec,
-      returnDate: rec.returnDate ? dayjs(rec.returnDate) : null,
-    });
-    setIsEditOpen(true);
+  const handleQtyChange = (id, value) => {
+    setQtyState((prev) => ({ ...prev, [id]: value || 0 }));
+    form.setFieldsValue({ [`qty_${id}`]: value });
   };
 
-  const saveEdit = async () => {
+  const handleSave = async () => {
     try {
-      const vals = await editForm.validateFields();
+      await form.validateFields();
+      const values = form.getFieldsValue();
 
-      const payload = {
-        ...selected,
-        ...vals,
-        returnDate: vals.returnDate
-          ? vals.returnDate.format("YYYY-MM-DD")
-          : null,
+      const updatedItems = (modalRecord.items || []).map((it) => ({
+        ...it,
+        returnQty: values[`qty_${it.id}`] || 0,
+        returnReason: values[`reason_${it.id}`] || "",
+        otherReasonText: values[`other_${it.id}`] || "",
+        totalAmount: (values[`qty_${it.id}`] || 0) * it.rate,
+      }));
+
+      const hasReturn = updatedItems.some((i) => i.returnQty > 0);
+      if (!hasReturn) {
+        Modal.error({
+          title: "Validation Error",
+          content: "Please enter return quantity for at least one item.",
+        });
+        return;
+      }
+
+      const invalidReason = updatedItems.some(
+        (i) =>
+          i.returnQty > 0 &&
+          (!i.returnReason ||
+            (i.returnReason === "Other" && !i.otherReasonText))
+      );
+      if (invalidReason) {
+        Modal.error({
+          title: "Validation Error",
+          content:
+            "Please provide a reason for all items with return quantity.",
+        });
+        return;
+      }
+
+      // if this is coming from "Raise Dispute", make sure there is a disputeNo
+      let disputeNo = modalRecord.disputeNo;
+      if (modalMode === "dispute" && !disputeNo) {
+        disputeNo = generateDisputeNo(records);
+      }
+
+      const newRecord = {
+        ...modalRecord,
+        disputeNo,
+        itemsReturned: updatedItems.filter((i) => i.returnQty > 0),
+      status: values.status,
       };
 
       setRecords((prev) =>
-        prev.map((r) => (r.key === selected.key ? payload : r))
+        prev.map((r) =>
+          r.invoiceNo === newRecord.invoiceNo ? newRecord : r
+        )
       );
-      setIsEditOpen(false);
-      message.success("Dispute updated");
-    } catch (e) {
-      // validation errors are already handled by antd
+      setIsModalOpen(false);
+    } catch (err) {
+      // validation errors handled above
     }
   };
 
-  const changeStatusInline = (key, newStatus) => {
-    setRecords((prev) =>
-      prev.map((r) =>
-        r.key === key
-          ? {
-              ...r,
-              status: newStatus,
-            }
-          : r
-      )
+  const statusTag = (status) => {
+    const map = {
+      Approved: "bg-green-100 text-green-700",
+      Pending: "bg-yellow-100 text-yellow-700",
+      Delivered: "bg-red-100 text-red-700",
+      Rejected: "bg-red-100 text-red-700",
+    };
+    return (
+      <span
+        className={`px-3 py-1 rounded-full text-sm font-semibold ${map[status]}`}
+      >
+        {status}
+      </span>
     );
-    message.success("Status changed");
-  };
-
-  const exportCSV = () => {
-    const headers = [
-      "InvoiceNo",
-      "OrderNo",
-      "CustomerName",
-      "Plant",
-      "ReturnDate",
-      "Status",
-      "CreditNoteMessage",
-      "DisputeSummary",
-    ];
-
-    const rows = records.map((r) => [
-      r.invoiceNo,
-      r.orderNo,
-      r.customerName || "",
-      r.plantName || "",
-      r.returnDate || "",
-      r.status || "",
-      r.creditNoteMessage || "",
-      disputeSummary(r),
-    ]);
-
-    const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `sales_disputes_${dayjs().format("YYYYMMDD_HHmm")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    message.success("CSV exported");
   };
 
   const columns = [
     {
-      title: "Invoice / Order",
+      title: <span className="text-amber-700!">Invoice No</span>,
       dataIndex: "invoiceNo",
-      key: "invoiceOrder",
+      render: (text) => <span className="text-amber-700!">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700!">Order No</span>,
+      dataIndex: "orderNo",
+      render: (text) => <span className="text-amber-700!">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700!">Dispute No</span>,
+      dataIndex: "disputeNo",
+      render: (text) => (
+        <span className="text-amber-700!">{text || "-"}</span>
+      ),
+    },
+    {
+      title: <span className="text-amber-700!">Return Date</span>,
+      dataIndex: "returnDate",
+      render: (text) => <span className="text-amber-700!">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700!">Plant</span>,
+      dataIndex: "plantName",
+      render: (text) => <span className="text-amber-700!">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700!">Items</span>,
+      render: (_, r) => (
+        <span className="text-amber-700!">
+          {(r.itemsReturned || r.items || [])
+            .map((x) => x.item)
+            .join(", ")}
+        </span>
+      ),
+    },
+    
+    {
+      title: <span className="text-amber-700!">Status</span>,
+      dataIndex: "status",
+      render: statusTag,
+    },
+    {
+      title: <span className="text-amber-700!">Actions</span>,
       width: 180,
-      render: (_, r) => (
-        <div className="flex flex-col">
-          <span className="font-medium">{r.invoiceNo}</span>
-          <span className="text-xs text-gray-500">{r.orderNo}</span>
-        </div>
-      ),
-    },
-    {
-      title: "Customer / Plant",
-      dataIndex: "customerName",
-      key: "customerName",
-      width: 220,
-      render: (_, r) => (
-        <div className="flex flex-col">
-          <span className="font-medium">{r.customerName}</span>
-          <span className="text-xs text-gray-500">{r.plantName}</span>
-        </div>
-      ),
-    },
-    {
-      // MAIN: show item name, code, actual qty & dispute qty
-      title: "Dispute Item",
-      key: "disputeItem",
-      width: 280,
-      render: (_, r) => {
-        const dItems = disputedItems(r);
-        if (!dItems.length) {
-          return <span className="text-xs text-gray-400">No dispute lines</span>;
-        }
-        const first = dItems[0];
-        const extraCount = dItems.length - 1;
+   render: (record) => (
+  <div className="flex gap-3 items-center">
+    <EyeOutlined
+      className="cursor-pointer! text-blue-500!"
+      onClick={() => openModal(record, "view")}
+    />
 
-        return (
-          <div className="flex flex-col text-sm">
-            <span className="font-medium">
-              {first.item} ({first.itemCode})
-            </span>
-            <span className="text-xs text-gray-600">
-              Dispute Qty: {first.returnQty || 0} / Actual Qty: {first.quantity || 0} {first.uom || ""}
-            </span>
-            {extraCount > 0 && (
-              <span className="text-xs text-amber-600">
-                + {extraCount} more item(s) disputed
-              </span>
-            )}
-          </div>
-        );
+    {/* Only Pending → show Edit */}
+    {record.status === "Pending" && (
+      <EditOutlined
+        className="cursor-pointer! text-orange-500!"
+        onClick={() => openModal(record, "edit")}
+      />
+    )}
+
+    {/* Approved → show credit note */}
+    {record.status === "Approved" && (
+      <span className="text-green-600 font-semibold text-xs">
+        Credit Note Created
+      </span>
+    )}
+
+    {/* Delivered → allow dispute */}
+    {record.status === "Delivered" && (
+      <Button
+        className="bg-amber-500! text-white! text-xs! font-semibold! px-3! py-1! rounded-md!"
+        onClick={() => openModal(record, "dispute")}
+      >
+        Raise Dispute
+      </Button>
+    )}
+  </div>
+)
+    },
+  ];
+
+  const modalColumns = [
+    {
+      title: <span className="text-amber-700!">Item</span>,
+      dataIndex: "item",
+    },
+    {
+      title: <span className="text-amber-700!">Item Code</span>,
+      dataIndex: "itemCode",
+    },
+    {
+      title: <span className="text-amber-700!">UOM</span>,
+      dataIndex: "uom",
+    },
+    {
+      title: <span className="text-amber-700!">Rate</span>,
+      dataIndex: "rate",
+    },
+    {
+      title: <span className="text-amber-700!">Order Qty</span>,
+      dataIndex: "quantity",
+    },
+    {
+      title: <span className="text-amber-700!">Return Qty</span>,
+      render: (_, row) =>
+        modalMode === "view" ? (
+          row.returnQty
+        ) : (
+        <Form.Item
+  name={`qty_${row.id}`}
+  style={{ margin: 0 }}
+  rules={[
+    { required: true, message: "Return quantity is required" },
+    ({ getFieldValue }) => ({
+      validator(_, value) {
+        if (value == null) return Promise.resolve();
+
+        if (value > row.quantity) {
+          return Promise.reject(
+            new Error(
+              `Return quantity cannot be greater than order quantity (${row.quantity})`
+            )
+          );
+        }
+
+        return Promise.resolve();
+      },
+    }),
+  ]}
+>
+  <InputNumber
+    min={0}
+    value={qtyState[row.id]}
+    onChange={(v) => handleQtyChange(row.id, v)}
+    style={{ width: "100%" }}
+  />
+</Form.Item>
+
+        ),
+    },
+    {
+      title: <span className="text-amber-700!">Reason</span>,
+      render: (_, row) => {
+        if (modalMode === "view") {
+          return row.returnReason === "Other"
+            ? row.otherReasonText || ""
+            : row.returnReason;
+        } else {
+          return (
+            <Form.Item name={`reason_${row.id}`} style={{ margin: 0 }}>
+              <Select
+                placeholder="Select reason"
+                onChange={(v) => updateOtherReason(row.id, v)}
+                value={form.getFieldValue(`reason_${row.id}`)}
+              >
+                {reasonsList.map((r) => (
+                  <Select.Option key={r}>{r}</Select.Option>
+                ))}
+                <Select.Option value="Other">Other</Select.Option>
+              </Select>
+              {isOtherReason[row.id] && (
+                <Form.Item
+                  name={`other_${row.id}`}
+                  style={{ marginTop: 5 }}
+                >
+                  <Input
+                    placeholder="Other reason"
+                    value={form.getFieldValue(`other_${row.id}`)}
+                    onChange={(e) =>
+                      form.setFieldsValue({
+                        [`other_${row.id}`]: e.target.value,
+                      })
+                    }
+                  />
+                </Form.Item>
+              )}
+            </Form.Item>
+          );
+        }
       },
     },
     {
-      title: "Return Date",
-      dataIndex: "returnDate",
-      key: "returnDate",
-      width: 120,
-    },
-    {
-      title: "Status",
-      dataIndex: "status",
-      key: "status",
-      width: 180,
-      render: (s, rec) => (
-        <Space>
-          <Tag color={statusColor(s)}>{s}</Tag>
-          <Select
-            size="small"
-            value={s}
-            onChange={(val) => changeStatusInline(rec.key, val)}
-            style={{ width: 110 }}
-          >
-            {salesDisputeJSON.options.statusOptions.map((opt) => (
-              <Option key={opt} value={opt}>
-                {opt}
-              </Option>
-            ))}
-          </Select>
-        </Space>
-      ),
-    },
-    {
-      title: "Action",
-      key: "action",
-      width: 120,
-      fixed: "right",
-      render: (_, rec) => (
-        <Space>
-          <EyeOutlined
-            className="cursor-pointer! text-blue-600!"
-            onClick={() => openView(rec)}
-          />
-          <EditOutlined
-            className="cursor-pointer! text-red-500!"
-            onClick={() => openEdit(rec)}
-          />
-        </Space>
-      ),
+      title: <span className="text-amber-700!">Total</span>,
+      render: (_, row) => {
+        const qty =
+          modalMode === "view"
+            ? row.returnQty || 0
+            : qtyState[row.id] || 0;
+        return (qty * row.rate).toFixed(2);
+      },
     },
   ];
 
-  // columns for items inside View modal
-  const itemColumns = [
-    {
-      title: "Item",
-      dataIndex: "item",
-      key: "item",
-    },
-    {
-      title: "Code",
-      dataIndex: "itemCode",
-      key: "itemCode",
-    },
-    {
-      title: "UOM",
-      dataIndex: "uom",
-      key: "uom",
-      width: 80,
-    },
-    {
-      title: "Actual Qty",
-      dataIndex: "quantity",
-      key: "quantity",
-      width: 100,
-    },
-    {
-      title: "Dispute Qty",
-      dataIndex: "returnQty",
-      key: "returnQty",
-      width: 100,
-      render: (val) => val || 0,
-    },
-    {
-      title: "Dispute Reason",
-      key: "reason",
-      render: (_, it) => it.returnReason || it.otherReasonText || "-",
-    },
-  ];
+  const modalTitle =
+    modalMode === "view"
+      ? <span className="text-amber-600!" >View Dispute</span>
+      : modalMode === "edit"
+      ? <span className="text-amber-600!" >Edit Dispute</span>
+      : "Dispute Items";
 
   return (
     <div>
-      {/* Header filters */}
-      <div className="flex justify-between items-center mb-4">
-        <Space>
+     
+
+      <div className="flex justify-between items-center mb-2">
+        <div className="flex gap-2">
           <Input
-            placeholder="Search invoice / order / customer / item"
-            prefix={<SearchOutlined />}
+            placeholder="Search"
+            className="border-amber-300! w-64! focus:border-amber-500!"
+            prefix={<SearchOutlined className="text-amber-600!" />}
             value={searchText}
-             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
             onChange={(e) => setSearchText(e.target.value)}
-            style={{ width: 360 }}
-            allowClear
           />
-
-          <Select
-            placeholder="Filter by status"
-            
-            allowClear
-            value={statusFilter}
-            onChange={(v) => setStatusFilter(v)}
-          className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          <Button
+            icon={<FilterOutlined />}
+            onClick={() => setSearchText("")}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
-            {salesDisputeJSON.options.statusOptions.map((s) => (
-              <Option key={s} value={s}>
-                {s}
-              </Option>
-            ))}
-          </Select>
-
-          <Button icon={<DownloadOutlined />}  className="border-amber-400! text-amber-700! hover:bg-amber-100!" onClick={exportCSV}>
+            Reset
+          </Button>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            icon={<DownloadOutlined />}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
             Export
           </Button>
-        </Space>
-
-        <div />
+        </div>
       </div>
 
-      {/* Table card (DMS-style) */}
-      <div className="border rounded-lg p-4 shadow-sm bg-white">
-        <h2 className="text-lg font-semibold text-amber-700 mb-1">
-          Sales Disputes
-        </h2>
-        <p className="text-sm text-amber-600 mb-4">
-          View disputes from customer dashboard and manage status & single credit note per dispute.
-        </p>
-
-        <Table
-          columns={columns}
-          dataSource={filteredData}
-          rowKey={(r) => r.key}
-          pagination={{ pageSize: 8 }}
-          bordered
-          size="middle"
-        />
+      <div className="border border-amber-300 rounded-lg p-4 shadow-md">
+        <Table columns={columns} dataSource={filteredData} rowKey="key" />
       </div>
 
-      {/* View Modal */}
       <Modal
         title={
-          selected
-            ? `View Dispute: ${selected.invoiceNo} (${selected.orderNo})`
-            : "View Dispute"
-        }
-        open={isViewOpen}
-        onCancel={() => setIsViewOpen(false)}
-        footer={null}
-        width={900}
-      >
-        {selected && (
-          <div className="space-y-4">
-            <Row gutter={12}>
-              <Col span={12}>
-                <div className="font-semibold">Invoice / Order</div>
-                <div>
-                  {selected.invoiceNo} / {selected.orderNo}
-                </div>
-              </Col>
-              <Col span={12}>
-                <div className="font-semibold">Customer / Plant</div>
-                <div>
-                  {selected.customerName} / {selected.plantName}
-                </div>
-              </Col>
-            </Row>
-
-            <Row gutter={12}>
-              <Col span={8}>
-                <div className="font-semibold">Return Date</div>
-                <div>{selected.returnDate}</div>
-              </Col>
-              <Col span={8}>
-                <div className="font-semibold">Status</div>
-                <Tag color={statusColor(selected.status)}>
-                  {selected.status}
-                </Tag>
-              </Col>
-              <Col span={8}>
-                <div className="font-semibold">Dispute Summary</div>
-                <div>{disputeSummary(selected)}</div>
-              </Col>
-            </Row>
-
-            <div>
-              <div className="font-semibold mb-2">Items</div>
-              <Table
-                columns={itemColumns}
-                dataSource={selected.items}
-                rowKey={(it) => it.id}
-                pagination={false}
-                size="small"
-                bordered
-              />
-            </div>
-
-            <Row gutter={12}>
-              <Col span={24}>
-                <div className="font-semibold">Credit Note (for whole dispute)</div>
-                <div>{selected.creditNoteMessage || "-"}</div>
-              </Col>
-            </Row>
+          <div className="flex justify-between items-center">
+            <span>{modalTitle}</span>
+           
           </div>
-        )}
-      </Modal>
-
-      {/* Edit Modal */}
-      <Modal
-        title={
-          selected
-            ? `Edit Dispute: ${selected.invoiceNo} (${selected.orderNo})`
-            : "Edit Dispute"
         }
-        open={isEditOpen}
-        onCancel={() => setIsEditOpen(false)}
-        onOk={saveEdit}
-        width={900}
+        open={isModalOpen}
+        onCancel={() => setIsModalOpen(false)}
+        onOk={modalMode !== "view" ? handleSave : () => setIsModalOpen(false)}
+        okText={modalMode === "view" ? "Close" : "Save"}
+        width={1000}
       >
-        <Form form={editForm} layout="vertical">
-          <Row gutter={12}>
-            <Col span={8}>
-              <Form.Item label="Invoice No" name="invoiceNo">
-                <Input disabled />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item label="Order No" name="orderNo">
-                <Input disabled />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item label="Plant" name="plantName">
-                <Input disabled />
-              </Form.Item>
-            </Col>
-          </Row>
+        {modalRecord && (
+          <Form form={form} layout="vertical">
+            <Row gutter={24}>
+              <Col span={4}>
+                <Form.Item label="Invoice No">
+                  <Input value={modalRecord.invoiceNo} disabled />
+                </Form.Item>
+              </Col>
+              <Col span={4}>
+                <Form.Item label="Order No">
+                  <Input value={modalRecord.orderNo} disabled />
+                </Form.Item>
+              </Col>
+              <Col span={4}>
+                <Form.Item label="Plant">
+                  <Input value={modalRecord.plantName} disabled />
+                </Form.Item>
+              </Col>
+              <Col span={4}>
+                <Form.Item label="Date">
+                  <Input
+                    value={dayjs().format("YYYY-MM-DD")}
+                    disabled
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={4}>
+                <Form.Item label="Dispute No">
+                  <Input
+                    value={
+                      modalRecord.disputeNo ||
+                      (modalMode === "dispute"
+                        ? "N/A"
+                        : "N/A")
+                    }
+                    disabled
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={4}>
+  <Form.Item label="Status" name="status"  rules={[{ required: true, message: "Please select status" }]}>
+    <Select placeholder="Select Status" >
+      <Select.Option value="Pending">Pending</Select.Option>
+      <Select.Option value="Approved">Approved</Select.Option>
+      <Select.Option value="Rejected">Rejected</Select.Option>
+    </Select>
+  </Form.Item>
+</Col>
+            </Row>
 
-          <Row gutter={12}>
-            <Col span={8}>
-              <Form.Item label="Customer" name="customerName">
-                <Input disabled />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item label="Return Date" name="returnDate">
-                <DatePicker className="w-full" />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                label="Status"
-                name="status"
-                rules={[{ required: true, message: "Please select status" }]}
-              >
-                <Select>
-                  {salesDisputeJSON.options.statusOptions.map((s) => (
-                    <Option key={s} value={s}>
-                      {s}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
+            
 
-          <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item
-                label="Credit Note Message (for whole dispute)"
-                name="creditNoteMessage"
-              >
-                <Input.TextArea
-                  rows={3}
-                  placeholder="Single credit note for this invoice (e.g. CN number, amount, remarks)"
-                />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              {selected && (
-                <>
-                  <div className="font-semibold mb-1">Dispute Summary</div>
-                  <div className="text-sm text-gray-600">
-                    {disputeSummary(selected)}
-                  </div>
-                </>
-              )}
-            </Col>
-          </Row>
-        </Form>
+            <h6 className="text-amber-500 my-3">
+              {modalMode === "view"
+                ? "Items"
+                : "Enter qty & reason"}
+            </h6>
+
+            <Table
+              size="small"
+              dataSource={modalRecord.itemsReturned || modalRecord.items}
+              columns={modalColumns}
+              pagination={false}
+              scroll={{y:300}}
+              rowKey="id"
+            />
+          </Form>
+        )}
       </Modal>
     </div>
   );
