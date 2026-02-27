@@ -130,6 +130,43 @@ export default function AddOrganisation() {
     form.setFieldValue(fieldPath, value);
   };
 
+  const hydrateDates = (data) => {
+    const cloned = structuredClone(data || {});
+
+    // ---------- Partner DOB ----------
+    if (cloned.partners) {
+      cloned.partners = cloned.partners.map((p) => ({
+        ...p,
+        dob: p?.dob ? dayjs(p.dob) : null,
+      }));
+    }
+
+    // ---------- Legal Details ----------
+    if (cloned.legalDetails) {
+      Object.keys(cloned.legalDetails).forEach((key) => {
+        const validity = cloned.legalDetails[key]?.validity;
+
+        if (Array.isArray(validity)) {
+          cloned.legalDetails[key].validity = [
+            validity[0] ? dayjs(validity[0]) : null,
+            validity[1] ? dayjs(validity[1]) : null,
+          ];
+        }
+      });
+    }
+
+    // ---------- Custom Docs ----------
+    if (cloned.customLegalDocs) {
+      cloned.customLegalDocs = cloned.customLegalDocs.map((doc) => ({
+        ...doc,
+        validity: doc.validity
+          ? [dayjs(doc.validity[0]), dayjs(doc.validity[1])]
+          : undefined,
+      }));
+    }
+
+    return cloned;
+  };
   useEffect(() => {
     if (isEdit && orgData) return;
     let draftId = new URLSearchParams(window.location.search).get("draft");
@@ -137,11 +174,19 @@ export default function AddOrganisation() {
       draftId = createForm();
     }
     const loadedValues = loadValues(draftId);
-    const formData = loadedValues.formData || {};
+    // const formData = loadedValues.formData || {};
+    // form.setFieldsValue(formData);
+    const rawData = loadedValues.formData || {};
+    const formData = hydrateDates(rawData);
+
     form.setFieldsValue(formData);
     setCurrentStep(loadedValues.currentStep || 0);
-    if(formData.organisationType) {
-      handleOrgTypeChange(formData.organisationType, formData.partners || [{}]);
+    if (formData.organisationType) {
+      handleOrgTypeChange(
+        formData.organisationType,
+        formData.partners || [{}],
+        true,
+      );
     }
   }, []);
 
@@ -516,15 +561,34 @@ export default function AddOrganisation() {
     }
   }, [form, orgType, form.getFieldValue("partnersCount")]);
 
-  const handleOrgTypeChange = (value, partnerList = [{}]) => {
+  // const handleOrgTypeChange = (value, partnerList = [{}]) => {
+  //   setOrgType(value);
+  //   if (ORG_RULES[value].askCount) {
+  //     form.setFieldsValue({ partners: [] });
+  //   } else {
+  //     form.setFieldsValue({ partners: partnerList });
+  //   }
+  // };
+  const handleOrgTypeChange = (
+    value,
+    partnerList = null,
+    isRestore = false,
+  ) => {
     setOrgType(value);
-    if (ORG_RULES[value].askCount) {
-      form.setFieldsValue({ partners: [] });
+
+    const rule = ORG_RULES[value];
+
+    if (rule.askCount) {
+      // ✅ only clear when user manually changes type
+      if (!isRestore) {
+        form.setFieldsValue({ partners: [] });
+      }
     } else {
-      form.setFieldsValue({ partners: partnerList });
+      form.setFieldsValue({
+        partners: partnerList ?? [{}],
+      });
     }
   };
-
   const nextStep = async () => {
     try {
       // Validate current step fields
