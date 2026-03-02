@@ -36,155 +36,8 @@ import {
   getCustomersByOrganisation,
   getAllSalesContracts,
 } from "../../../../../api/sales";
-import { getAdminCustomerDetails } from "../../../../../api/customer";
 /* ------------------ data (use your salesOrderJSON) ------------------ */
-const salesOrderJSON = {
-  initialData: [
-    {
-      key: 1,
-      soudaNo: "SOUDA-001",
-      companyName: "ABC Oils Ltd",
-      customerName: "Bhubaneswar Market",
-      customerEmail: "contact@bhubaneswarmarket.com",
-      orderDate: "2025-10-01",
-      deliveryAddress: "Plot 12, Industrial Estate, Bhubaneswar, Odisha",
-      deliveryDate: "2025-10-05",
-      depoName: "Depo A",
-      brokerName: "Broker 1",
-      saleType: "Local",
-      transporter: "Blue Transport",
-      vehicleNo: "OD-05-AB-1234",
-      driverName: "Rajesh Kumar",
-      phoneNo: "9876543210",
-      route: "Bhubaneswar to Cuttack",
-      billType: "Tax Invoice",
-      waybillNo: "WB-001",
-      billMode: "Credit",
-      uom: "Ltrs",
-      status: "Approved",
-      location: "Warehouse A",
-      type: "Retail",
-      contracts: [
-        {
-          contractNo: "CNT-001",
-          items: [
-            {
-              lineKey: 1,
-              item: "Mustard Oil",
-              itemCode: "ITM001",
-              uom: "Ltrs",
-              qty: 2000,
-              freeQty: 100,
-              totalQty: 2100,
-              grossWt: 2100,
-              totalGrossWt: 2100,
-              rate: 125,
-              amount: 2000 * 125,
-              discountPercent: 5,
-              discountAmt: Math.round((2000 * 125 * 5) / 100),
-              totalAmount: Math.round(2000 * 125 - (2000 * 125 * 5) / 100),
-            },
-            {
-              lineKey: 2,
-              item: "Sunflower Oil",
-              itemCode: "ITM002",
-              uom: "Ltrs",
-              qty: 500,
-              freeQty: 0,
-              totalQty: 500,
-              grossWt: 500,
-              totalGrossWt: 500,
-              rate: 95,
-              amount: 500 * 95,
-              discountPercent: 2,
-              discountAmt: Math.round((500 * 95 * 2) / 100),
-              totalAmount: Math.round(500 * 95 - (500 * 95 * 2) / 100),
-            },
-          ],
-        },
-        {
-          contractNo: "CNT-002",
-          items: [
-            {
-              lineKey: 3,
-              item: "Coconut Oil",
-              itemCode: "ITM003",
-              uom: "Ltrs",
-              qty: 300,
-              freeQty: 0,
-              totalQty: 300,
-              grossWt: 300,
-              totalGrossWt: 300,
-              rate: 150,
-              amount: 300 * 150,
-              discountPercent: 0,
-              discountAmt: 0,
-              totalAmount: 45000,
-            },
-          ],
-        },
-      ],
-      orderTaxAndTotals: {
-        grossAmountTotal: 342500,
-        discountTotal: 13450,
-        taxableAmount: 329050,
-        sgstPercent: 5,
-        cgstPercent: 5,
-        igstPercent: 0,
-        sgst: 16452,
-        cgst: 16452,
-        igst: 0,
-        totalGST: 32905,
-        tcsAmt: 500,
-        grandTotal: 362455,
-      },
-      orderTotals: {
-        qtyTotal: 2800,
-        freeQtyTotal: 100,
-        totalQty: 2900,
-      },
-    },
-  ],
-  itemOptions: [
-    { name: "Mustard Oil", code: "ITM001" },
-    { name: "Sunflower Oil", code: "ITM002" },
-    { name: "Coconut Oil", code: "ITM003" },
-  ],
-  uomOptions: ["Ltrs", "Kg"],
-  statusOptions: ["Approved", "Pending", "Rejected"],
-  typeOptions: ["Retail", "Wholesale"],
-  locationOptions: ["Warehouse A", "Warehouse B", "Warehouse C"],
-  depoOptions: ["Depo A", "Depo B", "Depo C"],
-  brokerOptions: ["Broker 1", "Broker 2", "Broker 3"],
-  saleTypeOptions: ["Local", "Interstate"],
-  billTypeOptions: ["Tax Invoice", "Retail Invoice"],
-  billModeOptions: ["Credit", "Cash"],
-  transporterOptions: ["Blue Transport", "Green Express", "Fast Logistics"],
-  routeOptions: [
-    "Bhubaneswar to Cuttack",
-    "Cuttack to Puri",
-    "Puri to Bhubaneswar",
-    "Bhubaneswar to Rourkela",
-  ],
-  soudaOptions: [
-    {
-      soudaNo: "SOUDA-001",
-      companyName: "ABC Oils Ltd",
-      customerName: "Bhubaneswar Market",
-      items: [
-        { item: "Mustard Oil", itemCode: "ITM001", rate: 125, uom: "Ltrs" },
-      ],
-    },
-    {
-      soudaNo: "SOUDA-002",
-      companyName: "XYZ Oils Ltd",
-      customerName: "Cuttack Market",
-      items: [
-        { item: "Sunflower Oil", itemCode: "ITM002", rate: 135, uom: "Ltrs" },
-      ],
-    },
-  ],
-};
+
 
 /* ------------------ component ------------------ */
 export default function SaleOrdersInvoice() {
@@ -202,7 +55,12 @@ export default function SaleOrdersInvoice() {
   const [contractOptions, setContractOptions] = useState([]);
   // const [contractItems, setContractItems] = useState([]);
   const [contractItemsMap, setContractItemsMap] = useState({});
-
+  useEffect(() => {
+    fetchContracts();
+    fetchSalesOrders();
+     fetchContractPersons();
+  }, []);
+   
   /* ---------- search filter ---------- */
   const fetchContractPersons = async () => {
     try {
@@ -213,31 +71,36 @@ export default function SaleOrdersInvoice() {
       console.error("Error fetching customers:", error);
     }
   };
-  useEffect(() => {
-    fetchContractPersons();
-  }, []);
+ 
 
   const fetchContracts = async () => {
     try {
       const res = await getAllSalesContracts();
-      console.log("Fetched All Sales Contracts:", res);
-      setContractOptions(res || []);
+        const filtered = res.filter((item) =>
+      ["Approved"].includes(item.status)
+    );
+      console.log("Fetched All Sales Contracts:", filtered);
+      setContractOptions(filtered || []);
     } catch (err) {
       console.error("Failed to fetch all sales contracts:", err);
     }
   };
 
-  useEffect(() => {
-    fetchContracts();
-  }, []);
 
-  // filtering keys (customerName rather than customer)
-  const filteredData = data.filter((d) =>
-    ["companyName", "customerName", "status"].some((k) =>
-      (d[k] || "").toString().toLowerCase().includes(searchText.toLowerCase()),
-    ),
+const handleSearch = (value) => {
+  setSearchText(value);
+
+  if (!value) {
+    fetchSalesOrders();
+    return;
+  }
+
+  const filtered = data.filter((item) =>
+    JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
   );
 
+  setData(filtered);
+};
   /* ---------- utilities: compute item and order totals ---------- */
  const computeOrderTotalsFromContracts = (contracts = []) => {
   const allItems = [];
@@ -330,6 +193,7 @@ const handleStatusChange = async (value, form) => {
 
     // initialize with one contract + one item row to help user
     addForm.setFieldsValue({
+      
       contracts: [
         {
           contractNo: undefined,
@@ -362,9 +226,7 @@ const handleStatusChange = async (value, form) => {
     });
     setIsAddModalOpen(true);
   };
-  useEffect(() => {
-    fetchSalesOrders();
-  }, []);
+ 
 
   const fetchSalesOrders = async () => {
     try {
@@ -445,12 +307,12 @@ const handleStatusChange = async (value, form) => {
 
   const buildSalesOrderPayload = (values) => {
     const { orderTaxAndTotals } = values;
-
+console.log("PAYLOAD bill_mode 👉", values.bill_mode);
     return {
 customer_id: values.customer_id,
 status: values.status, 
  purchase_type: values.purchaseType,   // ✅ NEW
-  bill_mode: values.bill_mode || null,          // ✅ NEW
+ bill_mode: values.bill_mode,
   narration: values.narration || "", 
  order_date: values.orderDate
         ? dayjs(values.orderDate).format("YYYY-MM-DD")
@@ -490,6 +352,8 @@ status: values.status,
   };
 
   const handleAddFinish = async (values) => {
+     console.log("ADD bill_mode 👉", values.bill_mode);
+
     try {
       values.contracts.forEach((c, idx) => {
         console.log(`🧾 Contract[${idx}] ID:`, c.contract_id);
@@ -508,7 +372,7 @@ status: values.status,
 
       setIsAddModalOpen(false);
       addForm.resetFields();
-      console.log("FORM VALUES 🔍", values);
+      fetchSalesOrders();
     } catch (error) {
       console.error("❌ Sales Order API Error");
 
@@ -517,7 +381,7 @@ status: values.status,
         console.error("Status:", error.response.status);
         console.error("Data:", error.response.data);
         console.error("Headers:", error.response.headers);
-
+        console.log("bill_mode value 👉", values.bill_mode);
         message.error(error.response.data?.message || "Server error occurred");
       } else if (error.request) {
         // Request was sent but no response received
@@ -605,7 +469,7 @@ status: values.status,
         customerPhone: order.customer?.phone_number,
         deliveryAddress: order.customer?.address_line1,
 
-       bill_mode: order.bill_mode || undefined,
+      bill_mode: order.bill_mode || "Cash",
 purchaseType: order.purchase_type,
  // NEW
 narration: order.narration,      // NEW
@@ -645,6 +509,7 @@ narration: order.narration,      // NEW
   };
 
   const handleEditFinish = async (values) => {
+     console.log("EDIT bill_mode 👉", values.bill_mode);
     try {
       const payload = buildSalesOrderPayload(values);
       console.log("FINAL UPDATE PAYLOAD 🔥", payload);
@@ -741,7 +606,7 @@ narration: order.narration,      // NEW
         deliveryAddress: order.customer?.address_line1,
 
         status: order.status,
-      bill_mode: order.bill_mode || undefined,
+     bill_mode: order.bill_mode || "Cash",
 purchaseType: order.purchase_type,
 narration: order.narration,      // NEW
 
@@ -844,10 +709,12 @@ narration: order.narration,      // NEW
             className="cursor-pointer! text-blue-500!"
             onClick={() => openView(record)}
           />
-          <EditOutlined
-            className="cursor-pointer! text-red-500!"
-            onClick={() => openEdit(record)}
-          />
+          {record.status !== "Approved" && (
+        <EditOutlined
+          className="cursor-pointer! text-red-500!"
+          onClick={() => openEdit(record)}
+        />
+      )}
         </div>
       ),
     },
@@ -1272,8 +1139,8 @@ narration: order.narration,      // NEW
                               lineKey: Date.now(),
                               item: undefined,
                               itemCode: undefined,
-                              uom: salesOrderJSON.uomOptions[0],
-                              qty: 0,
+                             uom: undefined,
+                             qty: 0,
                               freeQty: 0,
                               totalQty: 0,
                               grossWt: 0,
@@ -1314,6 +1181,7 @@ name="customer_id"
 <Select
   placeholder="Select Customer"
   showSearch
+  disabled={disabled}
   optionFilterProp="label"
   onChange={(value) => {
     const selectedCustomer = contractPersonOptions.find(
@@ -1408,16 +1276,17 @@ name="customer_id"
 </Col>
 
 <Col span={6}>
-  <Form.Item
+ <Form.Item
   label="Bill Mode"
   name="bill_mode"
-  rules={[{ required: true, message: "Select Bill Mode" }]}
+  rules={[{ required: true }]}
 >
-   <Select disabled={disabled}>
-      <Select.Option value="Cash">Cash</Select.Option>
-      <Select.Option value="Credit">Credit</Select.Option>
-      <Select.Option value="Online">Online</Select.Option>
-    </Select>  </Form.Item>
+  <Select disabled={disabled}>
+    <Select.Option value="Cash">Cash</Select.Option>
+    <Select.Option value="Credit">Credit</Select.Option>
+    <Select.Option value="Online">Online</Select.Option>
+  </Select>
+</Form.Item>
 </Col>
 
 
@@ -1437,7 +1306,7 @@ name="customer_id"
 
         <Col span={6}>
           <Form.Item name="status" label="Status">
-  <Select onChange={(val) => handleStatusChange(val, form)}>
+  <Select disabled={disabled} onChange={(val) => handleStatusChange(val, form)}>
     <Select.Option value="Approved">Approved</Select.Option>
     <Select.Option value="Pending">Pending</Select.Option>
      <Select.Option value="Rejected">Rejected</Select.Option>
@@ -1551,15 +1420,17 @@ name="customer_id"
             placeholder="Search..."
             className="w-64! border-amber-300! focus:border-amber-500!"
             value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-          />
-          <Button
-            icon={<FilterOutlined />}
-            onClick={() => setSearchText("")}
-            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          >
-            Reset
-          </Button>
+           onChange={(e) => handleSearch(e.target.value)}   />
+         <Button
+  icon={<FilterOutlined />}
+  onClick={() => {
+    setSearchText("");
+    fetchSalesOrders(); // ✅ reload original data
+  }}
+  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+>
+  Reset
+</Button>
         </div>
 
         <div className="flex gap-2">
@@ -1589,7 +1460,7 @@ name="customer_id"
         </p>
         <Table
           columns={columns}
-          dataSource={filteredData}
+          dataSource={data}
           pagination={false}
           scroll={{ y: 300 }}
           rowKey="key"

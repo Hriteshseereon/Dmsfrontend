@@ -24,72 +24,7 @@ import { exportToExcel } from "../../../../../utils/exportToExcel";
 import { getLoadingAdvice, getLoadingAdviceById, updateLoadingAdvice } from "../../../../../api/sales";
 const { Option } = Select;
 
-const invoiceData = {
-  ORD001: {
-    invoiceNo: "ORD001",
-    companyName: "ABC Pvt Ltd",
-    companyAddress: "Bhubaneswar, Odisha",
-    companyGST: "21ABCDE1234F1Z5",
-    contactPerson: "Rakesh Sharma",
-    contactNo: "9876543210",
-    plantName: "Plant A",
-    plantCode: "PLT001",
-    plantGST: "21PLT1234F1Z9",
-    plantAddress: "Cuttack, Odisha",
-    plantContactPerson: "Suresh Kumar",
-    plantContactNo: "9090909090",
-    transporter: "Tata Logistics",
-    vehicleNo: "OD-05-AB-1234",
-    driverName: "Rajesh Kumar",
-    driverContact: "9876543211",
-    insuranceValidUpto: "2025-12-30",
-    puValidUpto: "2025-12-30",
-    fitnessValidUpto: "2025-12-30",
-    vehicleInTime: "08:30 AM",
-    vehicleOutTime: "10:45 AM",
-    tareWeight: 12000,
-    netWeight: 25000,
-    grossWeight: 37000,
-    itemCode: "ITM001",
-    itemName: "Palm Oil",
-    itemDescription: "Edible Palm Oil",
-    reqQty: 1000,
-    actualQty: 950,
-    variance: 50,
-  },
-  ORD002: {
-    invoiceNo: "ORD002",
-    companyName: "XYZ Ltd",
-    companyAddress: "Kolkata, WB",
-    companyGST: "19XYZAB1234F2Z3",
-    contactPerson: "Amit Kumar",
-    contactNo: "9123456789",
-    plantName: "Plant B",
-    plantCode: "PLT002",
-    plantGST: "19PLT5678F2Z4",
-    plantAddress: "Howrah, WB",
-    plantContactPerson: "Sunil Das",
-    plantContactNo: "9000000001",
-    transporter: "",
-    vehicleNo: "",
-    driverName: "",
-    driverContact: "",
-    insuranceValidUpto: "",
-    puValidUpto: "",
-    fitnessValidUpto: "",
-    vehicleInTime: "",
-    vehicleOutTime: "",
-    tareWeight: "",
-    netWeight: "",
-    grossWeight: "",
-    itemCode: "ITM002",
-    itemName: "Sunflower Oil",
-    itemDescription: "Refined Sunflower Oil",
-    reqQty: 800,
-    actualQty: 790,
-    variance: 10,
-  },
-};
+
 
 const ALL_STATUS = [
 
@@ -573,45 +508,22 @@ const getAllowedStatus = (formInstance) => {
       {/* Date and Order */}
       <Row gutter={16}>
         <Col span={6}>
-          <Form.Item label="Invoice No" name="invoiceNo" rules={[{ required: true }]}>
-            <Select
-              placeholder="Select invoice No"
-              onChange={(val) => {
-                if (!val) return;
-                const payload = invoiceData[val];
-                if (payload) {
-                  formInstance.setFieldsValue({
-                    invoiceNo: payload.invoiceNo,
-                    companyName: payload.companyName,
-                    companyAddress: payload.companyAddress,
-                    companyGST: payload.companyGST,
-                    contactPerson: payload.contactPerson,
-                    contactNo: payload.contactNo,
-                    plantName: payload.plantName,
-                    plantCode: payload.plantCode,
-                    plantAddress: payload.plantAddress,
-                    plantContactPerson: payload.plantContactPerson,
-                    plantPhone: payload.plantPhone,
-                    itemCode: payload.itemCode,
-                    itemName: payload.itemName,
-                    itemDescription: payload.itemDescription,
-                    reqQty: payload.reqQty,
-                    actualQty: payload.actualQty,
-                    variance: payload.variance,
-                    transporter: payload.transporter || "",
-                  });
-                }
-              }}
-              disabled
-              showSearch
-            >
-              {Object.keys(invoiceData).map((k) => (
-                <Option key={k} value={k}>
-                  {k}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
+         <Form.Item
+  label="Invoice No"
+  name="invoiceNo"
+  rules={[{ required: true }]}
+>
+  <Select
+    placeholder="Select invoice No"
+    disabled
+  >
+    {data.map((item) => (
+      <Option key={item.invoiceNo} value={item.invoiceNo}>
+        {item.invoiceNo}
+      </Option>
+    ))}
+  </Select>
+</Form.Item>
         </Col>
         <Col span={6}>
           <Form.Item label="Loading Advice Date" name="lodingadvicedate" rules={[{ required: true }]}>
@@ -823,16 +735,20 @@ const getAllowedStatus = (formInstance) => {
     <div>
       <div className="flex justify-between items-center mb-4">
         <div className="flex gap-2">
-          <Input
-            prefix={<SearchOutlined className="text-amber-600!" />}
-            placeholder="Search..."
-            className="w-64! border-amber-300! focus:border-amber-500!"
-            value={searchText}
-            onChange={(e) => handleSearch(e.target.value)}
-          />
-          <Button icon={<FilterOutlined />} className="border-amber-400! text-amber-700! hover:bg-amber-100!" onClick={() => handleSearch("")}>
-            Reset
-          </Button>
+                   <Input
+                     prefix={<SearchOutlined className="text-amber-600!" />}
+                     placeholder="Search..."
+                     className="w-64! border-amber-300! focus:border-amber-500!"
+                     value={searchText}
+                     onChange={(e) => setSearchText(e.target.value)}
+                   />
+                   <Button
+                     icon={<FilterOutlined />}
+                     onClick={() => setSearchText("")}
+                     className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+                   >
+                     Reset
+                   </Button>
         </div>
 
         <div className="flex gap-2">

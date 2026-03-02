@@ -381,8 +381,13 @@ export default function Contract() {
                   customer_email: contractDetails.customer_email,
                   totalAmount: Number(contractDetails.grand_total || 0).toFixed(2),
                   grossAmount: Number(contractDetails.total_amount || 0).toFixed(2),
-                  discountPercent: Number(contractDetails.discount_percent || 0),
-                  discountAmt: Number(contractDetails.cash_discount || 0).toFixed(2),
+                  sgstPercent: Number(contractDetails.sgst || 0),
+  cgstPercent: Number(contractDetails.cgst || 0),
+  igstPercent: Number(contractDetails.igst || 0),
+  tcsAmt: Number(contractDetails.tcs_amount || 0),
+
+  discountPercent: Number(contractDetails.items?.[0]?.discount_percent || 0),
+  discountAmt: Number(contractDetails.items?.[0]?.discount_amount || 0),
 
                   // Fields not present in API response - mapped to empty string
                   depoName: "",
@@ -1147,7 +1152,17 @@ export default function Contract() {
       <Input value={it.freeQty} disabled />
     </Form.Item>
   </Col>
+ <Col span={6}>
+      <Form.Item label="Discount %">
+        <Input value={selectedRecord?.discountPercent} disabled />
+      </Form.Item>
+    </Col>
 
+    <Col span={6}>
+      <Form.Item label="Discount Amount">
+        <Input value={selectedRecord?.discountAmt} disabled />
+      </Form.Item>
+    </Col>
 </Row>
         ))}
 
@@ -1155,31 +1170,54 @@ export default function Contract() {
 
 
       <h3 className="text-xl font-semibold text-amber-600 my-4">Pricing & Tax Details</h3>
-      <div className="border! p-2! rounded! mb-2! border-amber-300! relative!">
-        <Row gutter={16}>
-          <Col span={6}>
-            <Form.Item label="Gross Amount (Estimate)">
-              <Input value={selectedRecord?.grossAmount} disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Discount %">
-              <Input value={selectedRecord?.discountPercent} disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Discount Amount">
-              <Input value={selectedRecord?.discountAmt} disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Grand Total Amount">
-              <Input value={selectedRecord?.totalAmount} disabled />
-            </Form.Item>
-          </Col>
-        </Row>
+     <div className="border! p-2! rounded! mb-2! border-amber-300!">
+  <Row gutter={16}>
 
-      </div>
+    <Col span={6}>
+      <Form.Item label="Gross Amount">
+        <Input value={selectedRecord?.grossAmount} disabled />
+      </Form.Item>
+    </Col>
+
+   
+
+    {/* ✅ SGST */}
+    <Col span={6}>
+      <Form.Item label="SGST %">
+        <Input value={selectedRecord?.sgstPercent} disabled />
+      </Form.Item>
+    </Col>
+
+    {/* ✅ CGST */}
+    <Col span={6}>
+      <Form.Item label="CGST %">
+        <Input value={selectedRecord?.cgstPercent} disabled />
+      </Form.Item>
+    </Col>
+
+    {/* ✅ IGST */}
+    <Col span={6}>
+      <Form.Item label="IGST %">
+        <Input value={selectedRecord?.igstPercent} disabled />
+      </Form.Item>
+    </Col>
+
+    {/* ✅ TCS */}
+    <Col span={6}>
+      <Form.Item label="TCS Amount (₹)">
+        <Input value={selectedRecord?.tcsAmt} disabled />
+      </Form.Item>
+    </Col>
+
+    {/* ✅ FINAL TOTAL */}
+    <Col span={6}>
+      <Form.Item label="Grand Total">
+        <Input value={selectedRecord?.totalAmount} disabled />
+      </Form.Item>
+    </Col>
+
+  </Row>
+</div>
     </div>
   );
 
