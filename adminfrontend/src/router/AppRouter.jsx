@@ -5,11 +5,10 @@ import Login from "../pages/Login";
 import Dashboard from "../pages/Dashboard";
 import NotFound from "../pages/NotFound";
 import DMS from "../modules/DMS";
-import AMS from "../modules/AMS";
-import WMS from "../modules/WMS";
+
 import OrganizationDashboard from "../pages/OrganizationDashboard";
-import OrganizationList from "../pages/OrganizationList";
-import AddOrganisation from "../pages/AddOrganisation";
+
+import AddOrganisation from "../pages/AddOrganisation/index.jsx";
 import AppLayout from "../pages/AppLayout";
 import AssetModule from "../modules/AMS/AssetModule";
 import WealthModule from "../modules/WMS/WealthModule";
