@@ -111,7 +111,9 @@ export default function InventoryForm() {
         product_type: values.productType,
         hsn_code: values.hsnCode,
         mrp: values.mrp,
-        current_stock: values.totalStock,
+        current_stock: values.totalStock
+          ? Number(values.totalStock).toFixed(2)
+          : 0,
         minimum_stock_balance: values.minStockBalance,
       };
       await addInventory(payload);
@@ -132,7 +134,9 @@ export default function InventoryForm() {
         product_type: values.productType,
         hsn_code: values.hsnCode,
         mrp: values.mrp,
-        current_stock: values.totalStock,
+        current_stock: values.totalStock
+          ? Number(values.totalStock).toFixed(2)
+          : 0,
         minimum_stock_balance: values.minStockBalance,
       };
       await updateInventory(selectedRow.id, payload);
