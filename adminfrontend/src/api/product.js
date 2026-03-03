@@ -13,6 +13,22 @@ export const addProductGroup = async (payload) => {
   return res.data;
 };
 
+export const getProductGroupById = async (id) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get(`/product/product-groups/${id}/`, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+}
+
+export const updateProductGroupById = async (payload, id) => {
+  const { currentOrgId } = useSessionStore.getState();  
+  const res = await api.put(`/product/product-groups/${id}/`, payload, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
 // get all the HSN SAC code list
 export const getHSNSACCodes = async () => {
   const res = await api.get("/product/hsn/");

@@ -9,7 +9,12 @@ import {
   FilterOutlined,
   DeleteOutlined,
 } from "@ant-design/icons";
-import { addProductGroup, getProductGroups } from "../../../../../api/product";
+import {
+  addProductGroup,
+  getProductGroups,
+  getProductGroupById,
+  updateProductGroupById,
+} from "../../../../../api/product";
 
 export default function ProductGroupMaster() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -23,7 +28,41 @@ export default function ProductGroupMaster() {
   const [viewForm] = Form.useForm();
   const [data, setData] = useState([]);
 
-  /* ---------------- FETCH PRODUCT GROUPS ---------------- */
+  // mapper function
+  const openProductGroup = async (record, mode) => {
+    try {
+      setLoading(true);
+
+      const data = await getProductGroupById(record.key);
+
+      const formatted = {
+        key: data.id,
+        productGroupName: data.name,
+        raw: data,
+      };
+
+      setSelectedRecord(formatted);
+
+      if (mode === "view") {
+        viewForm.setFieldsValue({
+          productGroupName: data.name,
+        });
+        setIsViewModalOpen(true);
+      }
+
+      if (mode === "edit") {
+        form.setFieldsValue({
+          productGroupName: data.name,
+        });
+        setIsEditModalOpen(true);
+      }
+    } catch (error) {
+      message.error("Failed to load product group details");
+    } finally {
+      setLoading(false);
+    }
+  };
+  //  /* ---------------- FETCH PRODUCT GROUPS ---------------- */
   const fetchProductGroups = async () => {
     try {
       setLoading(true);
@@ -85,19 +124,11 @@ export default function ProductGroupMaster() {
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-red-500! hover:text-red-600!"
-            onClick={() => {
-              setSelectedRecord(record);
-              viewForm.setFieldsValue(record);
-              setIsViewModalOpen(true);
-            }}
+            onClick={() => openProductGroup(record, "view")}
           />
           <EditOutlined
             className="cursor-pointer! text-blue-500! hover:text-blue-600!"
-            onClick={() => {
-              setSelectedRecord(record);
-              form.setFieldsValue(record);
-              setIsEditModalOpen(true);
-            }}
+            onClick={() => openProductGroup(record, "edit")}
           />
           {/* <DeleteOutlined
             className="cursor-pointer text-gray-600 hover:text-red-600"
@@ -111,23 +142,19 @@ export default function ProductGroupMaster() {
   /* ---------------- ADD / EDIT SUBMIT ---------------- */
   const handleFormSubmit = async (values) => {
     try {
+      const payload = {
+        name: values.productGroupName,
+      };
+
       if (isEditModalOpen && selectedRecord) {
-        // TODO: integrate update API
-        setData((prev) =>
-          prev.map((item) =>
-            item.key === selectedRecord.key
-              ? { ...item, productGroupName: values.productGroupName }
-              : item,
-          ),
-        );
-        message.success("Product group updated (local)");
+        await updateProductGroupById(payload, selectedRecord.key);
+        message.success("Product group updated successfully");
       } else {
-        // ADD API CALL
-        const payload = { name: values.productGroupName };
         await addProductGroup(payload);
-        message.success("Product group added");
-        fetchProductGroups(); // refresh list from API
+        message.success("Product group added successfully");
       }
+
+      fetchProductGroups(); // always refresh
 
       setIsAddModalOpen(false);
       setIsEditModalOpen(false);
