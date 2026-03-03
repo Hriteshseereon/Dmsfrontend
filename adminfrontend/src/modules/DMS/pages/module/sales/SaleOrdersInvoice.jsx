@@ -25,6 +25,7 @@ import {
   FilterOutlined,
   DeleteOutlined,
 } from "@ant-design/icons";
+import { exportToExcel } from "../../../../../utils/exportToExcel";
 import dayjs from "dayjs";
 import {
  
@@ -86,7 +87,67 @@ export default function SaleOrdersInvoice() {
     }
   };
 
+const handleExport = () => {
+  if (data.length === 0) {
+    message.warning("No data available to export");
+    return;
+  }
 
+  const exportData = [];
+
+  data.forEach((order) => {
+    // 1. Pull the actual percentage values stored from your GET API
+    const sgstP = Number(order.orderTaxAndTotals?.sgstPercent || 0);
+    const cgstP = Number(order.orderTaxAndTotals?.cgstPercent || 0);
+    const igstP = Number(order.orderTaxAndTotals?.igstPercent || 0);
+    const tcsAmt = Number(order.orderTaxAndTotals?.tcsAmt || 0);
+
+    order.contracts.forEach((contract) => {
+      contract.items.forEach((item) => {
+        // 2. Calculate the tax amounts based on the taxable item total
+        const taxableVal = Number(item.totalAmount || 0);
+        
+        // Math: (Taxable Amount * Tax Percentage) / 100
+        const sAmt = (taxableVal * sgstP) / 100;
+        const cAmt = (taxableVal * cgstP) / 100;
+        const iAmt = (taxableVal * igstP) / 100;
+
+        exportData.push({
+          // Identity Fields
+          "Order Number": order.orderNumber,
+          "Order Date": order.orderDate ? dayjs(order.orderDate).format("YYYY-MM-DD") : "",
+          "Customer Name": order.customerName,
+          "Status": order.status,
+          "Bill Mode": order.bill_mode || "N/A",
+          
+          // Item Fields
+          "Item Name": item.item,
+          "HSN Code": item.hsnCode || "",
+          "Net Qty": item.qty,
+          "Rate": item.rate,
+          "Taxable Amount": taxableVal,
+          
+          // Tax Fields (Percentages)
+          "SGST %": sgstP,
+          "CGST %": cgstP,
+          "IGST %": igstP,
+          
+          // Calculated Amounts (Fixes the 0.00 issue in your images)
+          "SGST Amt": sAmt.toFixed(2),
+          "CGST Amt": cAmt.toFixed(2),
+          "IGST Amt": iAmt.toFixed(2),
+          
+          // Totals
+          "TCS Amount": tcsAmt,
+          "Grand Total": order.orderTaxAndTotals?.grandTotal || 0,
+        });
+      });
+    });
+  });
+
+  exportToExcel(exportData, "Sales_Orders_Export");
+  message.success("Excel file generated with calculated values");
+};
 const handleSearch = (value) => {
   setSearchText(value);
 
@@ -1098,22 +1159,64 @@ narration: order.narration,      // NEW
                            
 
                             <Col span={3}>
-                              <Form.Item
-                                name={[itf.name, "orderQuantity"]}
-                                label="Order Qty"
-                              >
-                                <InputNumber
-                                  min={0}
-                                  className="w-full"
-                                  disabled={disabled}
-                                  onChange={() =>
-                                    onFormValuesChange(
-                                      form,
-                                      form.getFieldsValue(),
-                                    )
-                                  }
-                                />
-                              </Form.Item>
+                             
+
+                   <Form.Item
+  name={[itf.name, "orderQuantity"]}
+  label="Order Qty"
+  validateTrigger="onChange"   // ✅ IMPORTANT
+  rules={[
+    {
+      required: true,
+      message: "Please enter order quantity",
+    },
+    {
+      validator: (_, value) => {
+        const qty = form.getFieldValue([
+          "contracts",
+          ci,
+          "items",
+          itf.name,
+          "qty",
+        ]);
+
+        // ❌ don't show error initially
+        if (value === undefined || value === null) {
+          return Promise.resolve();
+        }
+
+        if (isNaN(value)) {
+          return Promise.reject(new Error("Enter a valid number"));
+        }
+
+        if (value <= 0) {
+          return Promise.reject(
+            new Error("Order quantity must be greater than zero")
+          );
+        }
+
+        if (qty && value > qty) {
+          return Promise.reject(
+            new Error(
+              "Order quantity cannot be greater than available quantity"
+            )
+          );
+        }
+
+        return Promise.resolve();
+      },
+    },
+  ]}
+>
+  <Input
+    min={1}
+    className="w-full"
+    disabled={disabled}
+    onChange={() =>
+      onFormValuesChange(form, form.getFieldsValue())
+    }
+  />
+</Form.Item>
                             </Col>
                            
                           </Row>
@@ -1172,7 +1275,34 @@ narration: order.narration,      // NEW
     <>
       <h6 className="text-amber-500">Header</h6>
       <Row gutter={16}>
+      
+
         <Col span={6}>
+          <Form.Item
+            label={<span className="text-amber-700">Order Date</span>}
+            name="orderDate"
+            rules={[{ required: true }]}
+            initialValue={dayjs()}
+          >
+            <DatePicker className="w-full" disabled />
+          </Form.Item>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item
+            label={<span className="text-amber-700">Delivery Date</span>}
+            name="deliveryDate"
+          >
+           <DatePicker
+            className="w-full"
+            disabledDate={(current) =>
+              current &&
+              addForm.getFieldValue("orderDate") &&
+              current < addForm.getFieldValue("orderDate").startOf("day")
+            }
+          />   </Form.Item>
+        </Col>
+  <Col span={6}>
  <Form.Item
   label="Customer"
 name="customer_id"
@@ -1214,27 +1344,6 @@ name="customer_id"
   </Select>
 </Form.Item>
         </Col>
-
-        <Col span={6}>
-          <Form.Item
-            label={<span className="text-amber-700">Order Date</span>}
-            name="orderDate"
-            rules={[{ required: true }]}
-            initialValue={dayjs()}
-          >
-            <DatePicker className="w-full" disabled={disabled} />
-          </Form.Item>
-        </Col>
-
-        <Col span={6}>
-          <Form.Item
-            label={<span className="text-amber-700">Delivery Date</span>}
-            name="deliveryDate"
-          >
-            <DatePicker className="w-full" disabled={disabled} />
-          </Form.Item>
-        </Col>
-
        
         <Col span={6}>
           <Form.Item
@@ -1305,7 +1414,8 @@ name="customer_id"
 </Col>
 
         <Col span={6}>
-          <Form.Item name="status" label="Status">
+          <Form.Item name="status" label="Status"     rules={[{ required: true, message: "Select Status" }]}
+          >
   <Select disabled={disabled} onChange={(val) => handleStatusChange(val, form)}>
     <Select.Option value="Approved">Approved</Select.Option>
     <Select.Option value="Pending">Pending</Select.Option>
@@ -1436,6 +1546,7 @@ name="customer_id"
         <div className="flex gap-2">
           <Button
             icon={<DownloadOutlined />}
+            onClick={handleExport}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Export

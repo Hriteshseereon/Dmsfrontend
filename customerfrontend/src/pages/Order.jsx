@@ -1107,8 +1107,51 @@ narration: order.narration,      // NEW
                               <Form.Item
                                 name={[itf.name, "orderQuantity"]}
                                 label="Order Qty"
+                                 validateTrigger="onChange" 
+                                   rules={[
+                                     {
+                                       required: true,
+                                       message: "Please enter order quantity",
+                                     },
+                                     {
+                                       validator: (_, value) => {
+                                         const qty = form.getFieldValue([
+                                           "contracts",
+                                           ci,
+                                           "items",
+                                           itf.name,
+                                           "qty",
+                                         ]);
+                                 
+                                         // ❌ don't show error initially
+                                         if (value === undefined || value === null) {
+                                           return Promise.resolve();
+                                         }
+                                 
+                                         if (isNaN(value)) {
+                                           return Promise.reject(new Error("Enter a valid number"));
+                                         }
+                                 
+                                         if (value <= 0) {
+                                           return Promise.reject(
+                                             new Error("Order quantity must be greater than zero")
+                                           );
+                                         }
+                                 
+                                         if (qty && value > qty) {
+                                           return Promise.reject(
+                                             new Error(
+                                               "Order quantity cannot be greater than available quantity"
+                                             )
+                                           );
+                                         }
+                                 
+                                         return Promise.resolve();
+                                       },
+                                     },
+                                   ]}
                               >
-                                <InputNumber
+                                <Input
                                   min={0}
                                   className="w-full"
                                   disabled={disabled}
@@ -1178,48 +1221,7 @@ narration: order.narration,      // NEW
     <>
       <h6 className="text-amber-500">Header</h6>
       <Row gutter={16}>
-        {/* <Col span={6}>
- <Form.Item
-  label="Customer"
-name="customer_id"
-  rules={[{ required: true, message: "Please select customer" }]}
->
-<Select
-  placeholder="Select Customer"
-  showSearch
-  disabled={disabled}
-  optionFilterProp="label"
-  onChange={(value) => {
-    const selectedCustomer = contractPersonOptions.find(
-      (c) => c.customer_id === value
-    );
-
-    if (selectedCustomer) {
-      form.setFieldsValue({
-        customer_id: selectedCustomer.customer_id,
-
-        // ✅ correct fields from your API
-        customerEmail: selectedCustomer.email_address,
-        customerPhone:
-          selectedCustomer.phone_number || selectedCustomer.mobile_number,
-
-        deliveryAddress: selectedCustomer.address,
-      });
-    }
-  }}
->
-   {contractPersonOptions.map((c) => (
-  <Select.Option
-    key={c.customer_id}
-    value={c.customer_id}   // ✅ correct ID
-    label={c.customer_name}
-  >
-    {c.customer_name}
-  </Select.Option>
-))}
-  </Select>
-</Form.Item>
-        </Col> */}
+     
 
         <Col span={6}>
           <Form.Item
@@ -1228,7 +1230,7 @@ name="customer_id"
             rules={[{ required: true }]}
             initialValue={dayjs()}
           >
-            <DatePicker className="w-full" disabled={disabled} />
+            <DatePicker className="w-full" disabled/>
           </Form.Item>
         </Col>
 
@@ -1237,8 +1239,14 @@ name="customer_id"
             label={<span className="text-amber-700">Delivery Date</span>}
             name="deliveryDate"
           >
-            <DatePicker className="w-full" disabled={disabled} />
-          </Form.Item>
+          <DatePicker
+  className="w-full"
+  disabledDate={(current) =>
+    current &&
+    form.getFieldValue("orderDate") &&
+    current < form.getFieldValue("orderDate").startOf("day")
+  }
+/>    </Form.Item>
         </Col>
 
        
@@ -1296,7 +1304,7 @@ name="customer_id"
 </Col>
 
         <Col span={6}>
-          <Form.Item name="status" label="Status">
+          <Form.Item name="status" label="Status" rules={[{ required: true, message: "Select status" }]}>
   <Select disabled={disabled} onChange={(val) => handleStatusChange(val, form)}>
      <Select.Option value="Pending">Pending</Select.Option>
      </Select>

@@ -28,178 +28,17 @@ import { getContracts, getContractById, createContract, updateContract, getVendo
 import useSessionStore from "../store/sessionStore";
 
 // --- Mock Data/JSON Extended ---
-const contractJSON = {
-  initialData: [
-    {
-      key: "C-0001",
-      contractDate: "2025-10-01",
-      startDate: "2025-10-05",
-      endDate: "2025-10-31",
-      orderNo: "1",
-      items: [
-        {
-          companyName: "ABC Oils Ltd",
-          item: "Palm Oil",
-          itemCode: "IT23",
-          qty: 2000,
-          uom: "Ltrs",
-          baseRate: 125.50,
-          rate: 125.50,
-          freeQty: 100,
-          totalAmount: 251000.00
-        },
-      ],
-      totalQty: 2000,
-      uom: "Ltrs",
-      location: "Warehouse A",
-      status: "Approved",
-      totalAmount: 251000.00,
-      grossWt: 2100,
-      type: "Retail",
-      brokerName: "Broker 1",
-      discountPercent: 5,
-      discountAmt: 3354,
-      deliveryDate: "2024-03-21",
-      depoName: "Bhubaneswar Depo",
-      totalGrossWt: 1020,
-      grossAmount: 67080,
-      sgstPercent: 5,
-      cgstPercent: 5,
-      igstPercent: 0,
-      sgst: 3186,
-      cgst: 3186,
-      igst: 9,
-      totalGST: 6372,
-      tcsAmt: 500,
-      itemGroup: "G1",
-      hsnCode: "hsn1",
-      netQty: 2,
-      grossqty: 4,
-      cust_phone: "4535467576",
-      cust_email: "jaay@.com",
-      deliveryAddress: "kdp",
-      cashDiscounrt: 20,
-      roundOffAmount: 340,
-      naarration: "narrrr",
-    },
-    {
-      key: "C-0002",
-      contractDate: "2025-11-15",
-      startDate: "2025-11-20",
-      endDate: "2025-12-31",
-      orderNo: "2",
-      items: [
-        {
-          companyName: "XYZ Refineries",
-          item: "Mustard Oil",
-          itemCode: "MO101",
-          qty: 500,
-          uom: "Kg",
-          baseRate: 180.00,
-          rate: 180.00,
-          freeQty: 0,
-          totalAmount: 90000.00
-        },
-        {
-          companyName: "XYZ Refineries",
-          item: "Coconut Oil",
-          itemCode: "CO202",
-          qty: 1500,
-          uom: "Ltrs",
-          baseRate: 220.75,
-          rate: 220.75,
-          freeQty: 50,
-          totalAmount: 331125.00
-        },
-      ],
-      totalQty: 2000,
-      uom: "Mixed",
-      location: "Warehouse B",
-      status: "Pending",
-      totalAmount: 421125.00, // Updated Grand Total
-      brokerName: "Broker 2",
 
-    },
-  ],
-  companyOptions: ["ABC Oils Ltd", "XYZ Refineries", "PQR Traders"],
-  uomOptions: ["Ltrs", "Kg", "Box", "Drum"], // Extended UOM options
-  statusOptions: ["Approved", "Pending", "Rejected"],
-  locationOptions: ["Warehouse A", "Warehouse B", "Warehouse C"],
-};
-
-// Mock data for item code and rate lookup
-const itemDetailsByCompany = {
-  "ABC Oils Ltd": {
-    "Palm Oil": { itemCode: "IT23", rate: 125.50, uom: "Ltrs" },
-    "Sunflower Oil": { itemCode: "SF45", rate: 140.00, uom: "Ltrs" },
-  },
-  "XYZ Refineries": {
-    "Mustard Oil": { itemCode: "MO101", rate: 180.00, uom: "Kg" },
-    "Coconut Oil": { itemCode: "CO202", rate: 220.75, uom: "Ltrs" },
-  },
-  "PQR Traders": {
-    "Mustard Oil": { itemCode: "MO101", rate: 178.50, uom: "Kg" },
-    "Palm Oil": { itemCode: "IT23", rate: 126.00, uom: "Ltrs" },
-  }
-};
-
-// 🌟 Mock UOM Conversion Data (Simulates Backend)
-const itemUomConversions = {
-  "Sunflower Oil": {
-    "Ltrs": { rateFactor: 1, qtyFactor: 1, baseUom: "Ltrs" },
-    "Box": { rateFactor: 12, qtyFactor: 1 / 12, baseUom: "Ltrs" }, // Box is 12 Ltrs
-    "Drum": { rateFactor: 200, qtyFactor: 1 / 200, baseUom: "Ltrs" }, // Drum is 200 Ltrs
-  },
-  "Mustard Oil": {
-    "Kg": { rateFactor: 1, qtyFactor: 1, baseUom: "Kg" },
-    "Box": { rateFactor: 15, qtyFactor: 1 / 15, baseUom: "Kg" }, // Box is 15 Kg
-  },
-  // Default to 1 for all others if no special conversion exists
-};
-
-// 1. Define Company to Location Mapping
-const companyLocationMap = {
-  "ABC Oils Ltd": "Warehouse A",
-  "XYZ Refineries": "Warehouse B",
-  "PQR Traders": "Warehouse C",
-};
+ 
+ 
+const statusOptions = ["Pending", "Approved", "Rejected"];
 
 
-// Function to get item options for a specific company
-const getItemOptionsForCompany = (companyName) => {
-  return itemDetailsByCompany[companyName] ? Object.keys(itemDetailsByCompany[companyName]) : [];
-};
-
-const getCompanyNamesFromItems = (items) => {
-  return (items || []).map(item => item.companyName).filter((value, index, self) => self.indexOf(value) === index).join(", ");
-};
-
-// 🌟 Helper function to calculate single item amount with conversion
-const calculateItemAmount = (itemData) => {
-  const qty = Number(itemData.qty || 0);
-  const baseRate = Number(itemData.baseRate || 0); // Base rate is per base UOM (e.g., Ltr/Kg)
-  const uom = itemData.uom;
-  const itemName = itemData.item;
-
-  if (!qty || qty <= 0 || baseRate <= 0) return 0;
 
 
-  const conversions = itemUomConversions[itemName];
-  let finalRate = baseRate;
 
-  if (conversions && conversions[uom]) {
-    // Rate Factor: How many base units are in one selected unit (e.g., 1 Box = 12 Ltrs)
-    const rateFactor = conversions[uom].rateFactor || 1;
-    finalRate = baseRate * rateFactor; // Rate per Box/Drum
 
-    // Total quantity is the current Qty * Rate Factor (in base UOM)
-    // The calculation is (QTY * Converted Rate)
-    return qty * finalRate;
-  }
 
-  // If no conversion or using base UOM
-  return qty * baseRate;
-};
 
 
 export default function Contract() {
@@ -208,7 +47,7 @@ export default function Contract() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const [data, setData] = useState(contractJSON.initialData);
+const [data, setData] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [totalAmount, setTotalAmount] = useState(0); // This is the GRAND TOTAL
   const [loading, setLoading] = useState(false);
@@ -432,7 +271,7 @@ export default function Contract() {
               }
             }}
           />
-          {record.status === "Fresh" && (
+          {record.status === "Pending" && (
             <EditOutlined
               className="cursor-pointer! text-red-500!"
               onClick={async () => {
@@ -750,25 +589,15 @@ export default function Contract() {
           <Form.Item
             name="endDate"
             label="End Date"
-            rules={[
-              { required: true, message: "Please select End Date" },
-              {
-                validator(_, value) {
-                  const start = formInstance.getFieldValue("startDate");
-                  if (start && value && value.isBefore(start, "day")) {
-                    return Promise.reject(new Error("End Date cannot be before Start Date"));
-                  }
-                  return Promise.resolve();
-                },
-              },
-            ]}
+            rules={[{ required: true, message: "Please select End Date" }]}
           >
-            <DatePicker
-              className="w-full"
-              disabled={disabled}
-              disabledDate={(current) => current && current.isBefore(dayjs().startOf("day"))}
-              format="DD-MM-YYYY"
-            />
+                      <DatePicker
+  className="w-full"
+  disabledDate={(current) => {
+    const startDate = formInstance.getFieldValue("startDate");
+    return current && startDate && current < startDate.startOf("day");
+  }}
+/>
           </Form.Item>
         </Col>
 
@@ -785,8 +614,7 @@ export default function Contract() {
         <Col span={8}>
           <Form.Item label="Status" name="status">
             <Select disabled placeholder="Pending">
-              {contractJSON.statusOptions.map((s) => (
-                <Select.Option key={s} value={s}>
+             {statusOptions.map((s) => (   <Select.Option key={s} value={s}>
                   {s}
                 </Select.Option>
               ))}
@@ -800,7 +628,7 @@ export default function Contract() {
             name="customer_mobile"
             rules={[{ required: true, message: "Please enter customer mobile" }]}
           >
-            <Input placeholder="9999999999" disabled={disabled} />
+            <Input placeholder="6372770539" disabled={disabled} />
           </Form.Item>
         </Col>
 
@@ -808,12 +636,9 @@ export default function Contract() {
           <Form.Item
             label="Customer Email"
             name="customer_email"
-            rules={[
-              { required: true, message: "Please enter customer email" },
-              { type: 'email', message: 'Please enter a valid email' }
-            ]}
+          
           >
-            <Input placeholder="customer@test.com" disabled={disabled} />
+            <Input placeholder="customer@test.com" disabled />
           </Form.Item>
         </Col>
       </Row>
@@ -827,19 +652,12 @@ export default function Contract() {
     const vendorId = currentItem?.vendor_id;
     const productId = currentItem?.product_id;
     const product = vendorProducts[vendorId]?.find(p => (p.product_id || p.id) === productId);
-
+    const finalUomOptions = product?.uoms?.map(u => u.unit_name) || [];
     const selectedCompany = currentItem?.companyName;
-    const itemOptions = getItemOptionsForCompany(selectedCompany);
     const selectedItemName = currentItem?.item;
 
     // Get UOM options based on the selected item. If no specific conversion, use defaults.
-    const uomOptions = itemUomConversions[selectedItemName]
-      ? Object.keys(itemUomConversions[selectedItemName])
-      : contractJSON.uomOptions.filter(uom => uom === currentItem?.uom); // Only allow current UOM if no conversion exists.
-
-    // If item is not selected, only allow default options
-    const finalUomOptions = selectedItemName ? uomOptions : contractJSON.uomOptions;
-
+   
     return (
       <Row
         gutter={24} // Reduced gutter slightly for more columns
@@ -922,22 +740,27 @@ export default function Contract() {
             name={[field.name, "qty"]}
             fieldKey={[field.fieldKey, "qty"]}
             rules={[
-              { required: true, },
-              {
-                validator: (_, value) => {
-                  if (value === undefined || value === null || value === "") {
-                    return Promise.reject(new Error("Quantity is required"));
-                  }
-                  if (Number(value) <= 0) {
-                    return Promise.reject(new Error("Quantity must be greater than 0"));
-                  }
-                  return Promise.resolve();
-                },
-              },
-            ]}
+    { required: true, message: "Quantity is required" },
+    {
+      validator: (_, value) => {
+          if (value === undefined || value === null) {
+          return Promise.resolve();
+        }
+        if (isNaN(value)) {
+          return Promise.reject(new Error("Enter a valid number"));
+        }
+        if (value > 0) {
+          return Promise.resolve();
+        }
+        return Promise.reject(
+          new Error("Quantity must be greater than 0")
+        );
+      },
+    },
+  ]}
 
           >
-            <InputNumber
+            <Input
 
               placeholder="Qty"
               disabled={disabled || !selectedItemName}
