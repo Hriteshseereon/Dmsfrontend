@@ -39,7 +39,7 @@ export default function CustomerTab() {
   const [viewMode, setViewMode] = useState(false);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
-
+  const [securityType, setSecurityType] = useState(null);
   const [form] = Form.useForm();
 
   const fileFromUrl = (url) => {
@@ -383,7 +383,13 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={6}>
-                <Form.Item label="Business Name" name="branchName">
+                <Form.Item
+                  label="Business Name"
+                  name="branchName"
+                  rules={[
+                    { required: true, message: "Please enter business name" },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -489,10 +495,10 @@ export default function CustomerTab() {
           {/* ================= Contact & Address Details ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">
             <h3 className="text-lg font-semibold text-amber-700 mb-3">
-              Contact & Address Details
+              Address Details
             </h3>
             <Row gutter={24}>
-              <Col span={6}>
+              {/* <Col span={6}>
                 <Form.Item label="Contact Person" name="contactPerson">
                   <Input
                     className={inputClass}
@@ -500,10 +506,9 @@ export default function CustomerTab() {
                     placeholder="Enter contact person"
                   />
                 </Form.Item>
-              </Col>
-
+              </Col> */}
               <Col span={6}>
-                <Form.Item label="Address" name="address">
+                <Form.Item label="Address1" name="address1">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -511,27 +516,24 @@ export default function CustomerTab() {
                   />
                 </Form.Item>
               </Col>
-
-              <Col span={4}>
-                <Form.Item label="Country" name="country">
+              <Col span={6}>
+                <Form.Item label="Address2" name="address">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
-                    placeholder="Enter country"
+                    placeholder="Enter address"
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
-                <Form.Item label="State" name="state">
+                <Form.Item label="City" name="city">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
-                    placeholder="Enter state"
+                    placeholder="Enter city"
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item label="District" name="district">
                   <Input
@@ -541,13 +543,21 @@ export default function CustomerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
-                <Form.Item label="City" name="city">
+                <Form.Item label="State" name="state">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
-                    placeholder="Enter city"
+                    placeholder="Enter state"
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={4}>
+                <Form.Item label="Country" name="country">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter country"
                   />
                 </Form.Item>
               </Col>
@@ -592,7 +602,7 @@ export default function CustomerTab() {
             </h3>
             <Row gutter={24}>
               <Col span={4}>
-                <Form.Item label="Credit Facility" name="creditFacility">
+                <Form.Item label="Credit Facility type" name="creditFacility">
                   <Select
                     className={selectClass}
                     disabled={viewMode}
@@ -605,7 +615,179 @@ export default function CustomerTab() {
                   </Select>
                 </Form.Item>
               </Col>
+              {/* ================= Security Fields ================= */}
 
+              {securityType === "Bank Guarantee" && (
+                <Row gutter={24}>
+                  <Col span={6}>
+                    <Form.Item label="Bank Name" name="bgBankName">
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item label="Date" name="bgDate">
+                      <Input
+                        type="date"
+                        className={inputClass}
+                        disabled={viewMode}
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item label="Guarantee Amount" name="bgAmount">
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item label="Guarantee Number" name="bgNumber">
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item label="Valid From" name="bgValidFrom">
+                      <Input
+                        type="date"
+                        className={inputClass}
+                        disabled={viewMode}
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item label="Valid Upto" name="bgValidUpto">
+                      <Input
+                        type="date"
+                        className={inputClass}
+                        disabled={viewMode}
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item label="Upload Document" name="bgDoc">
+                      <Upload beforeUpload={() => false} maxCount={1}>
+                        <Button>Upload</Button>
+                      </Upload>
+                    </Form.Item>
+                  </Col>
+                </Row>
+              )}
+              {securityType === "Post Dated Cheque" && (
+                <Row gutter={24}>
+                  <Col span={6}>
+                    <Form.Item label="Bank" name="pdcBank">
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item label="Cheque Issue Date" name="pdcIssueDate">
+                      <Input
+                        type="date"
+                        className={inputClass}
+                        disabled={viewMode}
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item label="Cheque Dated" name="pdcDate">
+                      <Input
+                        type="date"
+                        className={inputClass}
+                        disabled={viewMode}
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item label="Cheque Number" name="pdcNumber">
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item label="Amount" name="pdcAmount">
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item label="Valid Upto" name="pdcValid">
+                      <Input
+                        type="date"
+                        className={inputClass}
+                        disabled={viewMode}
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              )}
+              {securityType === "Fixed Deposit" && (
+                <Row gutter={24}>
+                  <Col span={6}>
+                    <Form.Item label="Bank" name="fdBank">
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item label="Date" name="fdDate">
+                      <Input
+                        type="date"
+                        className={inputClass}
+                        disabled={viewMode}
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item label="Cheque Number" name="fdCheque">
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item label="Security Detail" name="fdSecurity">
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item label="Rate of Interest" name="fdInterest">
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              )}
+              {securityType === "Collateral" && (
+                <Row gutter={24}>
+                  <Col span={8}>
+                    <Form.Item
+                      label="Collateral Details"
+                      name="collateralDetails"
+                    >
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={8}>
+                    <Form.Item label="Address Details" name="collateralAddress">
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={8}>
+                    <Form.Item label="Market Value" name="collateralValue">
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              )}
               <Col span={6}>
                 <Form.Item
                   label="Security for Credit"
@@ -615,6 +797,7 @@ export default function CustomerTab() {
                     className={selectClass}
                     disabled={viewMode}
                     placeholder="Select security"
+                    onChange={(value) => setSecurityType(value)}
                   >
                     <Option value="Bank Guarantee">Bank Guarantee</Option>
                     <Option value="Post Dated Cheque">Post Dated Cheque</Option>
@@ -703,7 +886,7 @@ export default function CustomerTab() {
 
               <Col span={4}>
                 <Form.Item
-                  label="GST Document"
+                  label="GST Number"
                   name="gstDoc"
                   valuePropName="fileList"
                   getValueFromEvent={(e) =>
@@ -725,7 +908,7 @@ export default function CustomerTab() {
                       className="w-full text-left bg-white border-amber-400"
                       disabled={viewMode}
                     >
-                      Select GST Doc
+                      Upload
                     </Button>
                   </Upload>
                 </Form.Item>
@@ -783,7 +966,7 @@ export default function CustomerTab() {
                       className="w-full text-left bg-white border-amber-400"
                       disabled={viewMode}
                     >
-                      Select PAN Doc
+                      Upload
                     </Button>
                   </Upload>
                 </Form.Item>
@@ -823,7 +1006,7 @@ export default function CustomerTab() {
                       className="w-full text-left bg-white border-amber-400"
                       disabled={viewMode}
                     >
-                      Select Aadhar Doc
+                      Upload
                     </Button>
                   </Upload>
                 </Form.Item>
@@ -840,7 +1023,7 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="License Number" name="licenseNo">
+                <Form.Item label="Trade License Number" name="licenseNo">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -855,6 +1038,7 @@ export default function CustomerTab() {
                     className={selectClass}
                     disabled={viewMode}
                     placeholder="Select TDS option"
+                    initialValue="Yes"
                   >
                     <Option value="Yes">Yes</Option>
                     <Option value="No">No</Option>
@@ -863,15 +1047,12 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="Billing Type" name="billingType">
-                  <Select
-                    className={selectClass}
-                    disabled={viewMode}
-                    placeholder="Select billing type"
-                  >
-                    <Option value="Regular">Regular</Option>
-                    <Option value="Provisional">Provisional</Option>
-                  </Select>
+                <Form.Item
+                  label="Rate of TDS"
+                  name="tdsRate"
+                  initialValue="0.10"
+                >
+                  <Input disabled />
                 </Form.Item>
               </Col>
             </Row>
