@@ -25,7 +25,7 @@ import {
   addInventory,
   getInventoryById,
   updateInventory,
-} from "../../../../../api/Inventory";
+} from "../../../../../api/masterinventory";
 
 const { Option } = Select;
 
