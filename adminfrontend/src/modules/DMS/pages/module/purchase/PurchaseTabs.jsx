@@ -148,11 +148,11 @@ export default function PurchaseTabs({ allowedTabs }) {
       <h1 className="text-2xl text-amber-800 font-bold mb-1">
         Purchase Module
       </h1>
-      <p className="text-amber-700 mb-4">
+      <p className="text-amber-700 mb-2">
         Manage purchase contracts, indents, transit, invoices and returns
       </p>
 
-      <div className="mb-6">
+      <div className="mb-0 ">
         <Tabs activeKey={activeKey} onChange={handleChange} items={tabItems} />
       </div>
 

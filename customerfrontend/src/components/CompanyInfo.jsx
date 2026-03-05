@@ -44,14 +44,14 @@ export default function CompanyInfoModal({ open, onClose, onSave }) {
                   </div>
                   <Row gutter={24}>
                     <Col span={6}>
-                      <Form.Item label="Company Name" name={[name, "name"]} rules={[{ required: true }]}>
+                      <Form.Item label="Company Name" name={[name, "company_name"]} rules={[{ required: true }]}>
                         <Input />
                       </Form.Item>
                     </Col>
                     <Col span={6}>
                       <Form.Item
                         label="Phone"
-                        name="phone"
+                        name={[name, "phone"]}
                         rules={[
                           { required: true, message: "Please enter phone number" },
                           {
@@ -67,7 +67,7 @@ export default function CompanyInfoModal({ open, onClose, onSave }) {
                     <Col span={6}>
                       <Form.Item
                         label="Email"
-                        name="email"
+                        name={[name, "email"]}
                         rules={[
                           { required: true, message: "Please enter your email" },
                           {
@@ -120,11 +120,11 @@ export default function CompanyInfoModal({ open, onClose, onSave }) {
                     </Col>
 
                     <Col span={6}>
-                      <Form.Item label="TDC Applicable" name={[name, "tdc_applicable"]}>
+                      <Form.Item label="TDS Applicable" name={[name, "tds_applicable"]}>
                         <Select
                           options={[
-                            { label: "Yes", value: "Yes" },
-                            { label: "No", value: "No" },
+                            { label: "Yes", value: true },
+                            { label: "No", value: false },
                           ]}
                         />
                       </Form.Item>
@@ -137,7 +137,7 @@ export default function CompanyInfoModal({ open, onClose, onSave }) {
                     <Col span={6}>
                       <Form.Item
                         label="GSTIN"
-                        name={[name, "gst_in"]}
+                        name={[name, "gstin"]}
                         rules={[
                           { required: true, message: "Please enter GSTIN" },
                           {
@@ -161,14 +161,14 @@ export default function CompanyInfoModal({ open, onClose, onSave }) {
                         rules={[
                           { required: true, message: "Please enter TIN number" },
                           {
-                            pattern: /^\d{11}$/,
-                            message: "TIN must be 11 digits",
+                            pattern: /^\d{10,11}$/,
+                            message: "TIN must be 10 or 11 digits",
                           },
                         ]}
                       >
                         <Input
                           maxLength={11}
-                          placeholder="12345678901"
+                          placeholder="1234567890"
                         />
                       </Form.Item>
                     </Col>
@@ -192,7 +192,7 @@ export default function CompanyInfoModal({ open, onClose, onSave }) {
                     <Col span={6}>
                       <Form.Item
                         label="FSSAI No"
-                        name={[name, "fassai_no"]}
+                        name={[name, "fssai_no"]}
                         rules={[
                           { required: true, message: "Please enter FSSAI number" },
                           {
@@ -212,8 +212,8 @@ export default function CompanyInfoModal({ open, onClose, onSave }) {
                       <Form.Item label="Billing Type" name={[name, "billing_type"]}>
                         <Select
                           options={[
-                            { label: "Online", value: "online" },
-                            { label: "Offline", value: "offline" },
+                            { label: "Prepaid", value: "Prepaid" },
+                            { label: "Postpaid", value: "Postpaid" },
                           ]}
                         />
                       </Form.Item>
@@ -221,7 +221,7 @@ export default function CompanyInfoModal({ open, onClose, onSave }) {
                     <Col span={6}>
                       <Form.Item
                         label="Aadhaar No"
-                        name={[name, "adhhar_no"]}
+                        name={[name, "aadhaar_no"]}
                         rules={[
                           { required: true, message: "Please enter Aadhaar number" },
                           {
@@ -240,7 +240,7 @@ export default function CompanyInfoModal({ open, onClose, onSave }) {
                     <Col span={6}>
                       <Form.Item
                         label="PAN No"
-                        name={[name, "pan_no"]}
+                        name={[name, "pan"]}
                         rules={[
                           { required: true, message: "Please enter PAN number" },
                           {

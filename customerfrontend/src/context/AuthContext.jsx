@@ -1,48 +1,73 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import usersData from "../data/user.json";
+
+import { signup as apiSignup, login as apiLogin } from "../api/authService";
+import useSessionStore from "../store/sessionStore";
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState(null);
+  const { setSession, clearSession, user } = useSessionStore();
+  const [currentUser, setCurrentUser] = useState(user);
   const [users, setUsers] = useState(usersData);
 
-  // LOGIN
-  const login = ({ email, password }) => {
-    const user = users.find(u => u.email === email);
-    if (!user || user.password !== password) {
-      return { success: false, message: "Invalid credentials" };
-    }
-    if (user.status !== "approved") {
-      return { success: false, message: "Your account is not approved yet" };
-    }
+  useEffect(() => {
     setCurrentUser(user);
-    return { success: true, message: "Login successful" };
+  }, [user]);
+
+  // LOGIN
+  const login = async ({ email, password }) => {
+    try {
+      const response = await apiLogin(email, password);
+
+      const userData = response.user || { email: response.email || email, ...response };
+      const accessToken = response.access || response.token || response.accessToken;
+      const refreshToken = response.refresh || response.refreshToken;
+
+      // Extract organisation_id from response
+      const orgId = response.organisation_id ||
+        (response.organisation_ids && response.organisation_ids.length > 0 ? response.organisation_ids[0] : null) ||
+        (response.customer_org_map && response.customer_org_map.length > 0 ? response.customer_org_map[0].organisation_id : null) ||
+        response.org_id ||
+        response.currentOrgId;
+
+      setSession({
+        accessToken: accessToken,
+        refreshToken: refreshToken,
+        user: userData,
+        currentOrgId: orgId,
+      });
+
+      setCurrentUser(userData);
+      return { success: true, message: "Login successful", data: response };
+    } catch (error) {
+      console.error("Login error:", error);
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.response?.data?.detail || error.message || "Login failed";
+      return { success: false, message: errorMessage };
+    }
   };
 
   // SIGNUP
- const signup = ({ name, email, password, role = "user" }) => {
-  if (users.find(u => u.email === email)) {
-    return { success: false, message: "User already exists" };
-  }
-
-  const newUser = {
-    id: users.length + 1,
-    name,
-    email,
-    password,
-    role,           
-    status: "pending",
+  const signup = async (userData) => {
+    try {
+      const response = await apiSignup(userData);
+      // Depending on your API response structure, you might need to adjust this
+      // Assuming the API returns something successful
+      return { success: true, message: "Signup successful! Wait for admin approval.", data: response };
+    } catch (error) {
+      console.error("Signup error:", error);
+      const errorMessage = error.response?.data?.message || error.message || "Signup failed";
+      return { success: false, message: errorMessage };
+    }
   };
-
-  setUsers([...users, newUser]);
-  return { success: true, message: `Signup successful! Wait for admin approval.` };
-};
 
 
   // LOGOUT
-  const logout = () => setCurrentUser(null);
+  const logout = () => {
+    clearSession();
+    setCurrentUser(null);
+  };
 
   const approveUser = (email) => {
     setUsers(users.map(u => u.email === email ? { ...u, status: "approved" } : u));

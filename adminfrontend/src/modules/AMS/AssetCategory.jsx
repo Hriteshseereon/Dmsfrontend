@@ -1,4 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { getAssetCategories, addAssetCategory } from "../../api/assets";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 import {
   Table,
   Input,
@@ -9,6 +12,7 @@ import {
   InputNumber,
   Row,
   Col,
+  message,
 } from "antd";
 import {
   SearchOutlined,
@@ -18,95 +22,168 @@ import {
   EditOutlined,
   DownloadOutlined,
 } from "@ant-design/icons";
+import useSessionStore from "../../store/sessionStore";
 
 const { Option } = Select;
 const { TextArea } = Input;
 
-const assetCategoryJSON = {
-  records: [
-    {
-      key: 1,
-      categoryId: "AC-001",
-      categoryName: "Computer Equipment",
-      description: "Desktop computers, laptops, servers, and related hardware",
-      usefulLife: 5,
-      defaultDepreciationMethod: "Straight Line",
-      defaultDepreciationRate: 20,
-    },
-    {
-      key: 2,
-      categoryId: "AC-002",
-      categoryName: "Furniture & Fixtures",
-      description: "Office furniture, chairs, desks, cabinets",
-      usefulLife: 10,
-      defaultDepreciationMethod: "Written Down Value",
-      defaultDepreciationRate: 10,
-    },
-    {
-      key: 3,
-      categoryId: "AC-003",
-      categoryName: "Vehicles",
-      description: "Company cars, trucks, delivery vehicles",
-      usefulLife: 8,
-      defaultDepreciationMethod: "Straight Line",
-      defaultDepreciationRate: 12.5,
-    },
-  ],
-  depreciationMethods: [
-    "Straight Line",
-    "Written Down Value",
-    "Double Declining Balance",
-    "Sum of Years Digits",
-  ],
-};
+const depreciationMethods = [
+  "StraightLine",
+  "WrittenDownValue",
+  "DoubleDecliningBalance",
+  "SumOfYearsDigits",
+];
 
 export default function AssetCategory() {
+  const currentOrgId = useSessionStore((state) => state.currentOrgId);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const [data, setData] = useState(assetCategoryJSON.records);
+  const [data, setData] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
   const [searchText, setSearchText] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
 
+  // Fetch asset categories on component mount
+  useEffect(() => {
+    fetchAssetCategories();
+  }, []);
+  //  function write for download in the excel file
+  const handleExportExcel = () => {
+    try {
+      // choose what you want to export
+      const exportData = data.map((item) => ({
+        "Category Name": item.categoryName,
+        Description: item.description,
+        "Useful Life (Years)": item.usefulLife,
+        "Depreciation Method": item.defaultDepreciationMethod,
+        "Depreciation Rate (%)": item.defaultDepreciationRate,
+      }));
+
+      // Create worksheet
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+      // Create workbook
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Asset Categories");
+
+      // Generate Excel file buffer
+      const excelBuffer = XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "array",
+      });
+
+      // Save file
+      const fileData = new Blob([excelBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      saveAs(fileData, "Asset_Categories.xlsx");
+    } catch (error) {
+      console.error("Export error:", error);
+      message.error("Failed to export data");
+    }
+  };
+
+  const fetchAssetCategories = async () => {
+    setLoading(true);
+    try {
+      const response = await getAssetCategories();
+      console.log("Fetched asset categories:", response);
+
+      // Transform API data to match table format
+      const transformedData = response.map((item, index) => ({
+        key: item.id || index,
+        id: item.id,
+        categoryName: item.category_name,
+        description: item.description,
+        usefulLife: item.useful_life,
+        defaultDepreciationMethod: item.default_depreciation_method,
+        defaultDepreciationRate: item.default_depreciation_rate,
+      }));
+
+      setData(transformedData);
+      setFilteredData(transformedData);
+    } catch (error) {
+      console.error("Error fetching asset categories:", error);
+      message.error("Failed to fetch asset categories");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSearch = (value) => {
     setSearchText(value);
     if (!value) {
-      setData(assetCategoryJSON.records);
+      setFilteredData(data);
       return;
     }
     const filtered = data.filter((item) =>
-      Object.values(item).join(" ").toLowerCase().includes(value.toLowerCase())
+      Object.values(item).join(" ").toLowerCase().includes(value.toLowerCase()),
     );
-    setData(filtered);
+    setFilteredData(filtered);
+  };
+
+  const handleAddCategory = async (values) => {
+    setLoading(true);
+    try {
+      const apiData = {
+        organisation: currentOrgId,
+        category_name: values.categoryName,
+        description: values.description,
+        useful_life: values.usefulLife,
+        default_depreciation_method: values.defaultDepreciationMethod,
+        default_depreciation_rate: Number(
+          values.defaultDepreciationRate,
+        ).toFixed(2),
+      };
+
+      console.log("POST payload:", apiData);
+
+      const response = await addAssetCategory(apiData);
+      message.success("Asset category added successfully");
+      setIsAddModalOpen(false);
+      addForm.resetFields();
+      fetchAssetCategories();
+    } catch (error) {
+      console.log("Backend error:", error.response?.data);
+      message.error(
+        error.response?.data
+          ? JSON.stringify(error.response.data)
+          : "Failed to add asset category",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFormSubmit = (values, type) => {
-    if (type === "edit" && selectedRecord) {
+    if (type === "add") {
+      handleAddCategory(values);
+    } else if (type === "edit" && selectedRecord) {
+      // Edit functionality - you'll need to add updateAssetCategory API call
       setData((prev) =>
         prev.map((i) =>
-          i.key === selectedRecord.key ? { ...values, key: i.key } : i
-        )
+          i.key === selectedRecord.key ? { ...values, key: i.key } : i,
+        ),
+      );
+      setFilteredData((prev) =>
+        prev.map((i) =>
+          i.key === selectedRecord.key ? { ...values, key: i.key } : i,
+        ),
       );
       setIsEditModalOpen(false);
       editForm.resetFields();
-    } else {
-      setData((prev) => [...prev, { ...values, key: prev.length + 1 }]);
-      setIsAddModalOpen(false);
-      addForm.resetFields();
+      message.success("Asset category updated successfully");
     }
   };
 
   const columns = [
-    // {
-    //   title: <span className="text-amber-700 font-semibold">Category ID</span>,
-    //   dataIndex: "categoryId",
-    //   width: 120,
-    //   render: (t) => <span className="text-amber-800">{t}</span>,
-    // },
     {
       title: (
         <span className="text-amber-700 font-semibold">Category Name</span>
@@ -131,16 +208,6 @@ export default function AssetCategory() {
       width: 120,
       render: (t) => <span className="text-amber-800">{t} years</span>,
     },
-    // {
-    //   title: (
-    //     <span className="text-amber-700 font-semibold">
-    //       Default Depreciation Method
-    //     </span>
-    //   ),
-    //   dataIndex: "defaultDepreciationMethod",
-    //   width: 180,
-    //   render: (t) => <span className="text-amber-800">{t}</span>,
-    // },
     {
       title: (
         <span className="text-amber-700 font-semibold">
@@ -181,16 +248,7 @@ export default function AssetCategory() {
     <>
       <h6 className="text-amber-500 mb-3">Category Information</h6>
       <Row gutter={16}>
-        {/* <Col span={8}>
-          <Form.Item
-            label="Category ID"
-            name="categoryId"
-            rules={[{ required: true, message: "Please enter Category ID" }]}
-          >
-            <Input placeholder="Enter Category ID" disabled={disabled} />
-          </Form.Item>
-        </Col> */}
-        <Col span={8}>
+        <Col span={12}>
           <Form.Item
             label="Category Name"
             name="categoryName"
@@ -199,7 +257,7 @@ export default function AssetCategory() {
             <Input placeholder="Enter Category Name" disabled={disabled} />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col span={12}>
           <Form.Item
             label="Useful Life (Years)"
             name="usefulLife"
@@ -209,7 +267,14 @@ export default function AssetCategory() {
               className="w-full"
               placeholder="Enter years"
               min={1}
+              precision={0}
               disabled={disabled}
+              onKeyDown={(e) => {
+                // Block e, E, +, -, .
+                if (["e", "E", "+", "-", "."].includes(e.key)) {
+                  e.preventDefault();
+                }
+              }}
             />
           </Form.Item>
         </Col>
@@ -245,7 +310,7 @@ export default function AssetCategory() {
               placeholder="Select Depreciation Method"
               disabled={disabled}
             >
-              {assetCategoryJSON.depreciationMethods.map((method) => (
+              {depreciationMethods.map((method) => (
                 <Option key={method} value={method}>
                   {method}
                 </Option>
@@ -263,10 +328,17 @@ export default function AssetCategory() {
           >
             <InputNumber
               className="w-full"
-              placeholder="Enter rate"
               min={0}
               max={100}
+              step={0.01}
+              precision={2}
               disabled={disabled}
+              onKeyDown={(e) => {
+                // Block e, E, +, -
+                if (["e", "E", "+", "-"].includes(e.key)) {
+                  e.preventDefault();
+                }
+              }}
             />
           </Form.Item>
         </Col>
@@ -280,16 +352,16 @@ export default function AssetCategory() {
       <div className="flex justify-between items-center mb-4">
         <div className="flex gap-2">
           <Input
-           prefix={<SearchOutlined className="text-amber-600!" />}
-                       placeholder="Search assets..."
-                       className="w-64! border-amber-300! focus:border-amber-500!"
-                         value={searchText}
+            prefix={<SearchOutlined className="text-amber-600!" />}
+            placeholder="Search assets..."
+            className="w-64! border-amber-300! focus:border-amber-500!"
+            value={searchText}
             onChange={(e) => handleSearch(e.target.value)}
           />
           <Button
             icon={<FilterOutlined />}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-           onClick={() => handleSearch("")}
+            onClick={() => handleSearch("")}
           >
             Reset
           </Button>
@@ -298,14 +370,14 @@ export default function AssetCategory() {
           <Button
             icon={<DownloadOutlined />}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-            >
+            onClick={handleExportExcel}
+          >
             Export
           </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
             className="bg-amber-500! hover:bg-amber-600! border-none!"
-          
             onClick={() => {
               addForm.resetFields();
               setIsAddModalOpen(true);
@@ -324,9 +396,10 @@ export default function AssetCategory() {
         <p className="text-amber-600 mb-3">Manage your asset category data</p>
         <Table
           columns={columns}
-          dataSource={data}
+          dataSource={filteredData}
           pagination={false}
           scroll={{ y: 180 }}
+          loading={loading}
         />
       </div>
 
@@ -339,13 +412,13 @@ export default function AssetCategory() {
         }
         open={isAddModalOpen}
         onCancel={() => setIsAddModalOpen(false)}
-         cancelText="Cancel"
-        cancelButtonProps={{ className :"border-amber-400! text-amber-700! hover:bg-amber-100!"
+        cancelText="Cancel"
+        cancelButtonProps={{
+          className: "border-amber-400! text-amber-700! hover:bg-amber-100!",
         }}
-       
         onOk={() => addForm.submit()}
         okText="Add"
-        okButtonProps={{ className: "bg-amber-500! border-none!" }}
+        okButtonProps={{ className: "bg-amber-500! border-none!", loading }}
         width={900}
       >
         <Form
@@ -367,7 +440,8 @@ export default function AssetCategory() {
         open={isEditModalOpen}
         onCancel={() => setIsEditModalOpen(false)}
         cancelText="Cancel"
-        cancelButtonProps={{ className :"border-amber-400! text-amber-700! hover:bg-amber-100!"
+        cancelButtonProps={{
+          className: "border-amber-400! text-amber-700! hover:bg-amber-100!",
         }}
         onOk={() => editForm.submit()}
         okText="Update"
@@ -385,7 +459,7 @@ export default function AssetCategory() {
 
       {/* View Modal */}
       <Modal
-         title="View Category Details"
+        title="View Category Details"
         open={isViewModalOpen}
         onCancel={() => {
           setIsViewModalOpen(false);

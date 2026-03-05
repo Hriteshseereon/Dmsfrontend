@@ -12,6 +12,7 @@ import {
   Space,
   Divider,
   InputNumber,
+  message,
 } from "antd";
 import {
   SearchOutlined,
@@ -23,6 +24,8 @@ import {
   MinusCircleOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { getContracts, getContractById, createContract, updateContract, getVendors, getProductsByVendor } from "../api/contract";
+import useSessionStore from "../store/sessionStore";
 
 // --- Mock Data/JSON Extended ---
 const contractJSON = {
@@ -200,6 +203,7 @@ const calculateItemAmount = (itemData) => {
 
 
 export default function Contract() {
+  const { user, currentOrgId } = useSessionStore();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -207,9 +211,40 @@ export default function Contract() {
   const [data, setData] = useState(contractJSON.initialData);
   const [searchText, setSearchText] = useState("");
   const [totalAmount, setTotalAmount] = useState(0); // This is the GRAND TOTAL
+  const [loading, setLoading] = useState(false);
+  const [vendors, setVendors] = useState([]);
+  const [vendorProducts, setVendorProducts] = useState({}); // { vendorId: [products] }
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
+
+  const fetchInitialData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [contractsRes, vendorsRes] = await Promise.all([
+        getContracts(),
+        getVendors()
+      ]);
+
+      if (Array.isArray(contractsRes)) {
+        setData(contractsRes);
+      } else if (contractsRes?.results) {
+        setData(contractsRes.results);
+      }
+
+      const vendorList = vendorsRes?.results || vendorsRes || [];
+      setVendors(vendorList);
+    } catch (error) {
+      console.error("Error fetching initial data:", error);
+      message.error("Failed to load initial data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchInitialData();
+  }, [fetchInitialData]);
 
   // 🌟 Main logic to update the Grand Total
   const updateTotalAmount = useCallback((formInstance) => {
@@ -238,14 +273,16 @@ export default function Contract() {
 
   const filteredData = data.filter(
     (item) => {
-      const companyNames = getCompanyNamesFromItems(item.items);
-      return item.key?.toLowerCase().includes(searchText.toLowerCase()) ||
-        companyNames?.toLowerCase().includes(searchText.toLowerCase()) ||
-        (item.items || [])
-          .map((it) => it.item?.toLowerCase())
-          .join(" ")
-          .includes(searchText.toLowerCase()) ||
-        item.status?.toLowerCase().includes(searchText.toLowerCase())
+      const contractNo = item.sale_contract_number || "";
+      const vendors = item.vendor_names?.join(" ") || "";
+      const products = item.product_names?.join(" ") || "";
+      const status = item.status || "";
+      const search = searchText.toLowerCase();
+
+      return contractNo.toLowerCase().includes(search) ||
+        vendors.toLowerCase().includes(search) ||
+        products.toLowerCase().includes(search) ||
+        status.toLowerCase().includes(search);
     }
   );
 
@@ -260,55 +297,49 @@ export default function Contract() {
   const columns = [
     {
       title: <span className="text-amber-700 font-semibold">Contract No</span>,
-      dataIndex: "key",
-      width: 100,
-      render: (text) => <span className="text-amber-800 ">{text}</span>,
+      dataIndex: "sale_contract_number",
+      width: 150,
+      render: (text, record) => <span className="text-amber-800 ">{text || "N/A"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Vendor</span>,
-      width: 100,
-      render: (_, r) => <span className="text-amber-800">{getCompanyNamesFromItems(r.items)}</span>,
+      width: 150,
+      render: (_, r) => <span className="text-amber-800">{r.vendor_names?.join(", ") || "N/A"}</span>,
     },
-
 
     {
       title: <span className="text-amber-700 font-semibold">Items</span>,
       width: 250,
       render: (_, r) => {
-        const short = (r.items || [])
-          .slice(0, 2)
-          .map((it) => `${it.item} (${it.qty}${it.uom ? ` ${it.uom}` : ""})`)
-          .join(", ");
+        const productList = r.product_names || [];
+        const short = productList.slice(0, 2).join(", ");
         return (
           <div className="text-amber-800">
-            {short}
-            {(r.items || []).length > 2 && <span>, ...</span>}
-            <div className="text-xs text-amber-600">{(r.items || []).length} item(s)</div>
+            {short || "N/A"}
+            {productList.length > 2 && <span>, ...</span>}
+            <div className="text-xs text-amber-600">{r.items_count || 0} item(s)</div>
           </div>
         );
       },
     },
     {
-      title: <span className="text-amber-700 font-semibold">Total Qty</span>,
-      width: 100,
-      render: (_, r) => {
-        const totals = calculateTotals(r.items);
-        return (
-          <span className="text-amber-800">
-            {totals.totalQty} {totals.uom}
-          </span>
-        );
-      },
+      title: <span className="text-amber-700 font-semibold">Date Range</span>,
+      width: 180,
+      render: (_, r) => (
+        <div className="text-xs text-amber-800">
+          <div>From: {r.from_date || "N/A"}</div>
+          <div>To: {r.to_date || "N/A"}</div>
+        </div>
+      ),
     },
     {
-      title: <span className="text-amber-700 font-semibold">Grand Total</span>, // Changed title for clarity
-      dataIndex: "totalAmount",
+      title: <span className="text-amber-700 font-semibold">Grand Total</span>,
+      dataIndex: "grand_total",
       width: 120,
       render: (value) => (
         <span className="text-amber-800 ">₹ {Number(value || 0).toFixed(2)}</span>
       ),
     },
-
 
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
@@ -316,11 +347,11 @@ export default function Contract() {
       width: 120,
       render: (status) => {
         const base = "px-3 py-1 rounded-full text-sm font-semibold";
-        if (status === "Approved")
-          return <span className={`${base} bg-green-100 text-green-700`}>Approved</span>;
+        if (status === "Approved" || status === "Fresh")
+          return <span className={`${base} bg-green-100 text-green-700`}>{status}</span>;
         if (status === "Pending")
           return <span className={`${base} bg-yellow-100 text-yellow-700`}>Pending</span>;
-        return <span className={`${base} bg-red-100 text-red-700`}>{status}</span>;
+        return <span className={`${base} bg-red-100 text-red-700`}>{status || "N/A"}</span>;
       },
     },
     {
@@ -330,33 +361,127 @@ export default function Contract() {
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              viewForm.setFieldsValue({
-                ...record,
-                contractDate: record.contractDate ? dayjs(record.contractDate) : undefined,
-                startDate: record.startDate ? dayjs(record.startDate) : undefined,
-                endDate: record.endDate ? dayjs(record.endDate) : undefined,
-                deliveryDate: record.deliveryDate ? dayjs(record.deliveryDate) : null,
-              });
-              setIsViewModalOpen(true);
+            onClick={async () => {
+              try {
+                setLoading(true);
+                const contractDetails = await getContractById(record.sale_contract_id);
+                // Map API response to UI model
+                // Map API response STRICTLY to UI fields
+                const mappedRecord = {
+                  // Basic Contract Details
+                  key: contractDetails.sale_contract_number,
+                  contractDate: contractDetails.created_at ? dayjs(contractDetails.created_at).format("DD-MM-YYYY") : "",
+                  startDate: contractDetails.from_date ? dayjs(contractDetails.from_date).format("DD-MM-YYYY") : "",
+                  endDate: contractDetails.to_date ? dayjs(contractDetails.to_date).format("DD-MM-YYYY") : "",
+                  deliveryDate: contractDetails.to_date ? dayjs(contractDetails.to_date).format("DD-MM-YYYY") : "",
+
+                  location: contractDetails.location || "",
+                  status: contractDetails.status,
+                  customer_mobile: contractDetails.customer_mobile,
+                  customer_email: contractDetails.customer_email,
+                  totalAmount: Number(contractDetails.grand_total || 0).toFixed(2),
+                  grossAmount: Number(contractDetails.total_amount || 0).toFixed(2),
+                  discountPercent: Number(contractDetails.discount_percent || 0),
+                  discountAmt: Number(contractDetails.cash_discount || 0).toFixed(2),
+
+                  // Fields not present in API response - mapped to empty string
+                  depoName: "",
+                  brokerName: contractDetails.broker || "",
+                  type: "",
+                  deliveryAddress: "",
+                  naarration: contractDetails.narration || "",
+
+                  items: (contractDetails.items || []).map(item => ({
+                    companyName: item.vendor_name || vendors.find(v => v.id === item.vendor_id)?.name || "",
+                    vendor_id: item.vendor_id,
+                    item: item.product?.product_name || "",
+                    product_id: item.product?.product_id,
+                    itemCode: item.product?.product_code || item.product?.product_id || item.product?.id || "",
+                    uom: item.uom?.unit_name || "",
+                    uom_id: item.uom?.uom_id,
+                    qty: Number(item.net_qty || item.gross_qty || 0),
+                    rate: Number(item.mrp || 0).toFixed(2),
+                    baseRate: Number(item.mrp || 0),
+                    totalAmount: Number(item.line_total || 0).toFixed(2),
+                    freeQty: Number(item.free_qty || 0),
+                    discount_percent: item.discount_percent,
+                    discount_amount: item.discount_amount
+                  }))
+                };
+
+                setSelectedRecord(mappedRecord);
+
+                viewForm.setFieldsValue({
+                  ...mappedRecord,
+                  contractDate: contractDetails.created_at ? dayjs(contractDetails.created_at) : undefined,
+                  startDate: contractDetails.from_date ? dayjs(contractDetails.from_date) : undefined,
+                  endDate: contractDetails.to_date ? dayjs(contractDetails.to_date) : undefined,
+                });
+
+                setIsViewModalOpen(true);
+              } catch (error) {
+                console.error("Error fetching contract details:", error);
+                message.error("Failed to load contract details");
+              } finally {
+                setLoading(false);
+              }
             }}
           />
-          {record.status !== "Approved" && (
+          {record.status === "Fresh" && (
             <EditOutlined
               className="cursor-pointer! text-red-500!"
-              onClick={() => {
-                setSelectedRecord(record);
-                editForm.setFieldsValue({
-                  ...record,
-                  contractDate: record.contractDate ? dayjs(record.contractDate) : undefined,
-                  startDate: record.startDate ? dayjs(record.startDate) : undefined,
-                  endDate: record.endDate ? dayjs(record.endDate) : undefined,
-                  deliveryDate: record.deliveryDate ? dayjs(record.deliveryDate) : null,
-                  items: record.items || [],
-                });
-                setIsEditModalOpen(true);
-                updateTotalAmount(editForm);
+              onClick={async () => {
+                try {
+                  setLoading(true);
+                  const contractDetails = await getContractById(record.sale_contract_id);
+                  setSelectedRecord(contractDetails);
+
+                  // Fetch products for all unique vendors in the contract
+                  const uniqueVendorIds = [...new Set((contractDetails.items || []).map(i => i.vendor_id).filter(Boolean))];
+                  for (const vId of uniqueVendorIds) {
+                    if (!vendorProducts[vId]) {
+                      const res = await getProductsByVendor(vId);
+                      const products = res?.results || res || [];
+                      setVendorProducts(prev => ({ ...prev, [vId]: products }));
+                    }
+                  }
+
+                  const mappedItems = (contractDetails.items || []).map(item => ({
+                    vendor_id: item.vendor_id,
+                    companyName: item.vendor_name || vendors.find(v => v.id === item.vendor_id)?.name,
+                    product_id: item.product?.product_id,
+                    item: item.product?.product_name, // Name logic
+                    itemCode: item.product?.product_code || item.product?.product_id || item.product?.id,
+                    uom: item.uom?.unit_name,
+                    uom_id: item.uom?.uom_id,
+                    qty: Number(item.net_qty || item.gross_qty || 0),
+                    rate: Number(item.mrp || 0),
+                    baseRate: Number(item.mrp || 0),
+                    totalAmount: Number(item.line_total || 0),
+                    free_qty: Number(item.free_qty || 0),
+                    discount_percent: item.discount_percent,
+                    discount_amount: item.discount_amount
+                  }));
+
+                  // Calculate total amount from mapped items
+                  const total = mappedItems.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0);
+                  setTotalAmount(total);
+
+                  editForm.setFieldsValue({
+                    ...contractDetails,
+                    key: contractDetails.sale_contract_number,
+                    contractDate: contractDetails.created_at ? dayjs(contractDetails.created_at) : dayjs(),
+                    startDate: contractDetails.from_date ? dayjs(contractDetails.from_date) : undefined,
+                    endDate: contractDetails.to_date ? dayjs(contractDetails.to_date) : undefined,
+                    items: mappedItems,
+                  });
+                  setIsEditModalOpen(true);
+                } catch (error) {
+                  console.error("Error fetching contract details for edit:", error);
+                  message.error("Failed to load contract details");
+                } finally {
+                  setLoading(false);
+                }
               }}
             />
           )}
@@ -374,17 +499,34 @@ export default function Contract() {
 
     // 1. Get current values
     const qty = Number(item.qty || 0);
-    const uom = item.uom;
+    const selectedUomName = item.uom;
     const itemName = item.item;
     const baseRate = Number(item.baseRate || 0);
+    const vendorId = item.vendor_id;
+    const productId = item.product_id;
 
-    // 2. Check for conversion factor
-    const conversions = itemUomConversions[itemName];
-    let newRate = baseRate;
+    let newRate = 0;
+    let newUomId = item.uom_id;
 
-    if (conversions && conversions[uom]) {
-      const rateFactor = conversions[uom].rateFactor || 1;
-      newRate = baseRate * rateFactor;
+    // 2. Always calculate default rate automatically
+    const products = vendorProducts[vendorId] || [];
+    const product = products.find(p => (p.product_id || p.id) === productId);
+    const uomObj = product?.uoms?.find(u => u.unit_name === selectedUomName);
+
+    if (uomObj) {
+      // Use multiplier from API response
+      const multiplier = Number(uomObj.multiplier || 1);
+      newRate = baseRate * multiplier;
+      newUomId = uomObj.uom_id !== undefined ? uomObj.uom_id : null;
+    } else {
+      // Fallback to legacy conversion if product uoms not found
+      const conversions = itemUomConversions[itemName];
+      if (conversions && conversions[selectedUomName]) {
+        const rateFactor = conversions[selectedUomName].rateFactor || 1;
+        newRate = baseRate * rateFactor;
+      } else {
+        newRate = baseRate;
+      }
     }
 
     // 3. Calculate new total amount
@@ -395,6 +537,7 @@ export default function Contract() {
       ...item,
       rate: Number(newRate.toFixed(2)),
       totalAmount: Number(newTotalAmount.toFixed(2)),
+      uom_id: newUomId,
     };
 
     // 5. Push updated list back to form and update Grand Total
@@ -404,42 +547,60 @@ export default function Contract() {
 
 
   // Logic to handle item selection change for auto-fill (Rate and Item Code)
-  const handleItemSelect = (form, companyName, itemName, rowIndex) => {
-    const itemData = itemDetailsByCompany[companyName]?.[itemName];
+ const handleItemSelect = (form, vendorId, productId, rowIndex) => {
+  const products = vendorProducts[vendorId] || [];
+  const product = products.find(p => (p.product_id || p.id) === productId);
 
-    if (!itemData) return;
+  if (!product) return;
 
-    // Get current list
-    const items = form.getFieldValue('items') || [];
+  const items = [...(form.getFieldValue('items') || [])];
 
-    // Base rate is the rate in the smallest/base UOM (Ltrs/Kg)
-    const baseUom = itemData.uom;
-    const baseRate = itemData.rate;
+  // ✅ Get BASE UOM
+  const baseUomObj =
+    product.uoms?.find(u => u.type === "base") || product.uoms?.[0];
 
-    // Update only selected row
-    items[rowIndex] = {
-      ...items[rowIndex],
-      item: itemName,
-      itemCode: itemData.itemCode,
-      uom: baseUom, // Reset to base UOM initially
-      baseRate: baseRate,
-      rate: baseRate, // Initial rate is the base rate
-      qty: items[rowIndex].qty || 0,
-    };
+  const baseUomName = baseUomObj?.unit_name || product.base_unit;
+  const baseUomId = baseUomObj?.uom_id ?? null;
 
-    // Push updated list back to form
-    form.setFieldsValue({ items });
-    // Recalculate amount using the new base rate
-    updateItemCalculations(form, rowIndex);
+  // ✅ Get BASE PRICE from default_price
+  const baseRate = Number(product.default_price?.base_price || 0);
+
+  // ✅ Update row
+  items[rowIndex] = {
+    ...items[rowIndex],
+    item: product.product_name,
+    product_id: productId,
+    itemCode: product.product_code || product.product_id,
+
+    // 🔥 AUTO FILL
+    uom: baseUomName,
+    uom_id: baseUomId,
+    baseRate: baseRate,
+    rate: baseRate, // initial same as base
+
+    qty: items[rowIndex]?.qty || 0,
+    totalAmount: 0,
   };
 
-  const handleCompanyChange = (form, companyName, fieldName, isEdit) => {
+  form.setFieldsValue({ items });
 
-    const newLocation = companyLocationMap[companyName];
+  // 🔥 Calculate total
+  updateItemCalculations(form, rowIndex);
+};
+  const handleCompanyChange = async (form, vendorId, fieldName) => {
+    const vendor = vendors.find(v => v.id === vendorId);
+    if (!vendor) return;
 
-    // If first row → update location
-    if (fieldName === 0 && newLocation) {
-      form.setFieldsValue({ location: newLocation });
+    // Fetch products for this vendor if not already fetched
+    if (!vendorProducts[vendorId]) {
+      try {
+        const res = await getProductsByVendor(vendorId);
+        const products = res?.results || res || [];
+        setVendorProducts(prev => ({ ...prev, [vendorId]: products }));
+      } catch (error) {
+        console.error("Error fetching products:", error);
+        message.error("Failed to load products for selected vendor");
+      }
     }
 
     // Reset item details when company changes
@@ -448,7 +609,10 @@ export default function Contract() {
       index === fieldName
         ? {
           ...item,
+          companyName: vendor.name,
+          vendor_id: vendor.id,
           item: undefined,
+          product_id: undefined,
           itemCode: undefined,
           rate: undefined,
           baseRate: undefined, // Clear base rate
@@ -461,12 +625,12 @@ export default function Contract() {
 
     form.setFieldsValue({ items: updatedItems });
 
-    // 🔥 MOST IMPORTANT FIX → reset live grand total
+
     updateTotalAmount(form);
   };
 
 
-  const handleFormSubmit = (values, isEdit) => {
+  const handleFormSubmit = async (values, isEdit) => {
     const formInstance = isEdit ? editForm : addForm;
     const finalValues = values || formInstance.getFieldsValue();
     const items = finalValues.items && finalValues.items.length > 0 ? finalValues.items : [];
@@ -479,38 +643,68 @@ export default function Contract() {
     // Determine the next contract number
     const newContractNo = `C-${String(data.length + 1).padStart(4, '0')}`;
 
-    const payload = {
-      // Use existing key or generated one
-      key: isEdit ? selectedRecord.key : newContractNo,
-      ...finalValues,
-      items,
-      totalQty: totals.totalQty,
-      uom: totals.uom,
-      status: finalValues.status || "Pending",
-      contractDate: finalValues.contractDate
-        ? finalValues.contractDate.format("YYYY-MM-DD")
-        : undefined,
-      startDate: finalValues.startDate ? finalValues.startDate.format("YYYY-MM-DD") : undefined,
-      endDate: finalValues.endDate ? finalValues.endDate.format("YYYY-MM-DD") : undefined,
-      deliveryDate: finalValues.deliveryDate
-        ? finalValues.deliveryDate.format("YYYY-MM-DD")
-        : undefined,
-      totalAmount: grandTotal, // Use the calculated Grand Total
+    const apiPayload = {
+      location: finalValues.location || "N/A",
+      product_group: null,
+      from_date: finalValues.startDate ? finalValues.startDate.format("YYYY-MM-DD") : undefined,
+      to_date: finalValues.endDate ? finalValues.endDate.format("YYYY-MM-DD") : undefined,
+      broker: null,
+      customer_mobile: finalValues.customer_mobile,
+      customer_email: finalValues.customer_email,
+      sgst: finalValues.sgst || 0,
+      cgst: finalValues.cgst || 0,
+      igst: finalValues.igst || 0,
+      tcs_amount: finalValues.tcs_amount || 0,
+      cash_discount: finalValues.cash_discount || 0,
+      round_off_amount: finalValues.round_off_amount || 0,
+      narration: finalValues.narration || "Customer created contract",
+      items: items.map(item => ({
+        vendor_id: item.vendor_id,
+        product_id: item.product_id,
+        uom_id: item.uom_id || null,
+        net_qty: Number(item.qty || 0).toFixed(2),
+        gross_qty: Number(item.qty || 0).toFixed(2),
+        free_qty: Number(item.free_qty || 0).toFixed(2),
+        mrp: Number(item.rate || 0).toFixed(2),
+        discount_percent: Number(item.discount_percent || 0).toFixed(2),
+        discount_amount: Number(item.discount_amount || 0).toFixed(2),
+        line_total: Number(item.totalAmount || 0).toFixed(2)
+      }))
     };
 
-    if (isEdit) {
-      setData((prev) =>
-        prev.map((item) =>
-          item.key === selectedRecord.key ? { ...item, ...payload } : item
-        )
-      );
-    } else {
-      setData((prev) => [...prev, payload]);
-    }
+    try {
+      if (isEdit) {
+        await updateContract(selectedRecord.sale_contract_id, apiPayload);
+        message.success("Contract updated successfully");
+        fetchInitialData();
+      } else {
+        await createContract(apiPayload);
+        message.success("Contract created successfully");
+        fetchInitialData();
+      }
 
-    setIsAddModalOpen(false);
-    setIsEditModalOpen(false);
-    setSelectedRecord(null);
+      setIsAddModalOpen(false);
+      setIsEditModalOpen(false);
+      setSelectedRecord(null);
+    } catch (error) {
+      console.error("Error submitting contract:", error);
+      const errorData = error.response?.data;
+      let errorMessage = "Failed to submit contract";
+
+      if (errorData) {
+        if (Array.isArray(errorData)) {
+          errorMessage = errorData[0];
+        } else if (typeof errorData === "object") {
+          errorMessage = errorData.message || errorData.error || errorData.detail || JSON.stringify(errorData);
+        } else if (typeof errorData === "string") {
+          errorMessage = errorData;
+        }
+      } else {
+        errorMessage = error.message || errorMessage;
+      }
+
+      message.error(errorMessage);
+    }
   };
 
   const renderBasicFields = (formInstance, disabled = false) => (
@@ -577,15 +771,9 @@ export default function Contract() {
           <Form.Item
             label="Location"
             name="location"
-            rules={[{ required: true, message: "Please select Location" }]}
+            rules={[{ required: true, message: "Please enter Location" }]}
           >
-            <Select placeholder="Select Location" disabled={disabled}>
-              {contractJSON.locationOptions.map((loc) => (
-                <Select.Option key={loc} value={loc}>
-                  {loc}
-                </Select.Option>
-              ))}
-            </Select>
+            <Input placeholder="Enter Location" disabled={disabled} />
           </Form.Item>
         </Col>
 
@@ -600,6 +788,29 @@ export default function Contract() {
             </Select>
           </Form.Item>
         </Col>
+
+        <Col span={8}>
+          <Form.Item
+            label="Customer Mobile"
+            name="customer_mobile"
+            rules={[{ required: true, message: "Please enter customer mobile" }]}
+          >
+            <Input placeholder="9999999999" disabled={disabled} />
+          </Form.Item>
+        </Col>
+
+        <Col span={8}>
+          <Form.Item
+            label="Customer Email"
+            name="customer_email"
+            rules={[
+              { required: true, message: "Please enter customer email" },
+              { type: 'email', message: 'Please enter a valid email' }
+            ]}
+          >
+            <Input placeholder="customer@test.com" disabled={disabled} />
+          </Form.Item>
+        </Col>
       </Row>
     </div>
 
@@ -608,6 +819,10 @@ export default function Contract() {
   const renderItemRow = (formInstance, field, remove, disabled) => {
     const items = formInstance.getFieldValue('items');
     const currentItem = items && items[field.name];
+    const vendorId = currentItem?.vendor_id;
+    const productId = currentItem?.product_id;
+    const product = vendorProducts[vendorId]?.find(p => (p.product_id || p.id) === productId);
+
     const selectedCompany = currentItem?.companyName;
     const itemOptions = getItemOptionsForCompany(selectedCompany);
     const selectedItemName = currentItem?.item;
@@ -633,19 +848,19 @@ export default function Contract() {
           <label>Vendor</label>
           <Form.Item
             {...field}
-            name={[field.name, "companyName"]}
-            fieldKey={[field.fieldKey, "companyName"]}
+            name={[field.name, "vendor_id"]}
+            fieldKey={[field.fieldKey, "vendor_id"]}
             rules={[{ required: true, message: "Select vendor" }]}
           >
             <Select
               placeholder="Select Vendor"
               disabled={disabled}
-              onChange={(companyName) =>
-                handleCompanyChange(formInstance, companyName, field.name, isEditModalOpen)
+              onChange={(vendorId) =>
+                handleCompanyChange(formInstance, vendorId, field.name)
               }
             >
-              {contractJSON.companyOptions.map((c) => (
-                <Select.Option key={c} value={c}>{c}</Select.Option>
+              {(vendors || []).map((v) => (
+                <Select.Option key={v.id} value={v.id}>{v.name}</Select.Option>
               ))}
             </Select>
           </Form.Item>
@@ -656,25 +871,24 @@ export default function Contract() {
           <label>Item Name</label>
           <Form.Item
             {...field}
-            name={[field.name, "item"]}
-            fieldKey={[field.fieldKey, "item"]}
+            name={[field.name, "product_id"]}
+            fieldKey={[field.fieldKey, "product_id"]}
             rules={[{ required: true, message: "Select item" }]}
           >
             <Select
               placeholder="Select Item"
-              disabled={disabled || !selectedCompany}
+              disabled={disabled || !currentItem?.vendor_id}
               onChange={(value) =>
                 handleItemSelect(
                   formInstance,
-                  selectedCompany,
+                  currentItem?.vendor_id,
                   value,
-                  field.name,
-                  field.fieldKey
+                  field.name
                 )
               }
             >
-              {itemOptions.map((it) => (
-                <Select.Option key={it} value={it}>{it}</Select.Option>
+              {(vendorProducts[currentItem?.vendor_id] || []).map((p) => (
+                <Select.Option key={p.product_id || p.id} value={p.product_id || p.id}>{p.product_name}</Select.Option>
               ))}
             </Select>
           </Form.Item>
@@ -683,22 +897,16 @@ export default function Contract() {
         {/* UOM - 🌟 MADE SELECTABLE 🌟 */}
         <Col span={4}>
           <label>UOM</label>
-          <Form.Item
-            {...field}
-            name={[field.name, "uom"]}
-            fieldKey={[field.fieldKey, "uom"]}
-            rules={[{ required: true, message: "Select UOM" }]}
-          >
-            <Select
-              placeholder="UOM"
-              disabled={disabled || !selectedItemName}
-              onChange={() => updateItemCalculations(formInstance, field.name)}
-            >
-              {finalUomOptions.map((uom) => (
-                <Select.Option key={uom} value={uom}>{uom}</Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
+         <Form.Item
+  {...field}
+  name={[field.name, "uom"]}
+  fieldKey={[field.fieldKey, "uom"]}
+>
+  <Select
+    disabled
+    value={formInstance.getFieldValue(["items", field.name, "uom"])}
+  />
+</Form.Item>
         </Col>
 
         {/* Quantity */}
@@ -725,7 +933,7 @@ export default function Contract() {
 
           >
             <InputNumber
-             
+
               placeholder="Qty"
               disabled={disabled || !selectedItemName}
               onChange={() => updateItemCalculations(formInstance, field.name)}
@@ -742,8 +950,14 @@ export default function Contract() {
             name={[field.name, "rate"]}
             fieldKey={[field.fieldKey, "rate"]}
           >
-            {/* Display final rate which is baseRate * conversionFactor */}
-            <Input type="number" placeholder="Rate" disabled />
+            <InputNumber
+              placeholder="Rate"
+              className="w-full"
+              disabled={disabled || !currentItem?.qty}
+              readOnly
+              formatter={value => `₹ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+              parser={value => value.replace(/\₹\s?|(,*)/g, '')}
+            />
           </Form.Item>
         </Col>
 
@@ -755,11 +969,13 @@ export default function Contract() {
             name={[field.name, "totalAmount"]}
             fieldKey={[field.fieldKey, "totalAmount"]}
           >
-            <Input
+            <InputNumber
               placeholder="Item Total"
-              disabled
-              addonBefore="₹"
-              value={currentItem?.totalAmount}
+              className="w-full"
+              disabled={disabled || !currentItem?.qty}
+              readOnly
+              formatter={value => `₹ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+              parser={value => value.replace(/\₹\s?|(,*)/g, '')}
             />
           </Form.Item>
         </Col>
@@ -770,7 +986,7 @@ export default function Contract() {
             <MinusCircleOutlined className="text-red-500!"
               onClick={() => {
                 remove(field.name);
-                setTimeout(() => updateTotalAmount(formInstance), 0); 
+                setTimeout(() => updateTotalAmount(formInstance), 0);
               }}
             />
           )}
@@ -868,7 +1084,7 @@ export default function Contract() {
             </Form.Item>
           </Col>
 
-          <Col span={6}>
+          {/* <Col span={6}>
             <Form.Item label="Depo">
               <Input value={selectedRecord?.depoName} disabled />
             </Form.Item>
@@ -892,7 +1108,7 @@ export default function Contract() {
             <Form.Item label="Delivery Address">
               <Input value={selectedRecord?.deliveryAddress} disabled />
             </Form.Item>
-          </Col>
+          </Col> */}
           <Col span={6}>
             <Form.Item label="Status">
               <Input value={selectedRecord?.status} disabled />
@@ -1040,6 +1256,8 @@ export default function Contract() {
                 // Set initial item with empty company/item/code/rate
                 items: [{ companyName: undefined, item: undefined, itemCode: undefined, qty: undefined, uom: "Ltrs", rate: 0, baseRate: 0, totalAmount: 0 }],
                 location: undefined, // Reset location
+                customer_email: user?.email || user?.email_address,
+                customer_mobile: user?.mobile || user?.phone || user?.mobile_number || user?.phone_number,
               });
               setSelectedRecord(null);
               setIsAddModalOpen(true);
@@ -1051,7 +1269,7 @@ export default function Contract() {
       </div>
 
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
-        <Table columns={columns} dataSource={filteredData} pagination={10} scroll={{ y: 150 }} rowKey="key" />
+        <Table columns={columns} dataSource={filteredData} pagination={10} scroll={{ y: 250 }} rowKey="id" loading={loading} />
       </div>
 
       {/* Add Modal */}
@@ -1075,6 +1293,8 @@ export default function Contract() {
             endDate: dayjs().add(7, "day"),
             status: "Pending",
             items: [{ companyName: undefined, item: undefined, itemCode: undefined, qty: 0, uom: "Ltrs", rate: 0, baseRate: 0, totalAmount: 0 }],
+            customer_email: user?.email || user?.email_address,
+            customer_mobile: user?.mobile || user?.phone || user?.mobile_number || user?.phone_number,
           }}
         >
           {renderBasicFields(addForm, false)}

@@ -1,13 +1,13 @@
 // src/pages/Signup.jsx
 import { useState } from "react";
 import { Form, Input, Button, Alert, Row, Col, Tag, Space } from "antd";
-import { useAuth } from "../context/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
 import { UserOutlined, PlusOutlined } from "@ant-design/icons";
 import CompanyInfoModal from "../components/CompanyInfo";
 
+import { signup as customerSignup } from "../api/customer";
+
 export default function Signup() {
-  const { signup } = useAuth();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
@@ -17,20 +17,38 @@ export default function Signup() {
   const [companyModal, setCompanyModal] = useState(false);
   const [companies, setCompanies] = useState([]);
 
-  const onFinish = (values) => {
+  const onFinish = async (values) => {
     setLoading(true);
+    setAlert(null);
 
     const finalValues = {
-      ...values,
+      name: values.name,
+      email: values.email,
+      password: values.password,
+      phone: values.phone,
+      address: values.address,
       companies: companies,
     };
 
-    const res = signup(finalValues);
-    setLoading(false);
-    setAlert({ type: res.success ? "success" : "error", message: res.message });
+    try {
+      const res = await customerSignup(finalValues);
+      setAlert({
+        type: "success",
+        message: "Signup successful! Your account has been created and is pending admin approval."
+      });
 
-    if (res.success) {
-      navigate("/login", { state: { signupMessage: res.message } });
+      // Navigate after a delay to show success message
+      setTimeout(() => {
+        navigate("/login", { state: { signupMessage: "Signup successful! Please wait for admin approval." } });
+      }, 2000);
+    } catch (error) {
+      console.error("Signup error:", error);
+      const errorMessage = error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Signup failed. Please check your information and try again.";
+      setAlert({ type: "error", message: errorMessage });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -70,53 +88,53 @@ export default function Signup() {
               </Form.Item>
             </Col>
             <Col span={12}>
-<Form.Item
-    label="Email"
-    name="email"
-    rules={[
-      { required: true, message: "Please enter your email" },
-      {
-        pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-        message: "Enter a valid email (example@gmail.com)",
-      },
-    ]}
-  >
-    <Input placeholder="example@gmail.com" />
-  </Form.Item>            </Col>
+              <Form.Item
+                label="Email"
+                name="email"
+                rules={[
+                  { required: true, message: "Please enter your email" },
+                  {
+                    pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                    message: "Enter a valid email (example@gmail.com)",
+                  },
+                ]}
+              >
+                <Input placeholder="example@gmail.com" />
+              </Form.Item>            </Col>
           </Row>
 
           <Row gutter={16}>
             <Col span={12}>
-                <Form.Item
-    label="Password"
-    name="password"
-    rules={[
-      { required: true, message: "Please enter password" },
-      {
-        pattern: /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/,
-        message:
-          "Password must contain 1 uppercase, 1 number & 1 special character",
-      },
-    ]}
-  >
-    <Input.Password placeholder="Strong password" />
-  </Form.Item>
+              <Form.Item
+                label="Password"
+                name="password"
+                rules={[
+                  { required: true, message: "Please enter password" },
+                  {
+                    pattern: /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/,
+                    message:
+                      "Password must contain 1 uppercase, 1 number & 1 special character",
+                  },
+                ]}
+              >
+                <Input.Password placeholder="Strong password" />
+              </Form.Item>
 
             </Col>
             <Col span={12}>
-           <Form.Item
-    label="Phone"
-    name="phone"
-    rules={[
-      { required: true, message: "Please enter phone number" },
-      {
-        pattern: /^[6-9]\d{9}$/,
-        message: "Enter valid 10-digit mobile number",
-      },
-    ]}
-  >
-    <Input maxLength={10} placeholder="9876543210" />
-  </Form.Item>
+              <Form.Item
+                label="Phone"
+                name="phone"
+                rules={[
+                  { required: true, message: "Please enter phone number" },
+                  {
+                    pattern: /^[6-9]\d{9}$/,
+                    message: "Enter valid 10-digit mobile number",
+                  },
+                ]}
+              >
+                <Input maxLength={10} placeholder="9876543210" />
+              </Form.Item>
             </Col>
           </Row>
 
@@ -154,7 +172,7 @@ export default function Signup() {
                     onClose={() => removeCompany(i)}
                     className="bg-amber-100! text-amber-800! px-4! py-2! rounded-lg!"
                   >
-                    {c.name} ({c.city})
+                    {c.company_name} ({c.city})
                   </Tag>
                 ))}
               </Space>

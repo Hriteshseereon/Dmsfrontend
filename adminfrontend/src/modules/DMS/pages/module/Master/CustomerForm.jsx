@@ -1,6 +1,6 @@
 // forms/CustomerForm.jsx
 import React from "react";
-import { Row, Col, Form, Input, Select, Card } from "antd";
+import { Row, Col, Form, Input, Select, Card, Button, Upload } from "antd";
 
 const { Option } = Select;
 const inputClass = "border-amber-400 h-8";
@@ -17,42 +17,109 @@ export default function CustomerForm({ disabled = false }) {
 
         <Row gutter={24}>
           <Col span={6}>
+            <Form.Item label="Customer Code" name="customerCode">
+              <Input
+                className={inputClass}
+                disabled
+                placeholder="Auto-generated"
+              />
+            </Form.Item>
+          </Col>
+
+          <Col span={6}>
             <Form.Item
               label="Customer Name"
               name="name"
-              rules={[{ required: true }]}
+              rules={[
+                { required: true, message: "Please enter customer name" },
+              ]}
             >
-              <Input className={inputClass} disabled={disabled} placeholder="Enter customer name" />
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter customer name"
+              />
             </Form.Item>
           </Col>
 
           <Col span={6}>
             <Form.Item label="Business Name" name="branchName">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter business name" />
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter business name"
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Phone Number" name="phoneNo">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter phone number" />
+            <Form.Item
+              label="Phone Number"
+              name="phoneNo"
+              rules={[
+                {
+                  pattern: /^[0-9]\d{9,10}$/,
+                  message: "Enter a valid phone number",
+                },
+              ]}
+            >
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter phone number"
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Mobile Number" name="mobileNo">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter mobile number" />
+            <Form.Item
+              label="Mobile Number"
+              name="mobileNo"
+              rules={[
+                { required: true, message: "Please enter mobile number" },
+                {
+                  pattern: /^[6-9]\d{9}$/,
+                  message: "Enter a valid 10-digit mobile number",
+                },
+              ]}
+            >
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter mobile number"
+                maxLength={10}
+              />
             </Form.Item>
           </Col>
 
           <Col span={6}>
-            <Form.Item label="Email Address" name="email">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter email address" />
+            <Form.Item
+              label="Email Address"
+              name="email"
+              rules={[
+                { required: true, message: "Please enter email" },
+                { type: "email", message: "Please enter valid email" },
+              ]}
+            >
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter email address"
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Customer Type" name="type">
-              <Select className={selectClass} disabled={disabled} placeholder="Select type">
+            <Form.Item
+              label="Customer Type"
+              name="type"
+              rules={[{ required: true, message: "Please select type" }]}
+            >
+              <Select
+                className={selectClass}
+                disabled={disabled}
+                placeholder="Select type"
+              >
                 <Option value="Customer">Customer</Option>
                 <Option value="Supplier">Supplier</Option>
                 <Option value="Both">Both</Option>
@@ -61,8 +128,16 @@ export default function CustomerForm({ disabled = false }) {
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Status" name="status">
-              <Select className={selectClass} disabled={disabled} placeholder="Select status">
+            <Form.Item
+              label="Status"
+              name="status"
+              rules={[{ required: true, message: "Please select status" }]}
+            >
+              <Select
+                className={selectClass}
+                disabled={disabled}
+                placeholder="Select status"
+              >
                 <Option value="Active">Active</Option>
                 <Option value="Inactive">Inactive</Option>
               </Select>
@@ -80,49 +155,89 @@ export default function CustomerForm({ disabled = false }) {
         <Row gutter={24}>
           <Col span={6}>
             <Form.Item label="Contact Person" name="contactPerson">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter contact person" />
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter contact person"
+              />
             </Form.Item>
           </Col>
 
           <Col span={6}>
             <Form.Item label="Address" name="address">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter address" />
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter address"
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
             <Form.Item label="Country" name="country">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter country" />
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter country"
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
             <Form.Item label="State" name="state">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter state" />
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter state"
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
             <Form.Item label="District" name="district">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter district" />
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter district"
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
             <Form.Item label="City" name="city">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter city" />
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter city"
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Pin Code" name="pinCode">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter pin code" />
+            <Form.Item
+              label="Pin Code"
+              name="pinCode"
+              rules={[
+                { required: true, message: "Please enter pin code" },
+                { pattern: /^\d{6}$/, message: "PIN code must be 6 digits" },
+              ]}
+            >
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter pin code"
+                maxLength={6}
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
             <Form.Item label="Location" name="location">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter location" />
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter location"
+              />
             </Form.Item>
           </Col>
         </Row>
@@ -137,7 +252,11 @@ export default function CustomerForm({ disabled = false }) {
         <Row gutter={24}>
           <Col span={4}>
             <Form.Item label="Credit Facility" name="creditFacility">
-              <Select className={selectClass} disabled={disabled} placeholder="Select credit facility">
+              <Select
+                className={selectClass}
+                disabled={disabled}
+                placeholder="Select credit facility"
+              >
                 <Option value="Advance">Advance</Option>
                 <Option value="Cheque">Cheque</Option>
                 <Option value="Online">Online</Option>
@@ -147,8 +266,15 @@ export default function CustomerForm({ disabled = false }) {
           </Col>
 
           <Col span={6}>
-            <Form.Item label="Security for Credit" name="securityForCreditFacility">
-              <Select className={selectClass} disabled={disabled} placeholder="Select security">
+            <Form.Item
+              label="Security for Credit"
+              name="securityForCreditFacility"
+            >
+              <Select
+                className={selectClass}
+                disabled={disabled}
+                placeholder="Select security"
+              >
                 <Option value="Bank Guarantee">Bank Guarantee</Option>
                 <Option value="Post Dated Cheque">Post Dated Cheque</Option>
                 <Option value="Fixed Deposit">Fixed Deposit</Option>
@@ -160,31 +286,51 @@ export default function CustomerForm({ disabled = false }) {
 
           <Col span={4}>
             <Form.Item label="Advance Cheque No" name="advCheque">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter cheque number" />
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter cheque number"
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
             <Form.Item label="Amount Limit" name="amountLimit">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter amount limit" />
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter amount limit"
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
             <Form.Item label="Days Limit" name="noDaysLimit">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter days limit" />
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter days limit"
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
             <Form.Item label="Invoice Limit" name="noInvoiceLimit">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter invoice limit" />
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter invoice limit"
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
             <Form.Item label="Souda Limit (Ton)" name="soudaLimit">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter souda limit" />
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter souda limit"
+              />
             </Form.Item>
           </Col>
         </Row>
@@ -198,62 +344,133 @@ export default function CustomerForm({ disabled = false }) {
 
         <Row gutter={24}>
           <Col span={4}>
-            <Form.Item label="GST Number" name="gstNo">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter GST number" />
+            <Form.Item
+              label="GST Number"
+              name="gstNo"
+              rules={[
+                {
+                  pattern:
+                    /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
+                  message: "Enter a valid GST number",
+                },
+              ]}
+            >
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter GST number"
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
-            <Form.Item label="GST Document" name="gstDoc">
-              <Input type="file" disabled={disabled} />
+            <Form.Item
+              label="GST Document"
+              name="gstDoc"
+              getValueFromEvent={(e) => (Array.isArray(e) ? e : e?.fileList)}
+            >
+              <Upload beforeUpload={() => false} maxCount={1}>
+                <Button className="w-full text-left bg-white border-amber-400">
+                  Select GST Doc
+                </Button>
+              </Upload>
             </Form.Item>
           </Col>
 
           <Col span={4}>
             <Form.Item label="TIN Number" name="tinNo">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter TIN number" />
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter TIN number"
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
-            <Form.Item label="PAN Number" name="panNo">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter PAN number" />
+            <Form.Item
+              label="PAN Number"
+              name="panNo"
+              rules={[
+                {
+                  pattern: /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/,
+                  message: "Enter a valid PAN number",
+                },
+              ]}
+            >
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter PAN number"
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
-            <Form.Item label="PAN Document" name="panDoc">
-              <Input type="file" disabled={disabled} />
+            <Form.Item
+              label="PAN Document"
+              name="panDoc"
+              getValueFromEvent={(e) => (Array.isArray(e) ? e : e?.fileList)}
+            >
+              <Upload beforeUpload={() => false} maxCount={1}>
+                <Button className="w-full text-left bg-white border-amber-400">
+                  Select PAN Doc
+                </Button>
+              </Upload>
             </Form.Item>
           </Col>
 
           <Col span={4}>
             <Form.Item label="Aadhar Number" name="aadharNo">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter Aadhar number" />
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter Aadhar number"
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
-            <Form.Item label="Aadhar Document" name="aadharDoc">
-              <Input type="file" disabled={disabled} />
+            <Form.Item
+              label="Aadhar Document"
+              name="aadharDoc"
+              getValueFromEvent={(e) => (Array.isArray(e) ? e : e?.fileList)}
+            >
+              <Upload beforeUpload={() => false} maxCount={1}>
+                <Button className="w-full text-left bg-white border-amber-400">
+                  Select Aadhar Doc
+                </Button>
+              </Upload>
             </Form.Item>
           </Col>
 
           <Col span={4}>
             <Form.Item label="FSSAI Number" name="fssaiNo">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter FSSAI number" />
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter FSSAI number"
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
             <Form.Item label="License Number" name="licenseNo">
-              <Input className={inputClass} disabled={disabled} placeholder="Enter license number" />
+              <Input
+                className={inputClass}
+                disabled={disabled}
+                placeholder="Enter license number"
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
             <Form.Item label="TDS Applicable" name="tdsApplicable">
-              <Select className={selectClass} disabled={disabled} placeholder="Select TDS option">
+              <Select
+                className={selectClass}
+                disabled={disabled}
+                placeholder="Select TDS option"
+              >
                 <Option value="Yes">Yes</Option>
                 <Option value="No">No</Option>
               </Select>
@@ -262,7 +479,11 @@ export default function CustomerForm({ disabled = false }) {
 
           <Col span={4}>
             <Form.Item label="Billing Type" name="billingType">
-              <Select className={selectClass} disabled={disabled} placeholder="Select billing type">
+              <Select
+                className={selectClass}
+                disabled={disabled}
+                placeholder="Select billing type"
+              >
                 <Option value="Regular">Regular</Option>
                 <Option value="Provisional">Provisional</Option>
               </Select>

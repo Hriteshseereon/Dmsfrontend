@@ -13,6 +13,7 @@ import {
   Col,
   Divider,
   Space,
+  message,
 } from "antd";
 import {
   SearchOutlined,
@@ -24,7 +25,18 @@ import {
   DeleteOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-
+import {
+  getContractpersonName,
+  getContractDetailsbyPerson,
+  salesContractItems,
+  createSalesOrder,
+  getSalesOrders,
+  getSalesOrderById,
+  updateSalesOrder,
+  getCustomersByOrganisation,
+  getAllSalesContracts,
+} from "../../../../../api/sales";
+import { getAdminCustomerDetails } from "../../../../../api/customer";
 /* ------------------ data (use your salesOrderJSON) ------------------ */
 const salesOrderJSON = {
   initialData: [
@@ -167,7 +179,9 @@ const salesOrderJSON = {
       soudaNo: "SOUDA-002",
       companyName: "XYZ Oils Ltd",
       customerName: "Cuttack Market",
-      items: [{ item: "Sunflower Oil", itemCode: "ITM002", rate: 135, uom: "Ltrs" }],
+      items: [
+        { item: "Sunflower Oil", itemCode: "ITM002", rate: 135, uom: "Ltrs" },
+      ],
     },
   ],
 };
@@ -184,11 +198,44 @@ export default function SaleOrdersInvoice() {
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
+  const [contractPersonOptions, setContractPersonOptions] = useState([]);
+  const [contractOptions, setContractOptions] = useState([]);
+  // const [contractItems, setContractItems] = useState([]);
+  const [contractItemsMap, setContractItemsMap] = useState({});
+
+  /* ---------- search filter ---------- */
+  const fetchContractPersons = async () => {
+    try {
+      const res = await getCustomersByOrganisation();
+      console.log("Contract persons (Customers) fetched:", res);
+      setContractPersonOptions(res);
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+    }
+  };
+  useEffect(() => {
+    fetchContractPersons();
+  }, []);
+
+  const fetchContracts = async () => {
+    try {
+      const res = await getAllSalesContracts();
+      console.log("Fetched All Sales Contracts:", res);
+      setContractOptions(res || []);
+    } catch (err) {
+      console.error("Failed to fetch all sales contracts:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchContracts();
+  }, []);
 
   // filtering keys (customerName rather than customer)
   const filteredData = data.filter((d) =>
-    ["companyName", "customerName", "status"]
-      .some((k) => (d[k] || "").toString().toLowerCase().includes(searchText.toLowerCase()))
+    ["companyName", "customerName", "status"].some((k) =>
+      (d[k] || "").toString().toLowerCase().includes(searchText.toLowerCase()),
+    ),
   );
 
   /* ---------- utilities: compute item and order totals ---------- */
@@ -198,8 +245,14 @@ export default function SaleOrdersInvoice() {
       (c.items || []).forEach((it) => allItems.push(it));
     });
 
-    const grossAmountTotal = allItems.reduce((s, it) => s + Number(it.amount || 0), 0);
-    const discountTotal = allItems.reduce((s, it) => s + Number(it.discountAmt || 0), 0);
+    const grossAmountTotal = allItems.reduce(
+      (s, it) => s + Number(it.amount || 0),
+      0,
+    );
+    const discountTotal = allItems.reduce(
+      (s, it) => s + Number(it.discountAmt || 0),
+      0,
+    );
     const taxableAmount = grossAmountTotal - discountTotal;
 
     const sgstPercent = Number(orderTax.sgstPercent || 0);
@@ -214,7 +267,10 @@ export default function SaleOrdersInvoice() {
     const grandTotal = Math.round(taxableAmount + totalGST + tcsAmt);
 
     const qtyTotal = allItems.reduce((s, it) => s + Number(it.qty || 0), 0);
-    const freeQtyTotal = allItems.reduce((s, it) => s + Number(it.freeQty || 0), 0);
+    const freeQtyTotal = allItems.reduce(
+      (s, it) => s + Number(it.freeQty || 0),
+      0,
+    );
 
     return {
       orderTaxAndTotals: {
@@ -254,12 +310,22 @@ export default function SaleOrdersInvoice() {
         const totalAmount = Math.round(amount - discountAmt);
         const totalQty = qty + freeQty;
         const totalGrossWt = Number(it.grossWt || 0);
-        return { ...it, amount, discountAmt, totalAmount, totalQty, totalGrossWt };
+        return {
+          ...it,
+          amount,
+          discountAmt,
+          totalAmount,
+          totalQty,
+          totalGrossWt,
+        };
       });
       return { ...c, items };
     });
 
-    const { orderTaxAndTotals, orderTotals } = computeOrderTotalsFromContracts(contracts, allValues.orderTaxAndTotals || {});
+    const { orderTaxAndTotals, orderTotals } = computeOrderTotalsFromContracts(
+      contracts,
+      allValues.orderTaxAndTotals || {},
+    );
 
     // set computed fields back into the form
     form.setFieldsValue({
@@ -297,334 +363,1003 @@ export default function SaleOrdersInvoice() {
           ],
         },
       ],
-      orderTaxAndTotals: { sgstPercent: 0, cgstPercent: 0, igstPercent: 0, tcsAmt: 0 },
+      orderTaxAndTotals: {
+        sgstPercent: 0,
+        cgstPercent: 0,
+        igstPercent: 0,
+        tcsAmt: 0,
+      },
     });
     setIsAddModalOpen(true);
   };
+  useEffect(() => {
+    fetchSalesOrders();
+  }, []);
 
-  const handleAddFinish = (values) => {
-    // final compute to ensure consistency
-    const contracts = (values.contracts || []).map((c) => ({
-      ...c,
-      items: (c.items || []).map((it) => ({
-        ...it,
-        amount: Math.round(Number(it.qty || 0) * Number(it.rate || 0)),
-        discountAmt: Math.round(((Number(it.qty || 0) * Number(it.rate || 0)) * Number(it.discountPercent || 0)) / 100),
-        totalAmount: Math.round((Number(it.qty || 0) * Number(it.rate || 0)) - (((Number(it.qty || 0) * Number(it.rate || 0)) * Number(it.discountPercent || 0)) / 100)),
-        totalQty: Number(it.qty || 0) + Number(it.freeQty || 0),
+  const fetchSalesOrders = async () => {
+    try {
+      const res = await getSalesOrders();
+
+      const mappedData = res.map((order, index) => {
+        // Group items by sale_contract_id
+        const contractsMap = {};
+        (order.items || []).forEach((item) => {
+          const cId = item.sale_contract_id;
+          if (!contractsMap[cId]) {
+            contractsMap[cId] = {
+              contract_id: cId,
+              contractNo: item.sale_contract_number,
+              items: [],
+            };
+          }
+          contractsMap[cId].items.push({
+            lineKey: item.id,
+            item: item.product_name,
+            itemCode: item.product_id,
+            uom: item.uom?.unit_name,
+            qty: Number(item.net_qty || 0),
+            freeQty: Number(item.free_qty || 0),
+            totalQty: Number(item.gross_qty || 0),
+            rate: Number(item.rate || 0),
+            discountPercent: Number(item.discount_percent || 0),
+            amount: Number(item.total_amount || 0),
+            // approximate discount amount if not directly provided
+            discountAmt:
+              Number(item.total_amount || 0) - Number(item.line_total || 0),
+            totalAmount: Number(item.line_total || 0),
+            hsnCode: item.hsn_code,
+            orderQuantity: Number(item.ordered_qty || 0),
+          });
+        });
+
+        const contracts = Object.values(contractsMap);
+
+        return {
+          key: order.sales_order_id, // REQUIRED by antd table
+
+          orderNumber: order.order_number,
+          orderDate: order.order_date,
+          deliveryDate: order.expected_receiving_date,
+
+          customerName: order.customer?.name || "-",
+          customerId: order.customer?.customer_id,
+          customer_id: order.customer?.customer_id,
+          customerEmail: order.customer?.email_id,
+          deliveryAddress: order.customer?.address_line1,
+
+          status: order.status,
+          billMode: order.bill_mode,
+          purchaseType: order.purchase_type,
+
+          totalAmount: order.total_amount,
+          grandTotal: order.grand_total,
+
+          contracts,
+          orderTaxAndTotals: {
+            sgstPercent: Number(order.sgst || 0),
+            cgstPercent: Number(order.cgst || 0),
+            igstPercent: Number(order.igst || 0),
+            tcsAmt: Number(order.tcs_amount || 0),
+            grandTotal: Number(order.grand_total || 0),
+            grossAmountTotal: Number(order.total_amount || 0),
+          },
+
+          createdAt: order.created_at,
+          companyName: "-",
+        };
+      });
+
+      setData(mappedData);
+    } catch (error) {
+      console.error("Failed to fetch sales orders", error);
+      message.error("Failed to load sales orders");
+    }
+  };
+
+  const buildSalesOrderPayload = (values) => {
+    const { orderTaxAndTotals } = values;
+
+    return {
+      customer_id: values.customerName || values.customer_id,
+      order_date: values.orderDate
+        ? dayjs(values.orderDate).format("YYYY-MM-DD")
+        : null,
+      expected_receiving_date: values.deliveryDate
+        ? dayjs(values.deliveryDate).format("YYYY-MM-DD")
+        : null,
+      delivery_address: values.deliveryAddress || "",
+      cash_discount: 0,
+      cgst: Number(orderTaxAndTotals?.cgstPercent || 0),
+      sgst: Number(orderTaxAndTotals?.sgstPercent || 0),
+      igst: Number(orderTaxAndTotals?.igstPercent || 0),
+      tcs_amount: Number(orderTaxAndTotals?.tcsAmt || 0),
+      round_off_amount: 0,
+      total_amount: Number(orderTaxAndTotals?.grossAmountTotal || 0),
+      grand_total: Number(orderTaxAndTotals?.grandTotal || 0),
+
+      items: (values.contracts || []).map((contract) => ({
+        sale_contract_id: contract.contract_id,
+        products: (contract.items || []).map((item) => ({
+          product_id: item.itemCode,
+          product_name: item.item || "",
+          uom_id: null,
+          hsn_code: item.hsnCode || 0,
+          mrp_per_unit: Number(item.rate || 0),
+          rate: Number(item.rate || 0),
+          gross_qty: Number(item.totalQty || 0),
+          free_qty: Number(item.freeQty || 0),
+          net_qty: Number(item.qty || 0),
+          ordered_qty: Number(item.orderQuantity || 0),
+          discount_percent: Number(item.discountPercent || 0),
+          line_total: Number(item.totalAmount || 0),
+          total_amount: Number(item.amount || 0),
+        })),
       })),
-    }));
-
-    const { orderTaxAndTotals, orderTotals } = computeOrderTotalsFromContracts(contracts, values.orderTaxAndTotals || {});
-
-    const payload = {
-      ...values,
-      contracts,
-      orderTaxAndTotals,
-      orderTotals,
-      key: data.length + 1,
-      orderDate: values.orderDate ? values.orderDate.format("YYYY-MM-DD") : undefined,
-      deliveryDate: values.deliveryDate ? values.deliveryDate.format("YYYY-MM-DD") : undefined,
     };
+  };
 
-    setData((prev) => [...prev, payload]);
-    setIsAddModalOpen(false);
-    addForm.resetFields();
+  const handleAddFinish = async (values) => {
+    try {
+      values.contracts.forEach((c, idx) => {
+        console.log(`🧾 Contract[${idx}] ID:`, c.contract_id);
+
+        (c.items || []).forEach((i, j) => {
+          console.log(`   📦 Product[${j}] ID:`, i.itemCode);
+        });
+      });
+      const payload = buildSalesOrderPayload(values);
+
+      console.log("FINAL SALES ORDER PAYLOAD 🔥", payload);
+
+      await createSalesOrder(payload);
+
+      message.success("Sales Order created successfully");
+
+      setIsAddModalOpen(false);
+      addForm.resetFields();
+    } catch (error) {
+      console.error("❌ Sales Order API Error");
+
+      if (error.response) {
+        // Backend responded with error status (400, 401, 500 etc.)
+        console.error("Status:", error.response.status);
+        console.error("Data:", error.response.data);
+        console.error("Headers:", error.response.headers);
+
+        message.error(error.response.data?.message || "Server error occurred");
+      } else if (error.request) {
+        // Request was sent but no response received
+        console.error("No response received:", error.request);
+        message.error("No response from server");
+      } else {
+        // Something else went wrong
+        console.error("Error message:", error.message);
+        message.error(error.message);
+      }
+    }
   };
 
   /* ---------- Edit handlers ---------- */
-  useEffect(() => {
-    if (isEditModalOpen && selectedRecord) {
-      // prepare values with dayjs dates
-      const pre = {
-        ...selectedRecord,
-        orderDate: selectedRecord.orderDate ? dayjs(selectedRecord.orderDate) : undefined,
-        deliveryDate: selectedRecord.deliveryDate ? dayjs(selectedRecord.deliveryDate) : undefined,
+  // useEffect(() => {
+  //   if (isEditModalOpen && selectedRecord) {
+  //     // prepare values with dayjs dates
+  //     const pre = {
+  //       ...selectedRecord,
+  //       customerName: selectedRecord.customer_id, // Ensure select shows correct value
+  //       orderDate: selectedRecord.orderDate
+  //         ? dayjs(selectedRecord.orderDate)
+  //         : undefined,
+  //       deliveryDate: selectedRecord.deliveryDate
+  //         ? dayjs(selectedRecord.deliveryDate)
+  //         : undefined,
+  //     };
+  //     editForm.setFieldsValue(pre);
+  //   }
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [isEditModalOpen, selectedRecord]);
+
+  const openEdit = async (record) => {
+    try {
+      const order = await getSalesOrderById(record.key);
+
+      // Ensure customer is in options list so Select displays name correctly
+      if (order.customer) {
+        setContractPersonOptions((prev) => {
+          const exists = prev.find(
+            (p) => String(p.customer_id) === String(order.customer.customer_id),
+          );
+          if (!exists) {
+            return [
+              ...prev,
+              {
+                customer_id: order.customer.customer_id, // ensure ID matches
+                name: order.customer.name,
+                email: order.customer.email_id,
+                mobile: order.customer.mobile_number,
+              },
+            ];
+          }
+          return prev;
+        });
+      }
+
+      // Group items by sale_contract_id
+      const contractsMap = {};
+      (order.items || []).forEach((item) => {
+        const cId = item.sale_contract_id;
+        if (!contractsMap[cId]) {
+          contractsMap[cId] = {
+            contract_id: cId,
+            contractNo: item.sale_contract_number,
+            items: [],
+          };
+        }
+        contractsMap[cId].items.push({
+          lineKey: item.id,
+          item: item.product_name_master,
+          itemCode: item.product_id,
+          uom: item.uom?.unit_name,
+          qty: Number(item.net_qty || 0),
+          freeQty: Number(item.free_qty || 0),
+          totalQty: Number(item.gross_qty || 0),
+          rate: Number(item.rate || 0),
+          discountPercent: Number(item.discount_percent || 0),
+          amount: Number(item.total_amount || 0),
+          discountAmt:
+            Number(item.total_amount || 0) - Number(item.line_total || 0),
+          totalAmount: Number(item.line_total || 0),
+          hsnCode: item.hsn_code,
+          orderQuantity: Number(item.ordered_qty || 0),
+        });
+      });
+
+      const contracts = Object.values(contractsMap);
+
+      const mappedData = {
+        key: order.sales_order_id,
+        orderNumber: order.order_number,
+        orderDate: order.order_date ? dayjs(order.order_date) : undefined,
+        deliveryDate: order.expected_receiving_date
+          ? dayjs(order.expected_receiving_date)
+          : undefined,
+
+        customerName: order.customer?.customer_id, // For Select to show name
+        customerId: order.customer?.customer_id,
+        customer_id: order.customer?.customer_id,
+        customerEmail: order.customer?.email_id,
+        deliveryAddress: order.customer?.address_line1,
+
+        status: order.status,
+        billMode: order.bill_mode,
+        purchaseType: order.purchase_type,
+
+        contracts,
+        orderTaxAndTotals: {
+          sgstPercent: Number(order.sgst || 0),
+          cgstPercent: Number(order.cgst || 0),
+          igstPercent: Number(order.igst || 0),
+          tcsAmt: Number(order.tcs_amount || 0),
+          grandTotal: Number(order.grand_total || 0),
+          grossAmountTotal: Number(order.total_amount || 0),
+          discountTotal: (order.items || []).reduce(
+            (acc, curr) =>
+              acc + (Number(curr.total_amount) - Number(curr.line_total)),
+            0,
+          ),
+          totalGST:
+            Number(order.grand_total || 0) -
+            Number(order.tcs_amount || 0) -
+            (Number(order.total_amount || 0) -
+              (order.items || []).reduce(
+                (acc, curr) =>
+                  acc + (Number(curr.total_amount) - Number(curr.line_total)),
+                0,
+              )),
+        },
       };
-      editForm.setFieldsValue(pre);
+
+      setSelectedRecord(mappedData);
+      editForm.setFieldsValue(mappedData);
+      setIsEditModalOpen(true);
+    } catch (err) {
+      console.error("Failed to fetch order details for edit:", err);
+      message.error("Failed to load order details for editing");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditModalOpen, selectedRecord]);
+  };
 
-  const handleEditFinish = (values) => {
-    const contracts = (values.contracts || []).map((c) => ({
-      ...c,
-      items: (c.items || []).map((it) => ({
-        ...it,
-        amount: Math.round(Number(it.qty || 0) * Number(it.rate || 0)),
-        discountAmt: Math.round(((Number(it.qty || 0) * Number(it.rate || 0)) * Number(it.discountPercent || 0)) / 100),
-        totalAmount: Math.round((Number(it.qty || 0) * Number(it.rate || 0)) - (((Number(it.qty || 0) * Number(it.rate || 0)) * Number(it.discountPercent || 0)) / 100)),
-        totalQty: Number(it.qty || 0) + Number(it.freeQty || 0),
-      })),
-    }));
-    const { orderTaxAndTotals, orderTotals } = computeOrderTotalsFromContracts(contracts, values.orderTaxAndTotals || {});
-    const payload = {
-      ...values,
-      contracts,
-      orderTaxAndTotals,
-      orderTotals,
-      orderDate: values.orderDate ? values.orderDate.format("YYYY-MM-DD") : undefined,
-      deliveryDate: values.deliveryDate ? values.deliveryDate.format("YYYY-MM-DD") : undefined,
-    };
+  const handleEditFinish = async (values) => {
+    try {
+      const payload = buildSalesOrderPayload(values);
+      console.log("FINAL UPDATE PAYLOAD 🔥", payload);
 
-    setData((prev) => prev.map((d) => (d.key === selectedRecord.key ? { ...payload, key: d.key } : d)));
-    setIsEditModalOpen(false);
-    editForm.resetFields();
-    setSelectedRecord(null);
+      await updateSalesOrder(selectedRecord.key, payload);
+
+      message.success("Sales Order updated successfully");
+      setIsEditModalOpen(false);
+      editForm.resetFields();
+      fetchSalesOrders(); // Refresh list
+    } catch (error) {
+      console.error("❌ Sales Order Update Error", error);
+      message.error("Failed to update sales order");
+    }
   };
 
   /* ---------- View ---------- */
-  const openView = (record) => {
-    setSelectedRecord(record);
-    const pre = {
-      ...record,
-      orderDate: record.orderDate ? dayjs(record.orderDate) : undefined,
-      deliveryDate: record.deliveryDate ? dayjs(record.deliveryDate) : undefined,
-    };
-    viewForm.setFieldsValue(pre);
-    setIsViewModalOpen(true);
+  const openView = async (record) => {
+    try {
+      const order = await getSalesOrderById(record.key);
+
+      // Group items by sale_contract_id
+      const contractsMap = {};
+      (order.items || []).forEach((item) => {
+        const cId = item.sale_contract_id;
+        if (!contractsMap[cId]) {
+          contractsMap[cId] = {
+            contract_id: cId,
+            contractNo: item.sale_contract_number,
+            items: [],
+          };
+        }
+        contractsMap[cId].items.push({
+          lineKey: item.id,
+          item: item.product_name,
+          itemCode: item.product_id,
+          uom: item.uom?.unit_name,
+          qty: Number(item.net_qty || 0),
+          freeQty: Number(item.free_qty || 0),
+          totalQty: Number(item.gross_qty || 0),
+          rate: Number(item.rate || 0),
+          discountPercent: Number(item.discount_percent || 0),
+          amount: Number(item.total_amount || 0),
+          // approximate discount amount if not directly provided
+          discountAmt:
+            Number(item.total_amount || 0) -
+            Number(item.line_total || 0),
+          totalAmount: Number(item.line_total || 0),
+          hsnCode: item.hsn_code,
+          orderQuantity: Number(item.ordered_qty || 0),
+        });
+      });
+
+      const contracts = Object.values(contractsMap);
+
+      // Ensure customer is in options list so Select displays name correctly
+      if (order.customer) {
+        setContractPersonOptions((prev) => {
+          const exists = prev.find(
+            (p) => String(p.customer_id) === String(order.customer.customer_id),
+          );
+          if (!exists) {
+            return [
+              ...prev,
+              {
+                customer_id: order.customer.customer_id, // ensure ID matches
+                name: order.customer.name,
+                email: order.customer.email_id,
+                mobile: order.customer.mobile_number,
+              },
+            ];
+          }
+          return prev;
+        });
+      }
+
+      const mappedData = {
+        key: order.sales_order_id,
+        orderNumber: order.order_number,
+        orderDate: order.order_date ? dayjs(order.order_date) : undefined,
+        deliveryDate: order.expected_receiving_date
+          ? dayjs(order.expected_receiving_date)
+          : undefined,
+
+        customerName: order.customer?.name || "-",
+        customerId: order.customer?.customer_id,
+        customer_id: order.customer?.customer_id,
+        customerEmail: order.customer?.email_id,
+        deliveryAddress: order.customer?.address_line1,
+
+        status: order.status,
+        billMode: order.bill_mode,
+        purchaseType: order.purchase_type,
+
+        contracts,
+        orderTaxAndTotals: {
+          sgstPercent: Number(order.sgst || 0),
+          cgstPercent: Number(order.cgst || 0),
+          igstPercent: Number(order.igst || 0),
+          tcsAmt: Number(order.tcs_amount || 0),
+          grandTotal: Number(order.grand_total || 0),
+          grossAmountTotal: Number(order.total_amount || 0),
+          // Calculate if missing
+          discountTotal: (order.items || []).reduce(
+            (acc, curr) =>
+              acc + (Number(curr.total_amount) - Number(curr.line_total)),
+            0,
+          ),
+          totalGST:
+            Number(order.grand_total || 0) -
+            Number(order.tcs_amount || 0) -
+            (Number(order.total_amount || 0) -
+              (order.items || []).reduce(
+                (acc, curr) =>
+                  acc + (Number(curr.total_amount) - Number(curr.line_total)),
+                0,
+              )),
+        },
+      };
+
+      setSelectedRecord(mappedData);
+      viewForm.setFieldsValue(mappedData);
+      setIsViewModalOpen(true);
+    } catch (err) {
+      console.error("Failed to fetch order details:", err);
+      message.error("Failed to load order details");
+    }
   };
 
   /* ---------- Columns ---------- */
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Order Date</span>,
-      dataIndex: "orderDate",
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Delivery Date</span>,
-      dataIndex: "deliveryDate",
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Company</span>,
-      dataIndex: "companyName",
+      title: <span className="text-amber-700 font-semibold">Order No</span>,
+      dataIndex: "orderNumber",
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
+    {
+      title: <span className="text-amber-700 font-semibold">Order Date</span>,
+      dataIndex: "orderDate",
+      render: (d) => (
+        <span className="text-amber-800">
+          {d ? dayjs(d).format("YYYY-MM-DD") : ""}
+        </span>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Delivery Date</span>
+      ),
+      dataIndex: "deliveryDate",
+      render: (d) => (
+        <span className="text-amber-800">
+          {d ? dayjs(d).format("YYYY-MM-DD") : ""}
+        </span>
+      ),
+    },
+    // {
+    //   title: <span className="text-amber-700 font-semibold">Company</span>,
+    //   dataIndex: "companyName",
+    //   render: (t) => <span className="text-amber-800">{t}</span>,
+    // },
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
       dataIndex: "customerName",
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
-    {
-      title: <span className="text-amber-700 font-semibold">Contracts</span>,
-      dataIndex: "contracts",
-      render: (contracts = []) => <span className="text-amber-800">{(contracts || []).map((c) => c.contractNo).join(", ")}</span>,
-    },
+    // {
+    //   title: <span className="text-amber-700 font-semibold">Contracts</span>,
+    //   dataIndex: "contracts",
+    //   render: (contracts = []) => (
+    //     <span className="text-amber-800">
+    //       {(contracts || []).map((c) => c.contractNo).join(", ")}
+    //     </span>
+    //   ),
+    // },
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
       render: (status) => {
         const base = "px-3 py-1 rounded-full text-sm font-semibold";
-        if (status === "Approved") return <span className={`${base} bg-green-100 text-green-700`}>Approved</span>;
-        if (status === "Pending") return <span className={`${base} bg-yellow-100 text-yellow-700`}>Pending</span>;
-        return <span className={`${base} bg-red-100 text-red-700`}>{status}</span>;
+        if (status === "Approved")
+          return (
+            <span className={`${base} bg-green-100 text-green-700`}>
+              Approved
+            </span>
+          );
+        if (status === "Pending")
+          return (
+            <span className={`${base} bg-yellow-100 text-yellow-700`}>
+              Pending
+            </span>
+          );
+        return (
+          <span className={`${base} bg-red-100 text-red-700`}>{status}</span>
+        );
       },
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       render: (record) => (
         <div className="flex gap-3">
-          <EyeOutlined className="cursor-pointer! text-blue-500!" onClick={() => openView(record)} />
-          <EditOutlined className="cursor-pointer! text-red-500!" onClick={() => { setSelectedRecord(record); editForm.setFieldsValue({ ...record, orderDate: record.orderDate ? dayjs(record.orderDate) : undefined, deliveryDate: record.deliveryDate ? dayjs(record.deliveryDate) : undefined }); setIsEditModalOpen(true); }} />
+          <EyeOutlined
+            className="cursor-pointer! text-blue-500!"
+            onClick={() => openView(record)}
+          />
+          <EditOutlined
+            className="cursor-pointer! text-red-500!"
+            onClick={() => openEdit(record)}
+          />
         </div>
       ),
     },
   ];
 
   /* ---------- Contract & Items UI blocks (used in Add/Edit form) ---------- */
-  const ContractsFormList = ({ form }) => (
+  const ContractsFormList = ({ form, disabled }) => (
     <Form.List name="contracts">
       {(contractFields, { add: addContract, remove: removeContract }) => (
         <>
+          {/* HEADER */}
           <div className="mb-2 flex justify-between items-center">
             <h6 className="text-amber-500">Contracts</h6>
-            <Button   className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
-           type="dashed" icon={<PlusOutlined />} onClick={() => addContract({
-              contractNo: `CNT-${Date.now()}`,
-              items: [{
-                lineKey: Date.now(),
-                item: undefined, itemCode: undefined, uom: undefined, qty: 0, freeQty: 0, totalQty: 0, grossWt: 0, totalGrossWt: 0, rate: 0, amount: 0, discountPercent: 0, discountAmt: 0, totalAmount: 0
-              }]
-            })}> Add Contract </Button>
+            {!disabled && (
+              <Button
+                className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
+                type="dashed"
+                icon={<PlusOutlined />}
+                onClick={() =>
+                  addContract({
+                    contractNo: `CNT-${Date.now()}`,
+                    items: [
+                      {
+                        lineKey: Date.now(),
+                        item: undefined,
+                        itemCode: undefined,
+                        uom: undefined,
+                        qty: 0,
+                        freeQty: 0,
+                        totalQty: 0,
+                        grossWt: 0,
+                        totalGrossWt: 0,
+                        rate: 0,
+                        amount: 0,
+                        discountPercent: 0,
+                        discountAmt: 0,
+                        totalAmount: 0,
+                      },
+                    ],
+                  })
+                }
+              >
+                Add Contract
+              </Button>
+            )}
           </div>
 
-          {contractFields.map((cf, ci) => (
-            <div key={cf.key} className="mb-4 p-4 border rounded-lg shadow-sm bg-white">
-              <div className="flex justify-between items-center mb-3">
-                <Space>
-                  {/* <div className="text-amber-700 font-semibold">Contract #{ci + 1}</div>
-                  <Form.Item name={[cf.name, "contractNo"]} fieldKey={[cf.fieldKey, "contractNo"]} rules={[{ required: true }]}>
-                    <Input placeholder="Contract No" />
-                  </Form.Item> */}
+          {contractFields.map((cf, ci) => {
+            const contractItems = contractItemsMap[ci] || [];
 
-                  {/* souda template select - auto-fill items if chosen */}
-                  <Form.Item label="Contract ID" name={[cf.name, "useSouda"]} fieldKey={[cf.fieldKey, "useSouda"]} style={{ marginBottom: 0 }}>
+            return (
+              <div
+                key={cf.key}
+                className="mb-4 p-4 border rounded-lg shadow-sm bg-white"
+              >
+                <div className="flex justify-between items-center mb-3">
+                  <Form.Item
+                    label="Contract ID"
+                    name={[cf.name, "contract_id"]}
+                  >
                     <Select
-                      placeholder="Select Souda"
-                      style={{ width: 220 }}
-                      onChange={(val) => {
-                        const souda = salesOrderJSON.soudaOptions.find((s) => s.soudaNo === val);
-                        if (!souda) return;
-                        // map souda items to contract items
-                        const mapped = (souda.items || []).map((si) => ({
-                          lineKey: Date.now() + Math.random(),
-                          item: si.item,
-                          itemCode: si.itemCode,
-                          uom: si.uom || "Ltrs",
-                          qty: 0,
-                          freeQty: 0,
-                          totalQty: 0,
-                          grossWt: 0,
-                          totalGrossWt: 0,
-                          rate: si.rate || 0,
-                          amount: 0,
-                          discountPercent: 0,
-                          discountAmt: 0,
-                          totalAmount: 0,
+                      placeholder="Select Contract"
+                      disabled={disabled}
+                      onChange={async (contractId) => {
+                        let items = [];
+
+                        // Try to find items locally first
+                        const selectedContract = contractOptions.find(
+                          (c) => c.sale_contract_id === contractId,
+                        );
+                        console.log("Selected Contract:", selectedContract);
+
+                        if (
+                          selectedContract &&
+                          selectedContract.items &&
+                          selectedContract.items.length > 0
+                        ) {
+                          items = selectedContract.items;
+                        } else {
+                          // Fallback to API
+                          items = await salesContractItems(contractId);
+                        }
+
+                        console.log("Contract Items for Dropdown:", items);
+
+                        // Update options for this specific contract row (using stable key)
+                        setContractItemsMap((prev) => ({
+                          ...prev,
+                          [cf.key]: items,
                         }));
 
-                        // set company/customer if present
-                        form.setFieldsValue({
-                          companyName: souda.companyName || form.getFieldValue("companyName"),
-                          customerName: souda.customerName || form.getFieldValue("customerName"),
-                        });
+                        // Reset items to a single empty row to allow user to select
+                        const contracts = form.getFieldValue("contracts") || [];
+                        contracts[ci] = {
+                          ...(contracts[ci] || {}),
+                          contract_id: contractId,
+                          items: [
+                            {
+                              lineKey: Date.now(),
+                              item: undefined,
+                              itemCode: undefined,
+                              uom: undefined,
+                              qty: 0,
+                              freeQty: 0,
+                              totalQty: 0,
+                              grossWt: 0,
+                              totalGrossWt: 0,
+                              rate: 0,
+                              amount: 0,
+                              discountPercent: 0,
+                              discountAmt: 0,
+                              totalAmount: 0,
+                            },
+                          ],
+                        };
 
-                        // set items for this contract
-                        const currentContracts = form.getFieldValue("contracts") || [];
-                        currentContracts[ci] = { ...(currentContracts[ci] || {}), contractNo: currentContracts[ci]?.contractNo || `CNT-${Date.now()}`, items: mapped };
-                        form.setFieldsValue({ contracts: currentContracts });
-                        // trigger calculation by calling onFormValuesChange
+                        form.setFieldsValue({ contracts });
                         onFormValuesChange(form, form.getFieldsValue());
                       }}
                     >
-                      {salesOrderJSON.soudaOptions.map((s) => (
-                        <Select.Option key={s.soudaNo} value={s.soudaNo}>
-                          {s.soudaNo} - {s.companyName}
+                      {contractOptions.map((c) => (
+                        <Select.Option
+                          key={c.sale_contract_id}
+                          value={c.sale_contract_id}
+                        >
+                          {c.sale_contract_number}
                         </Select.Option>
                       ))}
                     </Select>
                   </Form.Item>
-                </Space>
 
-                <Button danger icon={<DeleteOutlined />} onClick={() => removeContract(cf.name)} />
-              </div>
+                  {!disabled && (
+                    <Button
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => removeContract(cf.name)}
+                    />
+                  )}
+                </div>
 
-              {/* nested items list */}
-              <Form.List name={[cf.name, "items"]}>
-                {(itemFields, { add: addItem, remove: removeItem }) => (
-                  <>
-                    {itemFields.map((itf, ii) => (
-                      <div key={itf.key} className="mb-3 p-3 border rounded-md">
-                        <Col span={1} className="flex items-end">
-                            <Button danger icon={<DeleteOutlined />} onClick={() => { removeItem(itf.name); onFormValuesChange(form, form.getFieldsValue()); }} />
-                          </Col>
-                        <Row gutter={12}>
-                           
-                          <Col span={8}>
-                            <Form.Item name={[itf.name, "item"]} fieldKey={[itf.fieldKey, "item"]} label="Item" rules={[{ required: true }]}>
-                              <Select
-                                placeholder="Item"
-                                onChange={(val) => {
-                                  const sel = salesOrderJSON.itemOptions.find((o) => o.name === val);
-                                  if (sel) {
-                                    const curContracts = form.getFieldValue("contracts") || [];
-                                    const contract = curContracts[ci] || {};
-                                    const items = contract.items || [];
-                                    items[ii] = { ...(items[ii] || {}), itemCode: sel.code, uom: items[ii]?.uom || salesOrderJSON.uomOptions[0] };
-                                    curContracts[ci] = { ...contract, items };
-                                    form.setFieldsValue({ contracts: curContracts });
-                                    onFormValuesChange(form, form.getFieldsValue());
-                                  }
-                                }}
+                {/* ITEMS LIST */}
+                <Form.List name={[cf.name, "items"]}>
+                  {(itemFields, { add: addItem, remove: removeItem }) => (
+                    <>
+                      {itemFields.map((itf, ii) => (
+                        <div
+                          key={itf.key}
+                          className="mb-3 p-3 border rounded-md"
+                        >
+                          <Row gutter={12}>
+                            {/* ITEM */}
+                            <Col span={8}>
+                              <Form.Item
+                                name={[itf.name, "item"]}
+                                label="Item"
+                                rules={[{ required: true }]}
                               >
-                                {salesOrderJSON.itemOptions.map((it) => <Select.Option key={it.code} value={it.name}>{it.name}</Select.Option>)}
-                              </Select>
-                            </Form.Item>
-                          </Col>
+                                <Select
+                                  placeholder="Item"
+                                  disabled={disabled}
+                                  onChange={(val) => {
+                                    // Retrieve items using the stable key
+                                    const availableItems =
+                                      contractItemsMap[cf.key] || [];
+                                    const sel = availableItems.find(
+                                      (x) =>
+                                        (x.product_name ||
+                                          x.item_name ||
+                                          (x.product &&
+                                            x.product.product_name)) === val,
+                                    );
+                                    if (!sel) return;
 
-                          <Col span={4}>
-                            <Form.Item name={[itf.name, "itemCode"]} fieldKey={[itf.fieldKey, "itemCode"]} label="Code">
-                              <Input disabled />
-                            </Form.Item>
-                          </Col>
+                                    const contracts =
+                                      form.getFieldValue("contracts") || [];
+                                    const items = contracts[ci].items || [];
 
-                          <Col span={4}>
-                            <Form.Item name={[itf.name, "uom"]} fieldKey={[itf.fieldKey, "uom"]} label="UOM">
-                              <Select>
-                                {salesOrderJSON.uomOptions.map((u) => <Select.Option key={u} value={u}>{u}</Select.Option>)}
-                              </Select>
-                            </Form.Item>
-                          </Col>
+                                    items[ii] = {
+                                      ...(items[ii] || {}),
+                                      item:
+                                        sel.product_name ||
+                                        sel.item_name ||
+                                        (sel.product &&
+                                          sel.product.product_name),
+                                      itemCode:
+                                        sel.product_id ||
+                                        sel.item_code ||
+                                        (sel.product && sel.product.product_id),
+                                      hsnCode: sel.hsn_code,
+                                      uom: sel.uom?.unit_name || sel.uom,
+                                      qty: Number(
+                                        sel.net_qty || sel.qty || 0,
+                                      ),
+                                      freeQty: Number(
+                                        sel.free_qty || sel.free_qty || 0,
+                                      ),
+                                      totalQty: Number(
+                                        sel.gross_qty ||
+                                        sel.total_qty ||
+                                        0,
+                                      ),
+                                      rate: Number(sel.mrp || sel.rate || 0),
+                                      discountPercent: Number(
+                                        sel.discount_percent || 0,
+                                      ),
+                                      discountAmt: Number(
+                                        sel.discount_amount || 0,
+                                      ),
+                                      totalAmount: Number(
+                                        sel.line_total ||
+                                        sel.total_amount ||
+                                        0,
+                                      ),
+                                    };
 
-                          <Col span={3}>
-                            <Form.Item name={[itf.name, "qty"]} fieldKey={[itf.fieldKey, "qty"]} label="Qty" rules={[{ required: true }]}>
-                              <InputNumber min={0} onChange={() => onFormValuesChange(form, form.getFieldsValue())} className="w-full" />
-                            </Form.Item>
-                          </Col>
+                                    contracts[ci].items = items;
+                                    form.setFieldsValue({ contracts });
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    );
+                                  }}
+                                >
+                                  {(
+                                    contractItemsMap[cf.key] || []
+                                  ).map((it) => (
+                                    <Select.Option
+                                      key={
+                                        it.product_id ||
+                                        it.item_code ||
+                                        (it.product && it.product.product_id)
+                                      }
+                                      value={
+                                        it.product_name ||
+                                        it.item_name ||
+                                        (it.product && it.product.product_name)
+                                      }
+                                    >
+                                      {
+                                        it.product_name ||
+                                        it.item_name ||
+                                        (it.product && it.product.product_name)
+                                      }
+                                    </Select.Option>
+                                  ))}
+                                </Select>
+                              </Form.Item>
+                            </Col>
 
-                          <Col span={3}>
-                            <Form.Item name={[itf.name, "freeQty"]} fieldKey={[itf.fieldKey, "freeQty"]} label="Free" >
-                              <InputNumber min={0} onChange={() => onFormValuesChange(form, form.getFieldsValue())} className="w-full" />
-                            </Form.Item>
-                          </Col>
+                            {/* CODE */}
+                            <Col span={4}>
+                              <Form.Item
+                                name={[itf.name, "hsnCode"]}
+                                label="Code"
+                              >
+                                <Input disabled />
+                              </Form.Item>
+                            </Col>
 
-                          <Col span={4}>
-                            <Form.Item name={[itf.name, "rate"]} fieldKey={[itf.fieldKey, "rate"]} label="Rate" rules={[{ required: true }]}>
-                              <InputNumber min={0} onChange={() => onFormValuesChange(form, form.getFieldsValue())} className="w-full" />
-                            </Form.Item>
-                          </Col>
+                            {/* UOM */}
+                            <Col span={4}>
+                              <Form.Item name={[itf.name, "uom"]} label="UOM">
+                                <Input disabled />
+                              </Form.Item>
+                            </Col>
 
-                          <Col span={3}>
-                            <Form.Item name={[itf.name, "discountPercent"]} fieldKey={[itf.fieldKey, "discountPercent"]} label="Disc %">
-                              <InputNumber min={0} max={100} onChange={() => onFormValuesChange(form, form.getFieldsValue())} className="w-full" />
-                            </Form.Item>
-                          </Col>
-                                 <Col span={3}>
-                                <Form.Item name={[itf.name, "amount"]} fieldKey={[itf.fieldKey, "amount"]} label="Amount">
-                                  <InputNumber className="w-full" disabled />
-                                </Form.Item>
-                              </Col>
-                         <Col span={3}>
-                                <Form.Item name={[itf.name, "discountAmt"]} fieldKey={[itf.fieldKey, "discountAmt"]} label="Disc Amt">
-                                  <InputNumber className="w-full" disabled />
-                                </Form.Item>
-                              </Col>
-                                <Col span={3}>
-                                <Form.Item name={[itf.name, "totalAmount"]} fieldKey={[itf.fieldKey, "totalAmount"]} label="Total Amount">
-                                  <InputNumber className="w-full" disabled />
-                                </Form.Item>
-                              </Col>
-                              <Col span={3}>
-                                <Form.Item name={[itf.name, "totalQty"]} fieldKey={[itf.fieldKey, "totalQty"]} label="Total Qty">
-                                  <InputNumber className="w-full" disabled />
-                                </Form.Item>
-                              </Col>
-                              <Col span={3}>
-                                <Form.Item name={[itf.name, "grossWt"]} fieldKey={[itf.fieldKey, "grossWt"]} label="Gross Wt">
-                                  <InputNumber className="w-full" onChange={() => onFormValuesChange(form, form.getFieldsValue())} />
-                                </Form.Item>
-                              </Col>
-                              <Col span={3}>
-                                <Form.Item name={[itf.name, "totalGrossWt"]} fieldKey={[itf.fieldKey, "totalGrossWt"]} label="Total Gross Wt">
-                                  <InputNumber className="w-full" disabled />
-                                </Form.Item>
-                              </Col>
-                          {/* computed/display-only */}
-                        </Row>
-                      </div>
-                    ))}
+                            {/* QTY */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "qty"]}
+                                label="Qty"
+                                rules={[{ required: true }]}
+                              >
+                                <InputNumber
+                                  min={0}
+                                  className="w-full"
+                                  disabled
+                                  onChange={() =>
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    )
+                                  }
+                                />
+                              </Form.Item>
+                            </Col>
 
-                    <Button   className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
-           type="dashed" icon={<PlusOutlined />} onClick={() => { addItem({ lineKey: Date.now(), item: undefined, itemCode: undefined, uom: salesOrderJSON.uomOptions[0], qty: 0, freeQty: 0, rate: 0, discountPercent: 0, amount: 0, discountAmt: 0, totalAmount: 0 }); }}>
-                      Add Item
-                    </Button>
-                  </>
-                )}
-              </Form.List>
-            </div>
-          ))}
+                            {/* FREE QTY */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "freeQty"]}
+                                label="Free"
+                              >
+                                <InputNumber
+                                  min={0}
+                                  disabled
+                                  className="w-full"
+                                  onChange={() =>
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    )
+                                  }
+                                />
+                              </Form.Item>
+                            </Col>
+
+                            {/* RATE */}
+                            <Col span={4}>
+                              <Form.Item
+                                name={[itf.name, "rate"]}
+                                label="Rate"
+                                rules={[{ required: true }]}
+                              >
+                                <InputNumber
+                                  min={0}
+                                  className="w-full"
+                                  disabled
+                                  onChange={() =>
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    )
+                                  }
+                                />
+                              </Form.Item>
+                            </Col>
+
+                            {/* DISCOUNT PERCENT */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "discountPercent"]}
+                                label="Disc %"
+                              >
+                                <InputNumber
+                                  min={0}
+                                  max={100}
+                                  className="w-full"
+                                  disabled
+                                  onChange={() =>
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    )
+                                  }
+                                />
+                              </Form.Item>
+                            </Col>
+
+                            {/* AMOUNT */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "amount"]}
+                                label="Amount"
+                              >
+                                <InputNumber className="w-full" disabled />
+                              </Form.Item>
+                            </Col>
+
+                            {/* DISCOUNT AMOUNT */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "discountAmt"]}
+                                label="Disc Amt"
+                              >
+                                <InputNumber className="w-full" disabled />
+                              </Form.Item>
+                            </Col>
+
+                            {/* TOTAL AMOUNT */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "totalAmount"]}
+                                label="Total Amount"
+                              >
+                                <InputNumber className="w-full" disabled />
+                              </Form.Item>
+                            </Col>
+
+                            {/* TOTAL QTY */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "totalQty"]}
+                                label="Total Qty"
+                              >
+                                <InputNumber className="w-full" disabled />
+                              </Form.Item>
+                            </Col>
+
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "orderQuantity"]}
+                                label="Order Qty"
+                              >
+                                <InputNumber
+                                  min={0}
+                                  className="w-full"
+                                  disabled={disabled}
+                                  onChange={() =>
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    )
+                                  }
+                                />
+                              </Form.Item>
+                            </Col>
+                            {/* GROSS WT */}
+                            {/* <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "grossWt"]}
+                                label="Gross Wt"
+                              >
+                                <InputNumber
+                                  className="w-full"
+                                  onChange={() =>
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    )
+                                  }
+                                />
+                              </Form.Item>
+                            </Col> */}
+
+                            {/* TOTAL GROSS WT */}
+                            {/* <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "totalGrossWt"]}
+                                label="Total Gross Wt"
+                              >
+                                <InputNumber className="w-full" disabled />
+                              </Form.Item>
+                            </Col> */}
+
+                            {/* DELETE BUTTON */}
+                          </Row>
+                          {!disabled && (
+                            <Button
+                              danger
+                              icon={<DeleteOutlined />}
+                              onClick={() => {
+                                removeItem(itf.name);
+                                onFormValuesChange(form, form.getFieldsValue());
+                              }}
+                            />
+                          )}
+                        </div>
+                      ))}
+
+                      {!disabled && (
+                        <Button
+                          className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
+                          type="dashed"
+                          icon={<PlusOutlined />}
+                          onClick={() =>
+                            addItem({
+                              lineKey: Date.now(),
+                              item: undefined,
+                              itemCode: undefined,
+                              uom: salesOrderJSON.uomOptions[0],
+                              qty: 0,
+                              freeQty: 0,
+                              totalQty: 0,
+                              grossWt: 0,
+                              totalGrossWt: 0,
+                              rate: 0,
+                              amount: 0,
+                              discountPercent: 0,
+                              discountAmt: 0,
+                              totalAmount: 0,
+                            })
+                          }
+                        >
+                          Add Item
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </Form.List>
+              </div>
+            );
+          })}
         </>
       )}
     </Form.List>
@@ -636,48 +1371,87 @@ export default function SaleOrdersInvoice() {
       <h6 className="text-amber-500">Header</h6>
       <Row gutter={16}>
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Souda No</span>} name="soudaNo">
-            <Select placeholder="Select Souda" disabled={disabled} onChange={(val) => {
-              const s = salesOrderJSON.soudaOptions.find((x) => x.soudaNo === val);
-              if (s) form.setFieldsValue({ companyName: s.companyName, customerName: s.customerName });
-            }}>
-              {salesOrderJSON.soudaOptions.map((s) => <Select.Option key={s.soudaNo} value={s.soudaNo}>{s.soudaNo}</Select.Option>)}
+          <Form.Item label="Customer Name" name="customerName">
+            <Select
+              placeholder="Select Customer"
+              onChange={async (customerId) => {
+                const customer = contractPersonOptions.find(
+                  (c) => c.customer_id === customerId,
+                );
+
+                if (customer) {
+                  console.log("Selected User for Autofill:", customer);
+                  form.setFieldsValue({
+                    customerName: customer.name,
+                    customerEmail:
+                      customer.email_address || customer.email || "",
+                    customerMobile:
+                      customer.mobile_number || customer.mobile || "",
+                  });
+                }
+
+                // fetch contracts for this customer
+                // const contracts = await getContractDetailsbyPerson(customerId);
+                // setContractOptions(contracts);
+
+                // reset downstream data
+                setContractItems([]);
+                form.setFieldsValue({ contract_id: undefined });
+              }}
+              disabled={disabled}
+            >
+              {contractPersonOptions.map((c) => (
+                <Select.Option key={c.customer_id} value={c.customer_id}>
+                  {c.name}
+                </Select.Option>
+              ))}
             </Select>
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Order Date</span>} name="orderDate" rules={[{ required: true }]} initialValue={dayjs()}>
+          <Form.Item
+            label={<span className="text-amber-700">Order Date</span>}
+            name="orderDate"
+            rules={[{ required: true }]}
+            initialValue={dayjs()}
+          >
             <DatePicker className="w-full" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Delivery Date</span>} name="deliveryDate">
+          <Form.Item
+            label={<span className="text-amber-700">Delivery Date</span>}
+            name="deliveryDate"
+          >
             <DatePicker className="w-full" disabled={disabled} />
           </Form.Item>
         </Col>
 
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Company</span>} name="companyName" rules={[{ required: true }]}>
+        {/* <Col span={6}>
+          <Form.Item
+            label={<span className="text-amber-700">Company</span>}
+            name="companyName"
+            rules={[{ required: true }]}
+          >
             <Input placeholder="Company" disabled={disabled} />
           </Form.Item>
-        </Col>
-
+        </Col> */}
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Customer Name</span>} name="customerName" rules={[{ required: true }]}>
-            <Input placeholder="Customer" disabled={disabled} />
-          </Form.Item>
-        </Col>
-
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Customer Email</span>} name="customerEmail">
+          <Form.Item
+            label={<span className="text-amber-700">Customer Email</span>}
+            name="customerEmail"
+          >
             <Input placeholder="Email" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Delivery Address</span>} name="deliveryAddress">
+          <Form.Item
+            label={<span className="text-amber-700">Delivery Address</span>}
+            name="deliveryAddress"
+          >
             <Input placeholder="Address" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -697,11 +1471,12 @@ export default function SaleOrdersInvoice() {
             </Select>
           </Form.Item>
         </Col> */}
-         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Status</span>} name="status">
-            <Select placeholder="pending" disabled={disabled}>
-              
-            </Select>
+        <Col span={6}>
+          <Form.Item
+            label={<span className="text-amber-700">Status</span>}
+            name="status"
+          >
+            <Select placeholder="pending" disabled={disabled}></Select>
           </Form.Item>
         </Col>
       </Row>
@@ -709,7 +1484,7 @@ export default function SaleOrdersInvoice() {
       <Divider />
 
       {/* contracts + items */}
-      <ContractsFormList form={form} />
+      <ContractsFormList form={form} disabled={disabled} />
 
       <Divider />
 
@@ -717,46 +1492,93 @@ export default function SaleOrdersInvoice() {
       <h6 className="text-amber-500">Tax & Totals</h6>
       <Row gutter={16}>
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">SGST %</span>} name={["orderTaxAndTotals", "sgstPercent"]}>
-            <InputNumber min={0} max={100} className="w-full" disabled={disabled} onChange={() => onFormValuesChange(form, form.getFieldsValue())} />
+          <Form.Item
+            label={<span className="text-amber-700">SGST %</span>}
+            name={["orderTaxAndTotals", "sgstPercent"]}
+          >
+            <InputNumber
+              min={0}
+              max={100}
+              className="w-full"
+              disabled={disabled}
+              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
+            />
           </Form.Item>
         </Col>
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">CGST %</span>} name={["orderTaxAndTotals", "cgstPercent"]}>
-            <InputNumber min={0} max={100} className="w-full" disabled={disabled} onChange={() => onFormValuesChange(form, form.getFieldsValue())} />
+          <Form.Item
+            label={<span className="text-amber-700">CGST %</span>}
+            name={["orderTaxAndTotals", "cgstPercent"]}
+          >
+            <InputNumber
+              min={0}
+              max={100}
+              className="w-full"
+              disabled={disabled}
+              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
+            />
           </Form.Item>
         </Col>
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">IGST %</span>} name={["orderTaxAndTotals", "igstPercent"]}>
-            <InputNumber min={0} max={100} className="w-full" disabled={disabled} onChange={() => onFormValuesChange(form, form.getFieldsValue())} />
+          <Form.Item
+            label={<span className="text-amber-700">IGST %</span>}
+            name={["orderTaxAndTotals", "igstPercent"]}
+          >
+            <InputNumber
+              min={0}
+              max={100}
+              className="w-full"
+              disabled={disabled}
+              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
+            />
           </Form.Item>
         </Col>
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">TCS Amt (₹)</span>} name={["orderTaxAndTotals", "tcsAmt"]}>
-            <InputNumber min={0} className="w-full" disabled={disabled} onChange={() => onFormValuesChange(form, form.getFieldsValue())} />
+          <Form.Item
+            label={<span className="text-amber-700">TCS Amt (₹)</span>}
+            name={["orderTaxAndTotals", "tcsAmt"]}
+          >
+            <InputNumber
+              min={0}
+              className="w-full"
+              disabled={disabled}
+              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
+            />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Gross Total (₹)</span>} name={["orderTaxAndTotals", "grossAmountTotal"]}>
+          <Form.Item
+            label={<span className="text-amber-700">Gross Total (₹)</span>}
+            name={["orderTaxAndTotals", "grossAmountTotal"]}
+          >
             <InputNumber className="w-full" disabled />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Discount Total (₹)</span>} name={["orderTaxAndTotals", "discountTotal"]}>
+          <Form.Item
+            label={<span className="text-amber-700">Discount Total (₹)</span>}
+            name={["orderTaxAndTotals", "discountTotal"]}
+          >
             <InputNumber className="w-full" disabled />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Total GST (₹)</span>} name={["orderTaxAndTotals", "totalGST"]}>
+          <Form.Item
+            label={<span className="text-amber-700">Total GST (₹)</span>}
+            name={["orderTaxAndTotals", "totalGST"]}
+          >
             <InputNumber className="w-full" disabled />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Grand Total (₹)</span>} name={["orderTaxAndTotals", "grandTotal"]}>
+          <Form.Item
+            label={<span className="text-amber-700">Grand Total (₹)</span>}
+            name={["orderTaxAndTotals", "grandTotal"]}
+          >
             <InputNumber className="w-full" disabled />
           </Form.Item>
         </Col>
@@ -834,45 +1656,156 @@ export default function SaleOrdersInvoice() {
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
           />
-          <Button icon={<FilterOutlined />} onClick={() => setSearchText("")} className="border-amber-400! text-amber-700! hover:bg-amber-100!">Reset</Button>
+          <Button
+            icon={<FilterOutlined />}
+            onClick={() => setSearchText("")}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
+            Reset
+          </Button>
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} className="border-amber-400! text-amber-700! hover:bg-amber-100!">Export</Button>
-          <Button type="primary" icon={<PlusOutlined />} className="bg-amber-500! hover:bg-amber-600! border-none!" onClick={openAddModal}>Add New</Button>
+          <Button
+            icon={<DownloadOutlined />}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
+            Export
+          </Button>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            className="bg-amber-500! hover:bg-amber-600! border-none!"
+            onClick={openAddModal}
+          >
+            Add New
+          </Button>
         </div>
       </div>
 
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
-        <h2 className="text-lg font-semibold text-amber-700 mb-0">Sales Order & Invoice Records</h2>
-        <p className="text-amber-600 mb-3">Manage your sales Order & Invoice data</p>
-        <Table columns={columns} dataSource={filteredData} pagination={false} scroll={{ y: 300 }} rowKey="key" />
+        <h2 className="text-lg font-semibold text-amber-700 mb-0">
+          Sales Order & Invoice Records
+        </h2>
+        <p className="text-amber-600 mb-3">
+          Manage your sales Order & Invoice data
+        </p>
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          pagination={false}
+          scroll={{ y: 300 }}
+          rowKey="key"
+        />
       </div>
 
       {/* Add Modal */}
-      <Modal title={<span className="text-amber-700 text-2xl font-semibold">Add New Sales Order & Invoice</span>} open={isAddModalOpen} onCancel={() => { setIsAddModalOpen(false); addForm.resetFields(); }} footer={null} width={1000}>
-        <Form layout="vertical" form={addForm} onFinish={handleAddFinish} onValuesChange={() => onFormValuesChange(addForm, addForm.getFieldsValue())}>
+      <Modal
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Add New Sales Order & Invoice
+          </span>
+        }
+        open={isAddModalOpen}
+        onCancel={() => {
+          setIsAddModalOpen(false);
+          addForm.resetFields();
+        }}
+        footer={null}
+        width={1000}
+      >
+        <Form
+          layout="vertical"
+          form={addForm}
+          onFinish={handleAddFinish}
+          onValuesChange={() =>
+            onFormValuesChange(addForm, addForm.getFieldsValue())
+          }
+        >
           {renderFormFields(addForm)}
           <div className="flex justify-end gap-2 mt-4">
-            <Button onClick={() => { setIsAddModalOpen(false); addForm.resetFields(); }}  className="border-amber-400! text-amber-700! hover:bg-amber-100!">Cancel</Button>
-            <Button type="primary" htmlType="submit" className="bg-amber-500! hover:bg-amber-600! border-none!">Add</Button>
+            <Button
+              onClick={() => {
+                setIsAddModalOpen(false);
+                addForm.resetFields();
+              }}
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+            >
+              Add
+            </Button>
           </div>
         </Form>
       </Modal>
 
       {/* Edit Modal */}
-      <Modal title={<span className="text-amber-700 text-2xl font-semibold">Edit Sales Order & Invoice</span>} open={isEditModalOpen} onCancel={() => { setIsEditModalOpen(false); editForm.resetFields(); setSelectedRecord(null); }} footer={null} width={1000}>
-        <Form layout="vertical" form={editForm} onFinish={handleEditFinish} onValuesChange={() => onFormValuesChange(editForm, editForm.getFieldsValue())}>
+      <Modal
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Edit Sales Order & Invoice
+          </span>
+        }
+        open={isEditModalOpen}
+        onCancel={() => {
+          setIsEditModalOpen(false);
+          editForm.resetFields();
+          setSelectedRecord(null);
+        }}
+        footer={null}
+        width={1000}
+      >
+        <Form
+          layout="vertical"
+          form={editForm}
+          onFinish={handleEditFinish}
+          onValuesChange={() =>
+            onFormValuesChange(editForm, editForm.getFieldsValue())
+          }
+        >
           {renderFormFields(editForm)}
           <div className="flex justify-end gap-2 mt-4">
-            <Button onClick={() => { setIsEditModalOpen(false); editForm.resetFields(); setSelectedRecord(null); }}>Cancel</Button>
-            <Button type="primary" htmlType="submit" className="bg-amber-500 hover:bg-amber-600 border-none">Update</Button>
+            <Button
+              onClick={() => {
+                setIsEditModalOpen(false);
+                editForm.resetFields();
+                setSelectedRecord(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              className="bg-amber-500 hover:bg-amber-600 border-none"
+            >
+              Update
+            </Button>
           </div>
         </Form>
       </Modal>
 
       {/* View Modal */}
-      <Modal title={<span className="text-amber-700 text-2xl font-semibold">View Sales Order & Invoice</span>} open={isViewModalOpen} onCancel={() => { setIsViewModalOpen(false); viewForm.resetFields(); setSelectedRecord(null); }} footer={null} width={1000}>
+      <Modal
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            View Sales Order & Invoice
+          </span>
+        }
+        open={isViewModalOpen}
+        onCancel={() => {
+          setIsViewModalOpen(false);
+          viewForm.resetFields();
+          setSelectedRecord(null);
+        }}
+        footer={null}
+        width={1000}
+      >
         <Form layout="vertical" form={viewForm}>
           {renderFormFields(viewForm, true)}
         </Form>

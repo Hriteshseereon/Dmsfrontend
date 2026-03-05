@@ -1,5 +1,5 @@
 // AssetMaintenance.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Table,
   Input,
@@ -24,39 +24,26 @@ import {
   FilterOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-
+import { useAuth } from "../../context/AuthContext";
+import {
+  addAssetMaintenance,
+  getAssetMaintenances,
+  getAssets,
+  getAssetMaintenanceById,
+  updateAssetMaintenance,
+} from "../../api/assets";
+import useSessionStore from "../../store/sessionStore";
 const { Option } = Select;
 const { TextArea } = Input;
 
 export default function AssetMaintenance() {
-  const [data, setData] = useState([
-    {
-      key: 1,
-      maintenanceId: "MAINT-001",
-      assetId: "ASSET-001",
-      serviceType: "Preventive",
-      serviceProvider: "ServiceCo Pvt Ltd",
-      serviceDate: "2025-02-15",
-      nextServiceDue: "2025-08-15",
-      cost: 1200,
-      status: "Completed",
-      files: [],
-      remarks: "Quarterly preventive maintenance",
-    },
-    {
-      key: 2,
-      maintenanceId: "MAINT-002",
-      assetId: "ASSET-010",
-      serviceType: "Calibration",
-      serviceProvider: "CalibrateNow",
-      serviceDate: "2025-06-05",
-      nextServiceDue: "2026-06-05",
-      cost: 800,
-      status: "Scheduled",
-      files: [],
-      remarks: "Annual calibration",
-    },
-  ]);
+  // const { currentOrgId } = useAuth();
+  const currentOrgId = useSessionStore((state) => state.currentOrgId);
+
+  const [assets, setAssets] = useState([]);
+
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -77,20 +64,131 @@ export default function AssetMaintenance() {
 
   const filteredData = data.filter((row) =>
     ["maintenanceId", "assetId", "serviceProvider", "status"].some((f) =>
-      (row[f] || "").toString().toLowerCase().includes(searchText.trim().toLowerCase())
-    )
+      (row[f] || "")
+        .toString()
+        .toLowerCase()
+        .includes(searchText.trim().toLowerCase()),
+    ),
   );
+
+  const fetchMaintenances = async () => {
+    setLoading(true);
+    try {
+      const res = await getAssetMaintenances(currentOrgId);
+
+      const mapped = res.map((item) => ({
+        key: item.id,
+        id: item.id,
+
+        maintenanceId: item.maintenance_id,
+        assetId: item.asset?.asset_code,
+        assetPk: item.asset?.id,
+        asset_name: item.asset_name,
+        serviceType: item.service_type,
+        serviceProvider: item.service_provider,
+
+        serviceDate: item.service_date,
+        next_service_due_date: item.next_service_due_date,
+
+        cost: item.cost,
+        status: item.status,
+        remarks: item.remarks,
+        files: item.documents || [],
+      }));
+
+      setData(mapped);
+    } catch {
+      message.error("Failed to load maintenance records");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // handle view function to view button click
+  const handleView = async (id) => {
+    try {
+      setLoading(true);
+
+      const res = await getAssetMaintenanceById(id);
+
+      console.log("VIEW API:", res);
+
+      viewForm.setFieldsValue({
+        assetId: res.asset,
+        serviceType: res.service_type,
+        serviceProvider: res.service_provider,
+        serviceDate: res.service_date ? dayjs(res.service_date) : null,
+        nextServiceDue: res.next_service_due_date
+          ? dayjs(res.next_service_due_date)
+          : null,
+        cost: res.cost,
+        status: res.status,
+        remarks: res.remarks,
+      });
+
+      setSelectedRecord(res);
+      setIsViewModalOpen(true);
+    } catch (err) {
+      console.log(err);
+      message.error("Failed to load maintenance details");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // handle edit funtion
+  const handleEditOpen = async (id) => {
+    try {
+      setLoading(true);
+
+      const res = await getAssetMaintenanceById(id);
+
+      console.log("EDIT API:", res);
+
+      editForm.setFieldsValue({
+        assetId: res.asset,
+        serviceType: res.service_type,
+        serviceProvider: res.service_provider,
+        serviceDate: res.service_date ? dayjs(res.service_date) : null,
+        nextServiceDue: res.next_service_due_date
+          ? dayjs(res.next_service_due_date)
+          : null,
+        cost: res.cost,
+        status: res.status,
+        remarks: res.remarks,
+      });
+
+      setSelectedRecord(res); // IMPORTANT → used in update
+      setIsEditModalOpen(true);
+    } catch (err) {
+      console.log(err);
+      message.error("Failed to load maintenance data");
+    } finally {
+      setLoading(false);
+    }
+  };
+  const fetchAssets = async () => {
+    const res = await getAssets(currentOrgId);
+    setAssets(res);
+  };
+
+  useEffect(() => {
+    if (!currentOrgId) return;
+    fetchMaintenances();
+    fetchAssets();
+  }, [currentOrgId]);
 
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Maintenance ID</span>,
-      dataIndex: "maintenanceId",
-      width: 140,
-      render: (t) => <span className="text-amber-800">{t}</span>,
+      title: <span className="text-amber-700 font-semibold">SL No</span>,
+      width: 80,
+      render: (_, __, index) => (
+        <span className="text-amber-800">{index + 1}</span>
+      ),
     },
     {
-      title: <span className="text-amber-700 font-semibold">Asset ID</span>,
-      dataIndex: "assetId",
+      title: <span className="text-amber-700 font-semibold">Asset Name</span>,
+      dataIndex: "asset_name",
       width: 120,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
@@ -101,7 +199,9 @@ export default function AssetMaintenance() {
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Service Provider</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Service Provider</span>
+      ),
       dataIndex: "serviceProvider",
       width: 180,
       render: (t) => <span className="text-amber-800">{t}</span>,
@@ -110,13 +210,21 @@ export default function AssetMaintenance() {
       title: <span className="text-amber-700 font-semibold">Service Date</span>,
       dataIndex: "serviceDate",
       width: 130,
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
+      render: (d) => (
+        <span className="text-amber-800">
+          {d ? dayjs(d).format("YYYY-MM-DD") : ""}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Next Due</span>,
-      dataIndex: "nextServiceDue",
+      dataIndex: "next_service_due_date",
       width: 130,
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : "-"}</span>,
+      render: (d) => (
+        <span className="text-amber-800">
+          {d ? dayjs(d).format("YYYY-MM-DD") : "-"}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Cost (₹)</span>,
@@ -131,44 +239,39 @@ export default function AssetMaintenance() {
       render: (s) => {
         const base = "px-3 py-1 rounded-full text-sm font-semibold";
         if (s === "Completed")
-          return <span className={`${base} bg-green-100 text-green-700`}>Completed</span>;
+          return (
+            <span className={`${base} bg-green-100 text-green-700`}>
+              Completed
+            </span>
+          );
         if (s === "In Progress")
-          return <span className={`${base} bg-yellow-100 text-yellow-700`}>In Progress</span>;
+          return (
+            <span className={`${base} bg-yellow-100 text-yellow-700`}>
+              In Progress
+            </span>
+          );
         if (s === "Cancelled")
-          return <span className={`${base} bg-red-100 text-red-700`}>Cancelled</span>;
-        return <span className={`${base} bg-amber-100 text-amber-800`}>{s}</span>;
+          return (
+            <span className={`${base} bg-red-100 text-red-700`}>Cancelled</span>
+          );
+        return (
+          <span className={`${base} bg-amber-100 text-amber-800`}>{s}</span>
+        );
       },
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       width: 100,
-      render: (record) => (
+      render: (_, record) => (
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              viewForm.setFieldsValue({
-                ...record,
-                serviceDate: record.serviceDate ? dayjs(record.serviceDate) : undefined,
-                nextServiceDue: record.nextServiceDue ? dayjs(record.nextServiceDue) : undefined,
-              });
-              setIsViewModalOpen(true);
-            }}
+            onClick={() => handleView(record.id)}
           />
+
           <EditOutlined
             className="cursor-pointer! text-red-500!"
-            onClick={() => {
-              setSelectedRecord(record);
-              editForm.setFieldsValue({
-                ...record,
-                serviceDate: record.serviceDate ? dayjs(record.serviceDate) : undefined,
-                nextServiceDue: record.nextServiceDue ? dayjs(record.nextServiceDue) : undefined,
-              });
-              // populate edit file list if any
-              setEditFileList(record.files || []);
-              setIsEditModalOpen(true);
-            }}
+            onClick={() => handleEditOpen(record.id)}
           />
         </div>
       ),
@@ -202,8 +305,11 @@ export default function AssetMaintenance() {
       r.status,
       (r.remarks || "").replace(/[\n\r]/g, " "),
     ]);
-    const csvContent =
-      [headers, ...rows].map((e) => e.map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`).join(",")).join("\n");
+    const csvContent = [headers, ...rows]
+      .map((e) =>
+        e.map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`).join(","),
+      )
+      .join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -236,35 +342,75 @@ export default function AssetMaintenance() {
     },
   };
 
-  const handleAdd = (values) => {
-    const payload = {
-      ...values,
-      key: data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1,
-      serviceDate: values.serviceDate ? dayjs(values.serviceDate).format("YYYY-MM-DD") : undefined,
-      nextServiceDue: values.nextServiceDue ? dayjs(values.nextServiceDue).format("YYYY-MM-DD") : undefined,
-      files: addFileList,
-    };
-    setData((prev) => [payload, ...prev]);
-    setIsAddModalOpen(false);
-    addForm.resetFields();
-    setAddFileList([]);
-    message.success("Maintenance record added.");
+  const handleAdd = async (values) => {
+    try {
+      setLoading(true);
+
+      await addAssetMaintenance({
+        organisation: currentOrgId,
+        asset: values.assetId,
+
+        service_type: values.serviceType,
+        service_provider: values.serviceProvider,
+
+        service_date: values.serviceDate.format("YYYY-MM-DD"),
+        next_service_due_date: values.nextServiceDue
+          ? values.nextServiceDue.format("YYYY-MM-DD")
+          : null,
+
+        cost: values.cost ? values.cost.toString() : "0.00",
+        status: values.status,
+
+        remarks: values.remarks || null,
+      });
+
+      message.success("Maintenance record added");
+      setIsAddModalOpen(false);
+      addForm.resetFields();
+      setAddFileList([]);
+      fetchMaintenances();
+    } catch (err) {
+      console.log(err?.response?.data);
+      message.error("Failed to add maintenance record");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleEdit = (values) => {
-    const payload = {
-      ...selectedRecord,
-      ...values,
-      serviceDate: values.serviceDate ? dayjs(values.serviceDate).format("YYYY-MM-DD") : undefined,
-      nextServiceDue: values.nextServiceDue ? dayjs(values.nextServiceDue).format("YYYY-MM-DD") : undefined,
-      files: editFileList,
-    };
-    setData((prev) => prev.map((d) => (d.key === payload.key ? payload : d)));
-    setIsEditModalOpen(false);
-    editForm.resetFields();
-    setSelectedRecord(null);
-    setEditFileList([]);
-    message.success("Maintenance record updated.");
+  const handleEdit = async (values) => {
+    try {
+      setLoading(true);
+
+      await updateAssetMaintenance(selectedRecord.id, {
+        organisation: currentOrgId,
+        asset: values.assetId,
+
+        service_type: values.serviceType,
+        service_provider: values.serviceProvider,
+
+        service_date: values.serviceDate.format("YYYY-MM-DD"),
+        next_service_due_date: values.nextServiceDue
+          ? values.nextServiceDue.format("YYYY-MM-DD")
+          : null,
+
+        cost: values.cost ? values.cost.toString() : "0.00",
+        status: values.status,
+
+        remarks: values.remarks || null,
+      });
+
+      message.success("Maintenance updated");
+      setIsEditModalOpen(false);
+      editForm.resetFields();
+      setSelectedRecord(null);
+      setEditFileList([]);
+      fetchMaintenances();
+    } catch (err) {
+      console.log(err?.response?.data);
+      message.error("Failed to update maintenance");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderFormFields = (form, disabled = false, mode = "add") => (
@@ -283,11 +429,17 @@ export default function AssetMaintenance() {
 
         <Col span={8}>
           <Form.Item
-            label={<span className="text-amber-700">Asset ID</span>}
+            label={<span className="text-amber-700">Asset</span>}
             name="assetId"
-            rules={[{ required: true, message: "Please enter Asset ID" }]}
+            rules={[{ required: true }]}
           >
-            <Input placeholder="Asset ID" disabled={disabled} />
+            <Select placeholder="Select asset">
+              {assets.map((a) => (
+                <Select.Option key={a.id} value={a.id}>
+                  {a.asset_name} ({a.asset_code})
+                </Select.Option>
+              ))}
+            </Select>
           </Form.Item>
         </Col>
 
@@ -311,9 +463,13 @@ export default function AssetMaintenance() {
       <Row gutter={16}>
         <Col span={8}>
           <Form.Item
-            label={<span className="text-amber-700">Service Provider Name</span>}
+            label={
+              <span className="text-amber-700">Service Provider Name</span>
+            }
             name="serviceProvider"
-            rules={[{ required: true, message: "Please enter Service Provider" }]}
+            rules={[
+              { required: true, message: "Please enter Service Provider" },
+            ]}
           >
             <Input placeholder="Service Provider" disabled={disabled} />
           </Form.Item>
@@ -332,7 +488,9 @@ export default function AssetMaintenance() {
 
         <Col span={8}>
           <Form.Item
-            label={<span className="text-amber-700">Next Service Due Date</span>}
+            label={
+              <span className="text-amber-700">Next Service Due Date</span>
+            }
             name="nextServiceDue"
           >
             <DatePicker className="w-full" disabled={disabled} />
@@ -342,8 +500,34 @@ export default function AssetMaintenance() {
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Cost (₹)</span>} name="cost">
-            <InputNumber className="w-full" min={0} disabled={disabled} />
+          <Form.Item
+            label={<span className="text-amber-700">Cost (₹)</span>}
+            name="cost"
+            rules={[
+              {
+                type: "number",
+                min: 0,
+                message: "Cost must be a positive number",
+              },
+              {
+                validator: (_, value) => {
+                  if (value === undefined || value === null)
+                    return Promise.resolve();
+                  if (Number.isNaN(value)) {
+                    return Promise.reject("Only numbers are allowed");
+                  }
+                  return Promise.resolve();
+                },
+              },
+            ]}
+          >
+            <InputNumber
+              className="w-full"
+              min={0}
+              disabled={disabled}
+              controls={false}
+              parser={(value) => value.replace(/[^\d.]/g, "")}
+            />
           </Form.Item>
         </Col>
 
@@ -365,36 +549,53 @@ export default function AssetMaintenance() {
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Remarks</span>} name="remarks">
+          <Form.Item
+            label={<span className="text-amber-700">Remarks</span>}
+            name="remarks"
+          >
             <TextArea rows={1} placeholder="Any notes" disabled={disabled} />
           </Form.Item>
         </Col>
       </Row>
 
-      <h6 className="text-amber-500 mt-4">File Upload</h6>
+      {/* <h6 className="text-amber-500 mt-4">File Upload</h6>
       <Row gutter={16}>
         <Col span={24}>
           <Form.Item
-            label={<span className="text-amber-700">Choose File (Invoice, Report etc)</span>}
+            label={
+              <span className="text-amber-700">
+                Choose File (Invoice, Report etc)
+              </span>
+            }
             name="files"
-            extra={<span className="text-amber-600 text-sm">PDF, JPG, PNG, or other documents</span>}
+            extra={
+              <span className="text-amber-600 text-sm">
+                PDF, JPG, PNG, or other documents
+              </span>
+            }
           >
             {mode === "add" ? (
               <Upload {...addUploadProps} maxCount={5} multiple>
-                <Button icon={<UploadOutlined />} className="border-amber-400 text-amber-700 hover:bg-amber-100">
+                <Button
+                  icon={<UploadOutlined />}
+                  className="border-amber-400 text-amber-700 hover:bg-amber-100"
+                >
                   Click to Upload
                 </Button>
               </Upload>
             ) : (
               <Upload {...editUploadProps} maxCount={5} multiple>
-                <Button icon={<UploadOutlined />} className="border-amber-400 text-amber-700 hover:bg-amber-100">
+                <Button
+                  icon={<UploadOutlined />}
+                  className="border-amber-400 text-amber-700 hover:bg-amber-100"
+                >
                   Click to Upload
                 </Button>
               </Upload>
             )}
           </Form.Item>
         </Col>
-      </Row>
+      </Row> */}
     </>
   );
 
@@ -404,10 +605,10 @@ export default function AssetMaintenance() {
       <div className="flex justify-between items-center mb-2">
         <div className="flex gap-2">
           <Input
-          prefix={<SearchOutlined className="text-amber-600!" />}
-                      placeholder="Search assets..."
-                      className="w-64! border-amber-300! focus:border-amber-500!"
-                          value={searchText}
+            prefix={<SearchOutlined className="text-amber-600!" />}
+            placeholder="Search assets..."
+            className="w-64! border-amber-300! focus:border-amber-500!"
+            value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
           />
           <Button
@@ -420,15 +621,17 @@ export default function AssetMaintenance() {
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} onClick={exportCSV} 
-           className="border-amber-400! text-amber-700! hover:bg-amber-100!">
-          Export
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={exportCSV}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
+            Export
           </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
             className="bg-amber-500! hover:bg-amber-600! border-none!"
-           
             onClick={() => {
               addForm.resetFields();
               setAddFileList([]);
@@ -442,14 +645,27 @@ export default function AssetMaintenance() {
 
       {/* Table */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
-        <h2 className="text-lg font-semibold text-amber-700 mb-0">Asset Maintenance</h2>
-        <p className="text-amber-600 mb-3">Manage maintenance, calibration & service records</p>
-        <Table columns={columns} dataSource={filteredData} pagination={{ pageSize: 6 }} />
+        <h2 className="text-lg font-semibold text-amber-700 mb-0">
+          Asset Maintenance
+        </h2>
+        <p className="text-amber-600 mb-3">
+          Manage maintenance, calibration & service records
+        </p>
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          loading={loading}
+          pagination={{ pageSize: 6 }}
+        />
       </div>
 
       {/* Add Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Add Maintenance Record</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Add Maintenance Record
+          </span>
+        }
         open={isAddModalOpen}
         onCancel={() => {
           setIsAddModalOpen(false);
@@ -468,13 +684,16 @@ export default function AssetMaintenance() {
                 addForm.resetFields();
                 setAddFileList([]);
               }}
-               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-        
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
             >
               Cancel
             </Button>
-            <Button type="primary"  className="bg-amber-500! hover:bg-amber-600! border-none!"
-            htmlType="submit">
+            <Button
+              type="primary"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit"
+              loading={loading}
+            >
               Add
             </Button>
           </div>
@@ -483,7 +702,11 @@ export default function AssetMaintenance() {
 
       {/* Edit Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Edit Maintenance Record</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Edit Maintenance Record
+          </span>
+        }
         open={isEditModalOpen}
         onCancel={() => {
           setIsEditModalOpen(false);
@@ -504,13 +727,15 @@ export default function AssetMaintenance() {
                 setSelectedRecord(null);
                 setEditFileList([]);
               }}
-               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-        
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
             >
               Cancel
             </Button>
-            <Button type="primary"  className="bg-amber-500! hover:bg-amber-600! border-none!"
-            htmlType="submit">
+            <Button
+              type="primary"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit"
+            >
               Save Changes
             </Button>
           </div>

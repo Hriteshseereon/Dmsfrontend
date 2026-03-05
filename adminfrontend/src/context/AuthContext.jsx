@@ -1,80 +1,65 @@
-import { createContext, useState, useContext } from "react";
+import { createContext, useState, useContext, useEffect } from "react";
 import users from "../data/users.json";
 import orgs from "../data/organisations.json";
+import { login as authLogin } from "../api/authService";
 import modules from "../data/modules.json";
 import { getCustomUsers } from "../utils/customUsers";
+import TokenStore from "../utils/tokenStore";
+import useSessionStore from "../store/sessionStore";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [orgModules, setOrgModules] = useState([]);
-  const [organisations, setOrganisations] = useState([]);
+  const user = useSessionStore((s) => s.user);
+  const setSession = useSessionStore((s) => s.setSession);
+  const clearSession = useSessionStore((s) => s.clearSession);
 
-  // helper: normalize org lookup (org.id may be string)
-  const findOrgByIdOrName = (idOrName) =>
-    orgs.find(
-      (o) =>
-        String(o.id).toLowerCase() === String(idOrName).toLowerCase() ||
-        o.name.toLowerCase() === String(idOrName).toLowerCase()
-    );
-  // const login = (email, password) => {
-  //   const combinedUsers = [...users, ...getCustomUsers()];
+  const currentOrgId = useSessionStore((s) => s.currentOrgId);
+  const setCurrentOrgId = useSessionStore((s) => s.setCurrentOrgId);
+  const orgModules = useSessionStore((s) => s.orgModules);
+  const setOrgModules = useSessionStore((s) => s.setOrgModules);
 
-  //   const found = combinedUsers.find(
-  //     (u) => u.email === email && u.password === password
-  //   );
-  //   if (found) {
-  //     setUser(found);
-  //     if (found.role === "admin") {
-  //       setOrgModules(modules.map((m) => m.id));
-  //       setOrganisations(orgs);
-  //     } else if (found.modules) {
-  //       setOrgModules(found.modules);
-  //     } else {
-  //       const org = orgs.find((o) => o.id === found.org);
-  //       setOrgModules(org?.modules || []);
-  //     }
-  //     return true;
-  //   }
-  //   return false;
-  // };
-  const login = (email, password) => {
-    const combinedUsers = [...users, ...getCustomUsers()];
 
-    const found = combinedUsers.find(
-      (u) =>
-        u.email?.toLowerCase() === email?.toLowerCase() &&
-        u.password === password
-    );
+  const login = async (username, password) => {
+    try {
+      const authResponse = await authLogin(username, password);
 
-    if (!found) return false;
+      const {
+        access,
+        refresh,
+        organisation_id,
+        is_super_admin,
+        is_admin,
+        ...rest
+      } = authResponse;
 
-    setUser(found);
+      const userPayload = {
+        ...rest,
+        is_super_admin,
+        is_admin,
+        role: is_super_admin || is_admin ? "admin" : "user",
+      };
 
-    if (found.role === "admin") {
-      setOrganisations(orgs);
-    } else {
-      // if user has explicit modules array (rare)
-      if (found.modules && Array.isArray(found.modules)) {
-        setOrgModules(found.modules);
-      } else if (found.org) {
-        // lookup organization by id/name from organisations.json
-        const org = findOrgByIdOrName(found.org);
-        setOrgModules(org?.modules || []);
-      } else {
-        setOrgModules([]);
-      }
-      setOrganisations([]); // non-admins don't need full org list
+      setSession({
+        accessToken: access,
+        refreshToken: refresh,
+        user: userPayload,
+        currentOrgId: organisation_id,
+      });
+
+      setCurrentOrgId(organisation_id);
+
+    } catch (err) {
+      const message = err.response?.data?.detail || "Login failed";
+      throw new Error(message);
     }
-
-    return true;
   };
+
   const isAdmin = user?.role === "admin";
+
   const logout = () => {
-    setUser(null);
-    setOrgModules([]);
-    setOrganisations([]);
+    clearSession();
+    window.location.reload();
   };
 
   const hasModuleAccess = (module) => {
@@ -83,12 +68,21 @@ export const AuthProvider = ({ children }) => {
   // create a isadmin for check the role of the user as admin
   const hasSubmoduleAccess = (module, submodule) => {
     const modulePermission = user?.permissions.find((p) => p.module === module);
-    return modulePermission?.submodues.hasOwnProperty(submodule);
+    return modulePermission?.submodules?.hasOwnProperty(submodule);
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, login, logout, orgModules, isAdmin, organisations, setOrgModules }}
+      value={{
+        user,
+        login,
+        logout,
+        orgModules,
+        isAdmin,
+        setOrgModules,
+        currentOrgId,
+        setCurrentOrgId,
+      }}
     >
       {children}
     </AuthContext.Provider>
