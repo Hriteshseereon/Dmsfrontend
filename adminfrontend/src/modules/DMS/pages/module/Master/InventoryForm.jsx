@@ -18,14 +18,22 @@ import {
   EditOutlined,
   FilterOutlined,
 } from "@ant-design/icons";
+// import {
+//   getAllVendor,
+//   getproductbyVendor,
+//   getAllInventory,
+//   addInventory,
+//   getInventoryById,
+//   updateInventory,
+// } from "../../../../../api/inventory";
+
 import {
-  getAllVendor,
   getproductbyVendor,
   getAllInventory,
   addInventory,
   getInventoryById,
   updateInventory,
-} from "../../../../../api/Inventory";
+} from "../../../../../api/masterinventory";
 
 const { Option } = Select;
 
