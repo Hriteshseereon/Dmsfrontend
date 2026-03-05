@@ -541,8 +541,7 @@ const handleExport = async () => {
           "CGST %": item.cgst_percent,
           "IGST %": item.igst_percent,
 
-          "Total GST (₹)": item.total_gst_amount,
-          "Total Amount (₹)": item.total_amount,
+            "Total Amount (₹)": item.total_amount,
 
           "Order Total Qty": record.total_qty,
           "Total Gross Amount": record.gross_amount,

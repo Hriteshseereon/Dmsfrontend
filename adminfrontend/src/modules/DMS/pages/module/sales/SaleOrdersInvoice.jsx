@@ -88,7 +88,7 @@ export default function SaleOrdersInvoice() {
   };
 
 const handleExport = () => {
-  if (data.length === 0) {
+  if (!data || data.length === 0) {
     message.warning("No data available to export");
     return;
   }
@@ -96,57 +96,55 @@ const handleExport = () => {
   const exportData = [];
 
   data.forEach((order) => {
-    // 1. Pull the actual percentage values stored from your GET API
-    const sgstP = Number(order.orderTaxAndTotals?.sgstPercent || 0);
-    const cgstP = Number(order.orderTaxAndTotals?.cgstPercent || 0);
-    const igstP = Number(order.orderTaxAndTotals?.igstPercent || 0);
-    const tcsAmt = Number(order.orderTaxAndTotals?.tcsAmt || 0);
-
-    order.contracts.forEach((contract) => {
-      contract.items.forEach((item) => {
-        // 2. Calculate the tax amounts based on the taxable item total
-        const taxableVal = Number(item.totalAmount || 0);
-        
-        // Math: (Taxable Amount * Tax Percentage) / 100
-        const sAmt = (taxableVal * sgstP) / 100;
-        const cAmt = (taxableVal * cgstP) / 100;
-        const iAmt = (taxableVal * igstP) / 100;
+    (order.contracts || []).forEach((contract) => {
+      (contract.items || []).forEach((item) => {
 
         exportData.push({
-          // Identity Fields
           "Order Number": order.orderNumber,
-          "Order Date": order.orderDate ? dayjs(order.orderDate).format("YYYY-MM-DD") : "",
-          "Customer Name": order.customerName,
-          "Status": order.status,
-          "Bill Mode": order.bill_mode || "N/A",
-          
-          // Item Fields
-          "Item Name": item.item,
+          "Order Date": order.orderDate
+            ? dayjs(order.orderDate).format("YYYY-MM-DD")
+            : "",
+
+          "Customer Name": order.customerName || "",
+          "Status": order.status || "",
+          "Bill Mode": order.bill_mode || "",
+
+          "Contract No": contract.contractNo || "",
+
+          "Item Name": item.item || "",
+          "Item Code": item.itemCode || "",
           "HSN Code": item.hsnCode || "",
-          "Net Qty": item.qty,
-          "Rate": item.rate,
-          "Taxable Amount": taxableVal,
-          
-          // Tax Fields (Percentages)
-          "SGST %": sgstP,
-          "CGST %": cgstP,
-          "IGST %": igstP,
-          
-          // Calculated Amounts (Fixes the 0.00 issue in your images)
-          "SGST Amt": sAmt.toFixed(2),
-          "CGST Amt": cAmt.toFixed(2),
-          "IGST Amt": iAmt.toFixed(2),
-          
-          // Totals
-          "TCS Amount": tcsAmt,
+          "UOM": item.uom || "",
+
+          "Quantity": item.qty || 0,
+          "Free Quantity": item.freeQty || 0,
+          "Total Quantity": item.totalQty || 0,
+
+          "Rate": item.rate || 0,
+
+          "Amount": item.amount || 0,
+          "Discount %": item.discountPercent || 0,
+          "Discount Amount": item.discountAmt || 0,
+
+          "Taxable Amount": item.totalAmount || 0,
+
+          "SGST %": order.orderTaxAndTotals?.sgstPercent || 0,
+          "CGST %": order.orderTaxAndTotals?.cgstPercent || 0,
+          "IGST %": order.orderTaxAndTotals?.igstPercent || 0,
+
+          "TCS Amount": order.orderTaxAndTotals?.tcsAmt || 0,
+
+          "Gross Amount": order.orderTaxAndTotals?.grossAmountTotal || 0,
+          "Discount Total": order.orderTaxAndTotals?.discountTotal || 0,
           "Grand Total": order.orderTaxAndTotals?.grandTotal || 0,
         });
+
       });
     });
   });
 
   exportToExcel(exportData, "Sales_Orders_Export");
-  message.success("Excel file generated with calculated values");
+  message.success("Excel exported successfully");
 };
 const handleSearch = (value) => {
   setSearchText(value);
@@ -326,14 +324,17 @@ const handleStatusChange = async (value, form) => {
         });
 
         const contracts = Object.values(contractsMap);
-        const { orderTaxAndTotals, orderTotals } =
-  computeOrderTotalsFromContracts(contracts, {
-    sgstPercent: Number(order.sgst || 0),
-    cgstPercent: Number(order.cgst || 0),
-    igstPercent: Number(order.igst || 0),
-    tcsAmt: Number(order.tcs_amount || 0),
-  });
-        return {
+const totals = computeOrderTotalsFromContracts(contracts);
+
+const orderTaxAndTotals = {
+  ...totals.orderTaxAndTotals,
+  sgstPercent: Number(order.sgst || 0),
+  cgstPercent: Number(order.cgst || 0),
+  igstPercent: Number(order.igst || 0),
+  tcsAmt: Number(order.tcs_amount || 0),
+};
+
+return {
   key: order.sales_order_id,
   orderNumber: order.order_number,
   orderDate: order.order_date,
@@ -341,22 +342,8 @@ const handleStatusChange = async (value, form) => {
   customerName: order.customer?.name || "-",
   status: order.status,
   contracts,
-  orderTaxAndTotals,
-  orderTotals,
-          customerId: order.customer?.customer_id,
-          customer_id: order.customer?.customer_id,
-          customerEmail: order.customer?.email_id,
-          deliveryAddress: order.customer?.address_line1,
-
-          status: order.status,
-          bill_mode: order.bill_mode,
-          purchaseType: order.purchase_type,
-
-         
-
-          createdAt: order.created_at,
-          companyName: "-",
-        };
+  orderTaxAndTotals
+};
       });
 
       setData(mappedData);
@@ -672,29 +659,23 @@ purchaseType: order.purchase_type,
 narration: order.narration,      // NEW
 
         contracts,
-        orderTaxAndTotals: {
-          sgstPercent: Number(order.sgst || 0),
-          cgstPercent: Number(order.cgst || 0),
-          igstPercent: Number(order.igst || 0),
-          tcsAmt: Number(order.tcs_amount || 0),
-          grandTotal: Number(order.grand_total || 0),
-          grossAmountTotal: Number(order.total_amount || 0),
-          // Calculate if missing
-          discountTotal: (order.items || []).reduce(
-            (acc, curr) =>
-              acc + (Number(curr.total_amount) - Number(curr.line_total)),
-            0,
-          ),
-          totalGST:
-            Number(order.grand_total || 0) -
-            Number(order.tcs_amount || 0) -
-            (Number(order.total_amount || 0) -
-              (order.items || []).reduce(
-                (acc, curr) =>
-                  acc + (Number(curr.total_amount) - Number(curr.line_total)),
-                0,
-              )),
-        },
+      orderTaxAndTotals: {
+  sgstPercent: Number(order.sgst || 0),
+  cgstPercent: Number(order.cgst || 0),
+  igstPercent: Number(order.igst || 0),
+  tcsAmt: Number(order.tcs_amount || 0),
+
+  grandTotal: Number(order.grand_total || 0),
+  grossAmountTotal: Number(order.total_amount || 0),
+
+  discountTotal: (order.items || []).reduce(
+    (acc, curr) =>
+      acc + (Number(curr.total_amount) - Number(curr.line_total)),
+    0
+  ),
+
+  totalGST: Number(order.total_gst_amount || 0),
+}
       };
 
       setSelectedRecord(mappedData);
@@ -1300,6 +1281,7 @@ narration: order.narration,      // NEW
               addForm.getFieldValue("orderDate") &&
               current < addForm.getFieldValue("orderDate").startOf("day")
             }
+            disabled={disabled}
           />   </Form.Item>
         </Col>
   <Col span={6}>

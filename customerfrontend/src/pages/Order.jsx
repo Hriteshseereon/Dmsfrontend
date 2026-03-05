@@ -1,5 +1,5 @@
 
-  // SaleOrdersInvoice.jsx 
+  // OrdersInvoice.jsx 
 import React, { useState, useEffect,useMemo } from "react";
 import {
   Table,
@@ -306,7 +306,7 @@ if (res && res.length > 0) {
           customerEmail: order.customer?.email_id,
           deliveryAddress: order.customer?.address_line1,
 
-          status: order.status,
+        
           bill_mode: order.bill_mode,
           purchaseType: order.purchase_type,
 

@@ -44,7 +44,7 @@ export const getSalesOrders = async () => {
 
 export const getSalesOrderById = async (id) => {
   const { currentOrgId } = useSessionStore.getState();
-  const res = await api.get(`/sales/orders/${id}/`, {
+  const res = await api.get(`/sales/customer/orders/${id}/`, {
     params: { organisation: currentOrgId }
   });
   return res.data;
