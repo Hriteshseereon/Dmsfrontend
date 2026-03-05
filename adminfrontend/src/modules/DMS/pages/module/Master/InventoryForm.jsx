@@ -18,15 +18,23 @@ import {
   EditOutlined,
   FilterOutlined,
 } from "@ant-design/icons";
+// import {
+//   getAllVendor,
+//   getproductbyVendor,
+//   getAllInventory,
+//   addInventory,
+//   getInventoryById,
+//   updateInventory,
+// } from "../../../../../api/inventory";
+
 import {
-  getAllVendor,
   getproductbyVendor,
   getAllInventory,
   addInventory,
   getInventoryById,
   updateInventory,
+  getAllVendor,
 } from "../../../../../api/Inventory";
-
 const { Option } = Select;
 
 export default function InventoryForm() {
