@@ -33,8 +33,8 @@ import {
   addInventory,
   getInventoryById,
   updateInventory,
-  getAllVendor,
-} from "../../../../../api/Inventory";
+} from "../../../../../api/masterinventory";
+
 const { Option } = Select;
 
 export default function InventoryForm() {
