@@ -26,6 +26,25 @@ import { exportToExcel } from "../../../../../utils/exportToExcel";
 import { getPurchaseInvoice,getPurchaseOrder,addPurchaseInvoice,getPurchaseInvoiceById,updatePurchaseInvoice,getPurchaseOrderById ,getAllTransport,addAssignment} from "../../../../../api/purchase";
 const { Option } = Select;
 const isAdmin = true; // <-- change to false to simulate non-admin
+const dummySaleOrders = [
+  {
+    sale_order_no: "SO-001",
+    customer_name: "ABC Retail",
+    delivery_address: "Bhubaneswar",
+    items: [
+      { item: "Palm Oil", qty: 100 },
+      { item: "Sunflower Oil", qty: 50 },
+    ],
+  },
+  {
+    sale_order_no: "SO-002",
+    customer_name: "XYZ Traders",
+    delivery_address: "Cuttack",
+    items: [
+      { item: "Coconut Oil", qty: 80 },
+    ],
+  },
+];
 const purchaseInvoiceJSON = {
   records: [
     {
@@ -207,7 +226,10 @@ const [loading, setLoading] = useState(false);
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
   const [assignForm] = Form.useForm();
-
+  const [saleOrders, setSaleOrders] = useState([]);
+  useEffect(() => {
+  setSaleOrders(dummySaleOrders);
+}, []);
   // Search handler
  const handleSearch = (value) => {
   setSearchText(value);
@@ -865,18 +887,11 @@ console.log("PAYLOAD:", payload);
                   <DatePicker className="w-full" disabled format="YYYY-MM-DD" />
                 </Form.Item>
               </Col>
-              <Col span={8}>
-              <Form.Item
-                label="Delivery Address"
-                name="deliveryAddress"
-                rules={[{ required: true, message: "Please enter delivery address" }]}
-              >
-                <Input disabled placeholder="Delivery address" />
-              </Form.Item>
-            </Col>
+             
 
               
             </Row>
+          
 
             <h6 className=" text-amber-500 ">Item & Pricing Details</h6>
 
@@ -887,10 +902,10 @@ console.log("PAYLOAD:", payload);
                   {fields.map((field, index) => (
                     <div
                       key={field.key}
-                      className="border border-amber-200 rounded-lg p-3 mb-3"
+                      
                     >
                       <div className="flex justify-between items-center mb-2">
-                        <span className="font-semibold text-amber-700">Item #{index + 1}</span>
+                        <span className="font-semibold text-amber-700">Item {index + 1}</span>
                       </div>
 
                       <Row gutter={24}>
@@ -1038,6 +1053,74 @@ console.log("PAYLOAD:", payload);
                 </Form.Item>
               </Col>
             </Row>
+              <h6 className="text-amber-500 pb-2">Sale Order Details</h6>
+
+<Form.List name="sale_orders">
+  {(fields) => (
+    <>
+      {saleOrders.map((order, index) => (
+        <div
+          key={index}
+          className="border border-amber-200 rounded-lg p-3 mb-3"
+        >
+        
+
+          <Row gutter={24}>
+            <Col span={6}>
+              <Form.Item
+                label="Sale Order No"
+                name={[index, "sale_order_no"]}
+                initialValue={order.sale_order_no}
+              >
+                <Input disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item
+                label="Customer Name"
+                name={[index, "customer_name"]}
+                initialValue={order.customer_name}
+              >
+                <Input disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item
+                label="Delivery Address"
+                name={[index, "delivery_address"]}
+                initialValue={order.delivery_address}
+              >
+                <Input disabled />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {order.items.map((item, i) => (
+            <Row gutter={24} key={i}>
+              <Col span={6}>
+                <Form.Item label="Item">
+                  <Input value={item.item} disabled />
+                </Form.Item>
+              </Col>
+
+              <Col span={6}>
+                <Form.Item label="Item Quantity">
+                  <InputNumber
+                    className="w-full!"
+                    value={item.qty}
+                    disabled
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          ))}
+        </div>
+      ))}
+    </>
+  )}
+</Form.List>
           </>
     
       </>

@@ -1,12 +1,6 @@
  import React, { useState,useEffect } from "react";  
-import { positiveNumberInputProps } from "../../../helpers/numberInput";
-import {
-  requiredPositiveNumber,
-  optionalPositiveNumber,
-  percentageValidation,
-} from "../../../helpers/formValidation";
 import { exportToExcel } from "../../../../../utils/exportToExcel";
-import { getPurchaseOrder,getPurchaseContract ,getSoudaByContractId,addPurchaseOrder,getPurchaseOrderById,updatePurchaseOrder} from "../../../../../api/purchase";
+import { getPurchaseOrder,getPurchaseContract ,getSoudaByContractId,addPurchaseOrder,getPurchaseOrderById,updatePurchaseOrder,getAllSalesOrder} from "../../../../../api/purchase";
 import {
   Table,
   Input,
@@ -78,11 +72,10 @@ export default function PurchaseIndent() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
  const [soudaContracts, setSoudaContracts] = useState([]);
+ const [salesOrders, setSalesOrders] = useState([]);
   const [data, setData] = useState([]);
  const [loading, setLoading] = useState(false);
  const [contractItems, setContractItems] = useState([]);
-const [vendor, setVendor] = useState(null);
-const [selectedVendor, setSelectedVendor] = useState(null);
 
   const [searchText, setSearchText] = useState("");
 
@@ -92,7 +85,7 @@ const [selectedVendor, setSelectedVendor] = useState(null);
   useEffect(() => {
   fetchPurchaseOrder();
   fetchSoudaNoOptions();
-  
+   
 }, []);
 
 const fetchPurchaseOrder = async () => {
@@ -142,6 +135,17 @@ const fetchSoudaNoOptions = async () => {
   }
 };
 
+const fetchSalesOrderOptions = async (vendorId) => {
+  try {
+    const res = await getAllSalesOrder(vendorId);
+    const list = res?.data || res;
+    setSalesOrders(list);
+  } catch (err) {
+    message.error("Failed to load sales orders");
+  }
+};
+
+
 
 
 const handleSearch = (value) => {
@@ -168,7 +172,7 @@ const handleSoudaSelect = async (contractId, formInstance, existingItems = []) =
     const data = res?.data || res;
 
     setContractItems(data.items || []);
-
+     fetchSalesOrderOptions(data.vendor); 
     // Merge existing items if provided
     const itemsToSet = existingItems.length
       ? existingItems.map(it => ({
@@ -308,6 +312,21 @@ const handleExport = async () => {
 
 const handleFormSubmit = async (values, type) => {
   try {
+    const selectedSalesOrders = salesOrders.filter(so =>
+  values.saleorderNo?.includes(so.id)
+);
+
+const sales_orders = selectedSalesOrders.map(so => so.id);
+
+const sales_order_details = [];
+
+selectedSalesOrders.forEach(so => {
+  so.matching_items?.forEach(item => {
+    sales_order_details.push({
+      sales_order_id: so.id,
+    });
+  });
+});
     const selectedContract = soudaContracts.find(
       (c) => c.id === values.contract
     );
@@ -338,7 +357,8 @@ const handleFormSubmit = async (values, type) => {
       contract: values.contract,
       vendor: selectedContract?.vendor,
       souda_no: selectedContract?.contract_number,
-
+       sales_orders: sales_orders,               // ✅ ADD
+  sales_order_details: sales_order_details, // ✅ ADD
       plant_name: values.plantName || "",
       plant_display_name: values.plantName || "",
       delivery_address: values.deliveryAddress || "",
@@ -380,7 +400,7 @@ const handleFormSubmit = async (values, type) => {
         },
       })),
     };
-
+console.log("Purchase Order Payload:", payload);
     // 🔥 API CALL
     if (type === "edit") {
       await updatePurchaseOrder(selectedRecord.id, payload);
@@ -562,6 +582,7 @@ await handleSoudaSelect(data.contract, editForm, data.items);
   const formattedData = {
   contract: data.contract,
   vendorName: data.vendor_name,
+  vendorId: data.vendor, // ✅ Add vendor ID for API
   plantName: data.plant_name,
   deliveryAddress: data.delivery_address,
   status: data.status,
@@ -689,15 +710,28 @@ setTimeout(() => {
             </Select>
           </Form.Item>
         </Col>
-        <Col span={8}>
-          <Form.Item
-            label="Delivery Address"
-            name="deliveryAddress"
-            rules={[{ required: true }]}
+       <Col span={6}>
+  <Form.Item
+    label=" Sale Order No"
+    name="saleorderNo"
+    rules={[{ required: true, message: "Please select sale order number" }]}
+  >
+    <Select
+      mode="multiple"
+      placeholder="Select sale Order No"
+      allowClear
+      showSearch
+      disabled={disabled}
+      listHeight={150} 
+      options={salesOrders.map(c=>({
+        label: c.order_number,
+        value: c.id
+      }))}
+    
           >
-            <Input.TextArea rows={2} />
-          </Form.Item>
-        </Col>
+          </Select>
+  </Form.Item>
+</Col>
 
 
        

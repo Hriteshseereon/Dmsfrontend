@@ -105,6 +105,20 @@ export const updatePurchaseOrder = async (orderId, payload) => {
   );
   return res.data;
 }
+// fetch all sales orders for dropdown (by vendor)
+export const getAllSalesOrder = async (vendorId) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get("/sales/orders/by-vendor/", {
+    params: {
+      organisation: currentOrgId,
+      vendor_id: vendorId,
+    },
+  });
+
+  return res.data;
+};
+
 
 // PURCHASE INVOICES
 //fetch all purchase invoices
@@ -112,6 +126,7 @@ export const getPurchaseInvoice = async () => {
   const res = await api.get("/purchase/invoices/");
   return res.data;
 };
+
 //add purchase invoice
 export const addPurchaseInvoice = async (payload) => {
   const currentOrgId = useSessionStore.getState().currentOrgId;

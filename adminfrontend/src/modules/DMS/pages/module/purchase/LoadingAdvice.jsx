@@ -23,7 +23,25 @@ import dayjs from "dayjs";
 import { exportToExcel } from "../../../../../utils/exportToExcel";
 import { getLoadingAdvice, getLoadingAdviceById, updateLoadingAdvice } from "../../../../../api/purchase";
 const { Option } = Select;
-
+const dummySaleOrders = [
+  {
+    sale_order_no: "SO-001",
+    customer_name: "ABC Retail",
+    delivery_address: "Bhubaneswar",
+    items: [
+      { item: "Palm Oil", qty: 100 ,delivered_qty: 80},
+      { item: "Sunflower Oil", qty: 50 ,delivered_qty: 40},
+    ],
+  },
+  {
+    sale_order_no: "SO-002",
+    customer_name: "XYZ Traders",
+    delivery_address: "Cuttack",
+    items: [
+      { item: "Coconut Oil", qty: 80 ,delivered_qty: 60},
+    ],
+  },
+];
 const invoiceData = {
   ORD001: {
     invoiceNo: "ORD001",
@@ -485,7 +503,7 @@ await updateLoadingAdvice(selectedRecord.id, payload);
     },  
     {
       title: <span className="text-amber-700 font-semibold">Assignment</span>,
-      width:150,
+      width:180,
       dataIndex: "status",
       key: "status",
       render: (status) => {
@@ -496,13 +514,13 @@ await updateLoadingAdvice(selectedRecord.id, payload);
           Approved: "bg-green-100 text-green-700",
           Delivered:" bg-green-100 text-green-700",
           "In-Transit":"bg-orange-100 text-orange-700",
-         "Out for delivery":"bg-blue-100 text-blue-700"
+         "Out for delivery":"bg-blue-100 text-blue-700 ",
 
 
         };
 
         return (
-          <span className={`px-2 py-1 rounded ${colorMap[status] || "bg-gray-100 text-gray-700"}`}>
+          <span className={`px-3 py-1 rounded-full font-semibold inline-block text-sm ${colorMap[status] ||""}`}>
             {status || "-"}
           </span>
         );
@@ -630,7 +648,81 @@ const getAllowedStatus = (formInstance) => {
 </Form.Item>
         </Col>
       </Row>
+   <h6 className="text-amber-500 pb-2 font-semibold">
+        Sale Order Details
+      </h6>
 
+      {dummySaleOrders.map((order, index) => (
+        <div
+          key={index}
+              className="border border-amber-200 rounded-lg p-3 mb-3"
+       >
+           <Row gutter={24}>
+            <Col span={6}>
+              <Form.Item
+                label="Sale Order No"
+                name={[index, "sale_order_no"]}
+                initialValue={order.sale_order_no}
+              >
+                <Input disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item
+                label="Customer Name"
+                name={[index, "customer_name"]}
+                initialValue={order.customer_name}
+              >
+                <Input disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item
+                label="Delivery Address"
+                name={[index, "delivery_address"]}
+                initialValue={order.delivery_address}
+              >
+                <Input disabled />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {order.items?.map((item, i) => (
+            <Row gutter={24} key={i}>
+              <Col span={6}>
+                <Form.Item
+                  label="Item"
+                  name={[index, "item"]}
+                  initialValue={item.item}
+                >
+                  <Input disabled />
+                </Form.Item>
+              </Col>
+
+              <Col span={6}>
+                <Form.Item
+                  label="Quantity"
+                  name={[index, "qty"]}
+                  initialValue={item.qty}
+                >
+                  <Input disabled />
+                </Form.Item>
+              </Col>
+               <Col span={6}>
+                <Form.Item
+                  label="Delivered Quantity"
+                  name={[index, "delivered_qty"]}
+                  initialValue={item.delivered_qty}
+                >
+                  <Input  disabled={formInstance.getFieldValue("status") !== "Pending"} />
+                </Form.Item>
+              </Col>
+            </Row>
+          ))}
+        </div>
+      ))}
       {/* Company Details */}
       <Row gutter={24}>
         <Col span={24}>

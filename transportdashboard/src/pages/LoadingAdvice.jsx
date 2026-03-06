@@ -26,7 +26,25 @@ import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/;
 
-
+const dummySaleOrders = [
+  {
+    sale_order_no: "SO-001",
+    customer_name: "ABC Retail",
+    delivery_address: "Bhubaneswar",
+    items: [
+      { item: "Palm Oil", qty: 100 ,delivered_qty: 80},
+      { item: "Sunflower Oil", qty: 50 ,delivered_qty: 40},
+    ],
+  },
+  {
+    sale_order_no: "SO-002",
+    customer_name: "XYZ Traders",
+    delivery_address: "Cuttack",
+    items: [
+      { item: "Coconut Oil", qty: 80 ,delivered_qty: 60},
+    ],
+  },
+];
 
 export default function LoadingAdvice() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -146,6 +164,8 @@ variance: parseFloat(i.variance) || 0, uom: i.uom_details?.unit_name,
     })),
   };
 };
+
+
 const handleEdit = async (record) => {
   try {
    const res = await getLoadingAdviceById(record.key);
@@ -373,10 +393,97 @@ const getAllowedStatusOptions = (currentStatus) => {
     },
   ];
 
+const renderSaleOrderDetails = () => {
+  if (!selectedRecord || selectedRecord.status !== "In-Transit") return null;
+
+  const saleOrders = dummySaleOrders || [];
+
+  if (!saleOrders.length) return null;
+
+  return (
+    <>
+      <h6 className="text-amber-500 pb-2 font-semibold">
+        Sale Order Details
+      </h6>
+
+      {saleOrders.map((order, index) => (
+        <div
+          key={index}
+              className="border border-amber-200 rounded-lg p-3 mb-3"
+       >
+           <Row gutter={24}>
+            <Col span={6}>
+              <Form.Item
+                label="Sale Order No"
+                name={[index, "sale_order_no"]}
+                initialValue={order.sale_order_no}
+              >
+                <Input disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item
+                label="Customer Name"
+                name={[index, "customer_name"]}
+                initialValue={order.customer_name}
+              >
+                <Input disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item
+                label="Delivery Address"
+                name={[index, "delivery_address"]}
+                initialValue={order.delivery_address}
+              >
+                <Input disabled />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {order.items?.map((item, i) => (
+            <Row gutter={24} key={i}>
+              <Col span={6}>
+                <Form.Item
+                  label="Item"
+                  name={[index, "item"]}
+                  initialValue={item.item}
+                >
+                  <Input disabled />
+                </Form.Item>
+              </Col>
+
+              <Col span={6}>
+                <Form.Item
+                  label="Quantity"
+                  name={[index, "qty"]}
+                  initialValue={item.qty}
+                >
+                  <Input disabled />
+                </Form.Item>
+              </Col>
+               <Col span={6}>
+                <Form.Item
+                  label="Delivered Quantity"
+                  name={[index, "delivered_qty"]}
+                  initialValue={item.delivered_qty}
+                >
+                  <Input disabled />
+                </Form.Item>
+              </Col>
+            </Row>
+          ))}
+        </div>
+      ))}
+    </>
+  );
+};
   const renderVendorPlantDetails = (disabled = false) => {
     return (
       <>
-        <div className="text-base font-semibold m-0 text-amber-600 mb-3">
+        <div className="text-base font-semibold m-2 text-amber-600 mt-2!">
           Vendor Details
         </div>
         <Row gutter={24}>
@@ -419,7 +526,7 @@ const getAllowedStatusOptions = (currentStatus) => {
           </Col>
         </Row>
 
-        <div className="text-base font-semibold m-0 text-amber-600 mb-3 mt-4">
+        <div className="text-base font-semibold m-0 text-amber-600 mb-2">
           Plant Details
         </div>
         <Row gutter={24}>
@@ -468,7 +575,7 @@ const getAllowedStatusOptions = (currentStatus) => {
 
 const renderTransportDetails = (disabled = false) => (
   <>
-    <div className="text-base font-semibold m-0 text-amber-600 mb-3 mt-4">
+    <div className="text-base font-semibold m-0 text-amber-600 mb-2 ">
       Transport Details
     </div>
     <Row gutter={24}>
@@ -519,7 +626,7 @@ const renderTransportDetails = (disabled = false) => (
 );
 const renderLoadingDetails = (disabled = false) => (
   <>
-    <div className="text-base font-semibold m-0 text-amber-600 mb-3 mt-4">
+    <div className="text-base font-semibold m-0 text-amber-600 mb-3">
       Loading Details
     </div>
     <Row gutter={24}>
@@ -653,13 +760,13 @@ const renderLoadingDetails = (disabled = false) => (
     {
       title: "SL No.",
       dataIndex: "slNo",
-      width: 50,
+        width:20,
       render: (text) => <span className="font-medium">{text}</span>,
     },
     {
       title: "Item Name",
       dataIndex: "itemName",
-      width: 100,
+         width:20,
       render: (text) => <span>{text}</span>,
     },
    
@@ -667,13 +774,13 @@ const renderLoadingDetails = (disabled = false) => (
     {
       title: "Required Qty",
       dataIndex: "reqQty",
-      width: 50,
+           width:20,
       render: (text) => <span>{text}</span>,
     },
     {
       title: "Actual Qty",
       dataIndex: "actualQty",
-      width: 50,
+         width:20,
     render: (_, record) => (
   <Input
     type="number"
@@ -689,7 +796,7 @@ const renderLoadingDetails = (disabled = false) => (
     {
       title: "Variance",
       dataIndex: "variance",
-      width: 50,
+      width:20,
       render: (text) => (
         <span
           className={`font-semibold ${
@@ -703,7 +810,7 @@ const renderLoadingDetails = (disabled = false) => (
     {
       title: "UOM",
       dataIndex: "uom",
-      width: 50,
+           width:20,
       render: (text, record) =>
         disabled ? (
           <span>{text}</span>
@@ -725,7 +832,7 @@ const renderLoadingDetails = (disabled = false) => (
 
   return (
     <>
-      <div className="flex justify-between items-center mb-3 mt-4">
+      <div className="flex justify-between items-center mb-2 ">
         <div className="text-base font-semibold text-amber-600">
           Item Details
         </div>
@@ -850,13 +957,14 @@ const renderLoadingDetails = (disabled = false) => (
             </Col>
           
           </Row>
-
+  {renderTransportDetails(false)}
          {renderLoadingDetails(false)}
+       
 {renderItemsTable(false)}
-{renderTransportDetails(false)}
+
 {renderVendorPlantDetails(false)}
 
-
+{renderSaleOrderDetails()}
           <div className="flex justify-end gap-2 mt-4">
             <Button
               onClick={() => {
@@ -914,10 +1022,12 @@ const renderLoadingDetails = (disabled = false) => (
             </Col>
             
           </Row>
+          
+{renderTransportDetails(true)}
 {renderLoadingDetails(true)}
 {renderItemsTable(true)}
-{renderTransportDetails(true)}
 {renderVendorPlantDetails(true)}
+{renderSaleOrderDetails()}
 
         </Form>
       </Modal>
