@@ -95,7 +95,6 @@ export default function CustomerTab() {
 
   /* ================= MAP API → FORM ================= */
   const mapDetailsToForm = (details) => ({
-    customerCode: details.customer_code,
     name: details.customer_name,
     branchName: details.business_name,
     phoneNo: details.phone_number,
@@ -103,42 +102,82 @@ export default function CustomerTab() {
     email: details.email_address,
     type: details.customer_type,
     status: details.status,
-    contactPerson: details.contact_person,
+
     address: details.address,
+    address1: details.address_line1,
     country: details.country,
     state: details.state,
     district: details.district,
     city: details.city,
     pinCode: details.pin_code,
     location: details.location,
-    creditFacility: details.credit_facility,
-    securityForCreditFacility:
-      details.security_for_credit || details.security_for_credit_facility,
-    advCheque: details.advance_cheque_no || details.adv_cheque,
-    amountLimit: details.amount_limit,
-    noDaysLimit: details.days_limit || details.no_days_limit,
-    noInvoiceLimit: details.invoice_limit || details.no_invoice_limit,
-    soudaLimit: details.souda_limit_ton || details.souda_limit,
-    gstNo: details.gst_number || details.gst_no,
-    tinNo: details.tin_number || details.tin_no,
-    panNo: details.pan_number || details.pan_no,
-    aadharNo: details.aadhaar_number || details.aadhar_no,
-    fssaiNo: details.fssai_number || details.fssai_no,
-    licenseNo: details.license_number || details.license_no,
-    tdsApplicable: details.tds_applicable ? "Yes" : "No",
-    billingType: details.billing_type,
 
-    // File mappings
-    gstDoc: fileFromUrl(details.gst_document || details.gst_doc),
-    panDoc: fileFromUrl(details.pan_document || details.pan_doc),
-    aadharDoc: fileFromUrl(details.aadhaar_document || details.aadhar_doc),
+    creditFacility: details.credit_facility,
+    securityForCreditFacility: details.security_for_credit,
+
+    advCheque: details.advance_cheque_no,
+
+    amountLimit: details.amount_limit,
+    noDaysLimit: details.days_limit,
+    noInvoiceLimit: details.invoice_limit,
+    soudaLimit: details.souda_limit_ton,
+
+    gstNo: details.gst_number,
+    tinNo: details.tin_number,
+    panNo: details.pan_number,
+    aadharNo: details.aadhaar_number,
+    fssaiNo: details.fssai_number,
+    licenseNo: details.license_number,
+
+    tdsApplicable: details.tds_applicable ? "Yes" : "No",
+    tdsRate: details.rate_of_tds,
+
+    // ===== BG =====
+    bgBankName: details.bg_bank_name,
+    bgAmount: details.bg_amount,
+    bgNumber: details.bg_number,
+
+    bgDate: details.bg_date ? dayjs(details.bg_date) : null,
+    bgValidFrom: details.bg_valid_from ? dayjs(details.bg_valid_from) : null,
+    bgValidUpto: details.bg_valid_upto ? dayjs(details.bg_valid_upto) : null,
+
+    // ===== PDC =====
+    pdcBank: details.pdc_bank_name,
+    pdcNumber: details.pdc_cheque_number,
+    pdcAmount: details.pdc_amount,
+
+    pdcIssueDate: details.pdc_issue_date ? dayjs(details.pdc_issue_date) : null,
+    pdcDate: details.pdc_cheque_date ? dayjs(details.pdc_cheque_date) : null,
+    pdcValid: details.pdc_valid_upto ? dayjs(details.pdc_valid_upto) : null,
+
+    // ===== FD =====
+    fdBank: details.fd_bank_name,
+    fdCheque: details.fd_cheque_number,
+    fdSecurity: details.fd_security_detail,
+    fdInterest: details.fd_rate_of_interest,
+    fdDate: details.fd_date ? dayjs(details.fd_date) : null,
+
+    // ===== Collateral =====
+    collateralDetails: details.collateral_details,
+    collateralAddress: details.collateral_address,
+    collateralValue: details.collateral_market_value,
+
+    // ===== FILES =====
+    gstDoc: fileFromUrl(details.gst_document),
+    panDoc: fileFromUrl(details.pan_document),
+    aadharDoc: fileFromUrl(details.aadhaar_document),
   });
 
   const openCustomer = async (record, view = false) => {
     try {
       const id = record.customer_id || record.id;
+
       const details = await getAdminCustomerDetails(id);
+
       form.setFieldsValue(mapDetailsToForm(details));
+
+      setSecurityType(details.security_for_credit);
+
       setSelected(details);
       setViewMode(view);
       setOpen(true);
@@ -147,7 +186,6 @@ export default function CustomerTab() {
       message.error("Failed to load customer details");
     }
   };
-
   /* ================= SAVE ================= */
   const handleSubmit = async (values) => {
     try {
@@ -390,6 +428,7 @@ export default function CustomerTab() {
           onClick={() => {
             setSelected(null);
             setViewMode(false);
+            setSecurityType(null);
             form.resetFields();
             setOpen(true);
           }}
