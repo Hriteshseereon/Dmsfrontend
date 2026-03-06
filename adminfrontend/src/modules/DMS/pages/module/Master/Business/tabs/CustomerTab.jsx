@@ -26,7 +26,8 @@ import {
   updateAdminCustomer,
   getAdminCustomers,
 } from "../../../../../../../api/customer";
-
+import { DatePicker } from "antd";
+import dayjs from "dayjs";
 const { Option } = Select;
 
 const inputClass = "border-amber-400 h-8";
@@ -41,7 +42,15 @@ export default function CustomerTab() {
   const [loading, setLoading] = useState(false);
   const [securityType, setSecurityType] = useState(null);
   const [form] = Form.useForm();
-
+  const generatePassword = () => {
+    const chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let pass = "";
+    for (let i = 0; i < 8; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return pass;
+  };
   const fileFromUrl = (url) => {
     if (!url) return [];
 
@@ -72,6 +81,14 @@ export default function CustomerTab() {
     }
   };
 
+  // useeffect function to fetch the random password
+  useEffect(() => {
+    if (!selected && open) {
+      form.setFieldsValue({
+        password: generatePassword(),
+      });
+    }
+  }, [open]);
   useEffect(() => {
     fetchCustomers();
   }, []);
@@ -135,65 +152,141 @@ export default function CustomerTab() {
   const handleSubmit = async (values) => {
     try {
       setLoading(true);
-      const payload = {
-        customer_name: values.name,
-        business_name: values.branchName,
-        phone_number: values.phoneNo,
-        mobile_number: values.mobileNo,
-        email_address: values.email,
-        customer_type: values.type,
-        status: values.status,
-        contact_person: values.contactPerson,
-        address: values.address,
-        country: values.country,
-        state: values.state,
-        district: values.district,
-        city: values.city,
-        pin_code: values.pinCode,
-        location: values.location,
-        credit_facility: values.creditFacility,
-        security_for_credit: values.securityForCreditFacility,
-        advance_cheque_no: values.advCheque,
-        amount_limit: Number(values.amountLimit) || 0,
-        days_limit: Number(values.noDaysLimit) || 0,
-        invoice_limit: Number(values.noInvoiceLimit) || 0,
-        souda_limit_ton: Number(values.soudaLimit) || 0,
-        gst_number: values.gstNo,
-        tin_number: values.tinNo,
-        pan_number: values.panNo,
-        aadhaar_number: values.aadharNo,
-        fssai_number: values.fssaiNo,
-        license_number: values.licenseNo,
-        tds_applicable: values.tdsApplicable === "Yes",
-        billing_type: values.billingType,
-      };
 
-      // Extract ID resiliently
-      const id =
-        selected?.customer_id || selected?.id || selected?.customerCode;
+      const formData = new FormData();
 
-      // Add ID to payload if updating (some APIs need it in body)
-      if (selected) {
-        payload.id = id;
-        payload.customer_id = id;
+      // ===== BASIC =====
+      formData.append("customer_name", values.name);
+      formData.append("business_name", values.branchName);
+      formData.append("phone_number", values.phoneNo);
+      formData.append("mobile_number", values.mobileNo);
+      formData.append("email_address", values.email);
+      formData.append("password", values.password);
+
+      formData.append("customer_type", values.type);
+      formData.append("status", values.status);
+
+      // ===== ADDRESS =====
+      formData.append("address", values.address);
+      formData.append("address_line1", values.address1);
+      formData.append("country", values.country);
+      formData.append("state", values.state);
+      formData.append("district", values.district);
+      formData.append("city", values.city);
+      formData.append("pin_code", values.pinCode);
+      formData.append("location", values.location);
+
+      // ===== LEGAL =====
+      formData.append("gst_number", values.gstNo);
+      formData.append("tin_number", values.tinNo);
+      formData.append("pan_number", values.panNo);
+      formData.append("aadhaar_number", values.aadharNo);
+      formData.append("fssai_number", values.fssaiNo);
+      formData.append("license_number", values.licenseNo);
+
+      formData.append("tds_applicable", values.tdsApplicable === "Yes");
+      formData.append("rate_of_tds", values.tdsRate || "1.50");
+
+      // formData.append("billing_type", "REGULAR");
+
+      // ===== CREDIT =====
+      formData.append("credit_facility", values.creditFacility);
+      formData.append("security_for_credit", values.securityForCreditFacility);
+
+      formData.append("amount_limit", values.amountLimit || 0);
+      formData.append("days_limit", values.noDaysLimit || 0);
+      formData.append("invoice_limit", values.noInvoiceLimit || 0);
+      formData.append("souda_limit_ton", values.soudaLimit || 0);
+
+      formData.append("advance_cheque_no", values.advCheque || "");
+
+      // ===== SECURITY TYPES =====
+
+      if (values.securityForCreditFacility === "Bank Guarantee") {
+        formData.append("bg_bank_name", values.bgBankName);
+        formData.append(
+          "bg_date",
+          values.bgDate ? dayjs(values.bgDate).format("YYYY-MM-DD") : "",
+        );
+
+        formData.append("bg_amount", values.bgAmount);
+        formData.append("bg_number", values.bgNumber);
+        formData.append(
+          "bg_valid_from",
+          values.bgValidFrom
+            ? dayjs(values.bgValidFrom).format("YYYY-MM-DD")
+            : "",
+        );
+        formData.append(
+          "bg_valid_upto",
+          values.bgValidUpto
+            ? dayjs(values.bgValidUpto).format("YYYY-MM-DD")
+            : "",
+        );
+
+        if (values.bgDoc?.[0]?.originFileObj) {
+          formData.append("bg_document", values.bgDoc[0].originFileObj);
+        }
       }
 
-      // Handle File Uploads
+      if (values.securityForCreditFacility === "Post Dated Cheque") {
+        formData.append("pdc_bank_name", values.pdcBank);
+        formData.append(
+          "pdc_issue_date",
+          values.pdcIssueDate
+            ? dayjs(values.pdcIssueDate).format("YYYY-MM-DD")
+            : "",
+        );
+        formData.append(
+          "pdc_cheque_date",
+          values.pdcDate ? dayjs(values.pdcDate).format("YYYY-MM-DD") : "",
+        );
+        formData.append("pdc_cheque_number", values.pdcNumber);
+        formData.append("pdc_amount", values.pdcAmount);
+        formData.append(
+          "pdc_valid_upto",
+          values.pdcValid ? dayjs(values.pdcValid).format("YYYY-MM-DD") : "",
+        );
+      }
+
+      if (values.securityForCreditFacility === "Fixed Deposit") {
+        formData.append("fd_bank_name", values.fdBank);
+        formData.append(
+          "fd_date",
+          values.fdDate ? dayjs(values.fdDate).format("YYYY-MM-DD") : "",
+        );
+        formData.append("fd_cheque_number", values.fdCheque);
+        formData.append("fd_security_detail", values.fdSecurity);
+        formData.append("fd_rate_of_interest", values.fdInterest);
+      }
+
+      if (values.securityForCreditFacility === "Collateral") {
+        formData.append("collateral_details", values.collateralDetails);
+        formData.append("collateral_address", values.collateralAddress);
+        formData.append("collateral_market_value", values.collateralValue);
+      }
+
+      // ===== DOCUMENTS =====
+
       if (values.gstDoc?.[0]?.originFileObj) {
-        payload.gst_document = values.gstDoc[0].originFileObj;
-      }
-      if (values.panDoc?.[0]?.originFileObj) {
-        payload.pan_document = values.panDoc[0].originFileObj;
-      }
-      if (values.aadharDoc?.[0]?.originFileObj) {
-        payload.aadhaar_document = values.aadharDoc[0].originFileObj;
+        formData.append("gst_document", values.gstDoc[0].originFileObj);
       }
 
+      if (values.panDoc?.[0]?.originFileObj) {
+        formData.append("pan_document", values.panDoc[0].originFileObj);
+      }
+
+      if (values.aadharDoc?.[0]?.originFileObj) {
+        formData.append("aadhaar_document", values.aadharDoc[0].originFileObj);
+      }
+
+      const id = selected?.customer_id;
+
       if (selected) {
-        await updateAdminCustomer(id, payload);
+        await updateAdminCustomer(id, formData);
         message.success("Customer Updated");
       } else {
-        await addAdminCustomer(payload);
+        await addAdminCustomer(formData);
         message.success("Customer Added");
       }
 
@@ -203,11 +296,7 @@ export default function CustomerTab() {
       fetchCustomers();
     } catch (err) {
       console.error(err);
-      const errorMsg =
-        err.response?.data?.detail ||
-        err.response?.data?.message ||
-        "Save failed";
-      message.error(errorMsg);
+      message.error("Save failed");
     } finally {
       setLoading(false);
     }
@@ -356,7 +445,7 @@ export default function CustomerTab() {
               Customer Basic Details
             </h3>
             <Row gutter={24}>
-              <Col span={6}>
+              {/* <Col span={6}>
                 <Form.Item label="Customer Code" name="customerCode">
                   <Input
                     className={inputClass}
@@ -364,7 +453,7 @@ export default function CustomerTab() {
                     placeholder="Auto-generated"
                   />
                 </Form.Item>
-              </Col>
+              </Col> */}
 
               <Col span={6}>
                 <Form.Item
@@ -640,11 +729,7 @@ export default function CustomerTab() {
 
                   <Col span={6}>
                     <Form.Item label="Date" name="bgDate">
-                      <Input
-                        type="date"
-                        className={inputClass}
-                        disabled={viewMode}
-                      />
+                      <DatePicker className="w-full" format="YYYY-MM-DD" />
                     </Form.Item>
                   </Col>
 
@@ -662,21 +747,13 @@ export default function CustomerTab() {
 
                   <Col span={6}>
                     <Form.Item label="Valid From" name="bgValidFrom">
-                      <Input
-                        type="date"
-                        className={inputClass}
-                        disabled={viewMode}
-                      />
+                      <DatePicker className="w-full" format="YYYY-MM-DD" />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
                     <Form.Item label="Valid Upto" name="bgValidUpto">
-                      <Input
-                        type="date"
-                        className={inputClass}
-                        disabled={viewMode}
-                      />
+                      <DatePicker className="w-full" format="YYYY-MM-DD" />
                     </Form.Item>
                   </Col>
 
@@ -699,21 +776,13 @@ export default function CustomerTab() {
 
                   <Col span={6}>
                     <Form.Item label="Cheque Issue Date" name="pdcIssueDate">
-                      <Input
-                        type="date"
-                        className={inputClass}
-                        disabled={viewMode}
-                      />
+                      <DatePicker className="w-full" format="YYYY-MM-DD" />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
                     <Form.Item label="Cheque Dated" name="pdcDate">
-                      <Input
-                        type="date"
-                        className={inputClass}
-                        disabled={viewMode}
-                      />
+                      <DatePicker className="w-full" format="YYYY-MM-DD" />
                     </Form.Item>
                   </Col>
 
@@ -731,11 +800,7 @@ export default function CustomerTab() {
 
                   <Col span={6}>
                     <Form.Item label="Valid Upto" name="pdcValid">
-                      <Input
-                        type="date"
-                        className={inputClass}
-                        disabled={viewMode}
-                      />
+                      <DatePicker className="w-full" format="YYYY-MM-DD" />
                     </Form.Item>
                   </Col>
                 </Row>
@@ -750,11 +815,7 @@ export default function CustomerTab() {
 
                   <Col span={6}>
                     <Form.Item label="Date" name="fdDate">
-                      <Input
-                        type="date"
-                        className={inputClass}
-                        disabled={viewMode}
-                      />
+                      <DatePicker className="w-full" format="YYYY-MM-DD" />
                     </Form.Item>
                   </Col>
 
