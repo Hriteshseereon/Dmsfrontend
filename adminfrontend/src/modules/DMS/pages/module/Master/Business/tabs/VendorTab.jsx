@@ -402,16 +402,16 @@ export default function VendorTab() {
             setOpen(true);
           }}
         >
-          Add Vendor
+          Add Supplier
         </Button>
       </div>
 
       {/* ===== TABLE CONTAINER ===== */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
-          Vendor Records
+          Supplier Records
         </h2>
-        <p className="text-amber-600 mb-3">Manage your vendor data</p>
+        <p className="text-amber-600 mb-3">Manage your supplier data</p>
         <Table
           columns={columns}
           dataSource={filteredData}
@@ -434,7 +434,11 @@ export default function VendorTab() {
         }}
         title={
           <span className="text-amber-700 font-semibold text-lg">
-            {viewMode ? "View Vendor" : selected ? "Edit Vendor" : "Add Vendor"}
+            {viewMode
+              ? "View Supplier"
+              : selected
+                ? "Edit Supplier"
+                : "Add Supplier"}
           </span>
         }
         styles={{
@@ -450,15 +454,15 @@ export default function VendorTab() {
           {/* ================= Vendor / Company Details ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">
             <h3 className="text-lg font-semibold text-amber-700 mb-3">
-              Vendor / Company Details
+              Supplier Details
             </h3>
             <Row gutter={24}>
               <Col span={6}>
                 <Form.Item
-                  label="Company Name"
+                  label="Supplier Name"
                   name="name"
                   rules={[
-                    { required: true, message: "Company name is required" },
+                    { required: true, message: "Supplier name is required" },
                   ]}
                 >
                   <Input
@@ -693,7 +697,7 @@ export default function VendorTab() {
                 </Form.Item>
               </Col>
 
-              <Col span={6}>
+              {/* <Col span={6}>
                 <Form.Item label="Aadhar No" name="aadharNo">
                   <Input
                     className={inputClass}
@@ -702,10 +706,10 @@ export default function VendorTab() {
                     maxLength={14}
                   />
                 </Form.Item>
-              </Col>
+              </Col> */}
 
-              <Col span={6}>
-                {/* <Form.Item label="Aadhar Document" name="aadharDoc"> */}
+              {/* <Col span={6}>
+                
                 <Form.Item
                   name="aadharDoc"
                   label="Aadhar Document"
@@ -725,7 +729,7 @@ export default function VendorTab() {
                     <Button disabled={viewMode}>Select File</Button>
                   </Upload>
                 </Form.Item>
-              </Col>
+              </Col> */}
             </Row>
           </Card>
 
@@ -735,86 +739,6 @@ export default function VendorTab() {
               Tax & Registration
             </h3>
             <Row gutter={24}>
-              <Col span={4}>
-                <Form.Item
-                  label="TIN No"
-                  name="tinNo"
-                  rules={[
-                    {
-                      pattern: /^[A-Z0-9]{11,15}$/,
-                      message: "Please enter a valid TIN number",
-                    },
-                  ]}
-                >
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="TIN1234567890"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item label="TIN Date" name="tinDate">
-                  <DatePicker className="w-full h-10" disabled={viewMode} />
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                {/* <Form.Item label="TIN Document" name="tinDoc"> */}
-                <Form.Item
-                  name="tinDoc"
-                  label="TIN Document"
-                  valuePropName="fileList"
-                  getValueFromEvent={(e) => e?.fileList}
-                >
-                  <Upload
-                    beforeUpload={() => false}
-                    maxCount={1}
-                    listType="picture"
-                    onPreview={(file) => {
-                      window.open(
-                        file.url || URL.createObjectURL(file.originFileObj),
-                      );
-                    }}
-                  >
-                    <Button disabled={viewMode}>Select File</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item label="PAN No" name="panNo">
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="PAN1234567890"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item
-                  name="panDoc"
-                  label="PAN Document"
-                  valuePropName="fileList"
-                  getValueFromEvent={(e) => e?.fileList}
-                >
-                  <Upload
-                    beforeUpload={() => false}
-                    maxCount={1}
-                    listType="picture"
-                    onPreview={(file) => {
-                      window.open(
-                        file.url || URL.createObjectURL(file.originFileObj),
-                      );
-                    }}
-                  >
-                    <Button disabled={viewMode}>Select File</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-
               <Col span={4}>
                 <Form.Item label="GSTIN No" name="gstIn">
                   <Input
@@ -847,8 +771,86 @@ export default function VendorTab() {
                   </Upload>
                 </Form.Item>
               </Col>
+              <Col span={4}>
+                <Form.Item label="PAN No" name="panNo">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="PAN1234567890"
+                  />
+                </Form.Item>
+              </Col>
 
               <Col span={4}>
+                <Form.Item
+                  name="panDoc"
+                  label="PAN Document"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                    onPreview={(file) => {
+                      window.open(
+                        file.url || URL.createObjectURL(file.originFileObj),
+                      );
+                    }}
+                  >
+                    <Button disabled={viewMode}>Select File</Button>
+                  </Upload>
+                </Form.Item>
+              </Col>
+              <Col span={4}>
+                <Form.Item
+                  label="TIN No"
+                  name="tinNo"
+                  rules={[
+                    {
+                      pattern: /^[A-Z0-9]{11,15}$/,
+                      message: "Please enter a valid TIN number",
+                    },
+                  ]}
+                >
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="TIN1234567890"
+                  />
+                </Form.Item>
+              </Col>
+
+              {/* <Col span={4}>
+                <Form.Item label="TIN Date" name="tinDate">
+                  <DatePicker className="w-full h-10" disabled={viewMode} />
+                </Form.Item>
+              </Col> */}
+
+              <Col span={4}>
+                {/* <Form.Item label="TIN Document" name="tinDoc"> */}
+                <Form.Item
+                  name="tinDoc"
+                  label="TIN Document"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                    onPreview={(file) => {
+                      window.open(
+                        file.url || URL.createObjectURL(file.originFileObj),
+                      );
+                    }}
+                  >
+                    <Button disabled={viewMode}>Select File</Button>
+                  </Upload>
+                </Form.Item>
+              </Col>
+
+              {/* <Col span={4}>
                 <Form.Item label="IGST Applicable" name="igstApplicable">
                   <Select
                     className={selectClass}
@@ -859,7 +861,7 @@ export default function VendorTab() {
                     <Option value="No">No</Option>
                   </Select>
                 </Form.Item>
-              </Col>
+              </Col> */}
             </Row>
           </Card>
 
@@ -894,7 +896,33 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
+              <Col span={4}>
+                <Form.Item label="City" name="city">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter City"
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={4}>
+                <Form.Item label="District" name="district">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter District"
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={4}>
+                <Form.Item label="State" name="state">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter State"
+                  />
+                </Form.Item>
+              </Col>
               <Col span={4}>
                 <Form.Item
                   label="Location"
@@ -905,36 +933,6 @@ export default function VendorTab() {
                     className={inputClass}
                     disabled={viewMode}
                     placeholder="Enter Location"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item label="State" name="state">
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter State"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item label="District" name="district">
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter District"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item label="City" name="city">
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter City"
                   />
                 </Form.Item>
               </Col>
@@ -973,17 +971,14 @@ export default function VendorTab() {
               </Col>
 
               <Col span={6}>
-                <Form.Item label="Transaction Type" name="transactionType">
+                <Form.Item label="Type of Transaction" name="transactionType">
                   <Select
                     className={selectClass}
                     disabled={viewMode}
                     placeholder="Select Transaction Type"
                   >
-                    <Option value="Own">Own</Option>
-                    <Option value="Rent">Rent</Option>
                     <Option value="Super Stockist">Super Stockist</Option>
                     <Option value="Distributer">Distributer</Option>
-                    <Option value="Retailer">Retailer</Option>
                   </Select>
                 </Form.Item>
               </Col>
@@ -992,10 +987,22 @@ export default function VendorTab() {
 
           {/* ================= Plant Details (Dynamic) ================= */}
           <h3 className="text-lg font-semibold text-amber-700 mt-4 mb-2">
-            Plant Details
+            Company Group name
           </h3>
-
-          <div className="max-h-60 overflow-y-auto pr-2 mb-4">
+          <Card className="mb-4 border border-amber-200 rounded-lg">
+            <Row gutter={24}>
+              <Col span={6}>
+                <Form.Item label="Company Group Name" name="companyGroupName">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter Company Group Name"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+          {/* <div className="max-h-60 overflow-y-auto pr-2 mb-4">
             <Form.List name="plants">
               {(fields, { add, remove }) => (
                 <>
@@ -1184,7 +1191,7 @@ export default function VendorTab() {
                 </>
               )}
             </Form.List>
-          </div>
+          </div> */}
 
           {/* ===== FOOTER ACTIONS ===== */}
           {!viewMode && (
