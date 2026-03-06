@@ -32,7 +32,7 @@ const { Option } = Select;
 
 const inputClass = "border-amber-400 h-8";
 const selectClass = "border-amber-400 h-8 w-full";
-
+const { Password } = Input;
 export default function CustomerTab() {
   const [data, setData] = useState([]);
   const [search, setSearch] = useState("");
@@ -166,6 +166,7 @@ export default function CustomerTab() {
     gstDoc: fileFromUrl(details.gst_document),
     panDoc: fileFromUrl(details.pan_document),
     aadharDoc: fileFromUrl(details.aadhaar_document),
+    bgDoc: fileFromUrl(details.bg_document),
   });
 
   const openCustomer = async (record, view = false) => {
@@ -199,8 +200,9 @@ export default function CustomerTab() {
       formData.append("phone_number", values.phoneNo);
       formData.append("mobile_number", values.mobileNo);
       formData.append("email_address", values.email);
-      formData.append("password", values.password);
-
+      if (values.password) {
+        formData.append("password", values.password);
+      }
       formData.append("customer_type", values.type);
       formData.append("status", values.status);
 
@@ -586,11 +588,15 @@ export default function CustomerTab() {
                 <Form.Item
                   label="Password"
                   name="password"
-                  rules={[{ required: true, message: "Please enter password" }]}
+                  rules={
+                    selected
+                      ? [] // not required when editing
+                      : [{ required: true, message: "Please enter password" }]
+                  }
                 >
-                  <Input
+                  <Input.Password
                     className={inputClass}
-                    disabled={viewMode}
+                    disabled={viewMode || selected}
                     placeholder="Enter password"
                     type="password"
                   />
@@ -797,8 +803,20 @@ export default function CustomerTab() {
                   </Col>
 
                   <Col span={6}>
-                    <Form.Item label="Upload Document" name="bgDoc">
-                      <Upload beforeUpload={() => false} maxCount={1}>
+                    <Form.Item
+                      label="Upload Document"
+                      name="bgDoc"
+                      valuePropName="fileList"
+                      getValueFromEvent={(e) =>
+                        Array.isArray(e) ? e : e?.fileList
+                      }
+                    >
+                      <Upload
+                        beforeUpload={() => false}
+                        maxCount={1}
+                        listType="picture"
+                        disabled={viewMode}
+                      >
                         <Button>Upload</Button>
                       </Upload>
                     </Form.Item>
@@ -921,7 +939,7 @@ export default function CustomerTab() {
                 </Form.Item>
               </Col>
 
-              <Col span={4}>
+              {/* <Col span={4}>
                 <Form.Item label="Advance Cheque No" name="advCheque">
                   <Input
                     className={inputClass}
@@ -929,7 +947,7 @@ export default function CustomerTab() {
                     placeholder="Enter cheque number"
                   />
                 </Form.Item>
-              </Col>
+              </Col> */}
 
               <Col span={4}>
                 <Form.Item label="Amount Limit" name="amountLimit">
