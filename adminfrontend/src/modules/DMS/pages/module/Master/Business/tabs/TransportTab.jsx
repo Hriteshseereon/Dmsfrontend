@@ -10,6 +10,7 @@ import {
   Card,
   message,
   Upload,
+  Select,
 } from "antd";
 import {
   PlusOutlined,
@@ -29,7 +30,7 @@ import { API_BASE_URL } from "@/utils/config";
 
 const inputClass = "border-amber-400 h-8";
 const passwordClass = "border-amber-400 h-8";
-
+const selectClass = "border-amber-400 h-8 w-full";
 export const phoneValidator = (_, value) => {
   if (!value) return Promise.resolve(); // allow empty if not required
 
@@ -428,98 +429,20 @@ export default function TransportTab() {
                   />
                 </Form.Item>
               </Col>
-            </Row>
-          </Card>
-
-          {/* ================= Business & KYC Details ================= */}
-          <Card className="mb-4 border border-amber-200 rounded-lg">
-            <h3 className="text-lg font-semibold text-amber-700 mb-3">
-              Business & KYC Details
-            </h3>
-            <Row gutter={24}>
               <Col span={4}>
-                <Form.Item label="PAN Number" name="panNo">
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter PAN number"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={6}>
                 <Form.Item
-                  label="PAN Document"
-                  name="panDoc"
-                  valuePropName="fileList"
-                  getValueFromEvent={(e) => e?.fileList}
+                  label="Status"
+                  name="status"
+                  rules={[{ required: true, message: "Status is required" }]}
                 >
-                  <Upload
-                    beforeUpload={() => false}
-                    maxCount={1}
-                    listType="picture"
-                  >
-                    <Button disabled={viewMode}>Upload</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item label="GSTIN Number" name="gstin">
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter GSTIN number"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={6}>
-                <Form.Item
-                  label="GST Document"
-                  name="gstDoc"
-                  valuePropName="fileList"
-                  getValueFromEvent={(e) => e?.fileList}
-                >
-                  <Upload
-                    beforeUpload={() => false}
-                    maxCount={1}
-                    listType="picture"
-                  >
-                    <Button disabled={viewMode}>Upload</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item label="Owner Aadhar Number" name="ownerAadharNo">
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter owner Aadhar number"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={6}>
-                <Form.Item
-                  label="Adhar Document"
-                  name="aadharDoc"
-                  valuePropName="fileList"
-                  getValueFromEvent={(e) => e?.fileList}
-                >
-                  <Upload
-                    beforeUpload={() => false}
-                    maxCount={1}
-                    listType="picture"
-                  >
-                    <Button disabled={viewMode}>Upload</Button>
-                  </Upload>
+                  <Select className={selectClass} disabled={viewMode}>
+                    <Option value="Active">Active</Option>
+                    <Option value="Inactive">Inactive</Option>
+                  </Select>
                 </Form.Item>
               </Col>
             </Row>
           </Card>
-
           {/* ================= Address & Location ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">
             <h3 className="text-lg font-semibold text-amber-700 mb-3">
@@ -607,6 +530,94 @@ export default function TransportTab() {
                     disabled={viewMode}
                     placeholder="Enter pin code"
                   />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+          {/* ================= Business & KYC Details ================= */}
+          <Card className="mb-4 border border-amber-200 rounded-lg">
+            <h3 className="text-lg font-semibold text-amber-700 mb-3">
+              Legal Details
+            </h3>
+            <Row gutter={24}>
+              <Col span={4}>
+                <Form.Item label="PAN Number" name="panNo">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter PAN number"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={6}>
+                <Form.Item
+                  label="PAN Document"
+                  name="panDoc"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                  >
+                    <Button disabled={viewMode}>Upload</Button>
+                  </Upload>
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item label="GSTIN Number" name="gstin">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter GSTIN number"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={6}>
+                <Form.Item
+                  label="GST Document"
+                  name="gstDoc"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                  >
+                    <Button disabled={viewMode}>Upload</Button>
+                  </Upload>
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item label="Owner Aadhar Number" name="ownerAadharNo">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter owner Aadhar number"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={6}>
+                <Form.Item
+                  label="Adhar Document"
+                  name="aadharDoc"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                  >
+                    <Button disabled={viewMode}>Upload</Button>
+                  </Upload>
                 </Form.Item>
               </Col>
             </Row>
