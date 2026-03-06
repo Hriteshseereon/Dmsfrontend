@@ -108,7 +108,7 @@ export default function VendorTab() {
     email2: d.secondary_email,
     socialLink: d.social_link,
     websiteUrl: d.company_website,
-
+    companyGroupName: d.company_group_name,
     contactPerson:
       d.contact_person_input?.name ||
       d.contact_person_input?.contact_person_name ||
@@ -217,7 +217,7 @@ export default function VendorTab() {
       social_link: values.socialLink,
       company_website: values.websiteUrl,
       is_active: values.status === "Active",
-
+      company_group_name: values.companyGroupName,
       contact_person_input: {
         name: values.contactPerson || "",
         gender: values.gender,
