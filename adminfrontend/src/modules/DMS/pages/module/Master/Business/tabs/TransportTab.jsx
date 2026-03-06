@@ -54,9 +54,17 @@ export default function TransportTab() {
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState(false);
   const [selected, setSelected] = useState(null);
-
+  const { Option } = Select;
   const [form] = Form.useForm();
-
+  const generatePassword = (length = 10) => {
+    const chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$";
+    let password = "";
+    for (let i = 0; i < length; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
   /* ================= FETCH ================= */
   const fetchTransporters = async () => {
     try {
@@ -105,6 +113,7 @@ export default function TransportTab() {
     state: d.state,
     district: d.district,
     pinCode: d.pin,
+    status: d.is_active ? "true" : "false",
     // ✅ FILE PREVIEW DATA
     panDoc: fileFromUrl(d.pan_document),
     gstDoc: fileFromUrl(d.gstin_document),
@@ -121,7 +130,9 @@ export default function TransportTab() {
     fd.append("phone_number", values.mobileNo || "");
     fd.append("alternate_mobile_no", values.altMobileNo || "");
     fd.append("whatsapp_number", values.whatsappNo || "");
+    fd.append("is_active", values.status === "true");
     fd.append("pan", values.panNo || "");
+
     fd.append("gstin", values.gstin || "");
     fd.append("owner_aadhar_number", values.ownerAadharNo || "");
     fd.append("address_1", values.address1 || "");
@@ -259,9 +270,14 @@ export default function TransportTab() {
           icon={<PlusOutlined />}
           className="bg-amber-500! hover:bg-amber-600! border-none!"
           onClick={() => {
+            const randomPassword = generatePassword();
             setSelected(null);
             setViewMode(false);
             form.resetFields();
+            form.setFieldsValue({
+              password: randomPassword,
+              status: "true",
+            });
             setOpen(true);
           }}
         >
@@ -424,7 +440,7 @@ export default function TransportTab() {
                 <Form.Item label="Password" name="password">
                   <Input.Password
                     className={passwordClass}
-                    disabled={viewMode}
+                    disabled={viewMode || selected}
                     placeholder="Enter password"
                   />
                 </Form.Item>
@@ -436,8 +452,8 @@ export default function TransportTab() {
                   rules={[{ required: true, message: "Status is required" }]}
                 >
                   <Select className={selectClass} disabled={viewMode}>
-                    <Option value="Active">Active</Option>
-                    <Option value="Inactive">Inactive</Option>
+                    <Option value="true">Active</Option>
+                    <Option value="false">Inactive</Option>
                   </Select>
                 </Form.Item>
               </Col>
