@@ -454,7 +454,20 @@ export default function CustomerTab() {
                   />
                 </Form.Item>
               </Col>
-
+              <Col span={6}>
+                <Form.Item
+                  label="Password"
+                  name="password"
+                  rules={[{ required: true, message: "Please enter password" }]}
+                >
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter password"
+                    type="password"
+                  />
+                </Form.Item>
+              </Col>
               <Col span={4}>
                 <Form.Item
                   label="Customer Type"
