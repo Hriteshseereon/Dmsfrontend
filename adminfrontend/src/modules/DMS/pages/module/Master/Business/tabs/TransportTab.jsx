@@ -10,6 +10,7 @@ import {
   Card,
   message,
   Upload,
+  Select,
 } from "antd";
 import {
   PlusOutlined,
@@ -29,7 +30,7 @@ import { API_BASE_URL } from "@/utils/config";
 
 const inputClass = "border-amber-400 h-8";
 const passwordClass = "border-amber-400 h-8";
-
+const selectClass = "border-amber-400 h-8 w-full";
 export const phoneValidator = (_, value) => {
   if (!value) return Promise.resolve(); // allow empty if not required
 
@@ -53,9 +54,17 @@ export default function TransportTab() {
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState(false);
   const [selected, setSelected] = useState(null);
-
+  const { Option } = Select;
   const [form] = Form.useForm();
-
+  const generatePassword = (length = 10) => {
+    const chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$";
+    let password = "";
+    for (let i = 0; i < length; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
   /* ================= FETCH ================= */
   const fetchTransporters = async () => {
     try {
@@ -104,6 +113,7 @@ export default function TransportTab() {
     state: d.state,
     district: d.district,
     pinCode: d.pin,
+    status: d.is_active ? "true" : "false",
     // ✅ FILE PREVIEW DATA
     panDoc: fileFromUrl(d.pan_document),
     gstDoc: fileFromUrl(d.gstin_document),
@@ -120,7 +130,9 @@ export default function TransportTab() {
     fd.append("phone_number", values.mobileNo || "");
     fd.append("alternate_mobile_no", values.altMobileNo || "");
     fd.append("whatsapp_number", values.whatsappNo || "");
+    fd.append("is_active", values.status === "true");
     fd.append("pan", values.panNo || "");
+
     fd.append("gstin", values.gstin || "");
     fd.append("owner_aadhar_number", values.ownerAadharNo || "");
     fd.append("address_1", values.address1 || "");
@@ -219,6 +231,19 @@ export default function TransportTab() {
         </div>
       ),
     },
+    {
+      title: <span className="text-amber-700 font-semibold"> Password</span>,
+      render: (_, record) => (
+        <Button
+          size="small"
+          type="primary"
+          className="bg-amber-500! border-none! hover:bg-amber-600!"
+          onClick={() => handleSendPassword(record)}
+        >
+          Send
+        </Button>
+      ),
+    },
   ];
 
   const filteredData = data.filter((t) =>
@@ -258,9 +283,14 @@ export default function TransportTab() {
           icon={<PlusOutlined />}
           className="bg-amber-500! hover:bg-amber-600! border-none!"
           onClick={() => {
+            const randomPassword = generatePassword();
             setSelected(null);
             setViewMode(false);
             form.resetFields();
+            form.setFieldsValue({
+              password: randomPassword,
+              status: "true",
+            });
             setOpen(true);
           }}
         >
@@ -423,103 +453,25 @@ export default function TransportTab() {
                 <Form.Item label="Password" name="password">
                   <Input.Password
                     className={passwordClass}
-                    disabled={viewMode}
+                    disabled={viewMode || selected}
                     placeholder="Enter password"
                   />
                 </Form.Item>
               </Col>
-            </Row>
-          </Card>
-
-          {/* ================= Business & KYC Details ================= */}
-          <Card className="mb-4 border border-amber-200 rounded-lg">
-            <h3 className="text-lg font-semibold text-amber-700 mb-3">
-              Business & KYC Details
-            </h3>
-            <Row gutter={24}>
               <Col span={4}>
-                <Form.Item label="PAN Number" name="panNo">
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter PAN number"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={6}>
                 <Form.Item
-                  label="PAN Document"
-                  name="panDoc"
-                  valuePropName="fileList"
-                  getValueFromEvent={(e) => e?.fileList}
+                  label="Status"
+                  name="status"
+                  rules={[{ required: true, message: "Status is required" }]}
                 >
-                  <Upload
-                    beforeUpload={() => false}
-                    maxCount={1}
-                    listType="picture"
-                  >
-                    <Button disabled={viewMode}>Upload</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item label="GSTIN Number" name="gstin">
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter GSTIN number"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={6}>
-                <Form.Item
-                  label="GST Document"
-                  name="gstDoc"
-                  valuePropName="fileList"
-                  getValueFromEvent={(e) => e?.fileList}
-                >
-                  <Upload
-                    beforeUpload={() => false}
-                    maxCount={1}
-                    listType="picture"
-                  >
-                    <Button disabled={viewMode}>Upload</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item label="Owner Aadhar Number" name="ownerAadharNo">
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter owner Aadhar number"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={6}>
-                <Form.Item
-                  label="Adhar Document"
-                  name="aadharDoc"
-                  valuePropName="fileList"
-                  getValueFromEvent={(e) => e?.fileList}
-                >
-                  <Upload
-                    beforeUpload={() => false}
-                    maxCount={1}
-                    listType="picture"
-                  >
-                    <Button disabled={viewMode}>Upload</Button>
-                  </Upload>
+                  <Select className={selectClass} disabled={viewMode}>
+                    <Option value="true">Active</Option>
+                    <Option value="false">Inactive</Option>
+                  </Select>
                 </Form.Item>
               </Col>
             </Row>
           </Card>
-
           {/* ================= Address & Location ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">
             <h3 className="text-lg font-semibold text-amber-700 mb-3">
@@ -607,6 +559,94 @@ export default function TransportTab() {
                     disabled={viewMode}
                     placeholder="Enter pin code"
                   />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+          {/* ================= Business & KYC Details ================= */}
+          <Card className="mb-4 border border-amber-200 rounded-lg">
+            <h3 className="text-lg font-semibold text-amber-700 mb-3">
+              Legal Details
+            </h3>
+            <Row gutter={24}>
+              <Col span={4}>
+                <Form.Item label="PAN Number" name="panNo">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter PAN number"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={6}>
+                <Form.Item
+                  label="PAN Document"
+                  name="panDoc"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                  >
+                    <Button disabled={viewMode}>Upload</Button>
+                  </Upload>
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item label="GSTIN Number" name="gstin">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter GSTIN number"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={6}>
+                <Form.Item
+                  label="GST Document"
+                  name="gstDoc"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                  >
+                    <Button disabled={viewMode}>Upload</Button>
+                  </Upload>
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item label="Owner Aadhar Number" name="ownerAadharNo">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter owner Aadhar number"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={6}>
+                <Form.Item
+                  label="Adhar Document"
+                  name="aadharDoc"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    listType="picture"
+                  >
+                    <Button disabled={viewMode}>Upload</Button>
+                  </Upload>
                 </Form.Item>
               </Col>
             </Row>
