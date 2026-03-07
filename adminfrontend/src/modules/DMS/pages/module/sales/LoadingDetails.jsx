@@ -1,314 +1,792 @@
-import React, { useState } from "react";
+// LoadingAdvice.js
+import React, { useState, useEffect } from "react";
 import {
   Table,
-  Modal,
-  Form,
   Input,
   Button,
-  Upload,
+  Modal,
+  Form,
+  Select,
   DatePicker,
   Row,
   Col,
-  Select,
   message,
 } from "antd";
 import {
+  SearchOutlined,
+  EyeOutlined,
   EditOutlined,
-  UploadOutlined,
+  DownloadOutlined,
+  FilterOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import { exportToExcel } from "../../../../../utils/exportToExcel";
+import { getLoadingAdvice, getLoadingAdviceById, updateLoadingAdvice } from "../../../../../api/sales";
+const { Option } = Select;
 
-/* ============================
-   ADMIN SALES INVOICE DATA
-   (FROM BACKEND API IN REAL)
-   ============================ */
-const salesInvoiceJSON = {
-  initialData: [
-    {
-      key: 1,
-      adviceNo: "LA-2025-001",
-      adviceDate: "2025-11-20",
-      poNo: "PO-2025-001",
-      deliveryAddress: "Plant Gate A, Manufacturing Hub 1",
-      wayBill: "WB123",
 
-      invoiceStatus: "In-transit",
 
-      vendorName: "Global Suppliers Co.",
-      vendorAddress: "456 Commerce St, NY",
-      vendorGSTIN: "GSTEB001",
-      vendorContactPerson: "Alice Johnson",
-      vendorPhoneNumber: "9876543210",
+const ALL_STATUS = [
 
-      plantName: "Manufacturing Hub 1",
-      plantCode: "P-MH1",
-      plantGSTIN: "GSTMA001",
-      plantAddress: "123 Industrial Rd, CA",
-      plantContactPerson: "Bob Williams",
-      plantPhoneNumber: "0123456789",
+  "Approved",
+  "In-Transit",
+  "Out for delivery",
+  "Delivered",
+];
 
-      vehicleNo: "MH12AB4567",
-      driverName: "Ram Singh",
-      driverContact: "9123456789",
-      insuranceValidUpto: "2026-05-20",
-      puValidUpto: "2026-06-01",
-      fitnessValidUpto: "2026-07-15",
-      vehicleInTime: "10:00",
-      vehicleOutTime: "11:30",
-      tareWeights: 5000,
-      netWeight: 4500,
-      grossWeights: 9500,
+const statusFlow = {
+ Pending: ["Pending", ], 
+ 
+  Approved: ["Approved", "In-Transit"],
+  "In-Transit": ["In-Transit", "Out for delivery"],
+  "Out for delivery": ["Out for delivery", "Delivered"],
+  Delivered: ["Delivered"],
+};
+export default function LoadingDetails() {
+  const [data, setData] = useState([]);
 
-      items: [
-        {
-          key: "item-1",
-          slNo: 1,
-          itemCode: "ITEM-001",
-          itemDescription: "Raw Material X",
-          reqQty: 1000,
-          actualQty: 950,
-          variance: -50,
-          uom: "Kgs",
-        },
-        {
-          key: "item-2",
-          slNo: 2,
-          itemCode: "ITEM-002",
-          itemDescription: "Component A",
-          reqQty: 500,
-          actualQty: 500,
-          variance: 0,
-          uom: "Pcs",
-        },
-      ],
-    },
-  ],
+  const [searchText, setSearchText] = useState("");
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState(null);
+
+  const [form] = Form.useForm();
+  const [viewForm] = Form.useForm();
+  useEffect(() => {
+    fetchLoadingAdvice();
+  }, []);
+ 
+  const handleSearch = (value) => {
+  setSearchText(value);
+
+  if (!value) {
+    fetchLoadingAdvice();
+    return;
+  }
+
+  const filtered = data.filter((item) =>
+    JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
+  );
+
+  setData(filtered);
+};
+const handleExport = async () => {
+  try {
+    const res = await getLoadingAdvice();
+    const list = res || [];
+
+    const exportRows = [];
+
+    for (const advice of list) {
+      const detail = await getLoadingAdviceById(advice.loading_id);
+
+      detail.items?.forEach((item) => {
+        exportRows.push({
+          // Basic
+          "Advice No": detail.advice_no,
+          "Loading Advice Date": detail.advice_date,
+          "Status": detail.status,
+
+          // Company Details
+          "Vendor Name": detail.vendor_name,
+          "Vendor Address": detail.vendor_address,
+          "Contact Person": detail.vendor_contact_person,
+          "Vendor Phone": detail.vendor_phone,
+
+          // Plant Details
+          "Plant Name": detail.plant_name,
+          "Plant Address": detail.plant_address,
+          "Plant Contact Person": detail.plant_contact_person,
+
+          // Item Details
+         
+          "Item Name": item.product_name,
+          "Required Qty": item.required_qty,
+          "Actual Qty": item.actual_qty,
+          "Variance": item.variance,
+
+          // Transport Details
+          "Transporter": detail.transporter_name,
+          "Vehicle No": detail.vehicle_no,
+          "Driver Name": detail.driver_name,
+          "Driver Contact": detail.driver_contact,
+          "Insurance Valid Upto": detail.insurance_valid_upto,
+          "PU Valid Upto": detail.pu_valid_upto,
+          "Fitness Valid Upto": detail.fitness_valid_upto,
+
+          // Loading Details
+          "Vehicle In Time": detail.vehicle_in_time,
+          "Vehicle Out Time": detail.vehicle_out_time,
+          "Tare Weight (KG)": detail.tare_weight_kg,
+          "Net Weight (KG)": detail.net_weight_kg,
+          "Gross Weight (KG)": detail.gross_weight_kg,
+        });
+      });
+    }
+
+    exportToExcel(exportRows, "Loading_Advice_Details", "LoadingAdvice");
+
+  } catch (error) {
+    console.error("Export failed:", error);
+    message.error("Export failed");
+  }
 };
 
-export default function LoadingDetails() {
-  const [data, setData] = useState(salesInvoiceJSON.initialData);
-  const [selectedRecord, setSelectedRecord] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [form] = Form.useForm();
+  const fetchLoadingAdvice = async () => {
+    try {
+      const res = await getLoadingAdvice();
+        
+    const filtered = res.filter((item) =>
+      ["In-Transit", "Out for delivery", "Delivered"].includes(item.status)
+    );
+      const formatted = filtered.map((item) => ({
+        key: item.id,
+        id: item.id,
 
-  /* ============================
-     UPDATE INVOICE STATUS
-     ============================ */
-  const handleApproveInvoice = () => {
-    form.validateFields().then((values) => {
-      const payload = {
-        ...selectedRecord,
-        invoiceStatus: values.invoiceStatus,
-        invoiceDate: values.invoiceDate.format("YYYY-MM-DD"),
-        invoiceFile: values.invoiceFile,
-      };
+        // Basic Info
+         advice_no: item.advice_no || "-",
+        lodingadvicedate: item.advice_date || "-",
+        invoiceNo: item.invoice_number || "-",   
+        companyName: item.vendor_name || "-",
+        plantName: item.plant_name || "-",
+        status: item.status || "-",
+        vendor_name: item.vendor_name,
+        plant_name: item.plant_name,
+       vendor_address: item.vendor_addresses?.[0]?.address_line1,
+       plant_address: item.plant_details?.address,
+        vendor_gstin: item.vendor_gstin,
+        plant_gstin: item.plant_gstin,
+        // Transport Details ✅ correct fields from API
+        transporter: item.transporter_name || "-",
+        vehicleNo: item.vehicle_no || "-",
+        driverName: item.driver_name || "-",
+        driverContact: item.driver_contact || "-",
+        insuranceValidUpto: item.insurance_valid_upto || null,
+        puValidUpto: item.pu_valid_upto || null,
+        fitnessValidUpto: item.fitness_valid_upto || null,
 
-      setData((prev) =>
-        prev.map((item) =>
-          item.key === payload.key ? payload : item
-        )
-      );
+        // Loading Details
+        vehicleInTime: item.vehicle_in_time || "-",
+        vehicleOutTime: item.vehicle_out_time || "-",
+        tareWeight: item.tare_weight_kg || 0,
+        netWeight: item.net_weight_kg || 0,
+        grossWeight: item.gross_weight_kg || 0,
 
-      // 🔗 API CALL (ADMIN → CUSTOMER)
-      // POST /api/admin/sales-invoice
-      // payload
+      
+        itemCode: item.items?.[0]?.hsn_code || "-",   // 👈 HSN code
+itemName: item.items?.[0]?.product_name || "-",
 
-      message.success("Invoice updated and sent to customer");
-      setIsModalOpen(false);
-    });
+        reqQty: item.items?.[0]?.required_qty || 0,
+        actualQty: item.items?.[0]?.actual_qty || 0,
+        variance: item.items?.[0]?.variance || 0,
+
+        original: item,
+      }));
+
+      setData(formatted.reverse());
+    } catch (error) {
+      console.error("Failed to fetch loading advice:", error);
+    }
   };
 
-  /* ============================
-     TABLE COLUMNS
-     ============================ */
+
+
+  const handleOpenEdit = async (record) => {
+    try {
+      const res = await getLoadingAdviceById(record.id);
+      console.log("PLANT PHONE:", res.plant_details?.phone_number); // ✅ 
+      const item = res;
+form.setFieldsValue({
+  invoiceNo: item.invoice_number,
+  lodingadvicedate: item.advice_date ? dayjs(item.advice_date) : null,
+  status: item.status,
+
+ // ✅ VENDOR (CORRECT)
+  companyName: item.vendor_name,
+  companyAddress: item.vendor_addresses?.[0]?.address_line1 || "",
+  contactPerson: item.vendor_details?.contact_person || "",
+  contactNo: item.vendor_details?.contact_person_no || "",
+
+  // ✅ PLANT (CORRECT)
+  plantName: item.plant_name,
+  plantAddress: item.plant_details?.address || "",
+ plantContactPerson: item.vendor_details?.contact_person || "", plantPhone: item.plant_details?.phone_number || "",
+
+  // Transport
+  transporter: item.transporter_name,
+  vehicleNo: item.vehicle_no,
+  driverName: item.driver_name,
+  driverContact: item.driver_contact,
+
+  insuranceValidUpto: item.insurance_valid_upto
+    ? dayjs(item.insurance_valid_upto)
+    : null,
+  puValidUpto: item.pu_valid_upto
+    ? dayjs(item.pu_valid_upto)
+    : null,
+  fitnessValidUpto: item.fitness_valid_upto
+    ? dayjs(item.fitness_valid_upto)
+    : null,
+
+  vehicleInTime: item.vehicle_in_time,
+  vehicleOutTime: item.vehicle_out_time,
+  tareWeight: item.tare_weight_kg,
+  netWeight: item.net_weight_kg,
+
+ items: item.items?.map((itm) => ({
+    id: itm.id,
+    product: itm.product,
+    product_name: itm.product_name,
+    hsn_code: itm.hsn_code,
+    required_qty: itm.required_qty,
+    actual_qty: itm.actual_qty,
+    variance: itm.variance,
+  })) || [],
+});
+
+
+      setSelectedRecord(item);
+      setIsEditModalOpen(true);
+    } catch (error) {
+      console.error("Error fetching by ID:", error);
+      message.error("Failed to load data");
+    }
+  };
+
+
+  const handleEdit = async (values) => {
+    try {
+      const payload = {
+        advice_date: values.lodingadvicedate
+    ? dayjs(values.lodingadvicedate).format("YYYY-MM-DD")
+    : null,
+
+  invoice_number: values.invoiceNo,
+  status: values.status,
+        assignment: selectedRecord.assignment,
+
+        transporter_name: values.transporter,
+        vehicle_no: values.vehicleNo,
+        driver_name: values.driverName,
+        driver_contact: values.driverContact,
+        vendor_name: selectedRecord.vendor_name,
+plant_name: selectedRecord.plant_name,
+vendor_address: selectedRecord.vendor_address,
+plant_address: selectedRecord.plant_address,
+vendor_gstin: selectedRecord.vendor_gstin,
+plant_gstin: selectedRecord.plant_gstin,
+
+        insurance_valid_upto: values.insuranceValidUpto
+          ? dayjs(values.insuranceValidUpto).format("YYYY-MM-DD")
+          : null,
+        pu_valid_upto: values.puValidUpto
+          ? dayjs(values.puValidUpto).format("YYYY-MM-DD")
+          : null,
+        fitness_valid_upto: values.fitnessValidUpto
+          ? dayjs(values.fitnessValidUpto).format("YYYY-MM-DD")
+          : null,
+
+        vehicle_in_time: values.vehicleInTime,
+        vehicle_out_time: values.vehicleOutTime,
+        tare_weight_kg: values.tareWeight,
+        net_weight_kg: values.netWeight,
+
+       items: values.items.map((itm) => ({
+  id: itm.id,
+  product: itm.product,
+  loading_advice: selectedRecord.id,
+  product_name: itm.product_name,
+  hsn_code: itm.hsn_code,
+  required_qty: itm.required_qty,
+  actual_qty: itm.actual_qty,
+  variance: itm.variance,
+}))
+
+      };
+await updateLoadingAdvice(selectedRecord.id, payload);
+
+
+      message.success("Updated successfully");
+
+      setIsEditModalOpen(false);
+      form.resetFields();
+
+      fetchLoadingAdvice(); // refresh table
+    } catch (error) {
+      console.error("Update failed:", error);
+      message.error("Update failed");
+    }
+  };
+
+ const handleOpenView = async (record) => {
+  try {
+    const item = await getLoadingAdviceById(record.id);
+
+    viewForm.setFieldsValue({
+      invoiceNo: item.invoice_number,
+      lodingadvicedate: item.advice_date
+        ? dayjs(item.advice_date)
+        : null,
+      status: item.status,
+
+      // ✅ VENDOR (CORRECT)
+  companyName: item.vendor_name,
+  companyAddress: item.vendor_addresses?.[0]?.address_line1 || "",
+  contactPerson: item.vendor_details?.contact_person || "",
+  contactNo: item.vendor_details?.contact_person_no || "",
+
+  // ✅ PLANT (CORRECT)
+  plantName: item.plant_name,
+  plantAddress: item.plant_details?.address || "",
+  plantContactPerson: item.vendor_details?.contact_person || "",
+  plantPhone: item.plant_details?.phone_number || "",
+
+      // Transport
+      transporter: item.transporter_name,
+      vehicleNo: item.vehicle_no,
+      driverName: item.driver_name,
+      driverContact: item.driver_contact,
+
+      insuranceValidUpto: item.insurance_valid_upto
+        ? dayjs(item.insurance_valid_upto)
+        : null,
+      puValidUpto: item.pu_valid_upto
+        ? dayjs(item.pu_valid_upto)
+        : null,
+      fitnessValidUpto: item.fitness_valid_upto
+        ? dayjs(item.fitness_valid_upto)
+        : null,
+
+      vehicleInTime: item.vehicle_in_time,
+      vehicleOutTime: item.vehicle_out_time,
+      tareWeight: item.tare_weight_kg,
+      netWeight: item.net_weight_kg,
+
+       items: item.items?.map((itm) => ({
+    id: itm.id,
+    product_name: itm.product_name,
+    hsn_code: itm.hsn_code,
+    required_qty: itm.required_qty,
+    actual_qty: itm.actual_qty,
+    variance: itm.variance,
+  })) || [],
+    });
+
+    setSelectedRecord(item);
+    setIsViewModalOpen(true);
+  } catch (error) {
+    console.error("View fetch failed:", error);
+    message.error("Failed to load details");
+  }
+};
+
+
+ 
+
+  // Columns - removed Assign button; Admin can only approve pending ones
   const columns = [
     {
-      title: "Advice No",
-      dataIndex: "adviceNo",
-      render: (t) => <strong>{t}</strong>,
-    },
-    { title: "PO No", dataIndex: "poNo" },
-    { title: "Vendor", dataIndex: "vendorName" },
-    { title: "Plant", dataIndex: "plantName" },
-    {
-      title: "Invoice Status",
-      dataIndex: "invoiceStatus",
-      render: (status) => (
-        <span
-          className={`px-3 py-1 rounded-full text-sm font-semibold ${
-            status === "Approved"
-              ? "bg-green-100 text-green-700"
-              : "bg-yellow-100 text-yellow-700"
-          }`}
-        >
-          {status}
-        </span>
-      ),
+       title: <span className="text-amber-700 font-semibold">Advice No</span>,
+      dataIndex: "advice_no",
+      render: (t) => <span className="text-amber-800">{t}</span>,
+
     },
     {
-      title: "Action",
-      render: (record) => (
-        <EditOutlined
-          className="cursor-pointer! text-red-600! "
-          onClick={() => {
-            setSelectedRecord(record);
-            form.setFieldsValue({
-              invoiceStatus: record.invoiceStatus,
-              invoiceDate: dayjs(),
-            });
-            setIsModalOpen(true);
-          }}
+      title: <span className="text-amber-700 font-semibold">Invoice No</span>,
+      dataIndex: "invoiceNo",
+      render: (t) => <span className="text-amber-800">{t}</span>,
+    },
+
+  
+    {
+      title: <span className="text-amber-700 font-semibold">Loading Advice Date</span>,
+      dataIndex: "lodingadvicedate",
+      render: (t) => <span className="text-amber-800">{t}</span>,
+    },
+    
+
+    // transporter + vehicle/driver columns (display-only)
+    {
+      title: <span className="text-amber-700 font-semibold">Transporter</span>,
+      dataIndex: "transporter",
+      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Vehicle No</span>,
+      dataIndex: "vehicleNo",
+      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Driver</span>,
+      dataIndex: "driverName",
+      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+    },  
+    {
+      title: <span className="text-amber-700 font-semibold">Assignment</span>,
+      width:150,
+      dataIndex: "status",
+      key: "status",
+      render: (status) => {
+        const colorMap = {
+          Pending: "bg-yellow-100 text-yellow-700",
+         
+          "Pending Approval": "bg-orange-100 text-orange-700",
+          Approved: "bg-green-100 text-green-700",
+          Delivered:" bg-green-100 text-green-700",
+          "In-Transit":"bg-orange-100 text-orange-700",
+         "Out for delivery":"bg-blue-100 text-blue-700"
+
+
+        };
+
+        return (
+          <span className={`px-2 py-1 rounded ${colorMap[status] || "bg-gray-100 text-gray-700"}`}>
+            {status || "-"}
+          </span>
+        );
+      }
+
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Actions</span>,
+      key: "actions",
+       render: (_, record) => {
+    const showEdit =
+      record.driverName && record.vehicleNo && record.driverName !== "-" && record.vehicleNo !== "-";
+
+    return (
+      <div className="flex gap-3">
+        <EyeOutlined
+          className="cursor-pointer! text-blue-500!"
+          onClick={() => handleOpenView(record)}
         />
-      ),
+
+        {showEdit && (
+          <EditOutlined
+            className="cursor-pointer! text-red-500!"
+            onClick={() => handleOpenEdit(record)}
+          />
+        )}
+      </div>
+    );
+  },
     },
   ];
+const getAllowedStatus = (formInstance) => {
+  const currentStatus = formInstance.getFieldValue("status");
+  const driver = formInstance.getFieldValue("driverName");
+  const vehicle = formInstance.getFieldValue("vehicleNo");
+  const items = formInstance.getFieldValue("items") || [];
+
+  const hasDriverVehicle =
+    driver && vehicle && driver !== "-" && vehicle !== "-";
+
+  const hasActualQty = items.some(
+    (itm) => Number(itm.actual_qty) > 0
+  );
+
+  // ❌ No driver/vehicle → restrict
+  if (!hasDriverVehicle) {
+    return ["Pending"];
+  }
+
+  // ❌ Driver present but no actual qty → only till Approved
+  if (hasDriverVehicle && !hasActualQty) {
+    return [ "Approved"];
+  }
+
+  // ✅ ⭐ SPECIAL CASE (your requirement)
+  if (currentStatus === "Approved" && hasActualQty) {
+    return ALL_STATUS; // allow everything
+  }
+
+  // ✅ Default flow
+  return statusFlow[currentStatus] || [];
+};
+  const renderFormFields = (disabled = false, formInstance) => (
+    <>
+      {/* Date and Order */}
+      <Row gutter={16}>
+        <Col span={6}>
+         <Form.Item
+  label="Invoice No"
+  name="invoiceNo"
+  rules={[{ required: true }]}
+>
+  <Select
+    placeholder="Select invoice No"
+    disabled
+  >
+    {data.map((item) => (
+      <Option key={item.invoiceNo} value={item.invoiceNo}>
+        {item.invoiceNo}
+      </Option>
+    ))}
+  </Select>
+</Form.Item>
+        </Col>
+        <Col span={6}>
+          <Form.Item label="Loading Advice Date" name="lodingadvicedate" rules={[{ required: true }]}>
+            <DatePicker className="w-full" disabled format="YYYY-MM-DD" />
+          </Form.Item>
+        </Col>
+
+        <Col span={6}>
+        <Form.Item label="Status" name="status" rules={[{ required: true }]}>
+  <Select
+    placeholder="Select Status"
+    disabled={disabled && !isEditModalOpen}
+  >
+   {getAllowedStatus(formInstance).map((status) => (   <Option key={status} value={status}>
+        {status}
+      </Option>
+    ))}
+  </Select>
+</Form.Item>
+        </Col>
+      </Row>
+
+      {/* Company Details */}
+      <Row gutter={24}>
+        <Col span={24}>
+          <h6 className="text-amber-600 ">Vendor Details</h6>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item label="Vendor Name" name="companyName" rules={[{ required: true }]}>
+            <Input disabled />
+          </Form.Item>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item label="Address" name="companyAddress">
+            <Input disabled />
+          </Form.Item>
+        </Col>
+
+          <Col span={6}>
+         <Form.Item label="Phone" name="contactNo">
+    <Input disabled />
+          </Form.Item>
+        </Col>
+
+        <Col span={6}>
+         <Form.Item label="Contact Person" name="contactPerson">
+    <Input disabled />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      {/* Plant */}
+      <Row gutter={24} className="mt-2">
+        <Col span={24}>
+          <h6 className="text-amber-600  "> Plant Details</h6>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item label="Plant Name" name="plantName">
+            <Input disabled />
+          </Form.Item>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item label="Address" name="plantAddress">
+            <Input disabled />
+          </Form.Item>
+        </Col>
+        <Col span={6}>
+          <Form.Item label="Contact Person" name="plantContactPerson">
+  <Input disabled />
+</Form.Item>
+</Col>
+<Col span={6}>
+<Form.Item label="Phone" name="plantPhone">
+  <Input disabled />
+</Form.Item>
+</Col>
+      </Row>
+
+      {/* Item Details */}
+      <Row gutter={24} className="mt-2">
+        <Col span={24}>
+          <h6 className="text-amber-600 ">Items Details</h6>
+        </Col>
+
+        <Form.List name="items">
+  {(fields) => (
+    <>
+      {fields.map(({ key, name }) => (
+        <Row gutter={16} key={key} style={{ width: "100%" }} className="mt-2 ml-2! mr-2! border border-amber-200 rounded-lg p-2">
+        
+
+          <Col span={6}>
+            <Form.Item label="Item Name" name={[name, "product_name"]}>
+              <Input disabled className="w-full!"/>
+            </Form.Item>
+          </Col>
+
+          <Col span={6}>
+            <Form.Item label="Req. Qty" name={[name, "required_qty"]}>
+              <Input disabled className="w-full!"/>
+            </Form.Item>
+          </Col>
+
+          <Col span={6}>
+            <Form.Item label="Actual Qty" name={[name, "actual_qty"]}>
+              <Input disabled className="w-full!"/>
+            </Form.Item>
+          </Col>
+            <Col span={6}>
+            <Form.Item label="Variance" name={[name, "variance"]}>
+              <Input disabled className="w-full!"/>
+            </Form.Item>
+          </Col>
+        </Row>
+      ))}
+    </>
+  )}
+</Form.List>
+
+      </Row>
+
+      {/* Transport Details (display-only) */}
+      <Row gutter={24} className="mt-2">
+        <Col span={24}>
+          <h6 className="text-amber-600 "> Transport Details (from transporter)</h6>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item label="Transporter" name="transporter">
+            <Input disabled />
+          </Form.Item>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item label="Vehicle No" name="vehicleNo">
+            <Input disabled />
+          </Form.Item>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item label="Driver Name" name="driverName">
+            <Input disabled />
+          </Form.Item>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item label="Driver Contact" name="driverContact">
+            <Input disabled />
+          </Form.Item>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item label="Insurance Valid Upto" name="insuranceValidUpto">
+            <DatePicker className="w-full" format="DD-MM-YYYY" disabled />
+          </Form.Item>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item label="PU Valid Upto" name="puValidUpto">
+            <DatePicker className="w-full" format="DD-MM-YYYY" disabled />
+          </Form.Item>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item label="Fitness Valid Upto" name="fitnessValidUpto">
+            <DatePicker className="w-full" format="DD-MM-YYYY" disabled />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      {/* Loading Details */}
+      <Row gutter={24} className="mt-2">
+        <Col span={24}>
+          <h6 className="text-amber-600 "> Loading Details</h6>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item label="Vehicle In Time" name="vehicleInTime">
+            <Input disabled />
+          </Form.Item>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item label="Vehicle Out Time" name="vehicleOutTime">
+            <Input disabled />
+          </Form.Item>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item label="Tare Weight (KG)" name="tareWeight">
+            <Input type="number" disabled />
+          </Form.Item>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item label="Net Weight (KG)" name="netWeight">
+            <Input type="number" disabled />
+          </Form.Item>
+        </Col>
+      </Row>
+    </>
+  );
 
   return (
-    <div className="p-4">
-      <h1 className="text-3xl font-bold text-amber-700">
-        Loading Details
-      </h1>
-      <p className="text-amber-600 mb-4">
-        Review loading advice and approve sales order
-      </p>
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex gap-2">
+                   <Input
+                     prefix={<SearchOutlined className="text-amber-600!" />}
+                     placeholder="Search..."
+                     className="w-64! border-amber-300! focus:border-amber-500!"
+                     value={searchText}
+                     onChange={(e) => setSearchText(e.target.value)}
+                   />
+                   <Button
+                     icon={<FilterOutlined />}
+                     onClick={() => setSearchText("")}
+                     className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+                   >
+                     Reset
+                   </Button>
+        </div>
 
-      <Table
-        columns={columns}
-        dataSource={data}
-        rowKey="key"
-        bordered
-      />
+        <div className="flex gap-2">
+          <Button
+  icon={<DownloadOutlined />}
+  onClick={handleExport}
+  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+>
+  Export
+</Button>
 
-      {/* ============================
-          VIEW + APPROVE MODAL
-          ============================ */}
-      <Modal
-        title="Sales Invoice Details"
-        open={isModalOpen}
-        onCancel={() => setIsModalOpen(false)}
-        width={1400}
-        footer={null}
-      >
-        <Form layout="vertical" form={form}>
-          {/* READ-ONLY LOADING ADVICE */}
-          <Row gutter={24}>
-            <Col span={6}>
-              <Form.Item label="Advice No">
-                <Input value={selectedRecord?.adviceNo} disabled />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item label="PO No">
-                <Input value={selectedRecord?.poNo} disabled />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item label="Delivery Address">
-                <Input
-                  value={selectedRecord?.deliveryAddress}
-                  disabled
-                />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item label="Way Bill">
-                <Input value={selectedRecord?.wayBill} disabled />
-              </Form.Item>
-            </Col>
-          </Row>
+          {/* Add New removed as requested */}
+        </div>
+      </div>
 
-          <Row gutter={24}>
-            <Col span={6}>
-              <Form.Item label="Vehicle No">
-                <Input value={selectedRecord?.vehicleNo} disabled />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item label="Driver Name">
-                <Input value={selectedRecord?.driverName} disabled />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item label="Driver Contact">
-                <Input value={selectedRecord?.driverContact} disabled />
-              </Form.Item>
-            </Col>
-          </Row>
+      <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
+        <h2 className="text-lg font-semibold text-amber-700 mb-0">Loading Advice</h2>
+        <p className="text-amber-600 mb-3">Incoming loading advice; transporter details come from Purchase Indent</p>
 
-          {/* ITEMS */}
-          <div className="text-lg font-semibold text-amber-600 mt-4">
-            Item Details
-          </div>
+        <Table columns={columns} dataSource={data} pagination={false} scroll={{ y: 300 }} rowKey="key" />
+      </div>
 
-          <Table
-            dataSource={selectedRecord?.items || []}
-            rowKey="key"
-            pagination={false}
-            bordered
-            size="small"
-            columns={[
-              { title: "SL", dataIndex: "slNo" },
-              { title: "Item Code", dataIndex: "itemCode" },
-              { title: "Description", dataIndex: "itemDescription" },
-              { title: "Req Qty", dataIndex: "reqQty" },
-              { title: "Actual Qty", dataIndex: "actualQty" },
-              { title: "Variance", dataIndex: "variance" },
-              { title: "UOM", dataIndex: "uom" },
-            ]}
-          />
-
-          {/* INVOICE SECTION */}
-          <div className="text-lg font-semibold text-amber-600 mt-4">
-            Sales Invoice
-          </div>
-
-          <Row gutter={24}>
-            <Col span={6}>
-              <Form.Item
-                label="Invoice Date"
-                name="invoiceDate"
-                rules={[{ required: true }]}
-              >
-                <DatePicker className="w-full" />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item
-                label="Invoice Status"
-                name="invoiceStatus"
-                rules={[{ required: true }]}
-              >
-                <Select
-                  options={[
-                    { label: "In-transit", value: "In-transit" },
-                    { label: "Out-for-delivery", value: "Out-for-delivery" },
-                  ]}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item
-            label="Upload Invoice"
-            name="invoiceFile"
-            rules={[{ required: true }]}
-          >
-            <Upload beforeUpload={() => false}>
-              <Button className="border-amber-400! text-amber-700! hover:bg-amber-100!" icon={<UploadOutlined />}>
-                Upload Invoice
-              </Button>
-            </Upload>
-          </Form.Item>
-
-          <div className="flex justify-end gap-2">
-            <Button className="border-amber-400! text-amber-700! hover:bg-amber-100!" onClick={() => setIsModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button   className="bg-amber-500! hover:bg-amber-600! border-none!"
-            type="primary" onClick={handleApproveInvoice}>
-              Save & Send to Customer
+      {/* Edit Modal (admin can view/edit admin-level fields incl. approve status) */}
+      <Modal title={<span className="text-amber-700 text-2xl font-semibold">Edit Loading Advice</span>} open={isEditModalOpen} onCancel={() => setIsEditModalOpen(false)} footer={null} width={1200}>
+        <Form layout="vertical" form={form} onFinish={handleEdit}>
+          {renderFormFields(false, form)}
+          <div className="flex justify-end mt-4">
+            <Button htmlType="submit" className="bg-amber-500 hover:bg-amber-600 text-white border-none">
+              Update
             </Button>
           </div>
+        </Form>
+      </Modal>
+
+      {/* View Modal */}
+      <Modal title={<span className="text-amber-700 text-2xl font-semibold">View Loading Advice</span>} open={isViewModalOpen} onCancel={() => setIsViewModalOpen(false)} footer={null} width={1200}>
+        <Form layout="vertical" form={viewForm}>
+          {renderFormFields(true, viewForm)}
         </Form>
       </Modal>
     </div>

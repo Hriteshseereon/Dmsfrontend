@@ -64,7 +64,7 @@ export default function DeliveryStatus() {
   );
 
   const columns = [
-    { title: <span className="text-amber-700 font-semibold">Order No</span>, dataIndex: "orderNo", width: 100, render: (text) => <span className="text-amber-800">{text}</span> },
+    { title: <span className="text-amber-700 font-semibold">Invoice No</span>, dataIndex: "orderNo", width: 100, render: (text) => <span className="text-amber-800">{text}</span> },
     { title: <span className="text-amber-700 font-semibold">Company Name </span>, dataIndex: "companyName", width: 100, render: (text) => <span className="text-amber-800">{text}</span> },
     {
       title: <span className="text-amber-700 font-semibold">Transporter</span>,

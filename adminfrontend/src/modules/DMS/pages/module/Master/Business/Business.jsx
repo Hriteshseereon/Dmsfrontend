@@ -16,7 +16,7 @@ export default function Business() {
     },
     {
       key: "vendor",
-      label: "Vendor",
+      label: "Supplier",
       children: <VendorTab />,
     },
     {

@@ -1,4 +1,6 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+
+  // OrdersInvoice.jsx 
+import React, { useState, useEffect,useMemo } from "react";
 import {
   Table,
   Input,
@@ -10,502 +12,62 @@ import {
   DatePicker,
   Row,
   Col,
-  Tag,
   Divider,
-  message,
   Space,
+  message,
 } from "antd";
-import * as XLSX from "xlsx";
 import {
   SearchOutlined,
   PlusOutlined,
-  DownloadOutlined,
+WalletOutlined,
   EyeOutlined,
   EditOutlined,
   FilterOutlined,
   DeleteOutlined,
-  MinusCircleOutlined,
-  WalletOutlined,
 } from "@ant-design/icons";
-import dayjs from "dayjs";
 import Wallet from "./Wallet";
-import { getOrders, getContracts, getContractById, createOrder, getOrderById } from "../api/order";
-import useSessionStore from "../store/sessionStore";
+import dayjs from "dayjs";
+import {
+ 
+  salesContractItems,
+  createSalesOrder,
+  getSalesOrders,
+  getSalesOrderById,
+  updateSalesOrder,
+  getContractById,
+ // getCustomersByOrganisation,
+  getAllSalesContracts,
+} from "../api/order";
+/* ------------------ data (use your salesOrderJSON) ------------------ */
 
-const API_CONFIG = {
-  fetchData: () => contractJSON.initialData,
-  saveData: (data) => data,
-  updateData: (data) => data,
-  fetchContracts: () => contractJSON.contractOptions,
-};
 
+/* ------------------ component ------------------ */
+export default function SaleOrdersInvoice() {
+  const [data, setData] = useState([]);
+  const [searchText, setSearchText] = useState("");
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [formMode, setFormMode] = useState(null); 
+  const [customerId, setCustomerId] = useState(null);
+  const [addForm] = Form.useForm();
+  const [editForm] = Form.useForm();
+  const [viewForm] = Form.useForm();
+  const [walletOpen, setWalletOpen] = useState(false);
+  const [allData, setAllData] = useState([]);
+ const [selectedStatus, setSelectedStatus] = useState("All");
+  const [contractPersonOptions, setContractPersonOptions] = useState([]);
+  const [contractOptions, setContractOptions] = useState([]);
+  // const [contractItems, setContractItems] = useState([]);
+  const [contractItemsMap, setContractItemsMap] = useState({});
+  useEffect(() => {
+    fetchContracts();
+    fetchSalesOrders();
 
-/* ---------- utilities: compute item and order totals ---------- */
-const computeOrderTotalsFromContracts = (contracts = [], orderTax = {}) => {
-  const allItems = [];
-  contracts.forEach((c) => {
-    (c.items || []).forEach((it) => allItems.push(it));
-  });
-
-  const grossAmountTotal = allItems.reduce(
-    (s, it) => s + Number(it.amount || 0),
-    0
-  );
-  const discountTotal = allItems.reduce(
-    (s, it) => s + Number(it.discountAmt || 0),
-    0
-  );
-  const taxableAmount = grossAmountTotal - discountTotal;
-
-  const sgstPercent = Number(orderTax.sgstPercent || 0);
-  const cgstPercent = Number(orderTax.cgstPercent || 0);
-  const igstPercent = Number(orderTax.igstPercent || 0);
-  const tcsAmt = Number(orderTax.tcsAmt || 0);
-
-  const sgst = Math.round((taxableAmount * sgstPercent) / 100);
-  const cgst = Math.round((taxableAmount * cgstPercent) / 100);
-  const igst = Math.round((taxableAmount * igstPercent) / 100);
-  const totalGST = sgst + cgst + igst;
-  const grandTotal = Math.round(taxableAmount + totalGST + tcsAmt);
-
-  const qtyTotal = allItems.reduce((s, it) => s + Number(it.qty || 0), 0);
-  const freeQtyTotal = allItems.reduce(
-    (s, it) => s + Number(it.freeQty || 0),
-    0
-  );
-
-  return {
-    orderTaxAndTotals: {
-      grossAmountTotal,
-      discountTotal,
-      taxableAmount,
-      sgstPercent,
-      cgstPercent,
-      igstPercent,
-      sgst,
-      cgst,
-      igst,
-      totalGST,
-      tcsAmt,
-      grandTotal,
-    },
-    orderTotals: {
-      qtyTotal,
-      freeQtyTotal,
-      totalQty: qtyTotal + freeQtyTotal,
-    },
-    items: allItems,
-  };
-};
-
-const ContractsFormList = ({ form, contractsOptions, contractItemsMap, setContractItemsMap, onFormValuesChange }) => (
-  <Form.List name="contracts">
-    {(contractFields, { add: addContract, remove: removeContract }) => (
-      <>
-        {/* HEADER */}
-        <div className="mb-2 flex justify-between items-center">
-          <h6 className="text-amber-500">Contracts</h6>
-          <Button
-            className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
-            type="dashed"
-            icon={<PlusOutlined />}
-            onClick={() =>
-              addContract({
-                contractNo: undefined,
-                items: [
-                  {
-                    lineKey: Date.now(),
-                    item: undefined,
-                    itemCode: undefined,
-                    uom: undefined,
-                    qty: 0,
-                    freeQty: 0,
-                    totalQty: 0,
-                    grossWt: 0,
-                    totalGrossWt: 0,
-                    rate: 0,
-                    amount: 0,
-                    discountPercent: 0,
-                    discountAmt: 0,
-                    totalAmount: 0,
-                  },
-                ],
-              })
-            }
-          >
-            Add Contract
-          </Button>
-        </div>
-
-        {contractFields.map((cf, ci) => {
-          const contractItems = contractItemsMap[ci] || [];
-
-          return (
-            <div
-              key={cf.key}
-              className="mb-4 p-4 border rounded-lg shadow-sm bg-white"
-            >
-              {/* CONTRACT HEADER */}
-              <div className="flex justify-between items-center mb-3">
-                <Form.Item
-                  label="Contract No"
-                  name={[cf.name, "contract_id"]}
-                >
-                  <Select
-                    placeholder="Select Contract"
-                    onChange={async (contractId) => {
-                      // Fetch contract details (API call)
-                      const contract = contractsOptions.find(c => c.sale_contract_id === contractId);
-                      if (!contract) return;
-
-                      let items = [];
-                      try {
-                        const res = await getContractById(contractId);
-                        // Map items response from getContractById to UI expected format
-                        items = (res.items || []).map((it) => ({
-                          product_name: it.product?.product_name || it.product_name,
-                          product_id: it.product?.product_id || it.product_id,
-                          hsn_code: it.hsn_code,
-                          uom: { unit_name: it.uom?.unit_name },
-                          net_qty: it.net_qty,
-                          free_qty: it.free_qty,
-                          gross_qty: it.gross_qty,
-                          mrp: it.mrp,
-                          discount_percent: it.discount_percent,
-                          discount_amount: it.discount_amount,
-                          line_total: it.line_total
-                        }));
-                      } catch (e) {
-                        console.error("Error fetching contract items", e);
-                      }
-
-                      setContractItemsMap((prev) => ({
-                        ...prev,
-                        [ci]: items,
-                      }));
-
-                      const mappedItems = items.map((it) => ({
-                        lineKey: Date.now() + Math.random(),
-                        item: it.product_name,
-                        itemCode: it.product_id,
-                        hsnCode: it.hsn_code,
-                        uom: it.uom?.unit_name,
-                        qty: Number(it.net_qty),
-                        freeQty: Number(it.free_qty),
-                        totalQty: Number(it.gross_qty),
-                        grossWt: 0,
-                        totalGrossWt: 0,
-                        rate: Number(it.mrp),
-                        amount: 0,
-                        discountPercent: Number(it.discount_percent),
-                        discountAmt: Number(it.discount_amount),
-                        totalAmount: Number(it.line_total),
-                      }));
-
-                      const contracts = form.getFieldValue("contracts") || [];
-                      contracts[ci] = {
-                        ...(contracts[ci] || {}),
-                        contract_id: contractId,
-                        items: mappedItems,
-                      };
-
-                      form.setFieldsValue({ contracts });
-                      onFormValuesChange(form, form.getFieldsValue());
-                    }}
-                  >
-                    {contractsOptions.map((c) => (
-                      <Select.Option
-                        key={c.sale_contract_id}
-                        value={c.sale_contract_id}
-                      >
-                        {c.contractNo} — {c.companyName}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-
-                <Button
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={() => removeContract(cf.name)}
-                  className="ml-2"
-                />
-              </div>
-
-              {/* ITEMS LIST */}
-              <Form.List name={[cf.name, "items"]}>
-                {(itemFields, { add: addItem, remove: removeItem }) => (
-                  <>
-                    {itemFields.map((itf, ii) => (
-                      <div
-                        key={itf.key}
-                        className="mb-3 p-3 border rounded-md"
-                      >
-                        <Row gutter={12}>
-                          {/* ITEM */}
-                          <Col span={8}>
-                            <Form.Item
-                              name={[itf.name, "item"]}
-                              label="Item"
-                              rules={[{ required: true }]}
-                            >
-                              <Select
-                                placeholder="Item"
-                                showSearch
-                                optionFilterProp="children"
-                                onChange={(val) => {
-                                  const sel = contractItems.find(
-                                    (x) => x.product_name === val,
-                                  );
-                                  if (!sel) return;
-
-                                  const contracts =
-                                    form.getFieldValue("contracts") || [];
-                                  const items = contracts[ci].items || [];
-
-                                  items[ii] = {
-                                    ...(items[ii] || {}),
-                                    item: sel.product_name,
-                                    itemCode: sel.product_id,
-                                    hsnCode: sel.hsn_code,
-                                    uom: sel.uom?.unit_name,
-                                    qty: Number(sel.net_qty),
-                                    freeQty: Number(sel.free_qty),
-                                    totalQty: Number(sel.gross_qty),
-                                    rate: Number(sel.mrp),
-                                    discountPercent: Number(
-                                      sel.discount_percent || 0,
-                                    ),
-                                    discountAmt: Number(sel.discount_amount || 0),
-                                    totalAmount: Number(sel.line_total || 0),
-                                  };
-
-                                  contracts[ci].items = items;
-                                  form.setFieldsValue({ contracts });
-                                  onFormValuesChange(
-                                    form,
-                                    form.getFieldsValue(),
-                                  );
-                                }}
-                              >
-                                {contractItems.map((it) => (
-                                  <Select.Option
-                                    key={it.product_id}
-                                    value={it.product_name}
-                                  >
-                                    {it.product_name}
-                                  </Select.Option>
-                                ))}
-                              </Select>
-                            </Form.Item>
-                          </Col>
-
-                          {/* CODE */}
-                          <Col span={4}>
-                            <Form.Item
-                              name={[itf.name, "hsnCode"]}
-                              label="Code"
-                            >
-                              <Input disabled />
-                            </Form.Item>
-                          </Col>
-
-                          {/* UOM */}
-                          <Col span={4}>
-                            <Form.Item name={[itf.name, "uom"]} label="UOM">
-                              <Input disabled />
-                            </Form.Item>
-                          </Col>
-
-                          {/* QTY */}
-                          <Col span={3}>
-                            <Form.Item
-                              name={[itf.name, "qty"]}
-                              label="Qty"
-                              rules={[{ required: true }]}
-                            >
-                              <InputNumber
-                                min={0}
-                                className="w-full"
-                                disabled
-                                onChange={() =>
-                                  onFormValuesChange(
-                                    form,
-                                    form.getFieldsValue(),
-                                  )
-                                }
-                              />
-                            </Form.Item>
-                          </Col>
-
-                          {/* FREE QTY */}
-                          <Col span={3}>
-                            <Form.Item
-                              name={[itf.name, "freeQty"]}
-                              label="Free"
-                            >
-                              <InputNumber
-                                min={0}
-                                disabled
-                                className="w-full"
-                                onChange={() =>
-                                  onFormValuesChange(
-                                    form,
-                                    form.getFieldsValue(),
-                                  )
-                                }
-                              />
-                            </Form.Item>
-                          </Col>
-
-                          {/* RATE */}
-                          <Col span={4}>
-                            <Form.Item
-                              name={[itf.name, "rate"]}
-                              label="Rate"
-                              rules={[{ required: true }]}
-                            >
-                              <InputNumber
-                                min={0}
-                                className="w-full"
-                                disabled
-                                onChange={() =>
-                                  onFormValuesChange(
-                                    form,
-                                    form.getFieldsValue(),
-                                  )
-                                }
-                              />
-                            </Form.Item>
-                          </Col>
-
-                          {/* DISCOUNT PERCENT */}
-                          <Col span={3}>
-                            <Form.Item
-                              name={[itf.name, "discountPercent"]}
-                              label="Disc %"
-                            >
-                              <InputNumber
-                                min={0}
-                                max={100}
-                                className="w-full"
-                                disabled
-                                onChange={() =>
-                                  onFormValuesChange(
-                                    form,
-                                    form.getFieldsValue(),
-                                  )
-                                }
-                              />
-                            </Form.Item>
-                          </Col>
-
-                          {/* AMOUNT */}
-                          <Col span={3}>
-                            <Form.Item
-                              name={[itf.name, "amount"]}
-                              label="Amount"
-                            >
-                              <InputNumber className="w-full" disabled />
-                            </Form.Item>
-                          </Col>
-
-                          {/* DISCOUNT AMOUNT */}
-                          <Col span={3}>
-                            <Form.Item
-                              name={[itf.name, "discountAmt"]}
-                              label="Disc Amt"
-                            >
-                              <InputNumber className="w-full" disabled />
-                            </Form.Item>
-                          </Col>
-
-                          {/* TOTAL AMOUNT */}
-                          <Col span={3}>
-                            <Form.Item
-                              name={[itf.name, "totalAmount"]}
-                              label="Total Amount"
-                            >
-                              <InputNumber className="w-full" disabled />
-                            </Form.Item>
-                          </Col>
-
-                          {/* TOTAL QTY */}
-                          <Col span={3}>
-                            <Form.Item
-                              name={[itf.name, "totalQty"]}
-                              label="Total Qty"
-                            >
-                              <InputNumber className="w-full" disabled />
-                            </Form.Item>
-                          </Col>
-
-                          <Col span={3}>
-                            <Form.Item
-                              name={[itf.name, "orderQuantity"]}
-                              label="Order Qty"
-                            >
-                              <InputNumber
-                                min={0}
-                                className="w-full"
-                                onChange={() =>
-                                  onFormValuesChange(
-                                    form,
-                                    form.getFieldsValue(),
-                                  )
-                                }
-                              />
-                            </Form.Item>
-                          </Col>
-                        </Row>
-                        <Button
-                          danger
-                          icon={<DeleteOutlined />}
-                          onClick={() => {
-                            removeItem(itf.name);
-                            onFormValuesChange(form, form.getFieldsValue());
-                          }}
-                        />
-                      </div>
-                    ))}
-
-                    <Button
-                      className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
-                      type="dashed"
-                      icon={<PlusOutlined />}
-                      onClick={() =>
-                        addItem({
-                          lineKey: Date.now(),
-                          item: undefined,
-                          itemCode: undefined,
-                          uom: undefined,
-                          qty: 0,
-                          freeQty: 0,
-                          totalQty: 0,
-                          grossWt: 0,
-                          totalGrossWt: 0,
-                          rate: 0,
-                          amount: 0,
-                          discountPercent: 0,
-                          discountAmt: 0,
-                          totalAmount: 0,
-                        })
-                      }
-                    >
-                      Add Item
-                    </Button>
-                  </>
-                )}
-              </Form.List>
-            </div>
-          );
-        })}
-      </>
-    )}
-  </Form.List>
-);
-
-const STATUS_FILTERS = [
+  }, []);
+   
+ const STATUS_FILTERS = [
   "All",
   "Fresh",
   "Approved",
@@ -514,1307 +76,1153 @@ const STATUS_FILTERS = [
   "OutForDelivery",
   "Delivered",
 ];
+ 
 
-const contractJSON = {
-  initialData: [
-    {
-      key: 1,
-      orderGroupId: "ORD-2025-001",
-      contractNo: "SC-001",
-      orderDate: "2025-10-01",
-      companyName: "ABC Oils Ltd",
-      item: "Mustard Oil",
-      qty: 2000,
-      uom: "Ltrs",
-      itemcode: "MO-001",
-      deliveryDate: "2025-10-15",
-      deliveryAddress: "BBSR",
-      status: "Approved",
-      totalAmt: 250000,
-      rate: 125,
-      NetQty: 10,
-      GrossQty: 12,
-      HSNCode: 1514,
-      IGST: 12,
-      CashDiscount: 5,
-      PurchaseType: "Local",
-      BillMode: "Online",
-      ExpReceivingDate: "2025-10-18",
-      Narration: "Standard delivery order",
-    },
-    {
-      key: 2,
-      orderGroupId: "ORD-2025-001",
-      contractNo: "SC-002",
-      orderDate: "2025-10-01",
-      companyName: "XYZ Refineries",
-      item: "Sunflower Oil",
-      qty: 1000,
-      uom: "Ltrs",
-      itemcode: "SO-002",
-      deliveryDate: "2025-10-15",
-      deliveryAddress: "BBSR",
-      status: "InTransit",
-      totalAmt: 110000,
-      rate: 110,
-      NetQty: 8,
-      GrossQty: 10,
-      HSNCode: 1512,
-      IGST: 18,
-      CashDiscount: 3,
-      PurchaseType: "Interstate",
-      BillMode: "Offline",
-      ExpReceivingDate: "2025-10-17",
-      Narration: "Urgent interstate delivery",
-    },
-    {
-      key: 3,
-      orderGroupId: "ORD-2025-002",
-      contractNo: "SC-003",
-      orderDate: "2025-10-05",
-      companyName: "PQR Traders",
-      item: "Coconut Oil",
-      qty: 500,
-      uom: "Ltrs",
-      itemcode: "CO-002",
-      deliveryDate: "2025-10-20",
-      deliveryAddress: "BBSR",
-      status: "Pending",
-      totalAmt: 65000,
-      rate: 130,
-      NetQty: 5,
-      GrossQty: 6,
-      HSNCode: 1513,
-      IGST: 12,
-      CashDiscount: 2,
-      PurchaseType: "Local",
-      BillMode: "Online",
-      ExpReceivingDate: "2025-10-25",
-      Narration: "Pending approval",
-    },
-    {
-      key: 4,
-      orderGroupId: "ORD-2025-002",
-      contractNo: "SC-003",
-      orderDate: "2025-10-05",
-      companyName: "PQR Traders",
-      item: "Palm Oil",
-      qty: 300,
-      uom: "Ltrs",
-      itemcode: "PO-003",
-      deliveryDate: "2025-10-20",
-      deliveryAddress: "BBSR",
-      status: "Pending",
-      totalAmt: 39000,
-      rate: 130,
-      NetQty: 3,
-      GrossQty: 4,
-      HSNCode: 1511,
-      IGST: 18,
-      CashDiscount: 4,
-      PurchaseType: "Local",
-      BillMode: "Offline",
-      ExpReceivingDate: "2025-10-22",
-      Narration: "Standard order pending",
-    },
-    {
-      key: 5,
-      orderGroupId: "ORD-2025-003",
-      contractNo: "SC-001",
-      orderDate: "2025-10-10",
-      companyName: "ABC Oils Ltd",
-      item: "Mustard Oil",
-      qty: 500,
-      uom: "Ltrs",
-      itemcode: "MO-001",
-      deliveryDate: "2025-10-25",
-      deliveryAddress: "BBSR",
-      status: "Delivered",
-      totalAmt: 62500,
-      rate: 125,
-      NetQty: 5,
-      GrossQty: 6,
-      HSNCode: 1514,
-      IGST: 12,
-      CashDiscount: 5,
-      PurchaseType: "Local",
-      BillMode: "Online",
-      ExpReceivingDate: "2025-10-28",
-      deliveredDate: "2025-10-25",
-      Narration: "Delivered order",
-    },
-    {
-      key: 6,
-      orderGroupId: "ORD-2025-004",
-      contractNo: "SC-002",
-      orderDate: "2025-10-12",
-      companyName: "XYZ Refineries",
-      item: "Sunflower Oil",
-      qty: 400,
-      uom: "Ltrs",
-      itemcode: "SO-002",
-      deliveryDate: "2025-10-27",
-      deliveryAddress: "BBSR",
-      status: "OutForDelivery",
-      totalAmt: 44000,
-      rate: 110,
-      NetQty: 4,
-      GrossQty: 5,
-      HSNCode: 1512,
-      IGST: 18,
-      CashDiscount: 3,
-      PurchaseType: "Interstate",
-      BillMode: "Offline",
-      ExpReceivingDate: "2025-10-30",
-      Narration: "Out for delivery",
-    },
-  ],
-  contractOptions: [
-    {
-      contractNo: "SC-001",
-      companyName: "ABC Oils Ltd",
-      items: [
-        {
-          item: "Mustard Oil",
-          uomOptions: ["Ltrs", "Box"],
-          conversion: { Ltrs: 1, Box: 12 },
-          rate: 125,
-          itemcode: "MO-001",
-          restQty: 5000,
-        },
-        {
-          item: "Palm Oil",
-          uomOptions: ["Ltrs", "Box"],
-          conversion: { Ltrs: 1, Box: 10 },
-          rate: 125,
-          itemcode: "PO-001",
-          restQty: 1500,
-        },
-      ],
-    },
-    {
-      contractNo: "SC-002",
-      companyName: "XYZ Refineries",
-      items: [
-        {
-          item: "Sunflower Oil",
-          uomOptions: ["Ltrs", "Box"],
-          conversion: { Ltrs: 1, Box: 12 },
-          rate: 110,
-          itemcode: "SO-002",
-          restQty: 3000,
-        },
-        {
-          item: "Coconut Oil",
-          uomOptions: ["Ltrs", "Box"],
-          conversion: { Ltrs: 1, Box: 8 },
-          rate: 140,
-          itemcode: "CO-002",
-          restQty: 800,
-        },
-      ],
-    },
-    {
-      contractNo: "SC-003",
-      companyName: "PQR Traders",
-      items: [
-        {
-          item: "Coconut Oil",
-          uomOptions: ["Ltrs", "Box"],
-          conversion: { Ltrs: 1, Box: 8 },
-          rate: 130,
-          itemcode: "CO-003",
-          restQty: 1200,
-        },
-        {
-          item: "Palm Oil",
-          uomOptions: ["Ltrs", "Box"],
-          conversion: { Ltrs: 1, Box: 10 },
-          rate: 130,
-          itemcode: "PO-003",
-          restQty: 1200,
-        },
-      ],
-    },
-  ],
-  uomOptions: ["Ltrs", "Box", "Kg"],
-};
-
-const emptyItem = {
-  item: undefined,
-  uom: undefined,
-  rate: 0,
-  totalAmt: 0,
-  key: undefined,
-};
-
-const emptyContract = {
-  contractNo: undefined,
-  companyName: undefined,
-  items: [emptyItem],
-};
-
-const initialOrderGroup = {
-  deliveryDate: dayjs().add(3, "day"),
-  contracts: [emptyContract],
-};
-
-const downloadInvoiceExcel = (orderGroup) => {
-  // Flatten data for Excel
-  const rows = [];
-
-  orderGroup.contracts.forEach((contract) => {
-    contract.items.forEach((item) => {
-      rows.push({
-        OrderNo: orderGroup.orderGroupId,
-        OrderDate: orderGroup.orderDate,
-        DeliveryDate: orderGroup.deliveryDate,
-        DeliveryAddress: orderGroup.deliveryAddress,
-        Status: orderGroup.status,
-        ContractNo: contract.contractNo,
-        Vendor: contract.companyName,
-        Item: item.item,
-        ItemCode: item.itemcode,
-        Qty: item.qty,
-        UOM: item.uom,
-        Rate: item.rate,
-        Total: item.totalAmt,
-        IGST: item.IGST,
-        CashDiscount: item.CashDiscount,
-        PurchaseType: item.PurchaseType,
-        BillMode: item.BillMode,
-        Narration: item.Narration,
-      });
-    });
-  });
-
-  const worksheet = XLSX.utils.json_to_sheet(rows);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Invoice");
-
-  XLSX.writeFile(
-    workbook,
-    `${orderGroup.orderGroupId}_Invoice.xlsx`
-  );
-};
-// pdated grouping with grandTotal
-const groupDataByOrderGroup = (data) => {
-  if (!Array.isArray(data)) return [];
-
-  return data.map((order) => {
-    // Check if it's the new format from API
-    if (order.sales_order_id) {
-      return {
-        orderGroupId: order.order_number,
-        key: order.sales_order_id,
-        orderDate: order.order_date,
-        deliveryDate: order.expected_receiving_date,
-        deliveryAddress: order.delivery_address,
-        status: order.status,
-        grandTotal: Number(order.grand_total || 0),
-        contracts: (order.summary || []).map((s) => ({
-          contractNo: s.sale_contract_number,
-          companyName: "", // The summary API doesn't provide vendor name
-          items: (s.products || []).map((p, idx) => ({
-            key: `${s.sale_contract_id}-${idx}`,
-            item: p,
-            // These missing fields will be 0/empty in the list view
-            itemcode: "",
-            qty: 0,
-            uom: "",
-            rate: 0
-          })),
-        })),
-        flatKeys: [], // Not needed for new format
-      };
-    }
-
-    // Fallback for any legacy data/format if it persists during transition
-    const {
-      orderGroupId,
-      contractNo,
-      item,
-      qty,
-      uom,
-      itemcode,
-      rate,
-      totalAmt,
-      key,
-      ...rest
-    } = order;
-
-    // Simple check if this is already grouped or needs grouping
-    if (order.contracts) return order;
-
-    return {
-      orderGroupId,
-      key: orderGroupId,
-      orderDate: rest.orderDate,
-      deliveryDate: rest.deliveryDate,
-      deliveryAddress: rest.deliveryAddress,
-      status: rest.status,
-      grandTotal: totalAmt || 0,
-      contracts: [{
-        contractNo,
-        companyName: rest.companyName,
-        items: [{
-          item, qty, uom, itemcode, rate, totalAmt
-        }]
-      }]
-    };
-  });
-};
-
-// UOM handlers for conversion
-// UOM handlers for conversion
-const useUOMHandlers = (form, contractItemsMap) => {
-  const handleUOMChange = useCallback((uom, contractIndex, itemIndex) => {
-    const contracts = form.getFieldValue("contracts") || [];
-    const items = contractItemsMap[contractIndex] || [];
-    const currentItemName = contracts[contractIndex]?.items[itemIndex]?.item;
-    const selectedItem = items.find(item => item.item === currentItemName);
-
-    if (selectedItem?.conversion?.[uom]) {
-      const baseRate = selectedItem.rate;
-      const conversionFactor = selectedItem.conversion[uom];
-      const newRate = baseRate / conversionFactor; // Rate per selected UOM
-
-      const updatedContracts = contracts.map((c, ci) => {
-        if (ci !== contractIndex) return c;
-        const updatedItems = c.items.map((it, ii) => {
-          if (ii !== itemIndex) return it;
-          const qty = it.qty || 0;
-          return {
-            ...it,
-            uom,
-            rate: newRate,
-            totalAmt: newRate * qty,
-          };
-        });
-        return { ...c, items: updatedItems };
-      });
-      form.setFieldsValue({ contracts: updatedContracts });
-    }
-  }, [form, contractItemsMap]);
-
-  const handleQtyChange = useCallback((qty, contractIndex, itemIndex) => {
-    const contracts = form.getFieldValue("contracts") || [];
-    const updatedContracts = contracts.map((c, ci) => {
-      if (ci !== contractIndex) return c;
-      const updatedItems = c.items.map((it, ii) => {
-        if (ii !== itemIndex) return it;
-        const rate = it.rate || 0;
-        return {
-          ...it,
-          qty,
-          totalAmt: rate * qty,
-        };
-      });
-      return { ...c, items: updatedItems };
-    });
-    form.setFieldsValue({ contracts: updatedContracts });
-  }, [form]);
-
-  return { handleUOMChange, handleQtyChange };
-};
-
-const useFormHandlers = (form, contractItemsMap, setContractItemsMap, setSelectedItemMaxMap, contracts, isEdit = false) => {
-  const handleSelectContract = useCallback(async (contractNo, contractIndex) => {
-    const c = contracts.find((x) => x.contractNo === contractNo);
-    if (!c) return;
-
+  const fetchContracts = async () => {
     try {
-      const contractDetails = await getContractById(c.sale_contract_id);
-      const mappedItems = (contractDetails.items || []).map(item => ({
-        item: item.product?.product_name || item.product_name || "Unknown",
-        uomOptions: item.uom ? [item.uom.unit_name] : ["Ltrs"], // Fallback
-        rate: Number(item.mrp || 0),
-        itemcode: item.product?.product_code || item.product_code,
-        restQty: Number(item.net_qty || 0),
-        uom: item.uom?.unit_name,
-        conversion: {} // Can try to map conversion if needed
-      }));
-
-      setContractItemsMap((prev) => ({
-        ...prev,
-        [contractIndex]: mappedItems,
-      }));
+      const res = await getAllSalesContracts();
+         const filtered = res.filter((item) =>
+      ["Approved"].includes(item.status)
+    );
+      console.log("Fetched All Sales Contracts:", filtered);
+      setContractOptions(filtered || []);
     } catch (err) {
-      console.error("Error fetching contract details:", err);
-      message.error("Failed to fetch contract items");
-      setContractItemsMap((prev) => ({
-        ...prev,
-        [contractIndex]: [],
-      }));
-    }
-
-    const orders = form.getFieldValue("contracts") || [];
-    const updated = orders.map((entry, idx) =>
-      idx === contractIndex
-        ? {
-          ...entry,
-          contractNo,
-          companyName: c.companyName,
-          items: [emptyItem],
-        }
-        : entry
-    );
-    form.setFieldsValue({ contracts: updated });
-    setSelectedItemMaxMap((prev) => {
-      const copy = { ...prev };
-      Object.keys(copy).forEach((k) => {
-        if (k.startsWith(`${contractIndex}-`)) delete copy[k];
-      });
-      return copy;
-    });
-  }, [form, setContractItemsMap, setSelectedItemMaxMap, contracts]);
-
-  const handleSelectItem = useCallback((itemName, contractIndex, itemIndex) => {
-    const items = contractItemsMap[contractIndex] || [];
-    const sel = items.find((it) => it.item === itemName);
-    if (!sel) {
-      setSelectedItemMaxMap((p) => ({
-        ...p,
-        [`${contractIndex}-${itemIndex}`]: 0,
-      }));
-      return;
-    }
-    const contractsVals = form.getFieldValue("contracts") || [];
-    const updatedContracts = contractsVals.map((c, ci) => {
-      if (ci !== contractIndex) return c;
-      const updatedItems = (c.items || []).map((it, ii) =>
-        ii === itemIndex
-          ? {
-            ...it,
-            item: sel.item,
-            uom: sel.uomOptions?.[0] || "Ltrs",
-            itemcode: sel.itemcode,
-            rate: sel.rate,
-            qty: 0,
-            totalAmt: 0,
-          }
-          : it
-      );
-      return { ...c, items: updatedItems };
-    });
-    form.setFieldsValue({ contracts: updatedContracts });
-    setSelectedItemMaxMap((prev) => ({
-      ...prev,
-      [`${contractIndex}-${itemIndex}`]: sel.restQty || 0,
-    }));
-  }, [form, setSelectedItemMaxMap, contractItemsMap]);
-
-  return { handleSelectContract, handleSelectItem };
-};
-
-export default function Order() {
-  const { currentOrgId } = useSessionStore();
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [selectedOrderGroup, setSelectedOrderGroup] = useState(null);
-  const [data, setData] = useState([]);
-  const [searchText, setSearchText] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState("All");
-  const [contractItemsMap, setContractItemsMap] = useState({});
-  const [selectedItemMaxMap, setSelectedItemMaxMap] = useState({});
-  const [walletOpen, setWalletOpen] = useState(false);
-  const [contracts, setContracts] = useState([]);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!currentOrgId) return;
-      try {
-        const [ordersRes, contractsRes] = await Promise.all([
-          getOrders(),
-          getContracts()
-        ]);
-
-        const orders = Array.isArray(ordersRes) ? ordersRes : ordersRes.results || [];
-        setData(orders);
-
-        const contractsData = Array.isArray(contractsRes) ? contractsRes : contractsRes.results || [];
-        const mappedContracts = contractsData.map(c => ({
-          contractNo: c.sale_contract_number,
-          sale_contract_id: c.sale_contract_id,
-          companyName: c.vendor_names ? c.vendor_names.join(", ") : (c.vendor_name || ""),
-          items: []
-        }));
-        setContracts(mappedContracts);
-      } catch (error) {
-        console.error("Failed to fetch data:", error);
-        message.error("Failed to fetch initial data");
-      }
-    };
-    fetchData();
-  }, [currentOrgId]);
-
-  const [addForm] = Form.useForm();
-  const [editForm] = Form.useForm();
-
-  const addUOMHandlers = useUOMHandlers(addForm, contractItemsMap);
-  const editUOMHandlers = useUOMHandlers(editForm, contractItemsMap);
-
-  const disablePastDates = (current) =>
-    current && current < dayjs().startOf("day");
-
-  const groupedData = useMemo(() => groupDataByOrderGroup(data), [data]);
-
-  const filteredData = useMemo(() => {
-    const searchFiltered = groupedData.filter((d) =>
-      (d.orderGroupId || "")
-        .toLowerCase()
-        .includes(searchText.toLowerCase()) ||
-      (d.status || "").toLowerCase().includes(searchText.toLowerCase()) ||
-      d.contracts.some(
-        (c) =>
-          c.contractNo.toLowerCase().includes(searchText.toLowerCase()) ||
-          c.companyName.toLowerCase().includes(searchText.toLowerCase())
-      )
-    );
-
-    if (selectedStatus === "All") {
-      return searchFiltered;
-    }
-    return searchFiltered.filter((d) => d.status === selectedStatus);
-  }, [groupedData, searchText, selectedStatus]);
-
-  const handleStatusFilter = useCallback((status) => {
-    setSelectedStatus(status);
-  }, []);
-
-  const getStatusTagProps = (status) => {
-    const base = "px-3 py-1 rounded-full text-sm font-semibold";
-    switch (status) {
-      case "Approved":
-        return {
-          className: `${base} bg-green-100 text-green-700`,
-          color: "green",
-        };
-      case "Fresh":
-        return {
-          className: `${base} bg-cyan-100 text-cyan-700`,
-          color: "cyan",
-        };
-      case "Pending":
-        return {
-          className: `${base} bg-yellow-100 text-yellow-700`,
-          color: "yellow",
-        };
-      case "InTransit":
-        return {
-          className: `${base} bg-blue-100 text-blue-700`,
-          color: "blue",
-        };
-      case "OutForDelivery":
-        return {
-          className: `${base} bg-purple-100 text-purple-700`,
-          color: "purple",
-        };
-      case "Delivered":
-        return {
-          className: `${base} bg-emerald-100 text-emerald-700`,
-          color: "lime",
-        };
-      default:
-        return {
-          className: `${base} bg-gray-100 text-gray-700`,
-          color: "default",
-        };
+      console.error("Failed to fetch all sales contracts:", err);
     }
   };
 
+
+const handleSearch = (value) => {
+  setSearchText(value);
+
+  if (!value) {
+    fetchSalesOrders();
+    return;
+  }
+
+  const filtered = data.filter((item) =>
+    JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
+  );
+
+  setData(filtered);
+};
+  /* ---------- utilities: compute item and order totals ---------- */
+ const computeOrderTotalsFromContracts = (contracts = []) => {
+  const allItems = [];
+
+  contracts.forEach((c) => {
+    (c.items || []).forEach((it) => allItems.push(it));
+  });
+
+  const grossAmountTotal = allItems.reduce(
+    (s, it) => s + Number(it.amount || 0),
+    0
+  );
+
+  const discountTotal = allItems.reduce(
+    (s, it) => s + Number(it.discountAmt || 0),
+    0
+  );
+
+  return {
+    orderTaxAndTotals: {
+      grossAmountTotal,
+      discountTotal,
+      grandTotal: grossAmountTotal - discountTotal,
+    },
+  };
+};
+
+
+  
+  /* ---------- when form values change (add/edit) ---------- */
+const onFormValuesChange = (form, allValues) => {
+  const contracts = allValues.contracts || [];
+
+  // ✅ Only calculate when item is selected
+  const hasItemSelected = contracts.some((c) =>
+    (c.items || []).some((it) => it.itemCode)
+  );
+
+  // ❌ If no item → DO NOTHING (keep API values)
+  if (!hasItemSelected) return;
+
+  // ✅ Calculate only after item selection
+  const updatedContracts = contracts.map((c) => {
+    const items = (c.items || []).map((it) => {
+      const orderQty = Number(it.orderQuantity || 0);
+      const rate = Number(it.rate || 0);
+      const discountPercent = Number(it.discountPercent || 0);
+
+      const amount = Math.round(orderQty * rate);
+      const discountAmt = Math.round((amount * discountPercent) / 100);
+      const totalAmount = amount - discountAmt;
+
+      return { ...it, amount, discountAmt, totalAmount };
+    });
+
+    return { ...c, items };
+  });
+
+  const { orderTaxAndTotals } =
+    computeOrderTotalsFromContracts(updatedContracts);
+
+  form.setFieldsValue({
+    contracts: updatedContracts,
+    orderTaxAndTotals,
+  });
+};
+const handleStatusFilter = (value) => {
+  setSelectedStatus(value);
+
+  if (value === "All") {
+    setData(allData); // ✅ restore original
+    return;
+  }
+
+  const filtered = allData.filter(
+    (item) => item.status === value
+  );
+
+  setData(filtered);
+};
+const handleStatusChange = async (value, form) => {
+  // call API
+  const res = await getTaxByStatus(value); // your API
+
+  form.setFieldsValue({
+    orderTaxAndTotals: {
+      sgstPercent: res.sgst,
+      cgstPercent: res.cgst,
+      igstPercent: res.igst,
+      tcsAmt: res.tcs,
+    },
+  });
+ 
+};
+
+  /* ---------- Add handlers ---------- */
+  const openAddModal = () => {
+     setFormMode("add"); 
+    addForm.resetFields();
+
+    // initialize with one contract + one item row to help user
+    addForm.setFieldsValue({
+      
+      contracts: [
+        {
+          contractNo: undefined,
+          items: [
+            {
+              lineKey: Date.now(),
+              item: undefined,
+              itemCode: undefined,
+              uom: undefined,
+              qty: 0,
+              freeQty: 0,
+              totalQty: 0,
+              grossWt: 0,
+              totalGrossWt: 0,
+              rate: 0,
+              amount: 0,
+              discountPercent: 0,
+              discountAmt: 0,
+              totalAmount: 0,
+            },
+          ],
+        },
+      ],
+      orderTaxAndTotals: {
+        sgstPercent: 0,
+        cgstPercent: 0,
+        igstPercent: 0,
+        tcsAmt: 0,
+      },
+    });
+    setIsAddModalOpen(true);
+     };
+ 
+
+  const fetchSalesOrders = async () => {
+    try {
+      const res = await getSalesOrders();
+      // ✅ SET CUSTOMER ID FROM SALES ORDERS
+if (res && res.length > 0) {
+  setCustomerId(res[0].customer?.customer_id);
+}
+
+      const mappedData = res.map((order, index) => {
+        // Group items by sale_contract_id
+        const contractsMap = {};
+        (order.items || []).forEach((item) => {
+          const cId = item.sale_contract_id;
+          if (!contractsMap[cId]) {
+            contractsMap[cId] = {
+              contract_id: cId,
+              contractNo: item.sale_contract_number,
+              items: [],
+            };
+          }
+          contractsMap[cId].items.push({
+            lineKey: item.id,
+            item: item.product_name,
+            itemCode: item.product_id,
+            uom: item.uom?.unit_name,
+            qty: Number(item.net_qty || 0),
+            freeQty: Number(item.free_qty || 0),
+            totalQty: Number(item.gross_qty || 0),
+            rate: Number(item.rate || 0),
+            discountPercent: Number(item.discount_percent || 0),
+            amount: Number(item.total_amount || 0),
+            // approximate discount amount if not directly provided
+            discountAmt:
+              Number(item.total_amount || 0) - Number(item.line_total || 0),
+            totalAmount: Number(item.line_total || 0),
+            hsnCode: item.hsn_code,
+            orderQuantity: Number(item.ordered_qty || 0),
+          });
+        });
+
+        const contracts = Object.values(contractsMap);
+        const { orderTaxAndTotals, orderTotals } =
+  computeOrderTotalsFromContracts(contracts, {
+    sgstPercent: Number(order.sgst || 0),
+    cgstPercent: Number(order.cgst || 0),
+    igstPercent: Number(order.igst || 0),
+    tcsAmt: Number(order.tcs_amount || 0),
+  });
+        return {
+  key: order.sales_order_id,
+  orderNumber: order.order_number,
+  orderDate: order.order_date,
+  deliveryDate: order.expected_receiving_date,
+  customerName: order.customer?.name || "-",
+  status: order.status,
+  contracts,
+  orderTaxAndTotals,
+  orderTotals,
+          customerId: order.customer?.customer_id,
+          customer_id: order.customer?.customer_id,
+          customerEmail: order.customer?.email_id,
+          deliveryAddress: order.customer?.address_line1,
+
+        
+          bill_mode: order.bill_mode,
+          purchaseType: order.purchase_type,
+
+         
+
+          createdAt: order.created_at,
+          companyName: "-",
+        };
+      });
+
+      setData(mappedData);
+      setAllData(mappedData); 
+    } catch (error) {
+      console.error("Failed to fetch sales orders", error);
+      message.error("Failed to load sales orders");
+    }
+  };
+
+  const buildSalesOrderPayload = (values) => {
+    const { orderTaxAndTotals } = values;
+console.log("PAYLOAD bill_mode 👉", values.bill_mode);
+    return {
+
+status: values.status, 
+ purchase_type: values.purchaseType,   // ✅ NEW
+ bill_mode: values.bill_mode,
+  narration: values.narration || "", 
+ order_date: values.orderDate
+        ? dayjs(values.orderDate).format("YYYY-MM-DD")
+        : null,
+      expected_receiving_date: values.deliveryDate
+        ? dayjs(values.deliveryDate).format("YYYY-MM-DD")
+        : null,
+      delivery_address: values.deliveryAddress || "",
+      cash_discount: 0,
+      cgst: Number(orderTaxAndTotals?.cgstPercent || 0),
+      sgst: Number(orderTaxAndTotals?.sgstPercent || 0),
+      igst: Number(orderTaxAndTotals?.igstPercent || 0),
+      tcs_amount: Number(orderTaxAndTotals?.tcsAmt || 0),
+      round_off_amount: 0,
+      total_amount: Number(orderTaxAndTotals?.grossAmountTotal || 0),
+      grand_total: Number(orderTaxAndTotals?.grandTotal || 0),
+
+      items: (values.contracts || []).map((contract) => ({
+        sale_contract_id: contract.contract_id,
+        products: (contract.items || []).map((item) => ({
+          product_id: item.itemCode,
+          product_name: item.item || "",
+          uom_id: null,
+          hsn_code: item.hsnCode || 0,
+          mrp_per_unit: Number(item.rate || 0),
+          rate: Number(item.rate || 0),
+          gross_qty: Number(item.totalQty || 0),
+          free_qty: Number(item.freeQty || 0),
+          net_qty: Number(item.qty || 0),
+          ordered_qty: Number(item.orderQuantity || 0),
+          discount_percent: Number(item.discountPercent || 0),
+          line_total: Number(item.totalAmount || 0),
+          total_amount: Number(item.amount || 0),
+        })),
+      })),
+    };
+  };
+
+  const handleAddFinish = async (values) => {
+     console.log("ADD bill_mode 👉", values.bill_mode);
+  if (!customerId) {
+    message.error("Customer not loaded yet");
+    return;
+  }
+    try {
+      values.contracts.forEach((c, idx) => {
+        console.log(`🧾 Contract[${idx}] ID:`, c.contract_id);
+
+        (c.items || []).forEach((i, j) => {
+          console.log(`   📦 Product[${j}] ID:`, i.itemCode);
+        });
+      });
+      
+      const payload = {
+    ...buildSalesOrderPayload(values),
+    customer_id: customerId, // ✅ ALWAYS from state
+  };
+      console.log("FINAL SALES ORDER PAYLOAD 🔥", payload);
+
+      await createSalesOrder(payload);
+
+      message.success("Sales Order created successfully");
+
+      setIsAddModalOpen(false);
+      addForm.resetFields();
+      fetchSalesOrders();
+    } catch (error) {
+      console.error("❌ Sales Order API Error");
+
+      if (error.response) {
+        // Backend responded with error status (400, 401, 500 etc.)
+        console.error("Status:", error.response.status);
+        console.error("Data:", error.response.data);
+        console.error("Headers:", error.response.headers);
+        console.log("bill_mode value 👉", values.bill_mode);
+        message.error(error.response.data?.message || "Server error occurred");
+      } else if (error.request) {
+        // Request was sent but no response received
+        console.error("No response received:", error.request);
+        message.error("No response from server");
+      } else {
+        // Something else went wrong
+        console.error("Error message:", error.message);
+        message.error(error.message);
+      }
+    }
+  };
+
+
+
+  const openEdit = async (record) => {
+     setFormMode("edit");
+    try {
+      const order = await getSalesOrderById(record.key);
+
+      // Ensure customer is in options list so Select displays name correctly
+      if (order.customer) {
+        setContractPersonOptions((prev) => {
+          const exists = prev.find(
+            (p) => String(p.customer_id) === String(order.customer.customer_id),
+          );
+          if (!exists) {
+            return [
+              ...prev,
+              {
+                customer_id: order.customer.customer_id, // ensure ID matches
+                name: order.customer.name,
+                email: order.customer.email_id,
+                mobile: order.customer.mobile_number,
+              },
+            ];
+          }
+          return prev;
+        });
+      }
+
+      // Group items by sale_contract_id
+      const contractsMap = {};
+      (order.items || []).forEach((item) => {
+        const cId = item.sale_contract_id;
+        if (!contractsMap[cId]) {
+          contractsMap[cId] = {
+            contract_id: cId,
+            contractNo: item.sale_contract_number,
+            items: [],
+          };
+        }
+        contractsMap[cId].items.push({
+          lineKey: item.id,
+          item: item.product_name_master,
+          itemCode: item.product_id,
+          uom: item.uom?.unit_name,
+          qty: Number(item.net_qty || 0),
+          freeQty: Number(item.free_qty || 0),
+          totalQty: Number(item.gross_qty || 0),
+          rate: Number(item.rate || 0),
+          discountPercent: Number(item.discount_percent || 0),
+          amount: Number(item.total_amount || 0),
+          discountAmt:
+            Number(item.total_amount || 0) - Number(item.line_total || 0),
+          totalAmount: Number(item.line_total || 0),
+          hsnCode: item.hsn_code,
+          orderQuantity: Number(item.ordered_qty || 0),
+        });
+      });
+
+      const contracts = Object.values(contractsMap);
+
+      const mappedData = {
+        key: order.sales_order_id,
+        orderNumber: order.order_number,
+      status: order.status,
+        orderDate: order.order_date ? dayjs(order.order_date) : undefined,
+        deliveryDate: order.expected_receiving_date
+          ? dayjs(order.expected_receiving_date)
+          : undefined,
+
+      customer_id: order.customer?.customer_id,
+        customerEmail: order.customer?.email_id,
+        customerPhone: order.customer?.phone_number,
+        deliveryAddress: order.customer?.address_line1,
+
+      bill_mode: order.bill_mode || "Cash",
+purchaseType: order.purchase_type,
+ // NEW
+narration: order.narration,      // NEW
+
+        contracts,
+        orderTaxAndTotals: {
+          sgstPercent: Number(order.sgst || 0),
+          cgstPercent: Number(order.cgst || 0),
+          igstPercent: Number(order.igst || 0),
+          tcsAmt: Number(order.tcs_amount || 0),
+          grandTotal: Number(order.grand_total || 0),
+          grossAmountTotal: Number(order.total_amount || 0),
+          discountTotal: (order.items || []).reduce(
+            (acc, curr) =>
+              acc + (Number(curr.total_amount) - Number(curr.line_total)),
+            0,
+          ),
+          totalGST:
+            Number(order.grand_total || 0) -
+            Number(order.tcs_amount || 0) -
+            (Number(order.total_amount || 0) -
+              (order.items || []).reduce(
+                (acc, curr) =>
+                  acc + (Number(curr.total_amount) - Number(curr.line_total)),
+                0,
+              )),
+        },
+      };
+
+      setSelectedRecord(mappedData);
+      editForm.setFieldsValue(mappedData);
+      setIsEditModalOpen(true);
+    } catch (err) {
+      console.error("Failed to fetch order details for edit:", err);
+      message.error("Failed to load order details for editing");
+    }
+  };
+
+  const handleEditFinish = async (values) => {
+     console.log("EDIT bill_mode 👉", values.bill_mode);
+    try {
+    const payload = {
+  ...buildSalesOrderPayload(values),
+  customer_id: selectedRecord.customer_id, // ✅ ADD THIS
+};  console.log("FINAL UPDATE PAYLOAD 🔥", payload);
+
+      await updateSalesOrder(selectedRecord.key, payload);
+
+      message.success("Sales Order updated successfully");
+      setIsEditModalOpen(false);
+      editForm.resetFields();
+      fetchSalesOrders(); // Refresh list
+    } catch (error) {
+      console.error("❌ Sales Order Update Error", error);
+      message.error("Failed to update sales order");
+    }
+  };
+
+  /* ---------- View ---------- */
+  const openView = async (record) => {
+    setFormMode("view"); 
+    try {
+      const order = await getSalesOrderById(record.key);
+
+      // Group items by sale_contract_id
+      const contractsMap = {};
+      (order.items || []).forEach((item) => {
+        const cId = item.sale_contract_id;
+        if (!contractsMap[cId]) {
+          contractsMap[cId] = {
+            contract_id: cId,
+            contractNo: item.sale_contract_number,
+            items: [],
+          };
+        }
+        contractsMap[cId].items.push({
+          lineKey: item.id,
+          item: item.product_name,
+          itemCode: item.product_id,
+          uom: item.uom?.unit_name,
+          qty: Number(item.net_qty || 0),
+          freeQty: Number(item.free_qty || 0),
+          totalQty: Number(item.gross_qty || 0),
+          rate: Number(item.rate || 0),
+          discountPercent: Number(item.discount_percent || 0),
+          amount: Number(item.total_amount || 0),
+          // approximate discount amount if not directly provided
+          discountAmt:
+            Number(item.total_amount || 0) -
+            Number(item.line_total || 0),
+          totalAmount: Number(item.line_total || 0),
+          hsnCode: item.hsn_code,
+          orderQuantity: Number(item.ordered_qty || 0),
+        });
+      });
+
+      const contracts = Object.values(contractsMap);
+
+      // Ensure customer is in options list so Select displays name correctly
+      if (order.customer) {
+        setContractPersonOptions((prev) => {
+          const exists = prev.find(
+            (p) => String(p.customer_id) === String(order.customer.customer_id),
+          );
+          if (!exists) {
+            return [
+              ...prev,
+              {
+                customer_id: order.customer.customer_id, // ensure ID matches
+                name: order.customer.name,
+                email: order.customer.email_id,
+                mobile: order.customer.mobile_number,
+              },
+            ];
+          }
+          return prev;
+        });
+      }
+
+      const mappedData = {
+        key: order.sales_order_id,
+        orderNumber: order.order_number,
+        orderDate: order.order_date ? dayjs(order.order_date) : undefined,
+        deliveryDate: order.expected_receiving_date
+          ? dayjs(order.expected_receiving_date)
+          : undefined,
+
+       customerName:
+  order.customer?.name ||
+  order.customer_name ||
+ 
+  "-", customerId: order.customer?.customer_id,
+        customer_id: order.customer?.customer_id,
+        customerEmail: order.customer?.email_id,
+         customerPhone: order.customer?.phone_number,
+        deliveryAddress: order.customer?.address_line1,
+
+        status: order.status,
+     bill_mode: order.bill_mode || "Cash",
+purchaseType: order.purchase_type,
+narration: order.narration,      // NEW
+
+        contracts,
+        orderTaxAndTotals: {
+          sgstPercent: Number(order.sgst || 0),
+          cgstPercent: Number(order.cgst || 0),
+          igstPercent: Number(order.igst || 0),
+          tcsAmt: Number(order.tcs_amount || 0),
+          grandTotal: Number(order.grand_total || 0),
+          grossAmountTotal: Number(order.total_amount || 0),
+          // Calculate if missing
+          discountTotal: (order.items || []).reduce(
+            (acc, curr) =>
+              acc + (Number(curr.total_amount) - Number(curr.line_total)),
+            0,
+          ),
+          totalGST:
+            Number(order.grand_total || 0) -
+            Number(order.tcs_amount || 0) -
+            (Number(order.total_amount || 0) -
+              (order.items || []).reduce(
+                (acc, curr) =>
+                  acc + (Number(curr.total_amount) - Number(curr.line_total)),
+                0,
+              )),
+        },
+      };
+
+      setSelectedRecord(mappedData);
+      viewForm.setFieldsValue(mappedData);
+      setIsViewModalOpen(true);
+    } catch (err) {
+      console.error("Failed to fetch order details:", err);
+      message.error("Failed to load order details");
+    }
+  };
+
+  /* ---------- Columns ---------- */
   const columns = [
     {
       title: <span className="text-amber-700 font-semibold">Order No</span>,
-      dataIndex: "orderGroupId",
-      key: "orderGroupId",
-      width: 120,
+      dataIndex: "orderNumber",
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
-      title: (
-        <span className="text-amber-700 font-semibold">
-          Contract,Items & Vendor
+      title: <span className="text-amber-700 font-semibold">Order Date</span>,
+      dataIndex: "orderDate",
+      render: (d) => (
+        <span className="text-amber-800">
+          {d ? dayjs(d).format("YYYY-MM-DD") : ""}
         </span>
-      ),
-      key: "contractitems",
-      width: 120,
-      render: (_, record) => (
-        <div className="space-y-2 text-amber-800">
-          {record.contracts.map((contract) => (
-            <div key={contract.contractNo}>
-              {contract.contractNo} — {contract.companyName}
-              {contract.items.map((item) => (
-                <li key={item.key}>{item.item}</li>
-              ))}
-            </div>
-          ))}
-        </div>
       ),
     },
     {
       title: (
-        <span className="text-amber-700 font-semibold">Grand Total</span>
+        <span className="text-amber-700 font-semibold">Delivery Date</span>
       ),
-      key: "grandTotal",
-      width: 120,
-      render: (_, record) => (
-        <span className="text-amber-800 ">
-          ₹{record.grandTotal.toLocaleString()}
+      dataIndex: "deliveryDate",
+      render: (d) => (
+        <span className="text-amber-800">
+          {d ? dayjs(d).format("YYYY-MM-DD") : ""}
         </span>
       ),
     },
+
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
-      key: "status",
-      width: 100,
       render: (status) => {
-        const { className } = getStatusTagProps(status);
-        return <span className={className}>{status}</span>;
+        const base = "px-3 py-1 rounded-full text-sm font-semibold";
+        if (status === "Approved")
+          return (
+            <span className={`${base} bg-green-100 text-green-700`}>
+              Approved
+            </span>
+          );
+        if (status === "Pending")
+          return (
+            <span className={`${base} bg-yellow-100 text-yellow-700`}>
+              Pending
+            </span>
+          );
+        return (
+          <span className={`${base} bg-red-100 text-red-700`}>{status}</span>
+        );
       },
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
-      key: "actions",
-      width: 120,
       render: (record) => (
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
-            onClick={async () => {
-              try {
-                const res = await getOrderById(record.key);
-                // Merge detail data with existing summary data
-                const enriched = {
-                  ...record,
-                  purchaseType: res.purchase_type,
-                  billMode: res.bill_mode,
-                  narration: res.narration,
-                  expReceivingDate: res.expected_receiving_date,
-                };
-                setSelectedOrderGroup(enriched);
-                setIsViewModalOpen(true);
-              } catch (e) {
-                console.error("Error fetching order details", e);
-                setSelectedOrderGroup(record);
-                setIsViewModalOpen(true);
-              }
-            }}
+            onClick={() => openView(record)}
           />
-
-          {record.status === "Pending" && (
-            <EditOutlined
-              className="cursor-pointer! text-red-500!"
-              onClick={() => openEditModal(record)}
-            />
-          )}
-
-          {record.status === "Delivered" && (
-            <Button
-              size="small"
-              className="bg-amber-500!  text-white! hover:bg-amber-600! border-none!"
-
-              icon={<DownloadOutlined />}
-              onClick={() => downloadInvoiceExcel(record)}
-            >
-              Invoice
-            </Button>
-
-          )}
+          {record.status !== "Approved" && (
+        <EditOutlined
+          className="cursor-pointer! text-red-500!"
+          onClick={() => openEdit(record)}
+        />
+      )}
         </div>
       ),
-    }
-
+    },
   ];
 
-  const openEditModal = useCallback(
-    (record) => {
-      if (record.status !== "Pending") return;
-      const fullGroup = groupedData.find(
-        (g) => g.orderGroupId === record.orderGroupId
-      );
-      if (!fullGroup) return;
-
-      const initialContractItemsMap = {};
-      const initialSelectedItemMaxMap = {};
-      fullGroup.contracts.forEach((contract, contractIndex) => {
-        const contractDetails = contractJSON.contractOptions.find(
-          (c) => c.contractNo === contract.contractNo
-        );
-        if (contractDetails) {
-          initialContractItemsMap[contractIndex] = contractDetails.items;
-          contract.items.forEach((item, itemIndex) => {
-            const contractItemDetail = contractDetails.items.find(
-              (i) => i.item === item.item
-            );
-            const isExistingItem =
-              item.key !== undefined && item.key !== null;
-            const maxQty = contractItemDetail
-              ? isExistingItem
-                ? item.qty + (contractItemDetail.restQty || 0)
-                : contractItemDetail.restQty || 0
-              : 0;
-            initialSelectedItemMaxMap[`${contractIndex}-${itemIndex}`] = maxQty;
-          });
-        }
-      });
-
-      setContractItemsMap(initialContractItemsMap);
-      setSelectedItemMaxMap(initialSelectedItemMaxMap);
-      const initialValues = {
-        deliveryDate: fullGroup.deliveryDate
-          ? dayjs(fullGroup.deliveryDate)
-          : null,
-        deliveryAddress: fullGroup.deliveryAddress,
-        orderGroupId: fullGroup.orderGroupId,
-        orderDate: fullGroup.orderDate ? dayjs(fullGroup.orderDate) : null,
-        contracts: fullGroup.contracts.map((contract) => ({
-          contractNo: contract.contractNo,
-          companyName: contract.companyName,
-          items: contract.items,
-        })),
-      };
-      setSelectedOrderGroup(fullGroup);
-      editForm.setFieldsValue(initialValues);
-      setIsEditModalOpen(true);
-    },
-    [groupedData, editForm]
-  );
-
-
-
-
-
-
-  const RenderItemsList = useCallback(
-    ({
-      contractIndex,
-      fields,
-      operations,
-      formInstance,
-      handleSelectItem,
-      uomHandlers,
-      isEditMode = false,
-    }) => {
-      return fields.map((f) => {
-        const itemDetails = formInstance.getFieldValue([
-          "contracts",
-          contractIndex,
-          "items",
-          f.name,
-        ]);
-        const maxQty = selectedItemMaxMap[`${contractIndex}-${f.name}`];
-        const selectedItemConfig = (contractItemsMap[contractIndex] || [])
-          .find((item) => item.item === itemDetails?.item);
-
-        return (
-          <div
-            key={f.key}
-            className="border! p-2! rounded! mb-2! relative! border-amber-300!"
-          >
-            <Row gutter={12}>
-              <Col span={6}>
-                <Form.Item
-                  name={[f.name, "item"]}
-                  fieldKey={[f.fieldKey, "item"]}
-                  label="Item"
-                  rules={[{ required: true, message: "Select item" }]}
-                >
-                  <Select
-                    placeholder="Select item"
-                    onChange={(val) =>
-                      handleSelectItem(val, contractIndex, f.name)
-                    }
-                  >
-                    {(contractItemsMap[contractIndex] || []).map((it) => (
-                      <Select.Option key={it.item} value={it.item}>
-                        {it.item}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
-
-              <Form.Item
-                name={[f.name, "qty"]}
-                label="Qty"
-                rules={[
-                  {
-                    required: true,
-                    message: "Please enter quantity",
-                  },
-                  {
-                    type: "number",
-                    min: 1,
-                    message: "Value must be greater than or equal to 1",
-                  },
-                  {
-                    validator: (_, value) => {
-                      const maxQty =
-                        selectedItemMaxMap[`${contractIndex}-${f.name}`];
-
-                      if (
-                        maxQty !== undefined &&
-                        value !== undefined &&
-                        value > maxQty
-                      ) {
-                        return Promise.reject(
-                          new Error(`Qty cannot be greater than ${maxQty}`)
-                        );
-                      }
-                      return Promise.resolve();
-                    },
-                  },
-                ]}
-              >
-                <InputNumber
-
-
-                  controls
-                  style={{ width: "100%" }}
-                  placeholder="Enter Qty"
-                  onChange={(val) =>
-                    uomHandlers.handleQtyChange(val ?? 0, contractIndex, f.name)
-                  }
-                />
-              </Form.Item>
-
-
-
-
-              <Col span={4}>
-                <Form.Item name={[f.name, "uom"]} label="UOM">
-                  <Select
-                    placeholder="Select UOM"
-                    onChange={(val) => uomHandlers.handleUOMChange(val, contractIndex, f.name)}
-                  >
-                    {selectedItemConfig?.uomOptions?.map((uom) => (
-                      <Select.Option key={uom} value={uom}>
-                        {uom}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item name={[f.name, "itemcode"]} label="Item Code">
-                  <Input
-                    style={{ width: "100%" }}
-                    disabled
-                    value={itemDetails?.itemcode}
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item name={[f.name, "rate"]} label="Rate">
-                  <InputNumber
-                    style={{ width: "100%" }}
-                    disabled
-                    value={itemDetails?.rate}
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item name={[f.name, "totalAmt"]} label="Total">
-                  <InputNumber
-                    style={{ width: "100%" }}
-                    disabled
-                    value={itemDetails?.totalAmt}
-                    formatter={(value) => `₹ ${value?.toLocaleString()}`}
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={2}>
-                <Button
-                  type="text"
-                  danger
-                  icon={<MinusCircleOutlined />}
-                  onClick={() => operations.remove(f.name)}
-                />
-              </Col>
-              {isEditMode && <Form.Item name={[f.name, "key"]} hidden />}
-            </Row>
-          </div>
-        );
-      });
-    },
-    [contractItemsMap, selectedItemMaxMap, addUOMHandlers, editUOMHandlers]
-  );
-
-  const RenderContractsList = useCallback(
-    ({
-      fields,
-      operations,
-      formInstance,
-      handleSelectContract,
-      handleSelectItem,
-      isEditMode = false,
-    }) => {
-      const uomHandlers = isEditMode ? editUOMHandlers : addUOMHandlers;
-      return fields.map((field) => {
-        const contractDetails = formInstance.getFieldValue([
-          "contracts",
-          field.name,
-        ]);
-
-        return (
-          <div
-            key={field.key}
-            className="p-4 border border-amber-500 rounded-lg mb-4 relative"
-          >
-            <h3 className="text-amber-700 font-semibold mb-2">Contract Details</h3>
-            <Row gutter={12}>
-              <Col span={8}>
-                <Form.Item
-                  name={[field.name, "contractNo"]}
-                  fieldKey={[field.fieldKey, "contractNo"]}
-                  label="Contract No"
-                  rules={[{ required: true, message: "Select Contract" }]}
-                >
-                  <Select
-                    placeholder="Select Contract"
-                    onChange={(val) => handleSelectContract(val, field.name)}
-                  >
-                    {contracts.map((c) => (
-                      <Select.Option key={c.contractNo} value={c.contractNo}>
-                        {c.contractNo} — {c.companyName}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  name={[field.name, "companyName"]}
-                  fieldKey={[field.fieldKey, "companyName"]}
-                  label="Vendor"
-                >
-                  <Input disabled value={contractDetails?.companyName} />
-                </Form.Item>
-              </Col>
-            </Row>
-            <Divider className="my-2" />
-            <h4 className="text-amber-600 font-medium mb-2">Items</h4>
-            <Form.List name={[field.name, "items"]}>
-              {(itemsFields, itemsOps) => (
-                <>
-                  <RenderItemsList
-                    contractIndex={field.name}
-                    fields={itemsFields}
-                    operations={itemsOps}
-                    formInstance={formInstance}
-                    handleSelectItem={handleSelectItem}
-                    uomHandlers={uomHandlers}
-                    isEditMode={isEditMode}
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      type="dashed"
-                      onClick={() => itemsOps.add(emptyItem)}
-                      icon={<PlusOutlined />}
-                      className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-                    >
-                      Add Item
-                    </Button>
-                  </div>
-                </>
-              )}
-            </Form.List>
-            {fields.length > 1 && (
+  /* ---------- Contract & Items UI blocks (used in Add/Edit form) ---------- */
+  const ContractsFormList = ({ form, disabled }) => (
+    <Form.List name="contracts">
+      {(contractFields, { add: addContract, remove: removeContract }) => (
+        <>
+          {/* HEADER */}
+          <div className="mb-2 flex justify-between items-center">
+            <h6 className="text-amber-500">Contracts</h6>
+            {!disabled && (
               <Button
-                type="link"
-                danger
-                icon={<DeleteOutlined />}
-                className="absolute top-2 right-2 text-red-500"
-                onClick={() => {
-                  setContractItemsMap((prev) => {
-                    const copy = { ...prev };
-                    delete copy[field.name];
-                    return copy;
-                  });
-                  setSelectedItemMaxMap((prev) => {
-                    const copy = { ...prev };
-                    Object.keys(copy).forEach((k) => {
-                      if (k.startsWith(`${field.name}-`)) delete copy[k];
-                    });
-                    return copy;
-                  });
-                  operations.remove(field.name);
-                }}
+                className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
+                type="dashed"
+                icon={<PlusOutlined />}
+                onClick={() =>
+                  addContract({
+                    contractNo: `CNT-${Date.now()}`,
+                    items: [
+                      {
+                        lineKey: Date.now(),
+                        item: undefined,
+                        itemCode: undefined,
+                        uom: undefined,
+                        qty: 0,
+                        freeQty: 0,
+                        totalQty: 0,
+                        grossWt: 0,
+                        totalGrossWt: 0,
+                        rate: 0,
+                        amount: 0,
+                        discountPercent: 0,
+                        discountAmt: 0,
+                        totalAmount: 0,
+                      },
+                    ],
+                  })
+                }
               >
-                Remove Contract
+                Add Contract
               </Button>
             )}
           </div>
-        );
-      });
-    },
-    [RenderItemsList]
-  );
 
-  const renderOrderGroupView = useCallback((groupData) => {
-    if (!groupData) return null;
-    const {
-      orderGroupId,
-      orderDate,
-      deliveryDate,
-      status,
-      grandTotal,
-      contracts,
-    } = groupData; const isApprovedStatus =
-      status === "Approved" ||
-      status === "OutForDelivery" ||
-      status === "Delivered" ||
-      status === "Fresh";
+          {contractFields.map((cf, ci) => {
+            const contractItems = contractItemsMap[ci] || [];
 
-    const itemColumns = [
-      { title: "Item", dataIndex: "item", key: "item", width: 120 },
-      { title: "Item Code", dataIndex: "itemcode", key: "itemcode", width: 120 },
-      {
-        title: "Net Qty",
-        dataIndex: "NetQty",
-        key: "NetQty",
-        width: 80,
-        render: (val) => <span>{val}</span>,
-      },
-      {
-        title: "Gross Qty",
-        dataIndex: "GrossQty",
-        key: "GrossQty",
-        width: 90,
-        render: (val) => <span>{val}</span>,
-      },
-      {
-        title: "HSN Code",
-        dataIndex: "HSNCode",
-        key: "HSNCode",
-        width: 90,
-        render: (val) => <span>{val}</span>,
-      },
-      { title: "Qty", dataIndex: "qty", key: "qty", width: 70 },
-      { title: "UOM", dataIndex: "uom", key: "uom", width: 60 },
-      {
-        title: "Rate",
-        dataIndex: "rate",
-        key: "rate",
-        width: 80,
-        render: (val) => <span>₹{val}</span>,
-      },
-      ...(isApprovedStatus
-        ? [
-          {
-            title: "IGST",
-            dataIndex: "IGST",
-            key: "IGST",
-            width: 70,
-            render: (val) => <span>{val}%</span>,
-          },
-          {
-            title: "Cash Disc",
-            dataIndex: "CashDiscount",
-            key: "CashDiscount",
-            width: 80,
-            render: (val) => <span>-{val}%</span>,
-          },
-        ]
-        : []),
-      {
-        title: "Total",
-        key: "total",
-        width: 100,
-        render: (_, record) => (
-          <span>
-            ₹
-            {((record.qty || 0) * (record.rate || 0)).toLocaleString()}
-          </span>
-        ),
-      },
-    ];
+            return (
+              <div
+                key={cf.key}
+                className="mb-4 p-4 border rounded-lg shadow-sm bg-white"
+              >
+                <div className="flex justify-between items-center mb-3">
+                  <Form.Item
+                    label="Contract ID"
+                    name={[cf.name, "contract_id"]}
+                  >
+                    <Select
+                      placeholder="Select Contract"
+                      disabled={disabled}
+  onChange={async (contractId) => {
+  try {
+    const contractDetails = await getContractById(contractId);
 
-    return (
-      <div className="p-6">
-        <Row
-          gutter={24}
-          className="p-4 bg-amber-50 rounded-xl border border-amber-200 mb-6"
-        >
-          <Col span={4}>
-            <div className="font-semibold text-amber-700 mb-1">Order No:</div>
-            <div className="text-amber-500">{orderGroupId}</div>
-          </Col>
-          <Col span={4}>
-            <div className="font-semibold text-amber-700 mb-1">Order Date:</div>
-            <div className="text-amber-500">{orderDate}</div>
-          </Col>
-          <Col span={3}>
-            <div className="font-semibold text-amber-700 mb-1">Status:</div>
-            <Tag
-              {...getStatusTagProps(status)}
-              className="px-4 py-2"
-            >
-              {status}
-            </Tag>
-          </Col>
-          <Col span={4}>
-            <div className="font-semibold text-amber-700 mb-1">
-              Expected Delivery Date
-            </div>
-            <div className="text-amber-500">{deliveryDate}</div>
-          </Col>
-          <Col span={4}>
-            <div className="font-semibold text-amber-700 mb-1">Grand Total:</div>
-            <div className="text-amber-500">
-              ₹{grandTotal.toLocaleString()}
-            </div>
-          </Col>
-          <Col span={4}>
-            <div className="font-semibold text-amber-700 mb-1">
-              Delivery Address:
-            </div>
-            <div className="text-amber-500">
-              {groupData.deliveryAddress || "N/A"}
-            </div>
-          </Col>
-        </Row>
-        {isApprovedStatus && (
-          <Row
-            gutter={24}
-            className="mb-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200"
-          >
-            <Col span={4}>
-              <div className="font-semibold text-green-700 mb-1">Purchase Type:</div>
-              <div className="text-green-500">
-                {groupData.purchaseType || contracts[0]?.items[0]?.PurchaseType || "N/A"}
-              </div>
-            </Col>
-            <Col span={4}>
-              <div className="font-semibold text-green-700 mb-1">Bill Mode:</div>
-              <div className="text-green-500">
-                {groupData.billMode || contracts[0]?.items[0]?.BillMode || "N/A"}
-              </div>
-            </Col>
-            <Col span={5}>
-              <div className="font-semibold text-green-700 mb-1">Narration:</div>
-              <div className="text-green-500">
-                {groupData.narration || contracts[0]?.items[0]?.Narration || "N/A"}
-              </div>
-            </Col>
-            <Col span={5}>
-              <div className="font-semibold text-green-700 mb-1">
-                Expected Receiving Date:
-              </div>
-              <div className="text-green-500">
-                {groupData.expReceivingDate || contracts[0]?.items[0]?.ExpReceivingDate || "N/A"}
-              </div>
-            </Col>
-            <Col span={5}>
-              <div className="font-semibold text-green-700 mb-1">Delivered Date:</div>
-              <div className="text-green-500">
-                {contracts[0]?.items[0]?.deliveredDate || "N/A"}
-              </div>
-            </Col>
-
-          </Row>
-        )}
-        <Divider
-          orientation="left"
-          className="text-amber-700! font-bold! text-xl! mb-6!"
-        >
-          Contracts & Items Details
-        </Divider>
-        {contracts.map((contract) => (
-          <div
-            key={contract.contractNo}
-            className="mb-8 p-4 border-1 border-amber-300 rounded-xl bg-gradient-to-br from-amber-50 to-yellow-50"
-          >
-            <h4 className="text-xl font-bold text-amber-700 mb-4 flex items-center">
-              Contract No:{" "}
-              <span className="ml-2">{contract.contractNo}</span>{" "}
-              <span className="ml-4 text-lg font-semibold text-amber-700">
-                — {contract.companyName}
-              </span>
-            </h4>
-            <Table
-              columns={itemColumns}
-              dataSource={contract.items.map((item, i) => ({
-                ...item,
-                key: `${contract.contractNo}-${i}`,
-              }))}
-              pagination={false}
-              size="middle"
-              rowKey="key"
-              scroll={{ x: 1400, y: 400 }}
-            />
-          </div>
-        ))}
-      </div>
-    );
-  }, []);
-
-  const addHandlers = useFormHandlers(
-    addForm,
-    contractItemsMap,
-    setContractItemsMap,
-    setSelectedItemMaxMap,
-    contracts,
-    false
-  );
-  const editHandlers = useFormHandlers(
-    editForm,
-    contractItemsMap,
-    setContractItemsMap,
-    setSelectedItemMaxMap,
-    contracts,
-    true
-  );
-
-  const onFormValuesChange = (form, allValues) => {
-    // compute per-item fields for any item changed
-    const contracts = (allValues.contracts || []).map((c, ci) => {
-      const items = (c.items || []).map((it, ii) => {
-        const qty = Number(it.qty || 0);
-        const freeQty = Number(it.freeQty || 0);
-        const rate = Number(it.rate || 0);
-        const discountPercent = Number(it.discountPercent || 0);
-        const amount = Math.round(qty * rate);
-        const discountAmt = Math.round((amount * discountPercent) / 100);
-        const totalAmount = Math.round(amount - discountAmt);
-        const totalQty = qty + freeQty;
-        const totalGrossWt = Number(it.grossWt || 0);
-        return {
-          ...it,
-          amount,
-          discountAmt,
-          totalAmount,
-          totalQty,
-          totalGrossWt,
-        };
-      });
-      return { ...c, items };
-    });
-
-    const { orderTaxAndTotals, orderTotals } = computeOrderTotalsFromContracts(
-      contracts,
-      allValues.orderTaxAndTotals || {},
-    );
-
-    // set computed fields back into the form
+    // ✅ Fill TAX + TOTALS from API
     form.setFieldsValue({
-      contracts,
-      orderTaxAndTotals,
-      orderTotals,
-    });
-  };
+      
+      orderTaxAndTotals: {
+        sgstPercent: Number(contractDetails.sgst || 0),
+        cgstPercent: Number(contractDetails.cgst || 0),
+        igstPercent: Number(contractDetails.igst || 0),
+        tcsAmt: Number(contractDetails.tcs_amount || 0),
 
+            },
+    });
+
+    // ✅ Load items
+    const items =
+      contractDetails.items?.length > 0
+        ? contractDetails.items
+        : await salesContractItems(contractId);
+
+    setContractItemsMap((prev) => ({
+      ...prev,
+      [cf.key]: items,
+    }));
+
+    // reset items row
+    const contracts = form.getFieldValue("contracts") || [];
+    contracts[ci] = {
+      ...(contracts[ci] || {}),
+      contract_id: contractId,
+      items: [{ lineKey: Date.now() }],
+    };
+
+    form.setFieldsValue({ contracts });
+
+  } catch (err) {
+    console.error(err);
+  }
+}}
+                    >
+                      {contractOptions.map((c) => (
+                        <Select.Option
+                          key={c.sale_contract_id}
+                          value={c.sale_contract_id}
+                        >
+                          {c.sale_contract_number}
+                        </Select.Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+
+                  {!disabled && (
+                    <Button
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => removeContract(cf.name)}
+                    />
+                  )}
+                </div>
+
+                {/* ITEMS LIST */}
+                <Form.List name={[cf.name, "items"]}>
+                  {(itemFields, { add: addItem, remove: removeItem }) => (
+                    <>
+                      {itemFields.map((itf, ii) => (
+                        <div
+                          key={itf.key}
+                          className="mb-3 p-3 border rounded-md"
+                        >
+                          <Row gutter={12}>
+                            {/* ITEM */}
+                            <Col span={8}>
+                              <Form.Item
+                                name={[itf.name, "item"]}
+                                label="Item"
+                                rules={[{ required: true }]}
+                              >
+                                <Select
+                                  placeholder="Item"
+                                  disabled={disabled}
+                                  onChange={(val) => {
+                                    // Retrieve items using the stable key
+                                    const availableItems =
+                                      contractItemsMap[cf.key] || [];
+                                    const sel = availableItems.find(
+                                      (x) =>
+                                        (x.product_name ||
+                                          x.item_name ||
+                                          (x.product &&
+                                            x.product.product_name)) === val,
+                                    );
+                                    if (!sel) return;
+
+                                    const contracts =
+                                      form.getFieldValue("contracts") || [];
+                                    const items = contracts[ci].items || [];
+
+                                    items[ii] = {
+                                      ...(items[ii] || {}),
+                                      item:
+                                        sel.product_name ||
+                                        sel.item_name ||
+                                        (sel.product &&
+                                          sel.product.product_name),
+                                      itemCode:
+                                        sel.product_id ||
+                                        sel.item_code ||
+                                        (sel.product && sel.product.product_id),
+                                      hsnCode: sel.hsn_code,
+                                      uom: sel.uom?.unit_name || sel.uom,
+                                      qty: Number(
+                                        sel.net_qty || sel.qty || 0,
+                                      ),
+                                      freeQty: Number(
+                                        sel.free_qty || sel.free_qty || 0,
+                                      ),
+                                      totalQty: Number(
+                                        sel.gross_qty ||
+                                        sel.total_qty ||
+                                        0,
+                                      ),
+                                      rate: Number(sel.mrp || sel.rate || 0),
+                                      discountPercent: Number(
+                                        sel.discount_percent || 0,
+                                      ),
+                                      discountAmt: Number(
+                                        sel.discount_amount || 0,
+                                      ),
+                                      totalAmount: Number(
+                                        sel.line_total ||
+                                        sel.total_amount ||
+                                        0,
+                                      ),
+                                    };
+
+                                    contracts[ci].items = items;
+                                    form.setFieldsValue({ contracts });
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    );
+                                  }}
+                                >
+                                  {(
+                                    contractItemsMap[cf.key] || []
+                                  ).map((it) => (
+                                    <Select.Option
+                                      key={
+                                        it.product_id ||
+                                        it.item_code ||
+                                        (it.product && it.product.product_id)
+                                      }
+                                      value={
+                                        it.product_name ||
+                                        it.item_name ||
+                                        (it.product && it.product.product_name)
+                                      }
+                                    >
+                                      {
+                                        it.product_name ||
+                                        it.item_name ||
+                                        (it.product && it.product.product_name)
+                                      }
+                                    </Select.Option>
+                                  ))}
+                                </Select>
+                              </Form.Item>
+                            </Col>
+
+                            {/* CODE */}
+                            <Col span={4}>
+                              <Form.Item
+                                name={[itf.name, "hsnCode"]}
+                                label="Code"
+                              >
+                                <Input disabled />
+                              </Form.Item>
+                            </Col>
+
+                            {/* UOM */}
+                            <Col span={4}>
+                              <Form.Item name={[itf.name, "uom"]} label="UOM">
+                                <Input disabled />
+                              </Form.Item>
+                            </Col>
+
+                            {/* QTY */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "qty"]}
+                                label="Qty"
+                                rules={[{ required: true }]}
+                              >
+                                <InputNumber
+                                  min={0}
+                                  className="w-full"
+                                  disabled
+                                  onChange={() =>
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    )
+                                  }
+                                />
+                              </Form.Item>
+                            </Col>
+
+                            {/* FREE QTY */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "freeQty"]}
+                                label="Free"
+                              >
+                                <InputNumber
+                                  min={0}
+                                  disabled
+                                  className="w-full"
+                                  onChange={() =>
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    )
+                                  }
+                                />
+                              </Form.Item>
+                            </Col>
+
+                            {/* RATE */}
+                            <Col span={4}>
+                              <Form.Item
+                                name={[itf.name, "rate"]}
+                                label="Rate"
+                                rules={[{ required: true }]}
+                              >
+                                <InputNumber
+                                  min={0}
+                                  className="w-full"
+                                  disabled
+                                  onChange={() =>
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    )
+                                  }
+                                />
+                              </Form.Item>
+                            </Col>
+
+                            {/* DISCOUNT PERCENT */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "discountPercent"]}
+                                label="Disc %"
+                              >
+                                <InputNumber
+                                  min={0}
+                                  max={100}
+                                  className="w-full"
+                                  disabled
+                                  onChange={() =>
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    )
+                                  }
+                                />
+                              </Form.Item>
+                            </Col>
+
+                            {/* AMOUNT */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "amount"]}
+                                label="Amount"
+                              >
+                                <InputNumber className="w-full" disabled />
+                              </Form.Item>
+                            </Col>
+
+                            {/* DISCOUNT AMOUNT */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "discountAmt"]}
+                                label="Disc Amt"
+                              >
+                                <InputNumber className="w-full" disabled />
+                              </Form.Item>
+                            </Col>
+
+                            {/* TOTAL AMOUNT */}
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "totalAmount"]}
+                                label="Total Amount"
+                              >
+                                <InputNumber className="w-full" disabled />
+                              </Form.Item>
+                            </Col>
+
+                           
+
+                            <Col span={3}>
+                              <Form.Item
+                                name={[itf.name, "orderQuantity"]}
+                                label="Order Qty"
+                                 validateTrigger="onChange" 
+                                   rules={[
+                                     {
+                                       required: true,
+                                       message: "Please enter order quantity",
+                                     },
+                                     {
+                                       validator: (_, value) => {
+                                         const qty = form.getFieldValue([
+                                           "contracts",
+                                           ci,
+                                           "items",
+                                           itf.name,
+                                           "qty",
+                                         ]);
+                                 
+                                         // ❌ don't show error initially
+                                         if (value === undefined || value === null) {
+                                           return Promise.resolve();
+                                         }
+                                 
+                                         if (isNaN(value)) {
+                                           return Promise.reject(new Error("Enter a valid number"));
+                                         }
+                                 
+                                         if (value <= 0) {
+                                           return Promise.reject(
+                                             new Error("Order quantity must be greater than zero")
+                                           );
+                                         }
+                                 
+                                         if (qty && value > qty) {
+                                           return Promise.reject(
+                                             new Error(
+                                               "Order quantity cannot be greater than available quantity"
+                                             )
+                                           );
+                                         }
+                                 
+                                         return Promise.resolve();
+                                       },
+                                     },
+                                   ]}
+                              >
+                                <Input
+                                  min={0}
+                                  className="w-full"
+                                  disabled={disabled}
+                                  onChange={() =>
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    )
+                                  }
+                                />
+                              </Form.Item>
+                            </Col>
+                           
+                          </Row>
+                          {!disabled && (
+                            <Button
+                              danger
+                              icon={<DeleteOutlined />}
+                              onClick={() => {
+                                removeItem(itf.name);
+                                  }}
+                            />
+                          )}
+                        </div>
+                      ))}
+
+                      {!disabled && (
+                        <Button
+                          className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
+                          type="dashed"
+                          icon={<PlusOutlined />}
+                          onClick={() =>
+                            addItem({
+                              lineKey: Date.now(),
+                              item: undefined,
+                              itemCode: undefined,
+                             uom: undefined,
+                             qty: 0,
+                              freeQty: 0,
+                              totalQty: 0,
+                              grossWt: 0,
+                              totalGrossWt: 0,
+                              rate: 0,
+                              amount: 0,
+                              discountPercent: 0,
+                              discountAmt: 0,
+                              totalAmount: 0,
+                            })
+                          }
+                        >
+                          Add Item
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </Form.List>
+              </div>
+            );
+          })}
+        </>
+      )}
+    </Form.List>
+  );
+
+  /* ---------- Render form fields (shared by add/edit/view with disabled flag) ---------- */
   const renderFormFields = (form, disabled = false) => (
     <>
       <h6 className="text-amber-500">Header</h6>
       <Row gutter={16}>
+     
+
         <Col span={6}>
           <Form.Item
             label={<span className="text-amber-700">Order Date</span>}
@@ -1822,7 +1230,7 @@ export default function Order() {
             rules={[{ required: true }]}
             initialValue={dayjs()}
           >
-            <DatePicker className="w-full" disabled={disabled} />
+            <DatePicker className="w-full" disabled/>
           </Form.Item>
         </Col>
 
@@ -1831,10 +1239,18 @@ export default function Order() {
             label={<span className="text-amber-700">Delivery Date</span>}
             name="deliveryDate"
           >
-            <DatePicker className="w-full" disabled={disabled} />
-          </Form.Item>
+          <DatePicker
+  className="w-full"
+  disabledDate={(current) =>
+    current &&
+    form.getFieldValue("orderDate") &&
+    current < form.getFieldValue("orderDate").startOf("day")
+  }
+/>    </Form.Item>
         </Col>
 
+       
+   
         <Col span={6}>
           <Form.Item
             label={<span className="text-amber-700">Delivery Address</span>}
@@ -1844,78 +1260,62 @@ export default function Order() {
           </Form.Item>
         </Col>
 
-        <Col span={6}>
-          <Form.Item
-            label={<span className="text-amber-700">Status</span>}
-            name="status"
-          >
-            <Select placeholder="Pending" disabled={disabled}>
-              <Select.Option value="Pending">Pending</Select.Option>
-            </Select>
-          </Form.Item>
-        </Col>
-      </Row>
+       <Col span={6}>
+  <Form.Item
+    label="Purchase Type"
+    name="purchaseType"
+    rules={[{ required: true, message: "Select Purchase Type" }]}
+  >
+    <Select disabled={disabled}>
+      <Select.Option value="Transit">Transit</Select.Option>
+      <Select.Option value="Interstate">Interstate</Select.Option>
+      <Select.Option value="Local">Local</Select.Option>
+    </Select>
+  </Form.Item>
+</Col>
 
-      <Row gutter={16} className="mt-4">
-        <Col span={6}>
-          <Form.Item
-            label={<span className="text-amber-700">Purchase Type</span>}
-            name="purchaseType"
-            rules={[{ required: true, message: 'Select Purchase Type' }]}
-          >
-            <Select placeholder="Select Type" disabled={disabled}>
-              <Select.Option value="Transit">Transit</Select.Option>
-              <Select.Option value="Local">Local</Select.Option>
-              <Select.Option value="Interstate">Interstate</Select.Option>
-            </Select>
-          </Form.Item>
-        </Col>
+<Col span={6}>
+ <Form.Item
+  label="Bill Mode"
+  name="bill_mode"
+  rules={[{ required: true }]}
+>
+  <Select disabled={disabled}>
+    <Select.Option value="Cash">Cash</Select.Option>
+    <Select.Option value="Credit">Credit</Select.Option>
+    <Select.Option value="Online">Online</Select.Option>
+  </Select>
+</Form.Item>
+</Col>
 
-        <Col span={6}>
-          <Form.Item
-            label={<span className="text-amber-700">Bill Mode</span>}
-            name="billMode"
-            rules={[{ required: true, message: 'Select Bill Mode' }]}
-          >
-            <Select placeholder="Select Bill Mode" disabled={disabled}>
-              <Select.Option value="Cash">Cash</Select.Option>
-              <Select.Option value="Credit">Credit</Select.Option>
-              <Select.Option value="Online">Online</Select.Option>
-              <Select.Option value="Offline">Offline</Select.Option>
-            </Select>
-          </Form.Item>
-        </Col>
 
-        <Col span={6}>
-          <Form.Item
-            label={<span className="text-amber-700">Exp. Receiving Date</span>}
-            name="expReceivingDate"
-            rules={[{ required: true, message: 'Select Date' }]}
-          >
-            <DatePicker className="w-full" disabled={disabled} />
-          </Form.Item>
-        </Col>
+
+<Col span={12}>
+  <Form.Item
+    label="Narration"
+    name="narration"
+  >
+    <Input.TextArea
+      rows={2}
+      placeholder="Enter narration"
+      disabled={disabled}
+    />
+  </Form.Item>
+</Col>
 
         <Col span={6}>
-          <Form.Item
-            label={<span className="text-amber-700">Narration</span>}
-            name="narration"
-          >
-            <Input placeholder="Narration" disabled={disabled} />
-          </Form.Item>
+          <Form.Item name="status" label="Status" rules={[{ required: true, message: "Select status" }]}>
+  <Select disabled={disabled} onChange={(val) => handleStatusChange(val, form)}>
+     <Select.Option value="Pending">Pending</Select.Option>
+     </Select>
+</Form.Item>
         </Col>
       </Row>
 
       <Divider />
 
       {/* contracts + items */}
-      <ContractsFormList
-        form={form}
-        contractsOptions={contracts}
-        contractItemsMap={contractItemsMap}
-        setContractItemsMap={setContractItemsMap}
-        onFormValuesChange={onFormValuesChange}
-      />
+      <ContractsFormList form={form} disabled={disabled} />
 
       <Divider />
 
@@ -1931,9 +1331,7 @@ export default function Order() {
               min={0}
               max={100}
               className="w-full"
-              disabled
-              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
-            />
+             disabled  />
           </Form.Item>
         </Col>
         <Col span={6}>
@@ -1945,9 +1343,7 @@ export default function Order() {
               min={0}
               max={100}
               className="w-full"
-              disabled
-              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
-            />
+             disabled  />
           </Form.Item>
         </Col>
         <Col span={6}>
@@ -1959,9 +1355,7 @@ export default function Order() {
               min={0}
               max={100}
               className="w-full"
-              disabled
-              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
-            />
+             disabled    />
           </Form.Item>
         </Col>
         <Col span={6}>
@@ -1973,8 +1367,7 @@ export default function Order() {
               min={0}
               className="w-full"
               disabled
-              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
-            />
+                  />
           </Form.Item>
         </Col>
 
@@ -1996,14 +1389,7 @@ export default function Order() {
           </Form.Item>
         </Col>
 
-        <Col span={6}>
-          <Form.Item
-            label={<span className="text-amber-700">Total GST (₹)</span>}
-            name={["orderTaxAndTotals", "totalGST"]}
-          >
-            <InputNumber className="w-full" disabled />
-          </Form.Item>
-        </Col>
+        
 
         <Col span={6}>
           <Form.Item
@@ -2016,101 +1402,16 @@ export default function Order() {
       </Row>
 
       <Divider />
+
+     
     </>
   );
 
-
-
-  /* ---------- handle submit (add/edit) ---------- */
-  const handleAddSubmit = useCallback(
-    async (values) => {
-      try {
-        const orderDate = values.orderDate?.format("YYYY-MM-DD");
-        const deliveryDate = values.deliveryDate?.format("YYYY-MM-DD");
-        const expReceivingDate = values.expReceivingDate?.format("YYYY-MM-DD");
-        const deliveryAddress = values.deliveryAddress;
-
-        // Construct items payload grouped by contract
-        const payloadItems = [];
-        (values.contracts || []).forEach((contract) => {
-          const validProducts = [];
-          (contract.items || []).forEach((it) => {
-            const qty = Number(it.orderQuantity || 0);
-            if (qty > 0) {
-              validProducts.push({
-                product_id: it.itemCode,
-                uom: it.uom || null,
-                net_qty: qty.toFixed(2),
-                gross_qty: qty.toFixed(2), // Assuming gross=net if no specific logic
-                free_qty: "0.00",
-                mrp_per_unit: Number(it.rate || 0).toFixed(2),
-                ordered_qty: qty.toString(),
-                discount_percent: Number(it.discountPercent || 0).toFixed(2),
-                discount_amount: Number(it.discountAmt || 0).toFixed(2),
-                total_amount: (Number(it.rate || 0) * qty).toFixed(2)
-              });
-            }
-          });
-
-          if (validProducts.length > 0) {
-            payloadItems.push({
-              sale_contract_id: contract.contract_id,
-              products: validProducts
-            });
-          }
-        });
-
-        if (payloadItems.length === 0) {
-          message.error("Please add at least one item with quantity > 0");
-          return;
-        }
-
-        const payload = {
-          order_date: orderDate,
-          purchase_type: values.purchaseType,
-          bill_mode: values.billMode,
-          expected_receiving_date: expReceivingDate,
-          delivery_address: deliveryAddress,
-          crn: null,
-          sgst: values.orderTaxAndTotals?.sgst || 0,
-          cgst: values.orderTaxAndTotals?.cgst || 0,
-          igst: values.orderTaxAndTotals?.igst || 0,
-          tcs_amount: values.orderTaxAndTotals?.tcsAmt || 0,
-          cash_discount: 0,
-          round_off_amount: 0,
-          narration: values.narration || "Customer created order",
-          items: payloadItems
-        };
-
-        // Call API
-        await createOrder(payload);
-        message.success("Order created successfully");
-
-        // Refresh List
-        const response = await getOrders();
-        const orders = Array.isArray(response) ? response : response.results || [];
-        setData(orders);
-
-        // Reset and Close
-        addForm.resetFields();
-        setContractItemsMap({});
-        setIsAddModalOpen(false);
-
-      } catch (error) {
-        console.error("Error creating order:", error);
-        message.error("Failed to create order");
-      }
-    },
-    [contracts, addForm]
-  );
-
-  const handleEditSubmit = (values) => {
-    message.info("Edit functionality pending update to new structure");
-    setIsEditModalOpen(false);
-  };
-
+  /* ---------- JSX ---------- */
   return (
     <div>
+
+
       <div className="flex justify-between items-center mb-0">
         <div>
           <h1 className="text-3xl font-bold text-amber-700">Orders</h1>
@@ -2122,24 +1423,22 @@ export default function Order() {
 
         {/* LEFT: Search */}
         <div className="flex gap-2">
-          <Input
-            placeholder="Search"
-            className="border-amber-300! w-64! focus:border-amber-500!"
+             <Input
             prefix={<SearchOutlined className="text-amber-600!" />}
+            placeholder="Search..."
+            className="w-64! border-amber-300! focus:border-amber-500!"
             value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-          />
-
-          <Button
-            icon={<FilterOutlined />}
-            onClick={() => {
-              setSearchText("");
-              setSelectedStatus("All");   // ✅ Reset dropdown also
-            }}
-            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          >
-            Reset
-          </Button>
+           onChange={(e) => handleSearch(e.target.value)}   />
+         <Button
+  icon={<FilterOutlined />}
+  onClick={() => {
+    setSearchText("");
+    fetchSalesOrders(); // ✅ reload original data
+  }}
+  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+>
+  Reset
+</Button>
         </div>
 
         {/* RIGHT: Dropdown + Buttons */}
@@ -2165,18 +1464,13 @@ export default function Order() {
             Wallet
           </Button>
 
-          <Button
+       <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={() => {
-              addForm.setFieldsValue(initialOrderGroup);
-              setContractItemsMap({});
-              setSelectedItemMaxMap({});
-              setIsAddModalOpen(true);
-            }}
             className="bg-amber-500! hover:bg-amber-600! border-none!"
+            onClick={openAddModal}
           >
-            Add New Order
+            Add New 
           </Button>
         </div>
 
@@ -2184,20 +1478,22 @@ export default function Order() {
 
 
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
-        <Table
+       <Table
           columns={columns}
-          dataSource={filteredData}
-          pagination={{ pageSize: 10 }}
-          scroll={{ y: 130 }}
-          rowKey="orderGroupId"
+          dataSource={data}
+          pagination={false}
+          scroll={{ y: 300 }}
+          rowKey="key"
         />
       </div>
+
+
 
       {/* Add Modal */}
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            Add New Order
+            Add New Sales Order & Invoice
           </span>
         }
         open={isAddModalOpen}
@@ -2211,10 +1507,12 @@ export default function Order() {
         <Form
           layout="vertical"
           form={addForm}
-          onFinish={handleAddSubmit}
-          onValuesChange={() =>
-            onFormValuesChange(addForm, addForm.getFieldsValue())
-          }
+          onFinish={handleAddFinish}
+           onValuesChange={(_, allValues) => {
+    if (formMode === "add") {
+      onFormValuesChange(addForm, allValues);
+    }
+  }}
         >
           {renderFormFields(addForm)}
           <div className="flex justify-end gap-2 mt-4">
@@ -2242,14 +1540,14 @@ export default function Order() {
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            Edit Order
+            Edit Sales Order & Invoice
           </span>
         }
         open={isEditModalOpen}
         onCancel={() => {
           setIsEditModalOpen(false);
           editForm.resetFields();
-          setSelectedOrderGroup(null);
+          setSelectedRecord(null);
         }}
         footer={null}
         width={1000}
@@ -2257,10 +1555,12 @@ export default function Order() {
         <Form
           layout="vertical"
           form={editForm}
-          onFinish={handleEditSubmit}
-          onValuesChange={() =>
-            onFormValuesChange(editForm, editForm.getFieldsValue())
-          }
+          onFinish={handleEditFinish}
+           onValuesChange={(_, allValues) => {
+    if (formMode === "edit") {
+      onFormValuesChange(editForm, allValues);
+    }
+  }}
         >
           {renderFormFields(editForm)}
           <div className="flex justify-end gap-2 mt-4">
@@ -2268,7 +1568,7 @@ export default function Order() {
               onClick={() => {
                 setIsEditModalOpen(false);
                 editForm.resetFields();
-                setSelectedOrderGroup(null);
+                setSelectedRecord(null);
               }}
             >
               Cancel
@@ -2276,7 +1576,7 @@ export default function Order() {
             <Button
               type="primary"
               htmlType="submit"
-              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              className="bg-amber-500 hover:bg-amber-600 border-none"
             >
               Update
             </Button>
@@ -2287,22 +1587,30 @@ export default function Order() {
       {/* View Modal */}
       <Modal
         title={
-          <span className="text-2xl font-bold text-amber-600">
-            Order Details {selectedOrderGroup?.orderGroupId}
+          <span className="text-amber-700 text-2xl font-semibold">
+            View Sales Order & Invoice
           </span>
         }
         open={isViewModalOpen}
-        onCancel={() => setIsViewModalOpen(false)}
+        onCancel={() => {
+          setIsViewModalOpen(false);
+          viewForm.resetFields();
+          setSelectedRecord(null);
+        }}
         footer={null}
-        width={1200}
+        width={1000}
       >
-        {renderOrderGroupView(selectedOrderGroup)}
+        <Form layout="vertical" form={viewForm}>
+          {renderFormFields(viewForm, true)}
+        </Form>
       </Modal>
 
-      {/* Wallet Modal */}
-      <Modal open={walletOpen} onCancel={() => setWalletOpen(false)} footer={null} width={1200}>
+        <Modal open={walletOpen} onCancel={() => setWalletOpen(false)} footer={null} width={1200}>
         <Wallet />
       </Modal>
+
+
     </div>
   );
-}
+    }
+  
