@@ -339,9 +339,7 @@ export default function BrokerTab() {
       ),
     },
     {
-      title: (
-        <span className="text-amber-700 font-semibold">Send Password</span>
-      ),
+      title: <span className="text-amber-700 font-semibold">Password</span>,
       render: (_, record) => (
         <Button
           size="small"

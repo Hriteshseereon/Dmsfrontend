@@ -231,6 +231,19 @@ export default function TransportTab() {
         </div>
       ),
     },
+    {
+      title: <span className="text-amber-700 font-semibold"> Password</span>,
+      render: (_, record) => (
+        <Button
+          size="small"
+          type="primary"
+          className="bg-amber-500! border-none! hover:bg-amber-600!"
+          onClick={() => handleSendPassword(record)}
+        >
+          Send
+        </Button>
+      ),
+    },
   ];
 
   const filteredData = data.filter((t) =>
