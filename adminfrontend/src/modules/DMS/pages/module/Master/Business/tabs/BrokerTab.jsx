@@ -79,6 +79,7 @@ const fileFromUrl = (url) => {
   ];
 };
 
+const { Password } = Input;
 /** Build FormData exactly like VendorTab:
  *  - one `data` key containing a JSON string of all non-file fields
  *  - separate keys for each file
@@ -87,6 +88,9 @@ const buildFormData = (values) => {
   const fd = new FormData();
 
   fd.append("name", values.brokerName || "");
+  fd.append("password", values.password || "");
+  fd.append("username", values.email || values.phoneNo);
+  fd.append("email", values.email);
   fd.append("phone_number", values.phoneNo || "");
   fd.append("alternate_phone", values.altPhoneNo || "");
   fd.append("whatsapp_number", values.whatsappNo || "");
@@ -152,6 +156,15 @@ export default function BrokerTab() {
   const [productsMap, setProductsMap] = useState({});
   const [form] = Form.useForm();
 
+  const generatePassword = (length = 10) => {
+    const chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$!";
+    let password = "";
+    for (let i = 0; i < length; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
   /* ================= FETCH ================= */
   const fetchBrokers = async () => {
     try {
@@ -355,6 +368,10 @@ export default function BrokerTab() {
             setSelected(null);
             setViewMode(false);
             form.resetFields();
+            const autoPassword = generatePassword();
+            form.setFieldsValue({
+              password: autoPassword,
+            });
             setOpen(true);
           }}
         >
@@ -500,11 +517,11 @@ export default function BrokerTab() {
               </Col>
               <Col span={6}>
                 <Form.Item label="Password" name="password">
-                  <Input
+                  <Password
                     className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter password"
-                    type="password"
+                    disabled={viewMode || selected}
+                    placeholder="Auto generated password"
+                    visibilityToggle
                   />
                 </Form.Item>
               </Col>
