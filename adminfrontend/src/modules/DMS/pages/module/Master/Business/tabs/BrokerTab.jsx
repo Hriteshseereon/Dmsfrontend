@@ -30,6 +30,7 @@ import {
   updateBrokerById,
   getAllVendor,
   getproductbyVendor,
+  sendBrokerPassword,
 } from "@/api/broker";
 
 export const phoneValidator = (_, value) => {
@@ -189,6 +190,15 @@ export default function BrokerTab() {
     fetchVendors();
   }, []);
 
+  // password send button handler
+  const handleSendPassword = async (record) => {
+    try {
+      await sendBrokerPassword(record.id);
+      message.success(`Password sent to ${record.primary_email}`);
+    } catch (err) {
+      message.error("Failed to send password email");
+    }
+  };
   const handleVendorChange = async (vendorId) => {
     try {
       if (productsMap[vendorId]) return; // already loaded
@@ -326,6 +336,21 @@ export default function BrokerTab() {
             onClick={() => openBroker(record, false)}
           />
         </div>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Send Password</span>
+      ),
+      render: (_, record) => (
+        <Button
+          size="small"
+          type="primary"
+          className="bg-amber-500! border-none! hover:bg-amber-600!"
+          onClick={() => handleSendPassword(record)}
+        >
+          Send
+        </Button>
       ),
     },
   ];

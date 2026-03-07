@@ -63,3 +63,10 @@ export const updateBrokerById = async (id, payload) => {
 
   return res.data;
 };
+// pasword send button api 
+export const sendBrokerPassword = async (id) => {
+  return request({
+    url: `/brokers/${id}/send-password/`,
+    method: "POST",
+  });
+};
