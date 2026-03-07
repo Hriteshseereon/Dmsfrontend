@@ -15,7 +15,8 @@ import SaleReturn from "./SaleReturn";
 import DeliveryStatus from "./DeliveryStatus";
 import SaleDashboard from "./SaleDashboard";
 import SalesDispute from "./SalesDispute";
-import SalesInvoice from "./LoadingDetails";
+import LoadingDetails from "./LoadingDetails";
+import SaleInvoice from "./SaleInvoice";
 
 export const SALES_TAB_DEFINITIONS = [
   {
@@ -47,11 +48,18 @@ export const SALES_TAB_DEFINITIONS = [
   //   Component: DeliveryStatus,
   // },
   {
+    id: "saleinvoice",
+    label: "Sale Invoice",
+    path: "saleinvoice",
+    Icon: FaFileInvoice,
+    Component: SaleInvoice,
+  },
+  {
     id: "loadingdetails",
     label: "Loading Details",
     path: "loadingdetails",
-    Icon: FaFileInvoice,
-    Component: SalesInvoice,
+    Icon: FaTruck,
+    Component: LoadingDetails,
   },
   // {
   //   id: "return",
@@ -60,13 +68,13 @@ export const SALES_TAB_DEFINITIONS = [
   //   Icon: FaUndo,
   //   Component: SaleReturn,
   // },
-   {
+  {
     id: "dispute",
     label: "Sale Dispute",
     path: "dispute",
     Icon: FaUndo,
     Component: SalesDispute,
-    
+
   },
 ];
 

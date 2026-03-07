@@ -7,8 +7,11 @@ import {
   FaUndo,
   FaTachometerAlt,
   FaPaperPlane,
+  FaShippingFast,
+  
 } from "react-icons/fa";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
+
 
 export const PURCHASE_TAB_DEFINITIONS = [
   {
@@ -30,23 +33,23 @@ export const PURCHASE_TAB_DEFINITIONS = [
     Icon: FaShoppingCart,
   },
   {
-    id: "invoice",
-    label: "Purchase Invoice",
-    path: "invoice",
-    Icon: FaFileInvoice,
+    id: "assign",
+    label: "Transport Assign",
+    path: "assign",
+   Icon: FaPaperPlane,
   },
   {
     id: "loading",
     label: "Loading Advice",
     path: "loading",
-    Icon: FaPaperPlane,
+    Icon: FaShippingFast,
   },
-  // {
-  //   id: "status",
-  //   label: "Delivery Status",
-  //   path: "status",
-  //   Icon: FaTruck,
-  // },
+  {
+    id: "invoice",
+    label: "Purchase Invoice",
+    path: "invoice",
+    Icon: FaFileInvoice,
+  },
   {
     id: "return",
     label: "Return",
