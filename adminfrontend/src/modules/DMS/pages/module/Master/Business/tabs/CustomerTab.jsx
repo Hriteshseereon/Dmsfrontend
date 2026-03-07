@@ -762,6 +762,26 @@ export default function CustomerTab() {
                   </Select>
                 </Form.Item>
               </Col>
+
+              <Col span={6}>
+                <Form.Item
+                  label="Security for Credit"
+                  name="securityForCreditFacility"
+                >
+                  <Select
+                    className={selectClass}
+                    disabled={viewMode}
+                    placeholder="Select security"
+                    onChange={(value) => setSecurityType(value)}
+                  >
+                    <Option value="Bank Guarantee">Bank Guarantee</Option>
+                    <Option value="Post Dated Cheque">Post Dated Cheque</Option>
+                    <Option value="Fixed Deposit">Fixed Deposit</Option>
+                    <Option value="Collateral">Collateral</Option>
+                    <Option value="None">None</Option>
+                  </Select>
+                </Form.Item>
+              </Col>
               {/* ================= Security Fields ================= */}
 
               {securityType === "Bank Guarantee" && (
@@ -919,26 +939,6 @@ export default function CustomerTab() {
                   </Col>
                 </Row>
               )}
-              <Col span={6}>
-                <Form.Item
-                  label="Security for Credit"
-                  name="securityForCreditFacility"
-                >
-                  <Select
-                    className={selectClass}
-                    disabled={viewMode}
-                    placeholder="Select security"
-                    onChange={(value) => setSecurityType(value)}
-                  >
-                    <Option value="Bank Guarantee">Bank Guarantee</Option>
-                    <Option value="Post Dated Cheque">Post Dated Cheque</Option>
-                    <Option value="Fixed Deposit">Fixed Deposit</Option>
-                    <Option value="Collateral">Collateral</Option>
-                    <Option value="None">None</Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-
               {/* <Col span={4}>
                 <Form.Item label="Advance Cheque No" name="advCheque">
                   <Input
