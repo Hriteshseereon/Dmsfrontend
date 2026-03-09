@@ -529,7 +529,10 @@ export default function BrokerTab() {
                 <Form.Item
                   label="Primary Email"
                   name="email"
-                  rules={[{ required: true }]}
+                  rules={[
+                    { required: true },
+                    { type: "email", message: "Enter a valid email" },
+                  ]}
                 >
                   <Input
                     className={inputClass}
@@ -549,7 +552,11 @@ export default function BrokerTab() {
                 </Form.Item>
               </Col>
               <Col span={6}>
-                <Form.Item label="Secondary Email" name="secondaryEmail">
+                <Form.Item
+                  label="Secondary Email"
+                  name="secondaryEmail"
+                  rules={[{ type: "email", message: "Enter a valid email" }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -598,7 +605,16 @@ export default function BrokerTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="City" name="permanent_city">
+                <Form.Item
+                  label="City"
+                  name="permanent_city"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -607,7 +623,16 @@ export default function BrokerTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="District" name="permanent_district">
+                <Form.Item
+                  label="District"
+                  name="permanent_district"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -616,7 +641,16 @@ export default function BrokerTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="State" name="permanent_state">
+                <Form.Item
+                  label="State"
+                  name="permanent_state"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -625,7 +659,16 @@ export default function BrokerTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="Pin Code" name="permanent_pin">
+                <Form.Item
+                  label="Pin Code"
+                  name="permanent_pin"
+                  rules={[
+                    {
+                      pattern: /^[0-9]{6}$/,
+                      message: "Only numbers are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -727,7 +770,16 @@ export default function BrokerTab() {
 
               {/* Aadhar */}
               <Col span={4}>
-                <Form.Item label="Aadhar Number" name="aadharNo">
+                <Form.Item
+                  label="Aadhar Number"
+                  name="aadharNo"
+                  rules={[
+                    {
+                      pattern: /^[0-9]{12}$/,
+                      message: "Enter a valid 12-digit Aadhaar number",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
