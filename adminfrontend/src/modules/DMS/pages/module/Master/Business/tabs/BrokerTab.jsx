@@ -529,7 +529,10 @@ export default function BrokerTab() {
                 <Form.Item
                   label="Primary Email"
                   name="email"
-                  rules={[{ required: true }]}
+                  rules={[
+                    { required: true },
+                    { type: "email", message: "Enter a valid email" },
+                  ]}
                 >
                   <Input
                     className={inputClass}
@@ -549,7 +552,11 @@ export default function BrokerTab() {
                 </Form.Item>
               </Col>
               <Col span={6}>
-                <Form.Item label="Secondary Email" name="secondaryEmail">
+                <Form.Item
+                  label="Secondary Email"
+                  name="secondaryEmail"
+                  rules={[{ type: "email", message: "Enter a valid email" }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
