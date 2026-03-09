@@ -897,7 +897,16 @@ export default function VendorTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="City" name="city">
+                <Form.Item
+                  label="City"
+                  name="city"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -906,7 +915,16 @@ export default function VendorTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="District" name="district">
+                <Form.Item
+                  label="District"
+                  name="district"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -915,7 +933,16 @@ export default function VendorTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="State" name="state">
+                <Form.Item
+                  label="State"
+                  name="state"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}

@@ -686,7 +686,16 @@ export default function CustomerTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="City" name="city">
+                <Form.Item
+                  label="City"
+                  name="city"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -695,7 +704,16 @@ export default function CustomerTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="District" name="district">
+                <Form.Item
+                  label="District"
+                  name="district"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -704,7 +722,16 @@ export default function CustomerTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="State" name="state">
+                <Form.Item
+                  label="State"
+                  name="state"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -713,7 +740,16 @@ export default function CustomerTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="Country" name="country">
+                <Form.Item
+                  label="Country"
+                  name="country"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -1117,7 +1153,16 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="Aadhar Number" name="aadharNo">
+                <Form.Item
+                  label="Aadhar Number"
+                  name="aadharNo"
+                  rules={[
+                    {
+                      pattern: /^[0-9]{12}$/,
+                      message: "Enter a valid 12-digit Aadhaar number",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}

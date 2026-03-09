@@ -381,15 +381,12 @@ export default function TransportTab() {
                 <Form.Item
                   label="Mobile Number"
                   name="mobileNo"
-                  rules={[
-                    { required: true, message: "mobile number is required" },
-                  ]}
+                  rules={[{ validator: phoneValidator }]}
                 >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
                     placeholder="Enter mobile number"
-                    rules={[{ validator: phoneValidator }]}
                     maxLength={16}
                   />
                 </Form.Item>
@@ -429,7 +426,10 @@ export default function TransportTab() {
                 <Form.Item
                   label="Primary Email"
                   name="email"
-                  rules={[{ required: true, message: "Email id is required" }]}
+                  rules={[
+                    { required: true, message: "Email id is required" },
+                    { type: "email", message: "Please enter valid email" },
+                  ]}
                 >
                   <Input
                     className={inputClass}
@@ -440,7 +440,13 @@ export default function TransportTab() {
               </Col>
 
               <Col span={6}>
-                <Form.Item label="Secondary Email" name="secondaryEmail">
+                <Form.Item
+                  label="Secondary Email"
+                  name="secondaryEmail"
+                  rules={[
+                    { type: "email", message: "Please enter valid email" },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -506,7 +512,13 @@ export default function TransportTab() {
                 <Form.Item
                   label="City"
                   name="city"
-                  rules={[{ required: true, message: "City name is required" }]}
+                  rules={[
+                    { required: true, message: "City name is required" },
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
                 >
                   <Input
                     className={inputClass}
@@ -522,6 +534,10 @@ export default function TransportTab() {
                   name="state"
                   rules={[
                     { required: true, message: "state name is required" },
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
                   ]}
                 >
                   <Input
@@ -538,6 +554,10 @@ export default function TransportTab() {
                   name="district"
                   rules={[
                     { required: true, message: "District name is required" },
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
                   ]}
                 >
                   <Input
@@ -552,7 +572,12 @@ export default function TransportTab() {
                 <Form.Item
                   label="Pin Code"
                   name="pinCode"
-                  rules={[{ required: true, message: "pincode is required" }]}
+                  rules={[
+                    {
+                      pattern: /^[0-9]{6}$/,
+                      message: "Only numbers are allowed",
+                    },
+                  ]}
                 >
                   <Input
                     className={inputClass}
@@ -624,7 +649,16 @@ export default function TransportTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="Owner Aadhar Number" name="ownerAadharNo">
+                <Form.Item
+                  label="Owner Aadhar Number"
+                  name="ownerAadharNo"
+                  rules={[
+                    {
+                      pattern: /^[0-9]{12}$/,
+                      message: "Enter a valid 12-digit Aadhaar number",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
