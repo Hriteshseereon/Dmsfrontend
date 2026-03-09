@@ -1,5 +1,3 @@
-// SaleInvoice.jsx – Final merged component
-// Design: amber theme from design file | Functionality: modal-based from first + full detail from second
 import React, { useState, useEffect } from "react";
 import {
   Table,
@@ -13,11 +11,16 @@ import {
   Modal,
   Spin,
   message,
+  Input,
 } from "antd";
 import {
   PlusOutlined,
   FileTextOutlined,
   ReloadOutlined,
+  DownloadOutlined,
+  SearchOutlined,
+  FilterOutlined,
+    PrinterOutlined
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { getSalesOrders, getSalesOrderById } from "../../../../../api/sales";
@@ -60,7 +63,15 @@ export default function SaleInvoice() {
       setLoadingOrders(false);
     }
   };
+const handleDownload = (record) => {
+  message.success(`Downloading Invoice ${record.id}`);
+  console.log("Download invoice:", record);
+};
 
+const handlePrint = (record) => {
+  message.success(`Printing Invoice ${record.id}`);
+  console.log("Print invoice:", record);
+};
   /* ---------------- ORDER SELECT ---------------- */
 
   const onOrderSelect = async (orderId) => {
@@ -102,36 +113,41 @@ export default function SaleInvoice() {
 
   /* ---------------- DELIVERED CHANGE ---------------- */
 
-  const onDeliveredQtyChange = (value, index) => {
-    const numVal = value ?? 0;
-    setItemsWithDelivery((prev) => {
-      const next = [...prev];
-      if (next[index]) {
-        const required = next[index].requiredQty ?? 0;
-        next[index] = {
-          ...next[index],
-          deliveredQty: numVal,
-          creditedQty: Math.max(0, required - numVal),
-        };
-      }
-      return next;
-    });
-  };
+const onDeliveredQtyChange = (value, index) => {
+  const numVal = Number(value) || 0;
+
+  setItemsWithDelivery((prev) => {
+    const next = [...prev];
+    if (next[index]) {
+      const required = Number(next[index].requiredQty) || 0;
+
+      next[index] = {
+        ...next[index],
+        deliveredQty: numVal,
+        creditedQty: Math.max(0, required - numVal),
+      };
+    }
+    return next;
+  });
+};
 
   /* ---------------- TOTALS ---------------- */
 
-  const getTotals = () => {
-    let totalAmount = 0;
-    let creditedQuantityAmount = 0;
-    itemsWithDelivery.forEach((row) => {
-      const delivered = Number(row.deliveredQty ?? 0);
-      const rate = Number(row.rate ?? 0);
-      const credited = Number(row.creditedQty ?? 0);
-      totalAmount += delivered * rate;
-      creditedQuantityAmount += credited * rate;
-    });
-    return { totalAmount, creditedQuantityAmount };
-  };
+ const getTotals = () => {
+  let totalAmount = 0;
+  let creditedQuantityAmount = 0;
+
+  itemsWithDelivery.forEach((row) => {
+    const delivered = parseFloat(row.deliveredQty) || 0;
+    const rate = parseFloat(row.rate) || 0;
+    const credited = parseFloat(row.creditedQty) || 0;
+
+    totalAmount += delivered * rate;
+    creditedQuantityAmount += credited * rate;
+  });
+
+  return { totalAmount, creditedQuantityAmount };
+};
 
   const { totalAmount, creditedQuantityAmount } =
     orderDetails && itemsWithDelivery.length
@@ -216,33 +232,43 @@ export default function SaleInvoice() {
         </span>
       ),
     },
-    {
-      title: <span className="text-amber-700 font-semibold">Required Qty</span>,
-      dataIndex: "requiredQty",
-      render: (n) => (
-        <span className="text-amber-800 font-medium">{Number(n) ?? 0}</span>
-      ),
-    },
-    {
-      title: (
-        <span className="text-amber-700 font-semibold">Delivered Qty</span>
-      ),
-      key: "deliveredQty",
-      render: (_, __, index) => (
-        <Form.Item
-          name={["items", index, "deliveredQty"]}
-          rules={[{ required: true, message: "Required" }]}
-          style={{ marginBottom: 0 }}
-        >
-          <InputNumber
-            min={0}
-            className="w-full border-amber-300 focus:border-amber-500"
-            placeholder="0"
-            onChange={(v) => onDeliveredQtyChange(v, index)}
-          />
-        </Form.Item>
-      ),
-    },
+   {
+  title: <span className="text-amber-700 font-semibold">Required Qty</span>,
+  dataIndex: "requiredQty",
+  render: (n) => (
+    <span className="text-amber-800 font-medium">{Number(n) ?? 0}</span>
+  ),
+},
+{
+  title: <span className="text-amber-700 font-semibold">Delivered Qty</span>,
+  key: "deliveredQty",
+  render: (_, record, index) => (
+    <Form.Item
+      name={["items", index, "deliveredQty"]}
+      rules={[
+        { required: true, message: "Enter delivered quantity" },
+        {
+          validator: (_, value) => {
+            if (value > record.requiredQty) {
+              return Promise.reject(
+                "Delivered quantity can't be greater than required quantity"
+              );
+            }
+            return Promise.resolve();
+          },
+        },
+      ]}
+      style={{ marginBottom: 0 }}
+    >
+      <InputNumber
+        min={0}
+        className="w-full"
+        placeholder="0"
+        onChange={(v) => onDeliveredQtyChange(v, index)}
+      />
+    </Form.Item>
+  ),
+},
     {
       title: <span className="text-amber-700 font-semibold">Credited Qty</span>,
       dataIndex: "creditedQty",
@@ -307,6 +333,31 @@ export default function SaleInvoice() {
         </span>
       ),
     },
+    {
+  title: <span className="text-amber-700 font-semibold">Action</span>,
+  key: "action",
+  render: (_, record) => (
+    <div className="flex gap-2">
+      <Button
+        icon={<DownloadOutlined />}
+        size="small"
+        onClick={() => handleDownload(record)}
+        className="bg-amber-500! text-white!" 
+      >
+       
+      </Button>
+
+      <Button
+        icon={<PrinterOutlined />}
+        size="small"
+        onClick={() => handlePrint(record)}
+        className="bg-green-600! text-white!"
+      >
+       
+      </Button>
+    </div>
+  ),
+}
   ];
 
   /* ---------------- UI ---------------- */
@@ -314,36 +365,48 @@ export default function SaleInvoice() {
   return (
     <div>
       {/* HEADER */}
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <h2 className="text-lg font-semibold text-amber-700 mb-0">
-            Sales Invoices
-          </h2>
-          <p className="text-amber-600 mb-0">Manage your sales invoices</p>
+     <div className="flex justify-between items-center mb-2">
+        <div className="flex gap-2">
+          <Input
+            prefix={<SearchOutlined className="text-amber-600!" />}
+            placeholder="Search..."
+            className="w-64! border-amber-300! focus:border-amber-500!"
+           // value={searchText}
+           onChange={(e) => handleSearch(e.target.value)}   />
+         <Button
+  icon={<FilterOutlined />}
+  onClick={() => {
+    setSearchText("");
+   // fetchSalesOrders(); // ✅ reload original data
+  }}
+  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+>
+  Reset
+</Button>
         </div>
-        <Button
-          icon={<ReloadOutlined />}
-          onClick={fetchOrderOptions}
-          loading={loadingOrders}
-          className="border-amber-400 text-amber-700 hover:bg-amber-100"
-        >
-          Refresh Orders
-        </Button>
+
+        <div className="flex gap-2">
+          <Button
+            icon={<DownloadOutlined />}
+           // onClick={handleExport}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
+            Export
+          </Button>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            className="bg-amber-500! hover:bg-amber-600! border-none!"
+            onClick={openModal}
+          >
+            Add New
+          </Button>
+        </div>
       </div>
 
       {/* INVOICES TABLE CARD */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="text-amber-700 font-semibold mb-0">Saved Invoices</h3>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            className="bg-amber-500 hover:bg-amber-600 border-none"
-            onClick={openModal}
-          >
-            Add Invoice
-          </Button>
-        </div>
+       
 
         <Table
           columns={invoiceColumns}
@@ -351,9 +414,7 @@ export default function SaleInvoice() {
           rowKey="id"
           scroll={{ x: 700 }}
           pagination={savedInvoices.length > 10 ? { pageSize: 10 } : false}
-          locale={{
-            emptyText: "No invoices yet. Click 'Add Invoice' to create one.",
-          }}
+         
         />
       </div>
 
@@ -456,22 +517,7 @@ export default function SaleInvoice() {
                       {orderDetails.customer?.name || "-"}
                     </p>
                   </Col>
-                  <Col xs={24} sm={12} md={6}>
-                    <span className="text-amber-600 text-sm">Status</span>
-                    <p className="mb-0">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded text-sm font-medium ${
-                          orderDetails.status === "Approved"
-                            ? "bg-green-100 text-green-700"
-                            : orderDetails.status === "Pending"
-                              ? "bg-yellow-100 text-yellow-700"
-                              : "bg-gray-100 text-gray-700"
-                        }`}
-                      >
-                        {orderDetails.status || "-"}
-                      </span>
-                    </p>
-                  </Col>
+                
                 </Row>
               </Card>
 
@@ -497,7 +543,7 @@ export default function SaleInvoice() {
                 <Row gutter={24}>
                   <Col xs={24} sm={12} md={8}>
                     <span className="text-amber-600 block text-sm">
-                      Total Amount
+                      Delivered Amount
                     </span>
                     <span className="text-amber-800 text-xl font-semibold">
                       {totalAmount.toFixed(2)}
@@ -505,7 +551,7 @@ export default function SaleInvoice() {
                   </Col>
                   <Col xs={24} sm={12} md={8}>
                     <span className="text-amber-600 block text-sm">
-                      Credited Quantity Amount
+                      Credited Amount
                     </span>
                     <span
                       className={
@@ -524,15 +570,14 @@ export default function SaleInvoice() {
               <div className="flex justify-end gap-2">
                 <Button
                   onClick={closeModal}
-                  className="border-amber-400 text-amber-700 hover:bg-amber-100"
+                  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="primary"
                   htmlType="submit"
-                  icon={<FileTextOutlined />}
-                  className="bg-amber-500 hover:bg-amber-600 border-none"
+                   className="bg-amber-500! hover:bg-amber-600! border-none!"
                 >
                   Save Invoice
                 </Button>

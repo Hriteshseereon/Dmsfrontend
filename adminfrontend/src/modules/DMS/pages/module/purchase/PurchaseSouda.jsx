@@ -36,61 +36,6 @@ import dayjs from "dayjs";
 
 const { Option } = Select;
 
-const purchaseSoudaJSON = {
-  records: [
-    {
-      key: 1,
-      plantName: "Kalinga Oils Pvt. Ltd.",
-      plantCode: "PLT001",
-      soudaDate: "2024-10-01",
-      deliveryDate: "2024-12-09",
-      startDate: "2024-09-01",
-      endDate: "2024-09-30",
-      companyName: "Jay Traders",
-      depoName: "Bhubaneswar Depot",
-      // previously single item; now items array
-      items: [
-        {
-          lineKey: 1,
-          item: "Mustard Oil",
-          itemCode: "It1",
-          qty: 5000,
-          freeQty: 200,
-          totalQty: 5200,
-          uom: "Litre",
-          rate: 120,
-          discountPercent: 2,
-          discountAmt: 12000,
-          grossAmount: 5000 * 120,
-          grossWt: 2100,
-          totalGrossWt: 1020,
-          sgstPercent: 5,
-          cgstPercent: 5,
-          igstPercent: 0,
-          sgst: 3186,
-          cgst: 3186,
-          igst: 0,
-          totalGST: 6372,
-          tcsAmt: 500,
-          totalAmt: 588000,
-        },
-      ],
-      status: "Approved",
-    },
-  ],
-  plantOptions: [
-    { name: "Kalinga Oils Pvt. Ltd.", code: "PA" },
-    { name: "Odisha Edibles", code: "Sunrise Foods" },
-  ],
-  depoOptions: ["Bhubaneswar Depot", "Cuttack Depot", "Sambalpur Depot"],
-  itemOptions: [
-    { name: "Mustard Oil", code: "It1", rate: 120, uom: "Litre" },
-    { name: "Refined Oil", code: "It2", rate: 115, uom: "Litre" },
-    { name: "Sunflower Oil", code: "It3", rate: 100, uom: "Litre" },
-  ],
-  uomOptions: ["Litre", "Kg", "Packet", "Box"],
-  statusOptions: ["Approved", "Pending", "Rejected"],
-};
 
 
 export default function PurchaseSouda() {
@@ -111,7 +56,7 @@ export default function PurchaseSouda() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
-
+const statusOptions = ["Approved", "Pending", "Rejected"];
 
   useEffect(() => {
     fetchDropdownData();
@@ -375,7 +320,7 @@ const handleViewClick = async (record) => {
   // ---------- Table columns ----------
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Souda No</span>,
+      title: <span className="text-amber-700 font-semibold">Contract No</span>,
       dataIndex: "souda_number",
 
       width: 100,
@@ -388,7 +333,7 @@ const handleViewClick = async (record) => {
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Vendor Name</span>,
+      title: <span className="text-amber-700 font-semibold">Supplier Name</span>,
       dataIndex: "vendor_name",
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
       width: 100,
@@ -519,9 +464,9 @@ const handleExport = async () => {
     fullData.forEach((record) => {
       record.items?.forEach((item) => {
         exportRows.push({
-          "Vendor Name": record.vendor_name,
+          "Supplier Name": record.vendor_name,
           "Plant Name": record.plant_name,
-          "Souda Date": record.created_at, // or souda_date if exists
+          "Contract Date": record.created_at, // or contract_date if exists
           "Start Date": record.from_date,
           "End Date": record.to_date,
 
@@ -553,7 +498,7 @@ const handleExport = async () => {
       });
     });
 
-    exportToExcel(exportRows, "All_Purchase_Souda_Details", "SoudaData");
+    exportToExcel(exportRows, "All_Purchase_Contract_Details", "SoudaData");
 
   } catch (error) {
     console.error("Export failed:", error);
@@ -1002,12 +947,12 @@ const handleExport = async () => {
         <Row gutter={16}>
           <Col span={4}>
             <Form.Item
-              label="Vendor Name"
+              label="Supplier Name"
               name="vendor"
               rules={[{ required: true }]}
             >
               <Select
-                placeholder="Select Vendor"
+                placeholder="Select Supplier"
                 showSearch
                 optionFilterProp="label"
                 onChange={async (vendorId) => {
@@ -1098,7 +1043,7 @@ const handleExport = async () => {
 
 
           <Col span={4}>
-            <Form.Item label="Souda Date" name="soudaDate" initialValue={dayjs()}>
+            <Form.Item label="Contract Date" name="soudaDate" initialValue={dayjs()}>
               <DatePicker className="w-full" disabled={disabled}  />
             </Form.Item>
           </Col>
@@ -1163,7 +1108,7 @@ const handleExport = async () => {
           <Col span={4}>
             <Form.Item label="Status" name="status" rules={[{ required: true }]}>
               <Select placeholder="Select Status" disabled={disabled}>
-                {purchaseSoudaJSON.statusOptions.map((opt) => (
+                {statusOptions.map((opt) => (
                   <Option key={opt} value={opt}>
                     {opt}
                   </Option>

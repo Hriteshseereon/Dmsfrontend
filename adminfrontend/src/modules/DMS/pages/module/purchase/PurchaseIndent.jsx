@@ -28,43 +28,7 @@ const { Option } = Select;
 
 
 
-const purchaseIndentJSON = {
-  records: [
-    {
-      key: 1,
-      soudaNo: "SOUDA-001",
-      plantName: "Kalinga Oils Pvt. Ltd.",
-      plantCode: "PC1",
-      indentDate: "2024-10-01",
-      deliveryDate: "2024-12-09",
-      deliveryAddress: "Plot 12, Industrial Area, Bhubaneswar",
-      companyName: "Jay Traders",
-      depoName: "Bhubaneswar Depot",
-      items: [
-        {
-          item: "Mustard Oil",
-          itemCode: "ITM-MUST-1",
-          qty: 5000,
-          freeQty: 200,
-          totalQty: 5200,
-          uom: "Litre",
-          rate: 120,
-          discountPercent: 2,
-          discountAmt: 12000,
-          grossWt: 2100,
-          totalGrossWt: 1020,
-          grossAmount: 67080,
-        },
-      ],
-      totalQty: 5200,
-      totalAmt: 588000,
-      status: "Approved",
-    },
-  ],
-  uomOptions: ["Litre", "Kg", "Packet", "Box"],
-  statusOptions: ["Approved", "Pending", "Rejected"],
-  soudaNoOptions: ["SOUDA-001", "SOUDA-002", "SOUDA-003"],
-};
+
 
 export default function PurchaseIndent() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -78,7 +42,7 @@ export default function PurchaseIndent() {
  const [contractItems, setContractItems] = useState([]);
 
   const [searchText, setSearchText] = useState("");
-
+ const statusOptions = ["Pending", "Approved", "Rejected"];
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
@@ -110,7 +74,7 @@ const formattedData = list.map((item, index) => ({
 
 
 
-   setData(formattedData.reverse());
+   setData(formattedData);
    
 
   } catch (error) {
@@ -272,7 +236,7 @@ const handleExport = async () => {
         exportRows.push({
           "Order No": data.order_number,
           "Plant Name": data.plant_name,
-          "Vendor Name": data.vendor_name,
+          "Supplier Name": data.vendor_name,
 
           "Order Date": data.order_date,
           "Expected Receiving Date": data.expected_receiving_date,
@@ -439,7 +403,7 @@ console.log("Purchase Order Payload:", payload);
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
    {
-  title: <span className="text-amber-700 font-semibold">Vendor</span>,
+  title: <span className="text-amber-700 font-semibold">Supplier</span>,
   dataIndex: "vendor_name",
   width: 150,
   render: (t) => <span className="text-amber-800">{t}</span>,
@@ -641,13 +605,13 @@ setTimeout(() => {
       <Row gutter={16}>
         <Col span={6}>
         <Form.Item
-  label="Souda No"
+  label="Contract No"
   name="contract"   // store contract ID
   rules={[{ required: true }]}
   
 >
 <Select
-  placeholder="Select Souda No"
+  placeholder="Select Contract No"
   options={soudaContracts.map(c => ({
     label: c.souda_number,   
     value: c.id
@@ -669,7 +633,7 @@ setTimeout(() => {
 </Form.Item>
 </Col>
 <Col span={6}>
-<Form.Item label="Vendor Name" name="vendorName">
+<Form.Item label="Supplier Name" name="vendorName">
   <Input disabled />
 </Form.Item>
 </Col>
@@ -702,7 +666,7 @@ setTimeout(() => {
          <Col span={6}>
           <Form.Item label="Status" name="status">
             <Select disabled={disabled}>
-              {purchaseIndentJSON.statusOptions.map((opt) => (
+              {statusOptions.map((opt) => (
                 <Option key={opt} value={opt}>
                   {opt}
                 </Option>
@@ -712,13 +676,13 @@ setTimeout(() => {
         </Col>
        <Col span={6}>
   <Form.Item
-    label=" Sale Order No"
+    label="CRN No"
     name="saleorderNo"
-    rules={[{ required: true, message: "Please select sale order number" }]}
+    rules={[{ required: true, message: "Please select CRN number" }]}
   >
     <Select
       mode="multiple"
-      placeholder="Select sale Order No"
+      placeholder="Select CRN No"
       allowClear
       showSearch
       disabled={disabled}
@@ -1174,9 +1138,9 @@ rules={[
       {/* Table */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
-          Purchase Indent Records
+          Purchase Order Records
         </h2>
-        <p className="text-amber-600 mb-3">Manage your purchase souda data</p>
+        <p className="text-amber-600 mb-3">Manage your purchase Order data</p>
 
         <Table
           columns={columns}
@@ -1192,7 +1156,7 @@ rules={[
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            Add New Purchase Indent
+            Add New Purchase Order
           </span>
         }
         open={isAddModalOpen}
@@ -1226,7 +1190,7 @@ rules={[
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            Edit Purchase Indent
+            Edit Purchase Order
           </span>
         }
         open={isEditModalOpen}
@@ -1260,7 +1224,7 @@ rules={[
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            View Purchase Indent
+            View Purchase Order
           </span>
         }
         open={isViewModalOpen}

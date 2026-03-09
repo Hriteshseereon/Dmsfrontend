@@ -40,13 +40,7 @@ export const SALES_TAB_DEFINITIONS = [
     Icon: FaShoppingCart,
     Component: SaleOrders,
   },
-  // {
-  //   id: "status",
-  //   label: "Delivery Status",
-  //   path: "status",
-  //   Icon: FaTruck,
-  //   Component: DeliveryStatus,
-  // },
+ 
   {
     id: "saleinvoice",
     label: "Sale Invoice",
@@ -54,20 +48,14 @@ export const SALES_TAB_DEFINITIONS = [
     Icon: FaFileInvoice,
     Component: SaleInvoice,
   },
-  {
-    id: "loadingdetails",
-    label: "Loading Details",
-    path: "loadingdetails",
-    Icon: FaTruck,
-    Component: LoadingDetails,
-  },
   // {
-  //   id: "return",
-  //   label: "Sale Return",
-  //   path: "return",
-  //   Icon: FaUndo,
-  //   Component: SaleReturn,
+  //   id: "loadingdetails",
+  //   label: "Loading Details",
+  //   path: "loadingdetails",
+  //   Icon: FaTruck,
+  //   Component: LoadingDetails,
   // },
+ 
   {
     id: "dispute",
     label: "Sale Dispute",

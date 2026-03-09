@@ -814,7 +814,8 @@ narration: order.narration,      // NEW
               >
                 <div className="flex justify-between items-center mb-3">
                   <Form.Item
-                    label="Contract ID"
+                    label={<span className="text-amber-700">Contract Id</span>}
+       
                     name={[cf.name, "contract_id"]}
                   >
                     <Select
@@ -912,7 +913,7 @@ narration: order.narration,      // NEW
                             <Col span={8}>
                               <Form.Item
                                 name={[itf.name, "item"]}
-                                label="Item"
+                                label={<span className="text-amber-700">Item</span>}
                                 rules={[{ required: true }]}
                               >
                                 <Select
@@ -1011,7 +1012,7 @@ narration: order.narration,      // NEW
                             <Col span={4}>
                               <Form.Item
                                 name={[itf.name, "hsnCode"]}
-                                label="Code"
+                                label={<span className="text-amber-700">Code</span>}
                               >
                                 <Input disabled />
                               </Form.Item>
@@ -1019,7 +1020,8 @@ narration: order.narration,      // NEW
 
                             {/* UOM */}
                             <Col span={4}>
-                              <Form.Item name={[itf.name, "uom"]} label="UOM">
+                              <Form.Item name={[itf.name, "uom"]}  label={<span className="text-amber-700">UOM</span>}
+       >
                                 <Input disabled />
                               </Form.Item>
                             </Col>
@@ -1028,7 +1030,8 @@ narration: order.narration,      // NEW
                             <Col span={3}>
                               <Form.Item
                                 name={[itf.name, "qty"]}
-                                label="Qty"
+                                label={<span className="text-amber-700">Qty</span>}
+       
                                 rules={[{ required: true }]}
                               >
                                 <InputNumber
@@ -1049,7 +1052,7 @@ narration: order.narration,      // NEW
                             <Col span={3}>
                               <Form.Item
                                 name={[itf.name, "freeQty"]}
-                                label="Free"
+                                label={<span className="text-amber-700">Free Qty</span>}
                               >
                                 <InputNumber
                                   min={0}
@@ -1069,7 +1072,7 @@ narration: order.narration,      // NEW
                             <Col span={4}>
                               <Form.Item
                                 name={[itf.name, "rate"]}
-                                label="Rate"
+                                label={<span className="text-amber-700">Rate</span>}
                                 rules={[{ required: true }]}
                               >
                                 <InputNumber
@@ -1090,7 +1093,7 @@ narration: order.narration,      // NEW
                             <Col span={3}>
                               <Form.Item
                                 name={[itf.name, "discountPercent"]}
-                                label="Disc %"
+                                label={<span className="text-amber-700">Disc %</span>}
                               >
                                 <InputNumber
                                   min={0}
@@ -1111,7 +1114,7 @@ narration: order.narration,      // NEW
                             <Col span={3}>
                               <Form.Item
                                 name={[itf.name, "amount"]}
-                                label="Amount"
+                                label={<span className="text-amber-700">Amount</span>}
                               >
                                 <InputNumber className="w-full" disabled />
                               </Form.Item>
@@ -1121,7 +1124,7 @@ narration: order.narration,      // NEW
                             <Col span={3}>
                               <Form.Item
                                 name={[itf.name, "discountAmt"]}
-                                label="Disc Amt"
+                                label={<span className="text-amber-700">Disc Amt</span>}
                               >
                                 <InputNumber className="w-full" disabled />
                               </Form.Item>
@@ -1131,7 +1134,7 @@ narration: order.narration,      // NEW
                             <Col span={3}>
                               <Form.Item
                                 name={[itf.name, "totalAmount"]}
-                                label="Total Amount"
+                                label={<span className="text-amber-700">Total Amount</span>}
                               >
                                 <InputNumber className="w-full" disabled />
                               </Form.Item>
@@ -1144,7 +1147,7 @@ narration: order.narration,      // NEW
 
                    <Form.Item
   name={[itf.name, "orderQuantity"]}
-  label="Order Qty"
+  label={<span className="text-amber-700">Order Qty</span>}
   validateTrigger="onChange"   // ✅ IMPORTANT
   rules={[
     {
@@ -1286,8 +1289,8 @@ narration: order.narration,      // NEW
         </Col>
   <Col span={6}>
  <Form.Item
-  label="Customer"
-name="customer_id"
+  label={<span className="text-amber-700">Customer</span>}
+       name="customer_id"
   rules={[{ required: true, message: "Please select customer" }]}
 >
 <Select
@@ -1354,7 +1357,7 @@ name="customer_id"
 
        <Col span={6}>
   <Form.Item
-    label="Purchase Type"
+    label={<span className="text-amber-700">Purchase Type</span>}
     name="purchaseType"
     rules={[{ required: true, message: "Select Purchase Type" }]}
   >
@@ -1368,7 +1371,7 @@ name="customer_id"
 
 <Col span={6}>
  <Form.Item
-  label="Bill Mode"
+  label={<span className="text-amber-700">Bill Mode</span>}
   name="bill_mode"
   rules={[{ required: true }]}
 >
@@ -1384,7 +1387,8 @@ name="customer_id"
 
 <Col span={12}>
   <Form.Item
-    label="Narration"
+    label={<span className="text-amber-700">Narration</span>}
+       
     name="narration"
   >
     <Input.TextArea
@@ -1396,7 +1400,7 @@ name="customer_id"
 </Col>
 
         <Col span={6}>
-          <Form.Item name="status" label="Status"     rules={[{ required: true, message: "Select Status" }]}
+          <Form.Item name="status" label={<span className="text-amber-700">Status</span>}     rules={[{ required: true, message: "Select Status" }]}
           >
   <Select disabled={disabled} onChange={(val) => handleStatusChange(val, form)}>
     <Select.Option value="Approved">Approved</Select.Option>
@@ -1546,10 +1550,10 @@ name="customer_id"
 
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
-          Sales Order & Invoice Records
+          Sales Order Records
         </h2>
         <p className="text-amber-600 mb-3">
-          Manage your sales Order & Invoice data
+          Manage your sales Order
         </p>
         <Table
           columns={columns}
@@ -1564,7 +1568,7 @@ name="customer_id"
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            Add New Sales Order & Invoice
+            Add New Sales Order 
           </span>
         }
         open={isAddModalOpen}
@@ -1611,7 +1615,7 @@ name="customer_id"
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            Edit Sales Order & Invoice
+            Edit Sales Order 
           </span>
         }
         open={isEditModalOpen}
@@ -1659,7 +1663,7 @@ name="customer_id"
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            View Sales Order & Invoice
+            View Sales Order 
           </span>
         }
         open={isViewModalOpen}

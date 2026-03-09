@@ -28,7 +28,7 @@ export const PURCHASE_TAB_DEFINITIONS = [
   },
   {
     id: "indent",
-    label: "Purchase Indent",
+    label: "Purchase Order",
     path: "indent",
     Icon: FaShoppingCart,
   },

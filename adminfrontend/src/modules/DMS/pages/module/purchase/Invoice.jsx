@@ -17,7 +17,7 @@ import {
   SearchOutlined,
   FilterOutlined,
   DownloadOutlined,
-  PlusOutlined
+  PlusOutlined,PrinterOutlined
 } from "@ant-design/icons";
 
 const { Option } = Select;
@@ -30,9 +30,9 @@ const PurchaseIndent = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [vendor, setVendor] = useState("");
   const [file, setFile] = useState(null);
-
   const [editRecord, setEditRecord] = useState(null);
-
+  const [viewModal, setViewModal] = useState(false);
+const [viewRecord, setViewRecord] = useState(null);
   useEffect(() => {
     setFilteredData(data);
   }, [data]);
@@ -58,17 +58,36 @@ const PurchaseIndent = () => {
     setEditRecord(record);
     setModalOpen(true);
   };
+const openViewModal = (record) => {
+  setViewRecord(record);
+  setViewModal(true);
+};
+const openDocument = (file) => {
+  if (!file) return;
 
-  // VIEW FILE
-  const openFilePreview = (file) => {
+  const fileURL = URL.createObjectURL(file);
+  window.open(fileURL, "_blank");
+};
 
-    if (!file) return;
+const handlePrint = (record) => {
+  if (!record.file) {
+    alert("No file uploaded");
+    return;
+  }
 
-    const fileURL = URL.createObjectURL(file);
-    window.open(fileURL, "_blank");
+  const fileURL = URL.createObjectURL(record.file);
 
+  const iframe = document.createElement("iframe");
+  iframe.style.display = "none";
+  iframe.src = fileURL;
+
+  document.body.appendChild(iframe);
+
+  iframe.onload = () => {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
   };
-
+};
   // SAVE
   const handleSubmit = () => {
 
@@ -115,42 +134,57 @@ const PurchaseIndent = () => {
     setFilteredData(data);
   };
 
-  const columns = [
-    {
-      title: <span className="text-amber-700 font-semibold">Invoice No</span>,
-       dataIndex: "invoiceNo",
-        render: (text) => <span className="text-amber-800 ">{text}</span>,
- 
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Vendor</span>,
-      dataIndex: "vendor",
-      render: (text) => <span className="text-amber-800 ">{text}</span>
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">File</span>,
-      render: (_, record) =>
-        record.file ? record.file.name : "-"
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Actions</span>,
-      render: (_, record) => (
-        <div style={{ display: "flex", gap: 15 }}>
+ const columns = [
+  {
+    title: <span className="text-amber-700 font-semibold">Invoice No</span>,
+    dataIndex: "invoiceNo",
+    render: (text) => <span className="text-amber-800">{text}</span>
+  },
+  {
+    title: <span className="text-amber-700 font-semibold">Supplier</span>,
+    dataIndex: "vendor",
+    render: (text) => <span className="text-amber-800">{text}</span>
+  },
+  {
+    title: <span className="text-amber-700 font-semibold">File</span>,
+    render: (_, record) => (
+      <span className="text-amber-800">
+        {record.file ? record.file.name : "-"}
+      </span>
+    )
+  },
+  {
+    title: <span className="text-amber-700 font-semibold">Actions</span>,
+    render: (_, record) => (
+      <div style={{ display: "flex", gap: 15 }}>
 
-          <EyeOutlined
-            style={{ color: "#1677ff", cursor: "pointer" }}
-            onClick={() => openFilePreview(record.file)}
-          />
+        <EyeOutlined
+          style={{ color: "#1677ff", cursor: "pointer" }}
+          onClick={() => openViewModal(record)}
+        />
 
-          <EditOutlined
-            style={{ color: "red", cursor: "pointer" }}
-            onClick={() => openEditModal(record)}
-          />
+        <EditOutlined
+          style={{ color: "red", cursor: "pointer" }}
+          onClick={() => openEditModal(record)}
+        />
 
-        </div>
-      )
-    }
-  ];
+      </div>
+    )
+  },
+  {
+    title: <span className="text-amber-700 font-semibold">Print</span>,
+    render: (_, record) => (
+      <Button
+        type="primary"
+        icon={<PrinterOutlined />}
+        className="bg-amber-500! hover:bg-amber-600! border-none!"
+        onClick={() => handlePrint(record)}
+      >
+        Print
+      </Button>
+    )
+  }
+];
 
   return (
 
@@ -213,36 +247,44 @@ const PurchaseIndent = () => {
 </div>
       {/* MODAL */}
 
-      <Modal
-        title={editRecord ? "Edit Invoice" : "Add Invoice"}
-        open={modalOpen}
-        onCancel={() => setModalOpen(false)}
-        onOk={handleSubmit}
-      >
+     <Modal
+  title= {<span className="text-amber-600!"> {editRecord ? "Edit Invoice" : "Add Invoice"} </span>}
+  open={modalOpen}
+  onCancel={() => setModalOpen(false)}
+  onOk={handleSubmit}
+  okType="default"
+  okButtonProps={{
+    className: "bg-amber-500! hover:bg-amber-600! text-white! border-none"
+  }}
+  cancelButtonProps={{
+    className: "border border-amber-400! text-amber-700! hover:bg-amber-100!"
+  }}
+>
 
         {/* Vendor */}
 
-        <div style={{ marginBottom: 15 }}>
+        <div style={{ marginBottom: 10 }}>
 
-          <label>Vendor</label>
+          <label className="text-amber-600! " >Supplier</label>
 
           <Select
             value={vendor}
-            style={{ width: "100%" }}
+            style={{ width: "100%", marginTop: 8 }}
             onChange={(val) => setVendor(val)}
-            placeholder="Select Vendor"
+            placeholder="Select Supplier"
+             disabled={editRecord ? true : false} 
           >
 
             <Option value="vendor1">
-              Vendor 1
+              Supplier 1
             </Option>
 
             <Option value="vendor2">
-              Vendor 2
+              Supplier 2
             </Option>
 
             <Option value="vendor3">
-              Vendor 3
+              Supplier 3
             </Option>
 
           </Select>
@@ -253,7 +295,7 @@ const PurchaseIndent = () => {
 
         <div>
 
-          <label>Upload File</label>
+          <label className="text-amber-600! " >Upload File</label>
 
           <Upload
             beforeUpload={(file) => {
@@ -261,9 +303,11 @@ const PurchaseIndent = () => {
               return false;
             }}
             showUploadList
+             disabled={editRecord ? true : false}
+             className="ml-2!"
           >
 
-            <Button icon={<UploadOutlined />}>
+            <Button  icon={<UploadOutlined />}>
               Upload File
             </Button>
 
@@ -272,6 +316,32 @@ const PurchaseIndent = () => {
         </div>
 
       </Modal>
+<Modal
+  title={<span className="text-amber-600  text-lg">View Invoice</span>}
+  open={viewModal}
+  footer={null}
+  onCancel={() => setViewModal(false)}
+>
+  <div className="mb-4">
+    <label className="text-amber-600 ">Supplier</label>
+    <Input value={viewRecord?.vendor} readOnly className="mt-2!" />
+  </div>
+
+  <div>
+    <label className="text-amber-600 ">Uploaded Document</label>
+
+    {viewRecord?.file ? (
+      <p
+        className="text-blue-600 cursor-pointer mt-1 hover:underline"
+        onClick={() => openDocument(viewRecord.file)}
+      >
+        {viewRecord.file.name}
+      </p>
+    ) : (
+      <p className="text-gray-500 mt-1">No File Uploaded</p>
+    )}
+  </div>
+</Modal>
 
     </div>
   );

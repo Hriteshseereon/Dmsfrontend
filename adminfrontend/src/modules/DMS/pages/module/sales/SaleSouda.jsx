@@ -737,12 +737,12 @@ const handleExport = () => {
                     {/* COMPANY / VENDOR */}
                     <Col span={6}>
                       <Form.Item
-                        label={<span className="text-amber-700">Company</span>}
+                        label={<span className="text-amber-700">Supplier</span>}
                         name={[field.name, "vendorId"]}
-                        rules={[{ required: true, message: "Select company" }]}
+                        rules={[{ required: true, message: "Select supplier" }]}
                       >
                         <Select
-                          placeholder="Select Company"
+                          placeholder="Select Supplier"
                           onChange={async (vendorId) => {
                             if (!vendorProductsMap[vendorId]) {
                               const res = await getproductbyVendor(vendorId);
@@ -1273,7 +1273,7 @@ const handleExport = () => {
           <Row gutter={16}>
             <Col span={6}>
               <Form.Item
-                label={<span className="text-amber-700">Souda Date</span>}
+                label={<span className="text-amber-700">Contract Date</span>}
                 name="soudaDate"
                 rules={[{ required: true }]}
                 initialValue={dayjs()}
@@ -1927,7 +1927,7 @@ const handleExport = () => {
 
           <h6 className="text-amber-500">Items</h6>
           <div className="mb-2 text-sm font-semibold text-amber-700 grid grid-cols-12 gap-2">
-            <div className="col-span-2">Company</div>
+            <div className="col-span-2">Supplier</div>
             <div className="col-span-3">Item</div>
             <div className="col-span-1">Code</div>
             <div className="col-span-1">UOM</div>
