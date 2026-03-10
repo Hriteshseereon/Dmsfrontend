@@ -485,6 +485,7 @@ const handleView = async (record) => {
       plantName: data.plant_name,
       deliveryAddress: data.delivery_address,
       status: data.status,
+       saleorderNo: data.sales_orders || [], 
       order_date: data.order_date ? dayjs(data.order_date) : null,
       expected_receiving_date: data.expected_receiving_date
         ? dayjs(data.expected_receiving_date)
@@ -550,6 +551,7 @@ await handleSoudaSelect(data.contract, editForm, data.items);
   plantName: data.plant_name,
   deliveryAddress: data.delivery_address,
   status: data.status,
+   saleorderNo: data.sales_orders || [], 
   order_date: data.order_date ? dayjs(data.order_date) : null,
   expected_receiving_date: data.expected_receiving_date
     ? dayjs(data.expected_receiving_date)
@@ -678,8 +680,7 @@ setTimeout(() => {
   <Form.Item
     label="CRN No"
     name="saleorderNo"
-    rules={[{ required: true, message: "Please select CRN number" }]}
-  >
+     >
     <Select
       mode="multiple"
       placeholder="Select CRN No"

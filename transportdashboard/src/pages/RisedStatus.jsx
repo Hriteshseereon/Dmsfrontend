@@ -137,8 +137,7 @@ plantPhoneNumber: res.plant_details?.phone_number,
   };
 
   const columns = [
-    { title: <span className="text-amber-700 font-semibold">Invoice No</span>, dataIndex: "invoice_number", render: (t) => <span className="text-amber-800 font-medium">{t}</span> },
-    
+  
     {
   title: <span className="text-amber-700 font-semibold">Product Name</span>,
   render: (record) => (
@@ -155,7 +154,6 @@ plantPhoneNumber: res.plant_details?.phone_number,
     </span>
   ),
 },
- { title: <span className="text-amber-700 font-semibold">Delivery Address</span>, dataIndex: "deliveryAddress", render: (d) => <span className="text-amber-800">{d}</span> },
     { title: <span className="text-amber-700 font-semibold">Status</span>,width:180, dataIndex: "status", 
       render: (s) => {
   const displayStatus = s === "Pending" ? "Pending Approval" : s;
@@ -332,14 +330,13 @@ plantPhoneNumber: res.plant_details?.phone_number,
 </Col>
    </>)}
           {renderSection("Order Details", <>
-            <Col span={6}><Form.Item label="Invoice No" name="invoice_number"><Input disabled /></Form.Item></Col>
+            <Col span={6}><Form.Item label="Assign No" name="invoice_number"><Input disabled /></Form.Item></Col>
              <Col span={6}><Form.Item label="Way Bill" name="wayBill"><Input disabled/></Form.Item></Col>
             <Col span={6}><Form.Item label="Status" name="status"><Select disabled={isReadonly || isAssigning} options={[{label: 'Pending', value: 'Pending'}, ]} /></Form.Item></Col>
-            <Col span={6}><Form.Item label="Delivery Address" name="deliveryAddress"><Input disabled /></Form.Item></Col>
-          </>)}
+            </>)}
 
-          {renderSection("Vendor Detail", <>
-            <Col span={6}><Form.Item label="Vendor Name" name="vendorName" ><Input disabled /></Form.Item></Col>
+          {renderSection("Supplier Detail", <>
+            <Col span={6}><Form.Item label="Supplier Name" name="vendorName" ><Input disabled /></Form.Item></Col>
             <Col span={6}><Form.Item label="Address" name="vendorAddress" ><Input disabled /></Form.Item></Col>
             <Col span={6}><Form.Item label="Contact Person" name="vendorContactPerson"><Input disabled /></Form.Item></Col>
             <Col span={6}><Form.Item label="Phone" name="vendorPhoneNumber" ><Input disabled /></Form.Item></Col>

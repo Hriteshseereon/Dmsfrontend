@@ -80,11 +80,13 @@ export default function PurchaseInvoice() {
     try {
       setLoading(true);
       const res = await getPurchaseInvoice();
-      const list = res?.data || res;
+    const list = Array.isArray(res) ? res : res.data;
       console.log("API DATA:", list);
-      const formatted = list.map((item, index) => ({
-        key: index + 1,
-        ...item,
+     const formatted = list.map((item) => ({
+  key: item.id,
+  ...item,
+  trn_number: item.trn_number || item.invoice_number,
+
         assigned: item.is_transport_assigned,
         transport: item.transport_name,
       }));
@@ -181,12 +183,14 @@ export default function PurchaseInvoice() {
 
 
   const columns = [
-   {
+{
   title: <span className="text-amber-700 font-semibold">Assign No</span>,
+  dataIndex: "trn_number",
+  key: "trn_number",
   width: 120,
-  render: (_, record) => (
+  render: (_, record) => (   // 👈 use _ and read from record directly
     <span className="text-amber-800 font-medium">
-      {record.trn_number || "-"}
+      {record.trn_number || record.invoice_number || "-"}
     </span>
   ),
 },
@@ -928,7 +932,7 @@ export default function PurchaseInvoice() {
 
 
 
-
+console.log("TABLE DATA:", data.map(d => ({ id: d.id, trn_number: d.trn_number, invoice_number: d.invoice_number })));
   return (
     <div>
       {/* Header */}
@@ -976,6 +980,7 @@ export default function PurchaseInvoice() {
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">Transport Assignment Records</h2>
         <p className="text-amber-600 mb-3">Manage transport assignments for purchase orders</p>
+        
         <Table
           columns={columns}
           dataSource={data}
