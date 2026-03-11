@@ -959,7 +959,7 @@ export default function VendorTab() {
               </Col>
               <Col span={4}>
                 <Form.Item
-                  label="Location"
+                  label="Google Location"
                   name="location"
                   rules={[{ required: true }]}
                 >
