@@ -154,7 +154,7 @@ const handleEditClick = async (record) => {
       hsn_code: it.hsn_code || "",
 
       qty: Number(it.qty),
-      freeQty: Number(it.free_qty),
+    //  freeQty: Number(it.free_qty),
       totalQty: Number(it.total_qty),
 
       rate: Number(it.rate),
@@ -230,7 +230,7 @@ const handleEditSubmit = async (values) => {
         hsn_code: it.hsn_code || "",
         item_name: it.item_name || "",
         qty: round2(it.qty),
-        free_qty: round2(it.freeQty),
+      //  free_qty: round2(it.freeQty),
         total_qty: round2(it.totalQty),
 
         rate: round2(it.rate),
@@ -274,7 +274,7 @@ const handleViewClick = async (record) => {
       hsn_code: it.hsn_code || "",
 
       qty: Number(it.qty),
-      freeQty: Number(it.free_qty),
+      //  freeQty: Number(it.free_qty),
       totalQty: Number(it.total_qty),
 
       rate: Number(it.rate),
@@ -392,7 +392,7 @@ const handleViewClick = async (record) => {
   const computeAllFromFormValues = (values) => {
     const items = (values.items || []).map((it = {}, idx) => {
       const qty = Number(it.qty || 0);
-      const freeQty = Number(it.freeQty || 0);
+      // const freeQty = Number(it.freeQty || 0);
       const rate = Number(it.rate || 0);
       const discountPercent = Number(it.discountPercent || 0);
       const sgstPercent = Number(it.sgstPercent || 0);
@@ -401,7 +401,8 @@ const handleViewClick = async (record) => {
       const tcsAmt = Number(it.tcsAmt || 0);
       const grossWt = Number(it.grossWt || 0);
 
-      const totalQty = round2(qty + freeQty);
+      // const totalQty = round2(qty + freeQty);
+      const totalQty = round2(qty);
 
       const grossAmount = round2(qty * rate);
 
@@ -533,7 +534,7 @@ const handleExport = async () => {
         uom: it.base_unit || null,
 
         qty: round2(it.qty),
-        free_qty: round2(it.freeQty),
+       // free_qty: round2(it.freeQty),
         total_qty: round2(it.totalQty),
 
         rate: round2(it.rate),
@@ -585,7 +586,7 @@ const handleExport = async () => {
                     item: undefined,
 
                     qty: 0,
-                    freeQty: 0,
+                  // freeQty: 0,
                     totalQty: 0,
                     rate: 0,
                     discountPercent: 0,
@@ -695,7 +696,7 @@ const handleExport = async () => {
                   </Form.Item>
                 </Col>
                 {/* FIX: Free Qty with proper validation */}
-                <Col span={4}>
+                {/* <Col span={4}>
                   <Form.Item
                     {...field}
                     label="Free Qty"
@@ -722,7 +723,7 @@ const handleExport = async () => {
                       className="w-full!"
                     />
                   </Form.Item>
-                </Col>
+                </Col> */}
 
                 <Col span={4}>
                   <Form.Item
@@ -1164,7 +1165,7 @@ const handleExport = async () => {
                     item: undefined,
 
                     qty: 0,
-                    freeQty: 0,
+                   // freeQty: 0,
                     totalQty: 0,
                     rate: 0,
                     discountPercent: 0,

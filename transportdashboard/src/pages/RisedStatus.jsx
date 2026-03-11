@@ -2,10 +2,9 @@ import React, { useState ,useEffect} from "react";
 import { Table, Input, Button, Modal, Form, DatePicker, Row, Col, Select } from "antd";
 import { SearchOutlined, DownloadOutlined, EyeOutlined, EditOutlined, FilterOutlined, TruckOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
-import {getAllAssignedOrder,getAssignedOrderById,updateAssignedOrder} from '../api/risedStatus'
+import {getAllAssignedOrder,getAssignedOrderById,updateAssignedOrder,} from '../api/risedStatus'
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
-
 
 export default function PurchaseOrderList() {
   const [modalState, setModalState] = useState({ open: false, mode: null }); 
@@ -34,14 +33,14 @@ const fetchAssignedOrders = async () => {
       deliveryAddress: item.delivery_address,
       plantName: item.plant_name,
 
-      products: [
-        {
-          productName: item.product_name,
-          qty: item.total_qty,
-          productId: item.invoice,
-          uom: item.unit_name,   
-        },
-      ],
+     products: [
+  {
+    productName: item.product_name,
+    qty: item.invoice_items?.[0]?.qty,
+    productId: item.invoice,
+    uom: item.invoice_items?.[0]?.uom_details?.unit_name,
+  },
+],
 
          }));
 
@@ -84,13 +83,13 @@ plantAddress: res.plant_details?.address,
 plantPhoneNumber: res.plant_details?.phone_number,
 
   // ✅ PRODUCT (FIX HERE)
-  products: [
-    {
-      productName: res.product_name,
-      qty: res.total_qty,   // ❗ you used res.qty (wrong)
-      uom: res.invoice_items?.[0]?.uom_details?.unit_name,            // not in API
-    },
-  ],
+ products: [
+  {
+    productName: res.invoice_items?.[0]?.product_name,
+    qty: res.invoice_items?.[0]?.qty,
+    uom: res.invoice_items?.[0]?.uom_details?.unit_name,
+  },
+],
 });
 
 

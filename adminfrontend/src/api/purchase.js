@@ -126,8 +126,8 @@ export const getPurchaseInvoice = async () => {
   const res = await api.get("/purchase/invoices/");
   return res.data;
 };
-
-//add purchase invoice
+//Transport Assignments
+//add Transport Assignments
 export const addPurchaseInvoice = async (payload) => {
   const currentOrgId = useSessionStore.getState().currentOrgId;
   const res = await api.post("/purchase/invoices/", payload, {
@@ -135,12 +135,12 @@ export const addPurchaseInvoice = async (payload) => {
   });
   return res.data;
 }
-//fetch purchase invoice by id
+//fetch Transport Assignments by id
 export const getPurchaseInvoiceById = async (invoiceId) => {
   const res = await api.get(`/purchase/invoices/${invoiceId}/`);
   return res.data;
 };
-//update purchase invoice
+//update Transport Assignments
 export const updatePurchaseInvoice = async (invoiceId, payload) => {
   const { currentOrgId } = useSessionStore.getState(); 
   const res = await api.put(
@@ -169,6 +169,54 @@ export const addAssignment= async (payload) => {
   });
   return res.data;
 }
+///Purchase Invoice 
+
+//fetch purchase invoice by id
+export const getInvoiceById = async (invoiceId) => {
+  const res = await api.get(`/purchase/vendor-purchase-invoices/${invoiceId}/`);
+  return res.data;
+};
+//fetch all purchase invoice 
+export const getAllInvoice = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/purchase/vendor-purchase-invoices/`, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+//add purchase invoice
+
+export const addInvoice = async (payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.post(
+    `purchase/vendor-purchase-invoices/`,
+    payload,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      params: { organisation: currentOrgId },
+    }
+  );
+
+  return res.data;
+};
+//update purchase invoice
+export const updateInvoice = async (invoiceId, payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.put(
+    `purchase/vendor-purchase-invoices/${invoiceId}/`,
+    payload,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      params: { organisation: currentOrgId },
+    }
+  );
+  return res.data;
+};
 
 // PURCHASE RETURNS
 //fetch all purchase returns

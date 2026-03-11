@@ -20,7 +20,7 @@ import {
   PlusOutlined,
   DeleteOutlined,
 } from "@ant-design/icons";
-import { getLoadingAdvice ,getLoadingAdviceById,updateLoadingAdvice} from "../api/loadingAdvice";
+import { getLoadingAdvice ,getLoadingAdviceById,updateLoadingAdvice,getAllVendor} from "../api/loadingAdvice";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
@@ -302,8 +302,9 @@ setIsViewModalOpen(true);
  
 const getAllowedStatusOptions = (currentStatus) => {
   const flow = {
-    Approved: ["In-Transit", "Out for delivery", "Delivered"],
-    "In-Transit": ["Out for delivery", "Delivered"],
+    Approved: ["Dispatched"],
+    Dispatched: ["In-Transit"],
+    "In-Transit": ["Out for delivery"],
     "Out for delivery": ["Delivered"],
     Delivered: ["Delivered"],
   };
@@ -491,7 +492,7 @@ const renderSaleOrderDetails = () => {
             <Form.Item
               label="Vendor Name"
               name="vendorName"
-              rules={[{ required: true, message: "Required" }]}
+            //  rules={[{ required: true, message: "Required" }]}
             >
               <Input disabled />
             </Form.Item>
@@ -500,7 +501,7 @@ const renderSaleOrderDetails = () => {
             <Form.Item
               label="Address"
               name="vendorAddress"
-              rules={[{ required: true, message: "Required" }]}
+             // rules={[{ required: true, message: "Required" }]}
             >
               <Input disabled />
             </Form.Item>
@@ -510,7 +511,7 @@ const renderSaleOrderDetails = () => {
             <Form.Item
               label="Contact Person"
               name="vendorContactPerson"
-              rules={[{ required: true, message: "Required" }]}
+             // rules={[{ required: true, message: "Required" }]}
             >
               <Input disabled/>
             </Form.Item>
@@ -519,7 +520,7 @@ const renderSaleOrderDetails = () => {
             <Form.Item
               label="Phone Number"
               name="vendorPhoneNumber"
-              rules={[{ required: true, message: "Required" }]}
+             // rules={[{ required: true, message: "Required" }]}
             >
               <Input disabled />
             </Form.Item>
@@ -534,7 +535,7 @@ const renderSaleOrderDetails = () => {
             <Form.Item
               label="Plant Name"
               name="plantName"
-              rules={[{ required: true, message: "Required" }]}
+             // rules={[{ required: true, message: "Required" }]}
             >
               <Input disabled />
             </Form.Item>
@@ -545,7 +546,7 @@ const renderSaleOrderDetails = () => {
             <Form.Item
               label="Address"
               name="plantAddress"
-              rules={[{ required: true, message: "Required" }]}
+             // rules={[{ required: true, message: "Required" }]}
             >
               <Input disabled />
             </Form.Item>
@@ -554,7 +555,7 @@ const renderSaleOrderDetails = () => {
             <Form.Item
               label="Contact Person"
               name="vendorContactPerson"
-              rules={[{ required: true, message: "Required" }]}
+             // rules={[{ required: true, message: "Required" }]}
             >
               <Input disabled />
             </Form.Item>
@@ -563,7 +564,7 @@ const renderSaleOrderDetails = () => {
             <Form.Item
               label="Phone Number"
               name="plantPhoneNumber"
-              rules={[{ required: true, message: "Required" }]}
+             // rules={[{ required: true, message: "Required" }]}
             >
               <Input disabled/>
             </Form.Item>
@@ -950,11 +951,11 @@ const renderLoadingDetails = (disabled = false) => (
                 <Input disabled/>
               </Form.Item>
             </Col>
-            <Col span={4}>
+            {/* <Col span={4}>
               <Form.Item label="Delivery Address" name="deliveryAddress">
                 <Input disabled />
               </Form.Item>
-            </Col>
+            </Col> */}
           
           </Row>
   {renderTransportDetails(false)}

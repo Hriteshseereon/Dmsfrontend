@@ -173,11 +173,12 @@ const handleSoudaSelect = async (contractId, formInstance, existingItems = []) =
 
   const updatedItems = items.map((item) => {
     const qty = Number(item?.qty || 0);
-    const freeQty = Number(item?.freeQty || 0);
+  //  const freeQty = Number(item?.freeQty || 0);
     const rate = Number(item?.rate || 0);
     const discountPercent = Number(item?.discountPercent || 0);
 
-    const totalQty = qty + freeQty;
+  //  const totalQty = qty + freeQty;
+    const totalQty = qty; 
     const grossAmount = round2(qty * rate);
     const discountAmt = round2((grossAmount * discountPercent) / 100);
     const itemTaxable = round2(grossAmount - discountAmt);
@@ -351,7 +352,7 @@ selectedSalesOrders.forEach(so => {
         item_code: it.hsn_code,
         rate: Number(it.rate),
         qty: Number(it.qty),
-        free_qty: Number(it.freeQty),
+       // free_qty: Number(it.freeQty),
         discount_percent: Number(it.discountPercent),
         discount_amount: Number(it.discountAmt),
         gross_amount: Number(it.grossAmount),
@@ -495,7 +496,7 @@ const handleView = async (record) => {
         hsn_code: it.hsn_code,
         rate: it.rate,
         qty: it.qty,
-        freeQty: it.free_qty,
+       // freeQty: it.free_qty,
         totalQty: Number(it.qty || 0) + Number(it.free_qty || 0),
         discountPercent: it.discount_percent,
         discountAmt: it.discount_amount,
@@ -562,7 +563,7 @@ await handleSoudaSelect(data.contract, editForm, data.items);
     rate: it.rate,
     qty: it.qty,
     maxQty: it.qty,
-    freeQty: it.free_qty,
+    //freeQty: it.free_qty,
     totalQty: Number(it.qty || 0) + Number(it.free_qty || 0),
     discountPercent: it.discount_percent,
     discountAmt: it.discount_amount,
@@ -766,7 +767,7 @@ setTimeout(() => {
         qty: Number(selected.qty || 0),
         maxQty: Number(selected.qty || 0),   // ✅ ADD THIS
 
-        freeQty: Number(selected.free_qty || 0),
+       // freeQty: Number(selected.free_qty || 0),
         uom: selected.uom_details?.unit_name,
         discountPercent: Number(selected.discount_percent || 0),
       };
@@ -855,7 +856,7 @@ rules={[
                     </Form.Item>
                   </Col>
 
-                  <Col span={4}>
+                  {/* <Col span={4}>
                     <Form.Item
                       {...field}
                       label="Free Qty"
@@ -875,7 +876,7 @@ rules={[
                         onChange={() => recalcAll(formInstance)}
                       />
                     </Form.Item>
-                  </Col>
+                  </Col> */}
 
                   <Col span={4}>
                     <Form.Item

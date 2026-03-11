@@ -158,7 +158,7 @@ export default function PurchaseInvoice() {
           itemName: item.item_name,
           itemCode: item.hsn_code,  // your API gives hsn_code not item_code
           qty: Number(item.qty),
-          freeQty: Number(item.free_qty),
+         // freeQty: Number(item.free_qty),
           uom: item.uom_details?.unit_name,
           rate: Number(item.rate),
           discountPercent: Number(item.discount_percent),
@@ -301,7 +301,7 @@ export default function PurchaseInvoice() {
           itemName: item.item_name,
           itemCode: item.hsn_code,
           qty: item.qty,
-          freeQty: item.free_qty,
+          // freeQty: item.free_qty,
           uom: item.uom_details?.unit_name,
           rate: item.rate,
           discountPercent: item.dis_percent,
@@ -440,7 +440,7 @@ export default function PurchaseInvoice() {
           // adjust if needed
           itemCode: item.hsn_code,
           qty: item.qty,
-          freeQty: item.free_qty,
+          // freeQty: item.free_qty,
           uom: item.uom_details?.unit_name,
 
           rate: item.rate,
@@ -548,7 +548,7 @@ export default function PurchaseInvoice() {
         items: (values.items || []).map((item) => ({
           product: item.product_id,   // 👈 VERY IMPORTANT
           qty: item.qty,
-          free_qty: item.freeQty,
+         // free_qty: item.freeQty,
           uom: item.uom,
           rate: item.rate,
           dis_percent: item.discountPercent || 0,
@@ -754,11 +754,11 @@ export default function PurchaseInvoice() {
                         </Form.Item>
                       </Col>
 
-                      <Col span={6}>
+                      {/* <Col span={6}>
                         <Form.Item {...field} label="Free Qty" name={[field.name, "freeQty"]}>
                           <InputNumber className="w-full!" disabled />
                         </Form.Item>
-                      </Col>
+                      </Col> */}
                     </Row>
 
                     <Row gutter={24}>

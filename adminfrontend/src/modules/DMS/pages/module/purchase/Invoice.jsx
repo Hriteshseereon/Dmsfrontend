@@ -19,30 +19,97 @@ import {
   DownloadOutlined,
   PlusOutlined,PrinterOutlined
 } from "@ant-design/icons";
-
+import { addInvoice ,getAllInvoice,getInvoiceById,getAllVendor} from "../../../../../api/purchase";
 const { Option } = Select;
 
 const PurchaseIndent = () => {
 
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
-
+  const [vendors, setVendors] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [vendor, setVendor] = useState("");
   const [file, setFile] = useState(null);
   const [editRecord, setEditRecord] = useState(null);
   const [viewModal, setViewModal] = useState(false);
 const [viewRecord, setViewRecord] = useState(null);
-  useEffect(() => {
-    setFilteredData(data);
-  }, [data]);
+ useEffect(() => {
+  fetchInvoices();
+   fetchVendors();
+}, []);
+const fetchVendors = async () => {
+  try {
+    const res = await getAllVendor();
 
-  // Generate Invoice Number
-  const generateInvoiceNo = () => {
-    const nextNumber = data.length + 1;
-    return `INV-${String(nextNumber).padStart(4, "0")}`;
-  };
+    setVendors(res); // store full vendor list
 
+  } catch (error) {
+    console.error("Error fetching vendors", error);
+  }
+};
+const fetchInvoices = async () => {
+  try {
+    const res = await getAllInvoice();
+
+    const formatted = res.map((item) => ({
+      key: item.id,
+      invoiceNo: item.invoice_no,
+      vendor: item.vendor,
+     file: item.document_url
+    }));
+
+    setData(formatted);
+    setFilteredData(formatted);
+  } catch (error) {
+    console.error("Error fetching invoices", error);
+  }
+};
+const handleSubmit = async () => {
+  try {
+    const formData = new FormData();
+    formData.append("vendor", vendor);
+   formData.append("document", file);
+    await addInvoice(formData);
+
+    fetchInvoices(); // reload table
+
+    setModalOpen(false);
+    setVendor("");
+    setFile(null);
+
+  } catch (error) {
+    console.error("Error adding invoice", error);
+  }
+};
+
+ const openViewModal = async (record) => {
+  try {
+    const res = await getInvoiceById(record.key);
+
+   setViewRecord({
+  vendor: res.vendor,
+  file: res.document_url
+});
+
+    setViewModal(true);
+
+  } catch (error) {
+    console.error("Error fetching invoice", error);
+  }
+};
+const openEditModal = async (record) => {
+  try {
+    const res = await getInvoiceById(record.key);
+
+    setVendor(res.vendor);
+    setFile(res.file);
+    setEditRecord(record);
+
+    setModalOpen(true);
+  } catch (error) {
+    console.error("Error fetching invoice", error);
+  }
+};
   // ADD
   const openAddModal = () => {
     setVendor("");
@@ -50,25 +117,10 @@ const [viewRecord, setViewRecord] = useState(null);
     setEditRecord(null);
     setModalOpen(true);
   };
-
-  // EDIT
-  const openEditModal = (record) => {
-    setVendor(record.vendor);
-    setFile(record.file);
-    setEditRecord(record);
-    setModalOpen(true);
-  };
-const openViewModal = (record) => {
-  setViewRecord(record);
-  setViewModal(true);
-};
 const openDocument = (file) => {
   if (!file) return;
-
-  const fileURL = URL.createObjectURL(file);
-  window.open(fileURL, "_blank");
+  window.open(file, "_blank");
 };
-
 const handlePrint = (record) => {
   if (!record.file) {
     alert("No file uploaded");
@@ -88,36 +140,7 @@ const handlePrint = (record) => {
     iframe.contentWindow.print();
   };
 };
-  // SAVE
-  const handleSubmit = () => {
-
-    if (editRecord) {
-
-      const updated = data.map((item) =>
-        item.key === editRecord.key
-          ? { ...item, vendor, file }
-          : item
-      );
-
-      setData(updated);
-
-    } else {
-
-      const invoiceNo = generateInvoiceNo();
-
-      setData([
-        ...data,
-        {
-          key: Date.now(),
-          invoiceNo,
-          vendor,
-          file
-        }
-      ]);
-    }
-
-    setModalOpen(false);
-  };
+ 
 
   // SEARCH
   const handleSearch = (value) => {
@@ -140,18 +163,23 @@ const handlePrint = (record) => {
     dataIndex: "invoiceNo",
     render: (text) => <span className="text-amber-800">{text}</span>
   },
-  {
-    title: <span className="text-amber-700 font-semibold">Supplier</span>,
-    dataIndex: "vendor",
-    render: (text) => <span className="text-amber-800">{text}</span>
-  },
+ {
+  title: <span className="text-amber-700 font-semibold">Supplier</span>,
+  dataIndex: "vendor",
+  render: (vendorId) => {
+    const vendorName = vendors.find(v => v.id === vendorId)?.name;
+    return <span className="text-amber-800">{vendorName || "-"}</span>;
+  }
+},
   {
     title: <span className="text-amber-700 font-semibold">File</span>,
     render: (_, record) => (
-      <span className="text-amber-800">
-        {record.file ? record.file.name : "-"}
-      </span>
-    )
+    record.file ? (
+      <a href={record.file} target="_blank" rel="noreferrer">
+        View File
+      </a>
+    ) : "-"
+  )
   },
   {
     title: <span className="text-amber-700 font-semibold">Actions</span>,
@@ -267,27 +295,19 @@ const handlePrint = (record) => {
 
           <label className="text-amber-600! " >Supplier</label>
 
-          <Select
-            value={vendor}
-            style={{ width: "100%", marginTop: 8 }}
-            onChange={(val) => setVendor(val)}
-            placeholder="Select Supplier"
-             disabled={editRecord ? true : false} 
-          >
-
-            <Option value="vendor1">
-              Supplier 1
-            </Option>
-
-            <Option value="vendor2">
-              Supplier 2
-            </Option>
-
-            <Option value="vendor3">
-              Supplier 3
-            </Option>
-
-          </Select>
+        <Select
+  value={vendor}
+  style={{ width: "100%", marginTop: 8 }}
+  onChange={(val) => setVendor(val)}
+  placeholder="Select Supplier"
+  disabled={editRecord ? true : false}
+>
+  {vendors.map((v) => (
+    <Option key={v.id} value={v.id}>
+      {v.name}
+    </Option>
+  ))}
+</Select>
 
         </div>
 
