@@ -1080,7 +1080,7 @@ export default function CustomerTab() {
 
                   <Col span={6}>
                     <Form.Item
-                      label="Cheque Number"
+                      label="Cheque/RTGS Number"
                       name="fdCheque"
                       rules={[
                         {
@@ -1095,7 +1095,7 @@ export default function CustomerTab() {
 
                   <Col span={6}>
                     <Form.Item
-                      label="Security Detail"
+                      label="Security Detail/Narration"
                       name="fdSecurity"
                       rules={[
                         {
@@ -1117,9 +1117,17 @@ export default function CustomerTab() {
                           required: true,
                           message: "Please enter rate of interest",
                         },
+                        {
+                          pattern: /^(100|[0-9]{1,2})(\.\d{1,2})?$/,
+                          message: "Enter a valid number between 0 and 100",
+                        },
                       ]}
                     >
-                      <Input className={inputClass} disabled={viewMode} />
+                      <Input
+                        className={inputClass}
+                        disabled={viewMode}
+                        placeholder="Enter %"
+                      />
                     </Form.Item>
                   </Col>
                 </Row>

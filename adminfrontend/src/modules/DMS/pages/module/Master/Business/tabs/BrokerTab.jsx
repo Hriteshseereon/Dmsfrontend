@@ -917,7 +917,7 @@ export default function BrokerTab() {
                         <Col span={6}>
                           <Form.Item
                             {...restField}
-                            label="Supllier"
+                            label="Supplier"
                             name={[name, "vendor"]}
                             rules={[
                               {
