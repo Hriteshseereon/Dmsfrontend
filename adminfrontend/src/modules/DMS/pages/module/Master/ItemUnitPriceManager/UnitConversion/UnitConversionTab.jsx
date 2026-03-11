@@ -11,6 +11,7 @@ import {
   Row,
   Col,
   message,
+  Form,
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 
@@ -325,9 +326,13 @@ export default function UnitConversionTab({ items }) {
             dataSource={unitConversions?.units || []}
             loading={isUnitConversionsLoading}
             columns={[
-              { title: "Unit", dataIndex: "unit_name" },
-              { title: "Reference", dataIndex: "reference" },
-              { title: "Multiplier", dataIndex: "multiplier" },
+              { title: "Unit Name", dataIndex: "unit_name" },
+              { title: "Reference Unit", dataIndex: "reference" },
+              {
+                title: "Conversion Multiplier",
+                dataIndex: "multiplier",
+                render: (value) => Number(value),
+              },
               {
                 title: "Display",
                 dataIndex: "is_display_unit",
@@ -365,78 +370,75 @@ export default function UnitConversionTab({ items }) {
           >
             <Row gutter={16}>
               <Col span={12}>
-                <Input
-                  placeholder="Unit Name"
-                  value={formData.unit_name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, unit_name: e.target.value })
-                  }
-                />
+                <Form.Item label="New Unit Name">
+                  <Input
+                    placeholder="Enter unit name"
+                    value={formData.unit_name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, unit_name: e.target.value })
+                    }
+                  />
+                </Form.Item>
               </Col>
 
               <Col span={12}>
-                <Select
-                  value={formData.reference_type}
-                  style={{ width: "100%" }}
-                  onChange={(v) =>
-                    setFormData({
-                      ...formData,
-                      reference_type: v,
-                      reference_unit_id: null,
-                    })
-                  }
-                >
-                  {REFERENCE_TYPES.map((r) => (
-                    <Select.Option key={r} value={r}>
-                      {r}
-                    </Select.Option>
-                  ))}
-                </Select>
+                <Form.Item label="Reference Type">
+                  <Select
+                    placeholder="Select reference type"
+                    value={formData.reference_type}
+                    style={{ width: "100%" }}
+                    onChange={(v) =>
+                      setFormData({
+                        ...formData,
+                        reference_type: v,
+                        reference_unit_id: null,
+                      })
+                    }
+                  >
+                    {REFERENCE_TYPES.map((r) => (
+                      <Select.Option key={r} value={r}>
+                        {r}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
               </Col>
 
               {formData.reference_type === "UNIT" && (
-                <Col span={24} style={{ marginTop: 12 }}>
-                  <Select
-                    showSearch
-                    placeholder="Reference Unit"
-                    optionFilterProp="label"
-                    value={formData.reference_unit_id}
-                    onChange={(v) =>
-                      setFormData({ ...formData, reference_unit_id: v })
-                    }
-                    options={referenceUnits
-                      .filter((u) => u.type === "UNIT")
-                      .map((u) => ({
-                        value: u.uom_id,
-                        label: u.label,
-                      }))}
-                  />
+                <Col span={24}>
+                  <Form.Item label="Reference Unit">
+                    <Select
+                      showSearch
+                      placeholder="Select reference unit"
+                      optionFilterProp="label"
+                      value={formData.reference_unit_id}
+                      onChange={(v) =>
+                        setFormData({ ...formData, reference_unit_id: v })
+                      }
+                      options={referenceUnits
+                        .filter((u) => u.type === "UNIT")
+                        .map((u) => ({
+                          value: u.uom_id,
+                          label: u.label,
+                        }))}
+                    />
+                  </Form.Item>
                 </Col>
               )}
 
-              <Col span={24} style={{ marginTop: 12 }}>
-                <InputNumber
-                  style={{ width: "100%" }}
-                  placeholder="Multiplier"
-                  min={0}
-                  value={formData.multiplier}
-                  onChange={(v) => setFormData({ ...formData, multiplier: v })}
-                />
+              <Col span={24}>
+                <Form.Item label="Conversion Multiplier">
+                  <InputNumber
+                    style={{ width: "100%" }}
+                    placeholder="Enter multiplier value"
+                    min={0}
+                    value={formData.multiplier}
+                    onChange={(v) =>
+                      setFormData({ ...formData, multiplier: v })
+                    }
+                  />
+                </Form.Item>
               </Col>
-
-              {/* <Col span={24} style={{ marginTop: 12 }}>
-                <Checkbox
-                  checked={formData.set_as_display}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      set_as_display: e.target.checked,
-                    })
-                  }
-                >
-                  Set as display unit
-                </Checkbox>
-              </Col> */}
             </Row>
           </Modal>
         </Card>
