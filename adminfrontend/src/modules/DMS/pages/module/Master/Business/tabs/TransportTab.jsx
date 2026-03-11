@@ -18,6 +18,7 @@ import {
   EditOutlined,
   SearchOutlined,
   ReloadOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import {
   getAllTransport,
@@ -616,7 +617,9 @@ export default function TransportTab() {
                     maxCount={1}
                     listType="picture"
                   >
-                    <Button disabled={viewMode}>Upload</Button>
+                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                      Upload
+                    </Button>
                   </Upload>
                 </Form.Item>
               </Col>
@@ -643,7 +646,9 @@ export default function TransportTab() {
                     maxCount={1}
                     listType="picture"
                   >
-                    <Button disabled={viewMode}>Upload</Button>
+                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                      Upload
+                    </Button>
                   </Upload>
                 </Form.Item>
               </Col>
@@ -679,7 +684,9 @@ export default function TransportTab() {
                     maxCount={1}
                     listType="picture"
                   >
-                    <Button disabled={viewMode}>Upload</Button>
+                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                      Upload
+                    </Button>
                   </Upload>
                 </Form.Item>
               </Col>

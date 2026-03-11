@@ -18,6 +18,7 @@ import {
   EditOutlined,
   SearchOutlined,
   ReloadOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import { API_BASE_URL } from "@/utils/config";
 import {
@@ -627,8 +628,6 @@ export default function CustomerTab() {
                     placeholder="Select type"
                   >
                     <Option value="Customer">Customer</Option>
-                    <Option value="Supplier">Supplier</Option>
-                    <Option value="Both">Both</Option>
                   </Select>
                 </Form.Item>
               </Col>
@@ -780,7 +779,7 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="Location" name="location">
+                <Form.Item label="Google Location" name="location">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -1085,6 +1084,7 @@ export default function CustomerTab() {
                     }}
                   >
                     <Button
+                      icon={<UploadOutlined />}
                       className="w-full text-left bg-white border-amber-400"
                       disabled={viewMode}
                     >
@@ -1143,6 +1143,7 @@ export default function CustomerTab() {
                     }}
                   >
                     <Button
+                      icon={<UploadOutlined />}
                       className="w-full text-left bg-white border-amber-400"
                       disabled={viewMode}
                     >
@@ -1192,6 +1193,7 @@ export default function CustomerTab() {
                     }}
                   >
                     <Button
+                      icon={<UploadOutlined />}
                       className="w-full text-left bg-white border-amber-400"
                       disabled={viewMode}
                     >

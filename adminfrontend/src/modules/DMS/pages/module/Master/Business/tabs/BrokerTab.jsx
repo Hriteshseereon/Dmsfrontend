@@ -19,6 +19,7 @@ import {
   SearchOutlined,
   ReloadOutlined,
   MinusCircleOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import { API_BASE_URL } from "@/utils/config";
 
@@ -763,7 +764,9 @@ export default function BrokerTab() {
                       )
                     }
                   >
-                    <Button disabled={viewMode}>Select File</Button>
+                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                      Select File
+                    </Button>
                   </Upload>
                 </Form.Item>
               </Col>
@@ -804,7 +807,9 @@ export default function BrokerTab() {
                       )
                     }
                   >
-                    <Button disabled={viewMode}>Select File</Button>
+                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                      Select File
+                    </Button>
                   </Upload>
                 </Form.Item>
               </Col>
@@ -838,7 +843,9 @@ export default function BrokerTab() {
                       )
                     }
                   >
-                    <Button disabled={viewMode}>Select File</Button>
+                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                      Select File
+                    </Button>
                   </Upload>
                 </Form.Item>
               </Col>
@@ -870,7 +877,9 @@ export default function BrokerTab() {
                       )
                     }
                   >
-                    <Button disabled={viewMode}>Select File</Button>
+                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                      Select File
+                    </Button>
                   </Upload>
                 </Form.Item>
               </Col>

@@ -21,6 +21,7 @@ import {
   SearchOutlined,
   ReloadOutlined,
   MinusCircleOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 
@@ -767,7 +768,9 @@ export default function VendorTab() {
                       );
                     }}
                   >
-                    <Button disabled={viewMode}>Select File</Button>
+                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                      Upload
+                    </Button>
                   </Upload>
                 </Form.Item>
               </Col>
@@ -798,7 +801,9 @@ export default function VendorTab() {
                       );
                     }}
                   >
-                    <Button disabled={viewMode}>Select File</Button>
+                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                      Upload
+                    </Button>
                   </Upload>
                 </Form.Item>
               </Col>
@@ -845,7 +850,9 @@ export default function VendorTab() {
                       );
                     }}
                   >
-                    <Button disabled={viewMode}>Select File</Button>
+                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                      Upload
+                    </Button>
                   </Upload>
                 </Form.Item>
               </Col>
