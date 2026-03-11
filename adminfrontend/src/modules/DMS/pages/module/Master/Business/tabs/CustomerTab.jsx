@@ -67,7 +67,15 @@ export default function CustomerTab() {
       },
     ];
   };
-
+  // handler function to auto fill the 6 month
+  const handleBgValidFromChange = (date) => {
+    if (date) {
+      const validUpto = dayjs(date).add(6, "month");
+      form.setFieldsValue({
+        bgValidUpto: validUpto,
+      });
+    }
+  };
   /* ================= FETCH ================= */
   const fetchCustomers = async () => {
     try {
@@ -847,26 +855,35 @@ export default function CustomerTab() {
                   </Col>
 
                   <Col span={6}>
-                    <Form.Item label="Guarantee Amount" name="bgAmount">
+                    <Form.Item label="Bank Guarantee Amount" name="bgAmount">
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
-                    <Form.Item label="Guarantee Number" name="bgNumber">
+                    <Form.Item label="Bank Guarantee Number" name="bgNumber">
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
                     <Form.Item label="Valid From" name="bgValidFrom">
-                      <DatePicker className="w-full" format="YYYY-MM-DD" />
+                      <DatePicker
+                        className="w-full"
+                        format="YYYY-MM-DD"
+                        disabled={viewMode}
+                        onChange={handleBgValidFromChange}
+                      />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
                     <Form.Item label="Valid Upto" name="bgValidUpto">
-                      <DatePicker className="w-full" format="YYYY-MM-DD" />
+                      <DatePicker
+                        className="w-full"
+                        format="YYYY-MM-DD"
+                        disabled={viewMode}
+                      />
                     </Form.Item>
                   </Col>
 
@@ -885,7 +902,7 @@ export default function CustomerTab() {
                         listType="picture"
                         disabled={viewMode}
                       >
-                        <Button>Upload</Button>
+                        <Button icon={<UploadOutlined />}>Upload</Button>
                       </Upload>
                     </Form.Item>
                   </Col>
@@ -894,7 +911,7 @@ export default function CustomerTab() {
               {securityType === "Post Dated Cheque" && (
                 <Row gutter={24}>
                   <Col span={6}>
-                    <Form.Item label="Bank" name="pdcBank">
+                    <Form.Item label="Bank Name" name="pdcBank">
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
@@ -918,7 +935,7 @@ export default function CustomerTab() {
                   </Col>
 
                   <Col span={6}>
-                    <Form.Item label="Amount" name="pdcAmount">
+                    <Form.Item label="Cheque Amount" name="pdcAmount">
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
@@ -933,7 +950,7 @@ export default function CustomerTab() {
               {securityType === "Fixed Deposit" && (
                 <Row gutter={24}>
                   <Col span={6}>
-                    <Form.Item label="Bank" name="fdBank">
+                    <Form.Item label="Bank Name" name="fdBank">
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
@@ -1008,7 +1025,7 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="Days Limit" name="noDaysLimit">
+                <Form.Item label="Days Limit(No of Days)" name="noDaysLimit">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -1017,8 +1034,11 @@ export default function CustomerTab() {
                 </Form.Item>
               </Col>
 
-              <Col span={4}>
-                <Form.Item label="Invoice Limit" name="noInvoiceLimit">
+              <Col span={5}>
+                <Form.Item
+                  label="Invoice Limit(No of Invoice)"
+                  name="noInvoiceLimit"
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
