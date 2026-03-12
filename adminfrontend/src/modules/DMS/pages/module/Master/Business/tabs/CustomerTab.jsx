@@ -18,6 +18,7 @@ import {
   EditOutlined,
   SearchOutlined,
   ReloadOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import { API_BASE_URL } from "@/utils/config";
 import {
@@ -25,6 +26,7 @@ import {
   addAdminCustomer,
   updateAdminCustomer,
   getAdminCustomers,
+  sendCustomerCredential,
 } from "../../../../../../../api/customer";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
@@ -41,6 +43,7 @@ export default function CustomerTab() {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
   const [securityType, setSecurityType] = useState(null);
+  const [sendingId, setSendingId] = useState(null);
   const [form] = Form.useForm();
   const generatePassword = () => {
     const chars =
@@ -66,7 +69,15 @@ export default function CustomerTab() {
       },
     ];
   };
-
+  // handler function to auto fill the 6 month
+  const handleBgValidFromChange = (date) => {
+    if (date) {
+      const validUpto = dayjs(date).add(6, "month");
+      form.setFieldsValue({
+        bgValidUpto: validUpto,
+      });
+    }
+  };
   /* ================= FETCH ================= */
   const fetchCustomers = async () => {
     try {
@@ -341,7 +352,37 @@ export default function CustomerTab() {
       setLoading(false);
     }
   };
+  // mail sending functionality
 
+  const handleSendPassword = async (record) => {
+    try {
+      const partnerId = record.customer_id || record.id;
+
+      setSendingId(partnerId);
+
+      const payload = {
+        partner_type: "customer",
+        partner_id: partnerId,
+      };
+
+      await sendCustomerCredential(payload);
+
+      message.success("Mail successfully sent");
+
+      // update table row immediately
+      setData((prev) =>
+        prev.map((item) =>
+          (item.customer_id || item.id) === partnerId
+            ? { ...item, credentials_sent: true }
+            : item,
+        ),
+      );
+    } catch (error) {
+      message.error("Failed to send mail");
+    } finally {
+      setSendingId(null);
+    }
+  };
   /* ================= TABLE ================= */
   const columns = [
     {
@@ -390,17 +431,27 @@ export default function CustomerTab() {
       ),
     },
     {
-      title: <span className="text-amber-700 font-semibold"> Password</span>,
-      render: (_, record) => (
-        <Button
-          size="small"
-          type="primary"
-          className="bg-amber-500! border-none! hover:bg-amber-600!"
-          onClick={() => handleSendPassword(record)}
-        >
-          Send
-        </Button>
-      ),
+      title: <span className="text-amber-700 font-semibold">Password</span>,
+      render: (_, record) => {
+        const partnerId = record.customer_id || record.id;
+
+        return (
+          <Button
+            size="small"
+            type="primary"
+            disabled={record.credentials_sent}
+            loading={sendingId === partnerId}
+            className={
+              record.credentials_sent
+                ? "bg-green-500! border-none!"
+                : "bg-amber-500! border-none! hover:bg-amber-600!"
+            }
+            onClick={() => handleSendPassword(record)}
+          >
+            {record.credentials_sent ? "Sent" : "Send"}
+          </Button>
+        );
+      },
     },
   ];
 
@@ -627,8 +678,6 @@ export default function CustomerTab() {
                     placeholder="Select type"
                   >
                     <Option value="Customer">Customer</Option>
-                    <Option value="Supplier">Supplier</Option>
-                    <Option value="Both">Both</Option>
                   </Select>
                 </Form.Item>
               </Col>
@@ -780,7 +829,7 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="Location" name="location">
+                <Form.Item label="Google Location" name="location">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -816,6 +865,9 @@ export default function CustomerTab() {
                 <Form.Item
                   label="Security for Credit"
                   name="securityForCreditFacility"
+                  rules={[
+                    { required: true, message: "Please select security type" },
+                  ]}
                 >
                   <Select
                     className={selectClass}
@@ -836,38 +888,81 @@ export default function CustomerTab() {
               {securityType === "Bank Guarantee" && (
                 <Row gutter={24}>
                   <Col span={6}>
-                    <Form.Item label="Bank Name" name="bgBankName">
+                    <Form.Item
+                      label="Bank Name"
+                      name="bgBankName"
+                      rules={[{ required: true, message: "Enter Bank Name" }]}
+                    >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
-                    <Form.Item label="Date" name="bgDate">
+                    <Form.Item
+                      label="Date"
+                      name="bgDate"
+                      rules={[{ required: true, message: "Enter Date" }]}
+                    >
                       <DatePicker className="w-full" format="YYYY-MM-DD" />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
-                    <Form.Item label="Guarantee Amount" name="bgAmount">
+                    <Form.Item
+                      label="Bank Guarantee Amount"
+                      name="bgAmount"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Enter Bank Guarantee amount",
+                        },
+                      ]}
+                    >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
-                    <Form.Item label="Guarantee Number" name="bgNumber">
+                    <Form.Item
+                      label="Bank Guarantee Number"
+                      name="bgNumber"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Entere Bank Guarantee Number",
+                        },
+                      ]}
+                    >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
-                    <Form.Item label="Valid From" name="bgValidFrom">
-                      <DatePicker className="w-full" format="YYYY-MM-DD" />
+                    <Form.Item
+                      label="Valid From"
+                      name="bgValidFrom"
+                      rules={[{ required: true, message: "select Date" }]}
+                    >
+                      <DatePicker
+                        className="w-full"
+                        format="YYYY-MM-DD"
+                        disabled={viewMode}
+                        onChange={handleBgValidFromChange}
+                      />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
-                    <Form.Item label="Valid Upto" name="bgValidUpto">
-                      <DatePicker className="w-full" format="YYYY-MM-DD" />
+                    <Form.Item
+                      label="Valid Upto"
+                      name="bgValidUpto"
+                      rules={[{ required: true, message: "Select date" }]}
+                    >
+                      <DatePicker
+                        className="w-full"
+                        format="YYYY-MM-DD"
+                        disabled={viewMode}
+                      />
                     </Form.Item>
                   </Col>
 
@@ -879,6 +974,7 @@ export default function CustomerTab() {
                       getValueFromEvent={(e) =>
                         Array.isArray(e) ? e : e?.fileList
                       }
+                      rules={[{ required: true, message: "Please upload doc" }]}
                     >
                       <Upload
                         beforeUpload={() => false}
@@ -886,7 +982,7 @@ export default function CustomerTab() {
                         listType="picture"
                         disabled={viewMode}
                       >
-                        <Button>Upload</Button>
+                        <Button icon={<UploadOutlined />}>Upload</Button>
                       </Upload>
                     </Form.Item>
                   </Col>
@@ -895,38 +991,101 @@ export default function CustomerTab() {
               {securityType === "Post Dated Cheque" && (
                 <Row gutter={24}>
                   <Col span={6}>
-                    <Form.Item label="Bank" name="pdcBank">
+                    <Form.Item
+                      label="Bank Name"
+                      name="pdcBank"
+                      rules={[
+                        { required: true, message: "Please enter bank name" },
+                      ]}
+                    >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
-                    <Form.Item label="Cheque Issue Date" name="pdcIssueDate">
-                      <DatePicker className="w-full" format="YYYY-MM-DD" />
+                    <Form.Item
+                      label="Cheque Issue Date"
+                      name="pdcIssueDate"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please select cheque issue date",
+                        },
+                      ]}
+                    >
+                      <DatePicker
+                        className="w-full"
+                        format="YYYY-MM-DD"
+                        disabled={viewMode}
+                      />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
-                    <Form.Item label="Cheque Dated" name="pdcDate">
-                      <DatePicker className="w-full" format="YYYY-MM-DD" />
+                    <Form.Item
+                      label="Cheque Dated"
+                      name="pdcDate"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please select cheque date",
+                        },
+                      ]}
+                    >
+                      <DatePicker
+                        className="w-full"
+                        format="YYYY-MM-DD"
+                        disabled={viewMode}
+                      />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
-                    <Form.Item label="Cheque Number" name="pdcNumber">
+                    <Form.Item
+                      label="Cheque Number"
+                      name="pdcNumber"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please enter cheque number",
+                        },
+                      ]}
+                    >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
-                    <Form.Item label="Amount" name="pdcAmount">
+                    <Form.Item
+                      label="Cheque Amount"
+                      name="pdcAmount"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please enter cheque amount",
+                        },
+                      ]}
+                    >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
-                    <Form.Item label="Valid Upto" name="pdcValid">
-                      <DatePicker className="w-full" format="YYYY-MM-DD" />
+                    <Form.Item
+                      label="Valid Upto"
+                      name="pdcValid"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please select valid upto date",
+                        },
+                      ]}
+                    >
+                      <DatePicker
+                        className="w-full"
+                        format="YYYY-MM-DD"
+                        disabled={viewMode}
+                      />
                     </Form.Item>
                   </Col>
                 </Row>
@@ -934,32 +1093,83 @@ export default function CustomerTab() {
               {securityType === "Fixed Deposit" && (
                 <Row gutter={24}>
                   <Col span={6}>
-                    <Form.Item label="Bank" name="fdBank">
+                    <Form.Item
+                      label="Bank Name"
+                      name="fdBank"
+                      rules={[
+                        { required: true, message: "Please enter bank name" },
+                      ]}
+                    >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
-                    <Form.Item label="Date" name="fdDate">
-                      <DatePicker className="w-full" format="YYYY-MM-DD" />
+                    <Form.Item
+                      label="Date"
+                      name="fdDate"
+                      rules={[
+                        { required: true, message: "Please select date" },
+                      ]}
+                    >
+                      <DatePicker
+                        className="w-full"
+                        format="YYYY-MM-DD"
+                        disabled={viewMode}
+                      />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
-                    <Form.Item label="Cheque Number" name="fdCheque">
+                    <Form.Item
+                      label="Cheque/RTGS Number"
+                      name="fdCheque"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please enter cheque number",
+                        },
+                      ]}
+                    >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
-                    <Form.Item label="Security Detail" name="fdSecurity">
+                    <Form.Item
+                      label="Security Detail/Narration"
+                      name="fdSecurity"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please enter security detail",
+                        },
+                      ]}
+                    >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
 
                   <Col span={6}>
-                    <Form.Item label="Rate of Interest" name="fdInterest">
-                      <Input className={inputClass} disabled={viewMode} />
+                    <Form.Item
+                      label="Rate of Interest"
+                      name="fdInterest"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please enter rate of interest",
+                        },
+                        {
+                          pattern: /^(100|[0-9]{1,2})(\.\d{1,2})?$/,
+                          message: "Enter a valid number between 0 and 100",
+                        },
+                      ]}
+                    >
+                      <Input
+                        className={inputClass}
+                        disabled={viewMode}
+                        placeholder="Enter %"
+                      />
                     </Form.Item>
                   </Col>
                 </Row>
@@ -970,19 +1180,43 @@ export default function CustomerTab() {
                     <Form.Item
                       label="Collateral Details"
                       name="collateralDetails"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please enter collateral details",
+                        },
+                      ]}
                     >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
 
                   <Col span={8}>
-                    <Form.Item label="Address Details" name="collateralAddress">
+                    <Form.Item
+                      label="Address Details"
+                      name="collateralAddress"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please enter address details",
+                        },
+                      ]}
+                    >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
 
                   <Col span={8}>
-                    <Form.Item label="Market Value" name="collateralValue">
+                    <Form.Item
+                      label="Market Value"
+                      name="collateralValue"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please enter market value",
+                        },
+                      ]}
+                    >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
@@ -999,17 +1233,35 @@ export default function CustomerTab() {
               </Col> */}
 
               <Col span={4}>
-                <Form.Item label="Amount Limit" name="amountLimit">
+                <Form.Item
+                  label="Amount Limit"
+                  name="amountLimit"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Please enter amount limit",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
-                    placeholder="Enter amount limit"
+                    placeholder="100.00"
                   />
                 </Form.Item>
               </Col>
 
-              <Col span={4}>
-                <Form.Item label="Days Limit" name="noDaysLimit">
+              <Col span={5}>
+                <Form.Item
+                  label="Days Limit(No of Days)"
+                  name="noDaysLimit"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Enter Number of Days",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -1018,8 +1270,17 @@ export default function CustomerTab() {
                 </Form.Item>
               </Col>
 
-              <Col span={4}>
-                <Form.Item label="Invoice Limit" name="noInvoiceLimit">
+              <Col span={5}>
+                <Form.Item
+                  label="Invoice Limit(No of Invoice)"
+                  name="noInvoiceLimit"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Enter Number of invoice limit",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -1029,7 +1290,16 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="Souda Limit (Ton)" name="soudaLimit">
+                <Form.Item
+                  label="Souda Limit (Ton)"
+                  name="soudaLimit"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Enter Souda Limit",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -1045,15 +1315,14 @@ export default function CustomerTab() {
             <h3 className="text-lg font-semibold text-amber-700 mb-3">
               Legal & Tax Information
             </h3>
+
             <Row gutter={24}>
               <Col span={4}>
                 <Form.Item
                   label="GST Number"
                   name="gstNo"
                   rules={[
-                    {
-                      message: "Enter a valid GST number",
-                    },
+                    { required: true, message: "Please enter GST number" },
                   ]}
                 >
                   <Input
@@ -1066,12 +1335,15 @@ export default function CustomerTab() {
 
               <Col span={4}>
                 <Form.Item
-                  label="GST Number"
+                  label="GST Document"
                   name="gstDoc"
                   valuePropName="fileList"
                   getValueFromEvent={(e) =>
                     Array.isArray(e) ? e : e?.fileList
                   }
+                  rules={[
+                    { required: true, message: "Please upload GST document" },
+                  ]}
                 >
                   <Upload
                     beforeUpload={() => false}
@@ -1085,6 +1357,7 @@ export default function CustomerTab() {
                     }}
                   >
                     <Button
+                      icon={<UploadOutlined />}
                       className="w-full text-left bg-white border-amber-400"
                       disabled={viewMode}
                     >
@@ -1095,7 +1368,13 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="TIN Number" name="tinNo">
+                <Form.Item
+                  label="TIN Number"
+                  name="tinNo"
+                  rules={[
+                    { required: true, message: "Please enter TIN number" },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -1109,9 +1388,7 @@ export default function CustomerTab() {
                   label="PAN Number"
                   name="panNo"
                   rules={[
-                    {
-                      message: "Enter a valid PAN number",
-                    },
+                    { required: true, message: "Please enter PAN number" },
                   ]}
                 >
                   <Input
@@ -1130,6 +1407,9 @@ export default function CustomerTab() {
                   getValueFromEvent={(e) =>
                     Array.isArray(e) ? e : e?.fileList
                   }
+                  rules={[
+                    { required: true, message: "Please upload PAN document" },
+                  ]}
                 >
                   <Upload
                     beforeUpload={() => false}
@@ -1143,6 +1423,7 @@ export default function CustomerTab() {
                     }}
                   >
                     <Button
+                      icon={<UploadOutlined />}
                       className="w-full text-left bg-white border-amber-400"
                       disabled={viewMode}
                     >
@@ -1157,6 +1438,7 @@ export default function CustomerTab() {
                   label="Aadhar Number"
                   name="aadharNo"
                   rules={[
+                    { required: true, message: "Please enter Aadhaar number" },
                     {
                       pattern: /^[0-9]{12}$/,
                       message: "Enter a valid 12-digit Aadhaar number",
@@ -1179,6 +1461,12 @@ export default function CustomerTab() {
                   getValueFromEvent={(e) =>
                     Array.isArray(e) ? e : e?.fileList
                   }
+                  rules={[
+                    {
+                      required: true,
+                      message: "Please upload Aadhaar document",
+                    },
+                  ]}
                 >
                   <Upload
                     beforeUpload={() => false}
@@ -1192,6 +1480,7 @@ export default function CustomerTab() {
                     }}
                   >
                     <Button
+                      icon={<UploadOutlined />}
                       className="w-full text-left bg-white border-amber-400"
                       disabled={viewMode}
                     >
@@ -1202,7 +1491,13 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="FSSAI Number" name="fssaiNo">
+                <Form.Item
+                  label="FSSAI Number"
+                  name="fssaiNo"
+                  rules={[
+                    { required: true, message: "Please enter FSSAI number" },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -1212,7 +1507,16 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="Trade License Number" name="licenseNo">
+                <Form.Item
+                  label="Trade License Number"
+                  name="licenseNo"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Please enter trade license number",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -1222,12 +1526,17 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="TDS Applicable" name="tdsApplicable">
+                <Form.Item
+                  label="TDS Applicable"
+                  name="tdsApplicable"
+                  rules={[
+                    { required: true, message: "Please select TDS option" },
+                  ]}
+                >
                   <Select
                     className={selectClass}
                     disabled={viewMode}
                     placeholder="Select TDS option"
-                    initialValue="Yes"
                   >
                     <Option value="Yes">Yes</Option>
                     <Option value="No">No</Option>
@@ -1239,6 +1548,9 @@ export default function CustomerTab() {
                 <Form.Item
                   label="Rate of TDS"
                   name="tdsRate"
+                  rules={[
+                    { required: true, message: "Rate of TDS is required" },
+                  ]}
                   initialValue="0.10"
                 >
                   <Input disabled />
