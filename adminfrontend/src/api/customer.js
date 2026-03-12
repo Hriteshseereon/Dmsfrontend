@@ -48,3 +48,10 @@ export const updateAdminCustomer = async (customerId, formData) => {
     });
     return res.data;
 };
+
+
+// mail sending api 
+export const sendCustomerCredential = async (payload) => {
+    const res = await api.post('/api/send-credentials/',payload)
+    return res;
+}

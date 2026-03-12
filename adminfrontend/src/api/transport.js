@@ -74,3 +74,10 @@ export const updateTransport = async (id, formData) => {
 
   return res.data;
 };
+
+// api for sending the credential through mail
+
+export const sendTransportCredential =   async (payload) =>{
+  const res = await api.post('/api/send-credentials/',payload)
+  return res;
+}

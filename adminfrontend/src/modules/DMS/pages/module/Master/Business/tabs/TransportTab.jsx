@@ -18,12 +18,14 @@ import {
   EditOutlined,
   SearchOutlined,
   ReloadOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import {
   getAllTransport,
   createTransport,
   updateTransport,
   getTransportById,
+  sendTransportCredential,
 } from "@/api/transport.js";
 // import { getTransporters, addTransporter, updateTransporter, getTransporterDetails } from "../../../../../../../api/transporter";
 import { API_BASE_URL } from "@/utils/config";
@@ -54,6 +56,7 @@ export default function TransportTab() {
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [sendingId, setSendingId] = useState(null);
   const { Option } = Select;
   const [form] = Form.useForm();
   const generatePassword = (length = 10) => {
@@ -174,6 +177,33 @@ export default function TransportTab() {
       message.error("Save failed");
     }
   };
+  // mail sending function
+  const handleSendPassword = async (record) => {
+    try {
+      const partnerId = record.id;
+
+      setSendingId(partnerId);
+
+      const payload = {
+        partner_type: "transport",
+        partner_id: partnerId,
+      };
+
+      await sendTransportCredential(payload);
+
+      message.success("Mail successfully sent");
+
+      setData((prev) =>
+        prev.map((item) =>
+          item.id === partnerId ? { ...item, credentials_sent: true } : item,
+        ),
+      );
+    } catch (error) {
+      message.error("Failed to send mail");
+    } finally {
+      setSendingId(null);
+    }
+  };
 
   /* ================= TABLE ================= */
   const columns = [
@@ -232,17 +262,31 @@ export default function TransportTab() {
       ),
     },
     {
-      title: <span className="text-amber-700 font-semibold"> Password</span>,
-      render: (_, record) => (
-        <Button
-          size="small"
-          type="primary"
-          className="bg-amber-500! border-none! hover:bg-amber-600!"
-          onClick={() => handleSendPassword(record)}
-        >
-          Send
-        </Button>
-      ),
+      title: <span className="text-amber-700 font-semibold">Password</span>,
+      render: (_, record) => {
+        const partnerId = record.id;
+
+        return (
+          <Button
+            size="small"
+            type="primary"
+            disabled={record.credentials_sent}
+            loading={sendingId === partnerId}
+            className={
+              record.credentials_sent
+                ? "bg-green-500! border-none!"
+                : "bg-amber-500! border-none! hover:bg-amber-600!"
+            }
+            onClick={() => handleSendPassword(record)}
+          >
+            {record.credentials_sent
+              ? "Sent"
+              : sendingId === partnerId
+                ? "Sending..."
+                : "Send"}
+          </Button>
+        );
+      },
     },
   ];
 
@@ -616,7 +660,9 @@ export default function TransportTab() {
                     maxCount={1}
                     listType="picture"
                   >
-                    <Button disabled={viewMode}>Upload</Button>
+                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                      Upload
+                    </Button>
                   </Upload>
                 </Form.Item>
               </Col>
@@ -643,7 +689,9 @@ export default function TransportTab() {
                     maxCount={1}
                     listType="picture"
                   >
-                    <Button disabled={viewMode}>Upload</Button>
+                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                      Upload
+                    </Button>
                   </Upload>
                 </Form.Item>
               </Col>
@@ -679,7 +727,9 @@ export default function TransportTab() {
                     maxCount={1}
                     listType="picture"
                   >
-                    <Button disabled={viewMode}>Upload</Button>
+                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                      Upload
+                    </Button>
                   </Upload>
                 </Form.Item>
               </Col>
