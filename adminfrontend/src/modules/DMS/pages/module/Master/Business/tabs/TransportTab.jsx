@@ -25,6 +25,7 @@ import {
   createTransport,
   updateTransport,
   getTransportById,
+  sendTransportCredential,
 } from "@/api/transport.js";
 // import { getTransporters, addTransporter, updateTransporter, getTransporterDetails } from "../../../../../../../api/transporter";
 import { API_BASE_URL } from "@/utils/config";
@@ -175,6 +176,24 @@ export default function TransportTab() {
       message.error("Save failed");
     }
   };
+  // mail sending function
+  const handleSendPassword = async (record) => {
+    try {
+      const payload = {
+        partner_type: "transport",
+        partner_id: record.id,
+      };
+      await sendTransportCredential(payload);
+      message.success("Mail successfully sent");
+      setData((prev) =>
+        prev.map((item) =>
+          item.id === record.id ? { ...item, credentials_sent: true } : item,
+        ),
+      );
+    } catch (error) {
+      message.error("Failed to send mail");
+    }
+  };
 
   /* ================= TABLE ================= */
   const columns = [
@@ -233,15 +252,20 @@ export default function TransportTab() {
       ),
     },
     {
-      title: <span className="text-amber-700 font-semibold"> Password</span>,
+      title: <span className="text-amber-700 font-semibold">Password</span>,
       render: (_, record) => (
         <Button
           size="small"
           type="primary"
-          className="bg-amber-500! border-none! hover:bg-amber-600!"
+          disabled={record.credentials_sent}
+          className={
+            record.credentials_sent
+              ? "bg-green-500! border-none!"
+              : "bg-amber-500! border-none! hover:bg-amber-600!"
+          }
           onClick={() => handleSendPassword(record)}
         >
-          Send
+          {record.credentials_sent ? "Sent" : "Send"}
         </Button>
       ),
     },
