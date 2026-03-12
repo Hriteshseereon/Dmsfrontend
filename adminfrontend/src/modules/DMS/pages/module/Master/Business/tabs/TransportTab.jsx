@@ -56,6 +56,7 @@ export default function TransportTab() {
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [sendingId, setSendingId] = useState(null);
   const { Option } = Select;
   const [form] = Form.useForm();
   const generatePassword = (length = 10) => {
@@ -179,19 +180,28 @@ export default function TransportTab() {
   // mail sending function
   const handleSendPassword = async (record) => {
     try {
+      const partnerId = record.id;
+
+      setSendingId(partnerId);
+
       const payload = {
         partner_type: "transport",
-        partner_id: record.id,
+        partner_id: partnerId,
       };
+
       await sendTransportCredential(payload);
+
       message.success("Mail successfully sent");
+
       setData((prev) =>
         prev.map((item) =>
-          item.id === record.id ? { ...item, credentials_sent: true } : item,
+          item.id === partnerId ? { ...item, credentials_sent: true } : item,
         ),
       );
     } catch (error) {
       message.error("Failed to send mail");
+    } finally {
+      setSendingId(null);
     }
   };
 
@@ -253,21 +263,30 @@ export default function TransportTab() {
     },
     {
       title: <span className="text-amber-700 font-semibold">Password</span>,
-      render: (_, record) => (
-        <Button
-          size="small"
-          type="primary"
-          disabled={record.credentials_sent}
-          className={
-            record.credentials_sent
-              ? "bg-green-500! border-none!"
-              : "bg-amber-500! border-none! hover:bg-amber-600!"
-          }
-          onClick={() => handleSendPassword(record)}
-        >
-          {record.credentials_sent ? "Sent" : "Send"}
-        </Button>
-      ),
+      render: (_, record) => {
+        const partnerId = record.id;
+
+        return (
+          <Button
+            size="small"
+            type="primary"
+            disabled={record.credentials_sent}
+            loading={sendingId === partnerId}
+            className={
+              record.credentials_sent
+                ? "bg-green-500! border-none!"
+                : "bg-amber-500! border-none! hover:bg-amber-600!"
+            }
+            onClick={() => handleSendPassword(record)}
+          >
+            {record.credentials_sent
+              ? "Sent"
+              : sendingId === partnerId
+                ? "Sending..."
+                : "Send"}
+          </Button>
+        );
+      },
     },
   ];
 

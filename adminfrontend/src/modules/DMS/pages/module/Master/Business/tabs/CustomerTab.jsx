@@ -26,6 +26,7 @@ import {
   addAdminCustomer,
   updateAdminCustomer,
   getAdminCustomers,
+  sendCustomerCredential,
 } from "../../../../../../../api/customer";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
@@ -42,6 +43,7 @@ export default function CustomerTab() {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
   const [securityType, setSecurityType] = useState(null);
+  const [sendingId, setSendingId] = useState(null);
   const [form] = Form.useForm();
   const generatePassword = () => {
     const chars =
@@ -350,7 +352,37 @@ export default function CustomerTab() {
       setLoading(false);
     }
   };
+  // mail sending functionality
 
+  const handleSendPassword = async (record) => {
+    try {
+      const partnerId = record.customer_id || record.id;
+
+      setSendingId(partnerId);
+
+      const payload = {
+        partner_type: "customer",
+        partner_id: partnerId,
+      };
+
+      await sendCustomerCredential(payload);
+
+      message.success("Mail successfully sent");
+
+      // update table row immediately
+      setData((prev) =>
+        prev.map((item) =>
+          (item.customer_id || item.id) === partnerId
+            ? { ...item, credentials_sent: true }
+            : item,
+        ),
+      );
+    } catch (error) {
+      message.error("Failed to send mail");
+    } finally {
+      setSendingId(null);
+    }
+  };
   /* ================= TABLE ================= */
   const columns = [
     {
@@ -399,17 +431,27 @@ export default function CustomerTab() {
       ),
     },
     {
-      title: <span className="text-amber-700 font-semibold"> Password</span>,
-      render: (_, record) => (
-        <Button
-          size="small"
-          type="primary"
-          className="bg-amber-500! border-none! hover:bg-amber-600!"
-          onClick={() => handleSendPassword(record)}
-        >
-          Send
-        </Button>
-      ),
+      title: <span className="text-amber-700 font-semibold">Password</span>,
+      render: (_, record) => {
+        const partnerId = record.customer_id || record.id;
+
+        return (
+          <Button
+            size="small"
+            type="primary"
+            disabled={record.credentials_sent}
+            loading={sendingId === partnerId}
+            className={
+              record.credentials_sent
+                ? "bg-green-500! border-none!"
+                : "bg-amber-500! border-none! hover:bg-amber-600!"
+            }
+            onClick={() => handleSendPassword(record)}
+          >
+            {record.credentials_sent ? "Sent" : "Send"}
+          </Button>
+        );
+      },
     },
   ];
 
