@@ -9,7 +9,7 @@ import {
   Row,
   Col,
   Select,
-  Space,
+  message,
 } from "antd";
 import {
   SearchOutlined,
@@ -20,31 +20,13 @@ import {
   PlusOutlined,
   DeleteOutlined,
 } from "@ant-design/icons";
-import { getLoadingAdvice ,getLoadingAdviceById,updateLoadingAdvice,getAllVendor} from "../api/loadingAdvice";
+import { getLoadingAdvice ,getLoadingAdviceById,updateLoadingAdvice} from "../api/loadingAdvice";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/;
 
-const dummySaleOrders = [
-  {
-    sale_order_no: "SO-001",
-    customer_name: "ABC Retail",
-    delivery_address: "Bhubaneswar",
-    items: [
-      { item: "Palm Oil", qty: 100 ,delivered_qty: 80},
-      { item: "Sunflower Oil", qty: 50 ,delivered_qty: 40},
-    ],
-  },
-  {
-    sale_order_no: "SO-002",
-    customer_name: "XYZ Traders",
-    delivery_address: "Cuttack",
-    items: [
-      { item: "Coconut Oil", qty: 80 ,delivered_qty: 60},
-    ],
-  },
-];
+
 
 export default function LoadingAdvice() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -85,7 +67,7 @@ console.log(res); // 🔥 IMPORTANT
       plantAddress: item.plant_details?.address,
       plantPhoneNumber: item.plant_details?.phone_number,
 
-      vehicleNo: item.vehicle_no,
+      vehicleNo: item.vehicle_number,
       driverName: item.driver_name,
       driverContact: item.driver_contact,
 
@@ -137,7 +119,7 @@ const mapApiToForm = (item) => {
     plantAddress: item.plant_details?.address,
     plantPhoneNumber: item.plant_details?.phone_number,
 
-    vehicleNo: item.vehicle_no,
+    vehicleNo: item.vehicle_number,
     driverName: item.driver_name,
     driverContact: item.driver_contact,
 
@@ -152,7 +134,15 @@ const mapApiToForm = (item) => {
     tareWeights: item.tare_weight_kg,
     grossWeights: item.gross_weight_kg,
     netWeight: item.net_weight_kg,
-
+     deliveries: item.deliveries?.map((d) => ({
+  id: d.id,
+  sales_order_number: d.sales_order_number,
+  customer_name: d.customer_name,
+  customer_delivery_address: d.customer_delivery_address,
+  delivery_date: d.delivery_date,
+  status: d.status,
+  items: d.items || []
+})) || [],  
     items: item.items?.map((i, idx) => ({
       key: i.id,
       slNo: idx + 1,
@@ -212,14 +202,18 @@ setIsViewModalOpen(true);
     const values = await editForm.validateFields();
     console.log("FINAL ITEMS BEFORE PATCH", items); // ✅ HERE
     const currentRecord = selectedRecord;
-
+     // 🚨 CHECK IF STATUS CHANGED
+    if (values.status === currentRecord.status) {
+      message.warning("Please update status before submitting");
+      return;
+    }
     const payload = {
       // 🔥 map UI → API fields
       advice_date: values.adviceDate?.format("YYYY-MM-DD"),
       way_bill: values.wayBill,
       delivery_address: values.deliveryAddress,
 
-      vehicle_no: values.vehicleNo,
+      vehicle_number: values.vehicleNo,
       driver_name: values.driverName,
       driver_contact: values.driverContact,
 
@@ -243,6 +237,10 @@ setIsViewModalOpen(true);
   actual_qty: Number(i.actualQty) || 0,
   required_qty: Number(i.reqQty) || 0,
 })),
+ deliveries: selectedRecord.deliveries.map((d) => ({
+    id: d.id,
+    status: d.status
+  }))
     };
 
     console.log("PATCH PAYLOAD", payload);
@@ -270,6 +268,8 @@ setIsViewModalOpen(true);
         return `${base} bg-blue-100! text-blue-700!`;
       case "Out for delivery":
         return `${base} bg-yellow-100! text-yellow-700!`;
+        case "Partially Delivered":
+        return `${base} bg-purple-100! text-purple-700!`;
       case "Delivered":
         return `${base} bg-green-100! text-green-700!`;
       default:
@@ -298,14 +298,23 @@ setIsViewModalOpen(true);
         : null,
     };
   };
+const getSaleOrderAllowedStatus = (currentStatus) => {
+  const flow = {
+    "In-Transit": ["Out for Delivery"],
+    "Out for Delivery": ["Delivered"],
+    "Delivered": ["Delivered"]
+  };
 
+  return flow[currentStatus] || [currentStatus];
+};
  
 const getAllowedStatusOptions = (currentStatus) => {
   const flow = {
     Approved: ["Dispatched"],
     Dispatched: ["In-Transit"],
-    "In-Transit": ["Out for delivery"],
-    "Out for delivery": ["Delivered"],
+    "In-Transit": ["Out for Delivery"],
+    "Out for Delivery": ["Delivered"],
+    "Partially Delivered": ["Partially Delivered", "Delivered"],
     Delivered: ["Delivered"],
   };
 
@@ -395,85 +404,108 @@ const getAllowedStatusOptions = (currentStatus) => {
   ];
 
 const renderSaleOrderDetails = () => {
-  if (!selectedRecord || selectedRecord.status !== "In-Transit") return null;
 
-  const saleOrders = dummySaleOrders || [];
+  const visibleStatuses = [
+    "In-Transit",
+    "Out for Delivery",
+    "Partially Delivered",
+    "Delivered",
+  ];
+
+  if (!selectedRecord || !visibleStatuses.includes(selectedRecord.status)) {
+    return null;
+  }
+
+  const saleOrders = selectedRecord.deliveries || [];
 
   if (!saleOrders.length) return null;
 
   return (
     <>
       <h6 className="text-amber-500 pb-2 font-semibold">
-        Sale Order Details
+        Customer Order Details
       </h6>
 
       {saleOrders.map((order, index) => (
         <div
           key={index}
-              className="border border-amber-200 rounded-lg p-3 mb-3"
-       >
-           <Row gutter={24}>
+          className="border border-amber-200 rounded-lg p-3 mb-3"
+        >
+
+          <Row gutter={24}>
             <Col span={6}>
-              <Form.Item
-                label="Sale Order No"
-                name={[index, "sale_order_no"]}
-                initialValue={order.sale_order_no}
-              >
-                <Input disabled />
+              <Form.Item label="Customer Order No">
+                <Input value={order.sales_order_number} disabled />
               </Form.Item>
             </Col>
 
             <Col span={6}>
-              <Form.Item
-                label="Customer Name"
-                name={[index, "customer_name"]}
-                initialValue={order.customer_name}
-              >
-                <Input disabled />
+              <Form.Item label="Customer Name">
+                <Input value={order.customer_name} disabled />
               </Form.Item>
             </Col>
 
             <Col span={6}>
-              <Form.Item
-                label="Delivery Address"
-                name={[index, "delivery_address"]}
-                initialValue={order.delivery_address}
-              >
-                <Input disabled />
+              <Form.Item label="Delivery Address">
+                <Input value={order.customer_delivery_address} disabled />
               </Form.Item>
             </Col>
+
+            <Col span={6}>
+              <Form.Item label="Delivery Date">
+                <DatePicker
+                  value={dayjs(order.delivery_date)}
+                  className="w-full"
+                  disabled
+                />
+              </Form.Item>
+            </Col>
+                          <Col span={6}>
+ <Form.Item label="Status">
+<Select
+  value={order.status}
+  onChange={(value) => {
+    const updatedDeliveries = selectedRecord.deliveries.map((d, i) =>
+      i === index ? { ...d, status: value } : d
+    );
+
+    setSelectedRecord({
+      ...selectedRecord,
+      deliveries: updatedDeliveries,
+    });
+  }}
+>
+  {getSaleOrderAllowedStatus(order.status).map((st) => (
+    <Select.Option key={st} value={st}>
+      {st}
+    </Select.Option>
+  ))}
+</Select>
+  </Form.Item>
+</Col>
           </Row>
 
           {order.items?.map((item, i) => (
             <Row gutter={24} key={i}>
+
               <Col span={6}>
-                <Form.Item
-                  label="Item"
-                  name={[index, "item"]}
-                  initialValue={item.item}
-                >
-                  <Input disabled />
+                <Form.Item label="Item">
+                  <Input value={item.item_name} disabled />
                 </Form.Item>
               </Col>
 
               <Col span={6}>
-                <Form.Item
-                  label="Quantity"
-                  name={[index, "qty"]}
-                  initialValue={item.qty}
-                >
-                  <Input disabled />
+                <Form.Item label="Quantity">
+                  <Input value={item.order_qty} disabled />
                 </Form.Item>
               </Col>
-               <Col span={6}>
-                <Form.Item
-                  label="Delivered Quantity"
-                  name={[index, "delivered_qty"]}
-                  initialValue={item.delivered_qty}
-                >
-                  <Input disabled />
+
+              <Col span={6}>
+                <Form.Item label="Delivered Qty">
+                  <Input value={item.delivered_qty} disabled />
                 </Form.Item>
               </Col>
+
             </Row>
           ))}
         </div>
@@ -781,12 +813,21 @@ const renderLoadingDetails = (disabled = false) => (
     {
       title: "Actual Qty",
       dataIndex: "actualQty",
+
          width:20,
     render: (_, record) => (
   <Input
     type="number"
     value={record.actualQty}
       disabled={disabled} 
+      rules={[
+      { required: true, message: "Please enter valid Actual Qty" },   
+      {
+        validator: (_, value) =>
+          value >= 0          ? Promise.resolve()
+            : Promise.reject(),
+      },
+    ]}
     onChange={(e) =>
       updateItem(record.key, "actualQty", e.target.value)
     }
@@ -951,11 +992,7 @@ const renderLoadingDetails = (disabled = false) => (
                 <Input disabled/>
               </Form.Item>
             </Col>
-            {/* <Col span={4}>
-              <Form.Item label="Delivery Address" name="deliveryAddress">
-                <Input disabled />
-              </Form.Item>
-            </Col> */}
+           
           
           </Row>
   {renderTransportDetails(false)}

@@ -19,7 +19,7 @@ import {
   DownloadOutlined,
   PlusOutlined,PrinterOutlined
 } from "@ant-design/icons";
-import { addInvoice ,getAllInvoice,getInvoiceById,getAllVendor} from "../../../../../api/purchase";
+import { addInvoice ,getAllInvoice,getInvoiceById,getAllVendor,updateInvoice} from "../../../../../api/purchase";
 const { Option } = Select;
 
 const PurchaseIndent = () => {
@@ -81,15 +81,41 @@ const handleSubmit = async () => {
     console.error("Error adding invoice", error);
   }
 };
+const handleUpdate = async () => {
+  try {
+    const formData = new FormData();
 
- const openViewModal = async (record) => {
+    formData.append("vendor", vendor);
+
+    if (file) {
+      formData.append("document", file);
+    }
+
+    await updateInvoice(editRecord.key, formData);
+
+    fetchInvoices(); // reload table
+
+    setModalOpen(false);
+    setVendor("");
+    setFile(null);
+    setEditRecord(null);
+
+  } catch (error) {
+    console.error("Error updating invoice", error);
+  }
+};
+
+const openViewModal = async (record) => {
   try {
     const res = await getInvoiceById(record.key);
 
-   setViewRecord({
-  vendor: res.vendor,
-  file: res.document_url
-});
+    const vendorName =
+      vendors.find((v) => v.id === res.vendor)?.name || res.vendor;
+
+    setViewRecord({
+      vendor: vendorName,
+      file: res.document_url
+    });
 
     setViewModal(true);
 
@@ -97,19 +123,7 @@ const handleSubmit = async () => {
     console.error("Error fetching invoice", error);
   }
 };
-const openEditModal = async (record) => {
-  try {
-    const res = await getInvoiceById(record.key);
-
-    setVendor(res.vendor);
-    setFile(res.file);
-    setEditRecord(record);
-
-    setModalOpen(true);
-  } catch (error) {
-    console.error("Error fetching invoice", error);
-  }
-};
+2
   // ADD
   const openAddModal = () => {
     setVendor("");
@@ -140,7 +154,25 @@ const handlePrint = (record) => {
     iframe.contentWindow.print();
   };
 };
- 
+const openEditModal = async (record) => {
+  try {
+    const res = await getInvoiceById(record.key);
+
+    setVendor(res.vendor);
+
+    setFile({
+      url: res.document_url,
+      name: res.document_url.split("/").pop()
+    });
+
+    setEditRecord(record);
+
+    setModalOpen(true);
+
+  } catch (error) {
+    console.error("Error fetching invoice", error);
+  }
+};
 
   // SEARCH
   const handleSearch = (value) => {
@@ -172,15 +204,22 @@ const handlePrint = (record) => {
   }
 },
   {
-    title: <span className="text-amber-700 font-semibold">File</span>,
-    render: (_, record) => (
-    record.file ? (
-      <a href={record.file} target="_blank" rel="noreferrer">
-        View File
-      </a>
-    ) : "-"
-  )
-  },
+  title: <span className="text-amber-700 font-semibold">Document</span>,
+  render: (_, record) => {
+    if (!record.file) return "-";
+
+    const fileName = record.file.split("/").pop(); // extract name
+
+    return (
+      <span
+        className="text-blue-600 cursor-pointer hover:underline"
+        onClick={() => openDocument(record.file)}
+      >
+        {fileName}
+      </span>
+    );
+  }
+},
   {
     title: <span className="text-amber-700 font-semibold">Actions</span>,
     render: (_, record) => (
@@ -276,11 +315,15 @@ const handlePrint = (record) => {
       {/* MODAL */}
 
      <Modal
-  title= {<span className="text-amber-600!"> {editRecord ? "Edit Invoice" : "Add Invoice"} </span>}
+  title={
+    <span className="text-amber-600!">
+      {editRecord ? "Edit Invoice" : "Add Invoice"}
+    </span>
+  }
   open={modalOpen}
   onCancel={() => setModalOpen(false)}
-  onOk={handleSubmit}
-  okType="default"
+  onOk={editRecord ? handleUpdate : handleSubmit}
+  okText={editRecord ? "Update" : "Save"}
   okButtonProps={{
     className: "bg-amber-500! hover:bg-amber-600! text-white! border-none"
   }}
@@ -317,21 +360,26 @@ const handlePrint = (record) => {
 
           <label className="text-amber-600! " >Upload File</label>
 
-          <Upload
-            beforeUpload={(file) => {
-              setFile(file);
-              return false;
-            }}
-            showUploadList
-             disabled={editRecord ? true : false}
-             className="ml-2!"
-          >
-
-            <Button  icon={<UploadOutlined />}>
-              Upload File
-            </Button>
-
-          </Upload>
+        <Upload
+  beforeUpload={(file) => {
+    setFile(file);
+    return false;
+  }}
+  fileList={
+    file
+      ? [
+          {
+            uid: "-1",
+            name: file.name,
+            status: "done",
+            url: file.url
+          }
+        ]
+      : []
+  }
+>
+  <Button icon={<UploadOutlined />}>Upload File</Button>
+</Upload>
 
         </div>
 
@@ -350,16 +398,16 @@ const handlePrint = (record) => {
   <div>
     <label className="text-amber-600 ">Uploaded Document</label>
 
-    {viewRecord?.file ? (
-      <p
-        className="text-blue-600 cursor-pointer mt-1 hover:underline"
-        onClick={() => openDocument(viewRecord.file)}
-      >
-        {viewRecord.file.name}
-      </p>
-    ) : (
-      <p className="text-gray-500 mt-1">No File Uploaded</p>
-    )}
+  {viewRecord?.file ? (
+  <p
+    className="text-blue-600 cursor-pointer mt-1 hover:underline"
+    onClick={() => openDocument(viewRecord.file)}
+  >
+    {viewRecord.file.split("/").pop()}
+  </p>
+) : (
+  <p className="text-gray-500 mt-1">No File Uploaded</p>
+)}
   </div>
 </Modal>
 

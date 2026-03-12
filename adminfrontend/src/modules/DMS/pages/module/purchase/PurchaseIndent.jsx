@@ -717,7 +717,7 @@ setTimeout(() => {
                   <span className="font-semibold text-amber-700">
                     Item {index + 1}
                   </span>
-                  {!disabled && (
+                  {/* {!disabled && (
                     <div>
                       {fields.length > 1 && (
                         <Button
@@ -732,7 +732,7 @@ setTimeout(() => {
                         </Button>
                       )}
                     </div>
-                  )}
+                  )} */}
                 </div>
 
                 <Row gutter={24}>
@@ -979,7 +979,7 @@ rules={[
               </div>
             ))}
 
-            {!disabled && (
+            {/* {!disabled && (
               <Button
                 type="dashed"
                 onClick={() => {
@@ -991,7 +991,7 @@ rules={[
               >
                 Add Another Item
               </Button>
-            )}
+            )} */}
           </>
         )}
       </Form.List>
@@ -1128,8 +1128,8 @@ rules={[
             className="bg-amber-500! hover:bg-amber-600! border-none!"
             onClick={() => {
               addForm.resetFields();
-              addForm.setFieldsValue({ order_date: dayjs(), items: [] });
-              setIsAddModalOpen(true);
+          // addForm.setFieldsValue({ order_date: dayjs(), items: [] });
+addForm.setFieldsValue({ order_date: dayjs(), items: [{}] });    setIsAddModalOpen(true);
             }}
           >
             Add New

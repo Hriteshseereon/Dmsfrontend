@@ -21,7 +21,7 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { exportToExcel } from "../../../../../utils/exportToExcel";
-import { getLoadingAdvice, getLoadingAdviceById, updateLoadingAdvice } from "../../../../../api/purchase";
+import { getLoadingAdvice, getLoadingAdviceById, updateLoadingAdvice, getAllVendor } from "../../../../../api/purchase";
 const { Option } = Select;
 
 
@@ -30,17 +30,24 @@ const ALL_STATUS = [
   "Approved",
   "Dispatched",
   "In-Transit",
-  "Out for delivery",
+  "Out for Delivery",
+  "Partially Delivered",
   "Delivered",
 ];
+const SALE_ORDER_STATUS_FLOW = {
+  "In-Transit": ["In-Transit", "Out for Delivery"],
+  "Out for Delivery": ["Out for Delivery", "Delivered"],
+  "Delivered": ["Delivered"],
+};
 
 const statusFlow = {
   Pending: ["Pending",],
 
   Approved: ["Approved", "Dispatched"],
   Dispatched: ["Dispatched", "In-Transit"],
-  "In-Transit": ["In-Transit", "Out for delivery"],
-  "Out for delivery": ["Out for delivery", "Delivered"],
+  "In-Transit": ["In-Transit", "Out for Delivery"],
+  "Out for Delivery": ["Out for Delivery", "Delivered"],
+  "Partially Delivered": ["Partially Delivered", "Delivered"],
   Delivered: ["Delivered"],
 };
 export default function LoadingAdvice() {
@@ -50,6 +57,7 @@ export default function LoadingAdvice() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
+   const [messageApi, contextHolder] = message.useMessage(); 
 
   const [form] = Form.useForm();
   const [viewForm] = Form.useForm();
@@ -246,13 +254,14 @@ export default function LoadingAdvice() {
           sale_order_no: delivery.sales_order_number,
           customer_name: delivery.customer_name,
           delivery_address: delivery.customer_delivery_address,
-         delivery_date: null,
+          delivery_date: delivery.delivery_date ? dayjs(delivery.delivery_date) : null,
+          status: delivery.status,
           items: delivery.items?.map((itm) => ({
             item_id: itm.id,
             product_name: itm.item_name,
             qty: itm.order_qty,
-             delivered_qty: "" 
-
+            delivered_qty: itm.delivered_qty,
+           
           })),
         })),
       });
@@ -268,158 +277,53 @@ export default function LoadingAdvice() {
 
   const handleEdit = async (values) => {
     try {
+       if (values.status === selectedRecord.status) {
+    messageApi.warning("Please change status to update");
+      return;
+    }
       const payload = {
-        advice_date: values.lodingadvicedate
-          ? dayjs(values.lodingadvicedate).format("YYYY-MM-DD")
-          : null,
-        advice_no: values.advice_no,
-        invoice_number: values.invoiceNo,
         status: values.status,
-        assignment: selectedRecord.assignment,
 
-        transporter_name: values.transporter,
-        vehicle_number: values.vehicleNo,
-        driver_name: values.driverName,
-        driver_contact: values.driverContact,
-        vendor_name: selectedRecord.vendor_name,
-        plant_name: selectedRecord.plant_name,
-        vendor_address: selectedRecord.vendor_address,
-        plant_address: selectedRecord.plant_address,
-        vendor_gstin: selectedRecord.vendor_gstin,
-        plant_gstin: selectedRecord.plant_gstin,
-
-        insurance_valid_upto: values.insuranceValidUpto
-          ? dayjs(values.insuranceValidUpto).format("YYYY-MM-DD")
-          : null,
-        pu_valid_upto: values.puValidUpto
-          ? dayjs(values.puValidUpto).format("YYYY-MM-DD")
-          : null,
-        fitness_valid_upto: values.fitnessValidUpto
-          ? dayjs(values.fitnessValidUpto).format("YYYY-MM-DD")
-          : null,
-
-        vehicle_in_time: values.vehicleInTime,
-        vehicle_out_time: values.vehicleOutTime,
-        tare_weight_kg: values.tareWeight,
-        net_weight_kg: values.netWeight,
-
-        items: values.items.map((itm) => ({
+        items: values.items?.map((itm) => ({
           id: itm.id,
-          product: itm.product,
-          loading_advice: selectedRecord.id,
-          product_name: itm.product_name,
-          hsn_code: itm.hsn_code,
-          required_qty: itm.required_qty,
-          actual_qty: itm.actual_qty,
-          variance: itm.variance,
+          actual_qty: Number(itm.actual_qty).toFixed(2),
+          required_qty: Number(itm.required_qty).toFixed(2),
         })),
-      deliveries: values.sale_orders
-  ?.filter((so) => so && so.delivery_id)
-  .map((so) => ({
-    id: so.delivery_id,
-    delivery_date: so.delivery_date
-      ? dayjs(so.delivery_date).format("YYYY-MM-DD")
-      : null,
 
-    items: so.items
-      ?.filter((itm) => itm && itm.item_id)
-      .map((itm) => ({
-        id: itm.item_id,
-        delivered_qty: Number(itm.delivered_qty) || 0,
-      })),
-  })),
+        deliveries: values.sale_orders?.map((so) => ({
+          id: so.delivery_id,
+           status: so.status, 
+          delivery_date: so.delivery_date
+            ? dayjs(so.delivery_date).format("YYYY-MM-DD")
+            : null,
 
+          items: so.items?.map((itm) => ({
+            id: itm.item_id,
+            delivered_qty: itm.delivered_qty
+              ? Number(itm.delivered_qty).toFixed(3)
+              : "0.000"
+          })),
+        })),
       };
-      await updateLoadingAdvice(selectedRecord.id, payload);
 
+      await updateLoadingAdvice(selectedRecord.id, payload);
 
       message.success("Updated successfully");
 
       setIsEditModalOpen(false);
       form.resetFields();
+      fetchLoadingAdvice();
 
-      fetchLoadingAdvice(); // refresh table
     } catch (error) {
       console.error("Update failed:", error);
       message.error("Update failed");
     }
   };
 
-  const handleOpenView = async (record) => {
-    try {
-      const item = await getLoadingAdviceById(record.id);
-
-      viewForm.setFieldsValue({
-        advice_no: item.advice_no,
-        invoiceNo: item.invoice_number,
-        lodingadvicedate: item.advice_date
-          ? dayjs(item.advice_date)
-          : null,
-        status: item.status,
-
-        // ✅ VENDOR (CORRECT)
-        companyName: item.vendor_name,
-        companyAddress: item.vendor_addresses?.[0]?.address_line1 || "",
-        contactPerson: item.vendor_details?.contact_person || "",
-        contactNo: item.vendor_details?.contact_person_no || "",
-
-        // ✅ PLANT (CORRECT)
-        plantName: item.plant_name,
-        plantAddress: item.plant_details?.address || "",
-        plantContactPerson: item.vendor_details?.contact_person || "",
-        plantPhone: item.plant_details?.phone_number || "",
-
-        // Transport
-        transporter: item.transporter_name,
-        vehicleNo: item.vehicle_number,
-        driverName: item.driver_name,
-        driverContact: item.driver_contact,
-
-        insuranceValidUpto: item.insurance_valid_upto
-          ? dayjs(item.insurance_valid_upto)
-          : null,
-        puValidUpto: item.pu_valid_upto
-          ? dayjs(item.pu_valid_upto)
-          : null,
-        fitnessValidUpto: item.fitness_valid_upto
-          ? dayjs(item.fitness_valid_upto)
-          : null,
-
-        vehicleInTime: item.vehicle_in_time,
-        vehicleOutTime: item.vehicle_out_time,
-        tareWeight: item.tare_weight_kg,
-        netWeight: item.net_weight_kg,
-
-        items: item.items?.map((itm) => ({
-          id: itm.id,
-          product_name: itm.product_name,
-          hsn_code: itm.hsn_code,
-          required_qty: itm.required_qty,
-          actual_qty: itm.actual_qty,
-          variance: itm.variance,
-        })),
-        sale_orders: item.deliveries?.map((delivery) => ({
-          sale_order_no: delivery.sales_order_number,
-          customer_name: delivery.customer_name,
-          delivery_address: delivery.customer_delivery_address,
-          delivery_date: delivery.delivery_date ? dayjs(delivery.delivery_date) : null,
-
-          items: delivery.items?.map((itm) => ({
-            product_name: itm.item_name,
-            qty: itm.order_qty,
-          })),
-        })),
-      });
-
-      setSelectedRecord(item);
-      setIsViewModalOpen(true);
-    } catch (error) {
-      console.error("View fetch failed:", error);
-      message.error("Failed to load details");
-    }
-  };
-
-
+ 
+const getSaleOrderAllowedStatus = (currentStatus) => {
+  return SALE_ORDER_STATUS_FLOW[currentStatus] || ["In-Transit"];
+};
 
 
   // Columns - removed Assign button; Admin can only approve pending ones
@@ -470,10 +374,11 @@ export default function LoadingAdvice() {
           Pending: "bg-yellow-100 text-yellow-700",
 
           "Pending Approval": "bg-orange-100 text-orange-700",
-          Approved: "bg-green-100 text-green-700",
+          Approved: "bg-yellow-100 text-yellow-700",
           Delivered: " bg-green-100 text-green-700",
           "In-Transit": "bg-orange-100 text-orange-700",
-          "Out for delivery": "bg-blue-100 text-blue-700 ",
+          "Out for Delivery": "bg-purple-100 text-purple-700 ",
+          "Partially Delivered": "bg-blue-100 text-blue-700"
 
 
         };
@@ -497,7 +402,7 @@ export default function LoadingAdvice() {
           <div className="flex gap-3">
             <EyeOutlined
               className="cursor-pointer! text-blue-500!"
-              onClick={() => handleOpenView(record)}
+              onClick={() => handleOpenEdit(record)}
             />
 
             {showEdit && (
@@ -542,8 +447,15 @@ export default function LoadingAdvice() {
     // ✅ Default flow
     return statusFlow[currentStatus] || [];
   };
-  const renderFormFields = (disabled = false, formInstance) => (
+ const renderFormFields = (disabled = false, formInstance) => {
+  const status = formInstance.getFieldValue("status");
+
+  const isSalesDisabled = ["In-Transit", "Out for Delivery", "Delivered"].includes(status);
+
+  return (
     <>
+     {contextHolder}
+
       {/* Date and Order */}
       <Row gutter={16}>
         <Col span={6}>
@@ -586,8 +498,10 @@ export default function LoadingAdvice() {
           </Form.Item>
         </Col>
       </Row>
-      {formInstance.getFieldValue("status") === "Dispatched" && (
-        <>
+     {["Dispatched", "In-Transit", "Out for Delivery","Partially Delivered", "Delivered"].includes(
+  formInstance.getFieldValue("status")
+) && (  
+    <>
           <h6 className="text-amber-500 pb-2 font-semibold">
             Sale Order Details
           </h6>
@@ -618,11 +532,24 @@ export default function LoadingAdvice() {
                           <Input disabled />
                         </Form.Item>
                       </Col>
-                       <Col span={6}>
-                                <Form.Item label="Delivery Date" name={[name, "delivery_date"]}>
-                                  <DatePicker className="w-full" />
-                                </Form.Item>
-                              </Col>
+                      <Col span={6}>
+                        <Form.Item label="Delivery Date" name={[name, "delivery_date"]}>
+                          <DatePicker className="w-full" disabled={isSalesDisabled} />
+                        </Form.Item>
+                      </Col>
+                    <Col span={6}>
+  <Form.Item label="Status" name={[name, "status"]}>
+    <Select>
+      {getSaleOrderAllowedStatus(
+        formInstance.getFieldValue(["sale_orders", name, "status"])
+      ).map((st) => (
+        <Option key={st} value={st}>
+          {st}
+        </Option>
+      ))}
+    </Select>
+  </Form.Item>
+</Col>
                     </Row>
 
                     <Form.List name={[name, "items"]}>
@@ -644,10 +571,10 @@ export default function LoadingAdvice() {
 
                               <Col span={6}>
                                 <Form.Item label="Delivered Qty" name={[n, "delivered_qty"]}>
-                                  <Input />
+                                  <Input disabled={isSalesDisabled}/>
                                 </Form.Item>
                               </Col>
-                             
+
                             </Row>
                           ))}
                         </>
@@ -843,7 +770,7 @@ export default function LoadingAdvice() {
         </Col>
       </Row>
     </>
-  );
+  );};
 
   return (
     <div>
