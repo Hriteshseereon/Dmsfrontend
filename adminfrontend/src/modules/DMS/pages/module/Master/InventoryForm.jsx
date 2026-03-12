@@ -388,6 +388,7 @@ export default function InventoryForm() {
           <Button
             icon={<FilterOutlined className="text-amber-800!" />}
             className="border-amber-400!"
+            onClick={() => setSearchText("")}
           >
             <span className="text-amber-800!">Reset</span>
           </Button>
