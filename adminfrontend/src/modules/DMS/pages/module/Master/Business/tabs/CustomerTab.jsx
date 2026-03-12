@@ -1246,7 +1246,7 @@ export default function CustomerTab() {
                   <Input
                     className={inputClass}
                     disabled={viewMode}
-                    placeholder="Enter amount limit"
+                    placeholder="100.00"
                   />
                 </Form.Item>
               </Col>

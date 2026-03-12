@@ -1036,7 +1036,7 @@ export default function BrokerTab() {
                             <Input
                               className={inputClass}
                               disabled={viewMode}
-                              placeholder="Enter amount"
+                              placeholder="100.00"
                             />
                           </Form.Item>
                         </Col>
