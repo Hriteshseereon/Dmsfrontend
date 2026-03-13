@@ -678,6 +678,7 @@ export default function CustomerTab() {
                     placeholder="Select type"
                   >
                     <Option value="Customer">Customer</Option>
+                    <Option value="Both">Both</Option>
                   </Select>
                 </Form.Item>
               </Col>
@@ -847,7 +848,13 @@ export default function CustomerTab() {
             </h3>
             <Row gutter={24}>
               <Col span={4}>
-                <Form.Item label="Credit Facility type" name="creditFacility">
+                <Form.Item
+                  label="Credit Facility type"
+                  name="creditFacility"
+                  rules={[
+                    { required: true, message: "Please select security type" },
+                  ]}
+                >
                   <Select
                     className={selectClass}
                     disabled={viewMode}
@@ -861,7 +868,7 @@ export default function CustomerTab() {
                 </Form.Item>
               </Col>
 
-              <Col span={6}>
+              <Col span={5}>
                 <Form.Item
                   label="Security for Credit"
                   name="securityForCreditFacility"
@@ -886,8 +893,8 @@ export default function CustomerTab() {
               {/* ================= Security Fields ================= */}
 
               {securityType === "Bank Guarantee" && (
-                <Row gutter={24}>
-                  <Col span={6}>
+                <>
+                  <Col span={5}>
                     <Form.Item
                       label="Bank Name"
                       name="bgBankName"
@@ -897,7 +904,7 @@ export default function CustomerTab() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={6}>
+                  <Col span={5}>
                     <Form.Item
                       label="Date"
                       name="bgDate"
@@ -907,7 +914,7 @@ export default function CustomerTab() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={6}>
+                  <Col span={5}>
                     <Form.Item
                       label="Bank Guarantee Amount"
                       name="bgAmount"
@@ -922,7 +929,7 @@ export default function CustomerTab() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={6}>
+                  <Col span={5}>
                     <Form.Item
                       label="Bank Guarantee Number"
                       name="bgNumber"
@@ -937,7 +944,7 @@ export default function CustomerTab() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={6}>
+                  <Col span={5}>
                     <Form.Item
                       label="Valid From"
                       name="bgValidFrom"
@@ -952,7 +959,7 @@ export default function CustomerTab() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={6}>
+                  <Col span={5}>
                     <Form.Item
                       label="Valid Upto"
                       name="bgValidUpto"
@@ -966,7 +973,7 @@ export default function CustomerTab() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={6}>
+                  <Col span={5}>
                     <Form.Item
                       label="Upload Document"
                       name="bgDoc"
@@ -976,21 +983,26 @@ export default function CustomerTab() {
                       }
                       rules={[{ required: true, message: "Please upload doc" }]}
                     >
-                      <Upload
-                        beforeUpload={() => false}
-                        maxCount={1}
-                        listType="picture"
-                        disabled={viewMode}
-                      >
-                        <Button icon={<UploadOutlined />}>Upload</Button>
-                      </Upload>
+                      <div className="w-full">
+                        <Upload
+                          beforeUpload={() => false}
+                          maxCount={1}
+                          listType="picture"
+                          disabled={viewMode}
+                          style={{ width: "100%" }}
+                        >
+                          <Button icon={<UploadOutlined />} block>
+                            Upload Document
+                          </Button>
+                        </Upload>
+                      </div>
                     </Form.Item>
                   </Col>
-                </Row>
+                </>
               )}
               {securityType === "Post Dated Cheque" && (
-                <Row gutter={24}>
-                  <Col span={6}>
+                <>
+                  <Col span={5}>
                     <Form.Item
                       label="Bank Name"
                       name="pdcBank"
@@ -1002,7 +1014,7 @@ export default function CustomerTab() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={6}>
+                  <Col span={5}>
                     <Form.Item
                       label="Cheque Issue Date"
                       name="pdcIssueDate"
@@ -1021,7 +1033,7 @@ export default function CustomerTab() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={6}>
+                  <Col span={5}>
                     <Form.Item
                       label="Cheque Dated"
                       name="pdcDate"
@@ -1040,7 +1052,7 @@ export default function CustomerTab() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={6}>
+                  <Col span={5}>
                     <Form.Item
                       label="Cheque Number"
                       name="pdcNumber"
@@ -1055,7 +1067,7 @@ export default function CustomerTab() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={6}>
+                  <Col span={5}>
                     <Form.Item
                       label="Cheque Amount"
                       name="pdcAmount"
@@ -1070,7 +1082,7 @@ export default function CustomerTab() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={6}>
+                  <Col span={5}>
                     <Form.Item
                       label="Valid Upto"
                       name="pdcValid"
@@ -1088,11 +1100,11 @@ export default function CustomerTab() {
                       />
                     </Form.Item>
                   </Col>
-                </Row>
+                </>
               )}
               {securityType === "Fixed Deposit" && (
-                <Row gutter={24}>
-                  <Col span={6}>
+                <>
+                  <Col span={5}>
                     <Form.Item
                       label="Bank Name"
                       name="fdBank"
@@ -1104,7 +1116,7 @@ export default function CustomerTab() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={6}>
+                  <Col span={5}>
                     <Form.Item
                       label="Date"
                       name="fdDate"
@@ -1120,7 +1132,7 @@ export default function CustomerTab() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={6}>
+                  <Col span={5}>
                     <Form.Item
                       label="Cheque/RTGS Number"
                       name="fdCheque"
@@ -1135,7 +1147,7 @@ export default function CustomerTab() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={6}>
+                  <Col span={5}>
                     <Form.Item
                       label="Security Detail/Narration"
                       name="fdSecurity"
@@ -1150,7 +1162,7 @@ export default function CustomerTab() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={6}>
+                  <Col span={5}>
                     <Form.Item
                       label="Rate of Interest"
                       name="fdInterest"
@@ -1172,11 +1184,11 @@ export default function CustomerTab() {
                       />
                     </Form.Item>
                   </Col>
-                </Row>
+                </>
               )}
               {securityType === "Collateral" && (
-                <Row gutter={24}>
-                  <Col span={8}>
+                <>
+                  <Col span={5}>
                     <Form.Item
                       label="Collateral Details"
                       name="collateralDetails"
@@ -1191,7 +1203,7 @@ export default function CustomerTab() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={8}>
+                  <Col span={5}>
                     <Form.Item
                       label="Address Details"
                       name="collateralAddress"
@@ -1206,7 +1218,7 @@ export default function CustomerTab() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={8}>
+                  <Col span={5}>
                     <Form.Item
                       label="Market Value"
                       name="collateralValue"
@@ -1220,7 +1232,7 @@ export default function CustomerTab() {
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
-                </Row>
+                </>
               )}
               {/* <Col span={4}>
                 <Form.Item label="Advance Cheque No" name="advCheque">
@@ -1350,6 +1362,7 @@ export default function CustomerTab() {
                     maxCount={1}
                     disabled={viewMode}
                     listType="picture"
+                    style={{ width: "100%" }}
                     onPreview={(file) => {
                       window.open(
                         file.url || URL.createObjectURL(file.originFileObj),
@@ -1358,7 +1371,8 @@ export default function CustomerTab() {
                   >
                     <Button
                       icon={<UploadOutlined />}
-                      className="w-full text-left bg-white border-amber-400"
+                      style={{ width: "100%" }}
+                      className="text-left bg-white border-amber-400"
                       disabled={viewMode}
                     >
                       Upload
@@ -1414,6 +1428,7 @@ export default function CustomerTab() {
                   <Upload
                     beforeUpload={() => false}
                     maxCount={1}
+                    style={{ width: "100%" }}
                     disabled={viewMode}
                     listType="picture"
                     onPreview={(file) => {
@@ -1424,7 +1439,8 @@ export default function CustomerTab() {
                   >
                     <Button
                       icon={<UploadOutlined />}
-                      className="w-full text-left bg-white border-amber-400"
+                      style={{ width: "100%" }}
+                      className=" text-left bg-white border-amber-400"
                       disabled={viewMode}
                     >
                       Upload
@@ -1473,6 +1489,7 @@ export default function CustomerTab() {
                     maxCount={1}
                     disabled={viewMode}
                     listType="picture"
+                    style={{ width: "100%" }}
                     onPreview={(file) => {
                       window.open(
                         file.url || URL.createObjectURL(file.originFileObj),
@@ -1481,7 +1498,8 @@ export default function CustomerTab() {
                   >
                     <Button
                       icon={<UploadOutlined />}
-                      className="w-full text-left bg-white border-amber-400"
+                      style={{ width: "100%" }}
+                      className="text-left bg-white border-amber-400"
                       disabled={viewMode}
                     >
                       Upload
@@ -1506,7 +1524,7 @@ export default function CustomerTab() {
                 </Form.Item>
               </Col>
 
-              <Col span={4}>
+              <Col span={5}>
                 <Form.Item
                   label="Trade License Number"
                   name="licenseNo"
