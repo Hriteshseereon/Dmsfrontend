@@ -648,7 +648,7 @@ export default function TransportTab() {
                 </Form.Item>
               </Col>
 
-              <Col span={6}>
+              <Col span={4}>
                 <Form.Item
                   label="PAN Document"
                   name="panDoc"
@@ -658,9 +658,14 @@ export default function TransportTab() {
                   <Upload
                     beforeUpload={() => false}
                     maxCount={1}
+                    style={{ width: "100%" }}
                     listType="picture"
                   >
-                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
                       Upload
                     </Button>
                   </Upload>
@@ -677,7 +682,7 @@ export default function TransportTab() {
                 </Form.Item>
               </Col>
 
-              <Col span={6}>
+              <Col span={4}>
                 <Form.Item
                   label="GST Document"
                   name="gstDoc"
@@ -687,9 +692,14 @@ export default function TransportTab() {
                   <Upload
                     beforeUpload={() => false}
                     maxCount={1}
+                    style={{ width: "100%" }}
                     listType="picture"
                   >
-                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
                       Upload
                     </Button>
                   </Upload>
@@ -715,7 +725,7 @@ export default function TransportTab() {
                 </Form.Item>
               </Col>
 
-              <Col span={6}>
+              <Col span={4}>
                 <Form.Item
                   label="Adhar Document"
                   name="aadharDoc"
@@ -725,9 +735,14 @@ export default function TransportTab() {
                   <Upload
                     beforeUpload={() => false}
                     maxCount={1}
+                    style={{ width: "100%" }}
                     listType="picture"
                   >
-                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
                       Upload
                     </Button>
                   </Upload>
