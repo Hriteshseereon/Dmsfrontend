@@ -52,6 +52,6 @@ export const updateAdminCustomer = async (customerId, formData) => {
 
 // mail sending api 
 export const sendCustomerCredential = async (payload) => {
-    const res = await api.post('/api/send-credentials/',payload)
+    const res = await api.post('/credentials/send-credentials/',payload)
     return res;
 }
