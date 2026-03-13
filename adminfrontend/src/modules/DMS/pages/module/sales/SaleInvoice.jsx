@@ -12,6 +12,7 @@ import {
   Spin,
   message,
   Input,
+  DatePicker,
 } from "antd";
 import {
   PlusOutlined,
@@ -23,16 +24,17 @@ import {
     PrinterOutlined
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { getSalesOrders, getSalesOrderById } from "../../../../../api/sales";
+import { getSalesOrders, getSalesOrderById ,getItemByOrderId,getInvoiceDropdownData,createInvoice,getInvoiceById,getInvoices,updateInvoice} from "../../../../../api/sales";
 
 export default function SaleInvoice() {
   const [form] = Form.useForm();
-
+  const [itemOptions, setItemOptions] = useState([]);
+const [selectedItem, setSelectedItem] = useState(null);
   const [savedInvoices, setSavedInvoices] = useState([]);
   const [orderOptions, setOrderOptions] = useState([]);
   const [orderDetails, setOrderDetails] = useState(null);
   const [itemsWithDelivery, setItemsWithDelivery] = useState([]);
-
+  const [invoiceDate, setInvoiceDate] = useState(null);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [loadingOrder, setLoadingOrder] = useState(false);
 
@@ -74,43 +76,81 @@ const handlePrint = (record) => {
 };
   /* ---------------- ORDER SELECT ---------------- */
 
-  const onOrderSelect = async (orderId) => {
-    setSelectedOrderId(orderId);
-    setOrderDetails(null);
-    setItemsWithDelivery([]);
+ const onOrderSelect = async (orderId) => {
+  setSelectedOrderId(orderId);
+  setItemOptions([]);
+  setSelectedItem(null);
 
-    if (!orderId) return;
+  if (!orderId) return;
 
+  try {
+    // ✅ fetch order details
+    const order = await getSalesOrderById(orderId);
+    setOrderDetails(order);
+
+    // ✅ fetch order items
+    const items = await getItemByOrderId(orderId);
+
+    const options = (items || []).map((item) => ({
+      value: item.product_id,
+      label: item.product_name,
+    }));
+
+    setItemOptions(options);
+  } catch (err) {
+    console.error(err);
+    message.error("Failed to fetch order details");
+  }
+};
+
+const onItemSelect = async (product_ids) => {
+  try {
     setLoadingOrder(true);
-    try {
-      const order = await getSalesOrderById(orderId);
-      setOrderDetails(order);
 
-      const items = (order.items || []).map((item, index) => ({
-        key: item.id ?? index,
-        itemId: item.id,
-        productName: item.product_name || item.product_name_master || "-",
-        uom: item.uom?.unit_name || "-",
-        rate: Number(item.rate ?? 0),
-        requiredQty: Number(item.ordered_qty ?? item.net_qty ?? 0),
-        deliveredQty: undefined,
-        creditedQty: 0,
-      }));
+    const res = await getInvoiceDropdownData(selectedOrderId, product_ids);
 
-      setItemsWithDelivery(items);
-      form.setFieldsValue({
-        orderId,
-        items: items.map((i) => ({ deliveredQty: i.deliveredQty })),
-      });
-    } catch (err) {
-      console.error("Failed to fetch order details:", err);
-      message.error("Failed to load order details");
-      setSelectedOrderId(undefined);
-    } finally {
-      setLoadingOrder(false);
-    }
+    const items = res?.items || res;
+
+   const rows = items.map((item, index) => {
+  const rate = Number(item.rate || 0);
+  const deliveredQty = Number(item.suggested_delivered_qty || 0);
+  const requiredQty = Number(item.required_qty || 0);
+  const creditedQty = Math.max(0, requiredQty - deliveredQty);
+
+  return {
+    key: item.sales_order_item_id || index,
+    itemId: item.sales_order_item_id,
+    productId: item.product_id,
+    productName: item.product_name,
+    uom: item.uom_name || "-",
+    rate,
+    requiredQty,
+    deliveredQty,
+    creditedQty,
+    deliveredAmount: deliveredQty * rate,   // ✅ added
+    creditedAmount: creditedQty * rate      // ✅ added
   };
+});
 
+    setItemsWithDelivery(rows);
+
+    // delivered qty autofill
+    form.setFieldsValue({
+      items: rows.map((r) => ({
+        deliveredQty: r.deliveredQty,
+      })),
+    });
+
+    // ✅ set today invoice date
+    setInvoiceDate(dayjs());
+
+  } catch (err) {
+    console.error(err);
+    message.error("Failed to load items");
+  } finally {
+    setLoadingOrder(false);
+  }
+};
   /* ---------------- DELIVERED CHANGE ---------------- */
 
 const onDeliveredQtyChange = (value, index) => {
@@ -118,15 +158,22 @@ const onDeliveredQtyChange = (value, index) => {
 
   setItemsWithDelivery((prev) => {
     const next = [...prev];
+
     if (next[index]) {
       const required = Number(next[index].requiredQty) || 0;
+      const rate = Number(next[index].rate) || 0;
+
+      const creditedQty = Math.max(0, required - numVal);
 
       next[index] = {
         ...next[index],
         deliveredQty: numVal,
-        creditedQty: Math.max(0, required - numVal),
+        creditedQty,
+        deliveredAmount: numVal * rate,   // ✅ stored
+        creditedAmount: creditedQty * rate // ✅ stored
       };
     }
+
     return next;
   });
 };
@@ -155,40 +202,44 @@ const onDeliveredQtyChange = (value, index) => {
       : { totalAmount: 0, creditedQuantityAmount: 0 };
 
   /* ---------------- SAVE INVOICE ---------------- */
+const handleSubmit = async (values) => {
+  try {
+    const order = await getSalesOrderById(selectedOrderId);
 
-  const handleSubmit = (values) => {
-    const items = (values.items || []).map((item, i) => {
-      const row = itemsWithDelivery[i] || {};
-      const delivered = item?.deliveredQty ?? 0;
-      const required = row.requiredQty ?? 0;
-      const creditedQty = Math.max(0, required - delivered);
-      return {
-        ...row,
-        deliveredQty: delivered,
-        creditedQty,
-        lineAmount: delivered * (row.rate ?? 0),
-        creditedAmount: creditedQty * (row.rate ?? 0),
-      };
-    });
+   const payload = {
+  sales_order_id: selectedOrderId,
+  customer_id: order.customer_id,
+  invoice_date: invoiceDate
+    ? invoiceDate.format("YYYY-MM-DD")
+    : dayjs().format("YYYY-MM-DD"),
 
-    const { totalAmount, creditedQuantityAmount } = getTotals();
+ items: itemsWithDelivery.map((row) => ({
+  sales_order_item_id: row.itemId,
+  product_id: row.productId,
+  product_name: row.productName,
+  uom_name: row.uom || null,
+  required_qty: row.requiredQty,
 
-    const newInvoice = {
-      id: Date.now(),
-      orderId: selectedOrderId,
-      orderNumber: orderDetails?.order_number || "-",
-      customerName: orderDetails?.customer?.name || "-",
-      invoiceDate: dayjs().format("YYYY-MM-DD"),
-      items,
-      totalAmount,
-      creditedQuantityAmount,
-    };
+  delivered_qty: row.deliveredQty,
+  delivered_amount: row.deliveredAmount || 0,   // ✅ send
 
-    setSavedInvoices((prev) => [newInvoice, ...prev]);
-    message.success("Invoice saved");
+  credited_qty: row.creditedQty,
+  credited_amount: row.creditedAmount || 0,     // ✅ send
 
+  rate: row.rate
+}))
+};
+
+    await createInvoice(payload);
+
+    message.success("Invoice created successfully");
     closeModal();
-  };
+
+  } catch (err) {
+    console.error(err);
+    message.error("Failed to create invoice");
+  }
+};
 
   /* ---------------- MODAL HELPERS ---------------- */
 
@@ -434,7 +485,7 @@ const onDeliveredQtyChange = (value, index) => {
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           {/* Order Select */}
           <Row gutter={16}>
-            <Col xs={24} md={14}>
+            <Col md={8}>
               <Form.Item
                 label={
                   <span className="text-amber-700 font-medium">
@@ -462,17 +513,29 @@ const onDeliveredQtyChange = (value, index) => {
                 />
               </Form.Item>
             </Col>
+            <Col md={8}><Form.Item
+  label={<span className="text-amber-700 font-medium">Item</span>}
+  name="itemId"
+  rules={[{ required: true, message: "Select item" }]}
+>
+ <Select
+  mode="multiple"
+  placeholder="Select Items"
+  options={itemOptions}
+  onChange={onItemSelect}
+/>
+</Form.Item></Col>
           </Row>
 
           {/* Loading */}
-          {loadingOrder && (
-            <div className="flex justify-center py-8">
-              <Spin size="large" />
-            </div>
-          )}
+         {loadingOrder && (
+  <div className="flex justify-center py-8">
+    <Spin size="large" />
+  </div>
+)}
 
           {/* Order details + items */}
-          {!loadingOrder && orderDetails && (
+         {!loadingOrder && itemsWithDelivery.length > 0 && (
             <>
               {/* Order Details Card */}
               <Card
@@ -485,38 +548,43 @@ const onDeliveredQtyChange = (value, index) => {
                 }
               >
                 <Row gutter={[16, 8]}>
-                  <Col xs={24} sm={12} md={6}>
+                  <Col xs={24} sm={12} md={4}>
                     <span className="text-amber-600 text-sm">Order No</span>
                     <p className="text-amber-800 font-medium mb-0">
-                      {orderDetails.order_number || "-"}
+                     {orderDetails?.order_number || "-"}
                     </p>
                   </Col>
-                  <Col xs={24} sm={12} md={6}>
+                  <Col xs={24} sm={12} md={4}>
                     <span className="text-amber-600 text-sm">Order Date</span>
                     <p className="text-amber-800 font-medium mb-0">
-                      {orderDetails.order_date
-                        ? dayjs(orderDetails.order_date).format("DD-MM-YYYY")
-                        : "-"}
+                     {orderDetails?.order_date
+  ? dayjs(orderDetails.order_date).format("DD-MM-YYYY")
+  : "-"}
                     </p>
                   </Col>
-                  <Col xs={24} sm={12} md={6}>
+                  <Col xs={24} sm={12} md={4}>
                     <span className="text-amber-600 text-sm">
                       Delivery Date
                     </span>
                     <p className="text-amber-800 font-medium mb-0">
-                      {orderDetails.expected_receiving_date
-                        ? dayjs(orderDetails.expected_receiving_date).format(
-                            "DD-MM-YYYY",
-                          )
-                        : "-"}
+                     {orderDetails?.expected_receiving_date
+  ? dayjs(orderDetails.expected_receiving_date).format("DD-MM-YYYY")
+  : "-"}
                     </p>
                   </Col>
+<Col xs={24} sm={12} md={4}>
+  <span className="text-amber-600 text-sm">Invoice Date</span>
+  <p className="text-amber-800 font-medium mb-0">
+    {invoiceDate ? invoiceDate.format("DD-MM-YYYY") : "-"}
+  </p>
+</Col>
                   <Col xs={24} sm={12} md={6}>
                     <span className="text-amber-600 text-sm">Customer</span>
                     <p className="text-amber-800 font-medium mb-0">
-                      {orderDetails.customer?.name || "-"}
+                     {orderDetails?.customer?.name || "-"}
                     </p>
                   </Col>
+                           
                 
                 </Row>
               </Card>

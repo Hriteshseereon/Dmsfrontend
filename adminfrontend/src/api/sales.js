@@ -152,3 +152,72 @@ export const updateLoadingAdvice = async (adviceId, payload) => {
   );
   return res.data;
 }
+
+// Invoice API
+
+export const getItemByOrderId = async (sales_order_id) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/sales/invoices/order-items-dropdown/`, {
+    params: { organisation: currentOrgId
+      ,sales_order_id: sales_order_id
+     },
+  });
+  return res.data;
+};
+
+export const getInvoiceDropdownData = async (sales_order_id, product_ids) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get(`/sales/invoices/preview/`, {
+    params: {
+      organisation: currentOrgId,
+      sales_order_id: sales_order_id,
+      product_ids: product_ids, // axios will send multiple params
+    },
+    paramsSerializer: (params) => {
+      const query = new URLSearchParams();
+      query.append("organisation", params.organisation);
+      query.append("sales_order_id", params.sales_order_id);
+
+      params.product_ids.forEach((id) => {
+        query.append("product_ids", id);
+      });
+
+      return query.toString();
+    },
+  });
+
+  return res.data;
+};
+
+export const createInvoice = async (payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.post("/sales/invoices/", payload, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+
+export const getInvoices = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("/sales/invoices/", {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+
+export const getInvoiceById = async (invoiceId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/sales/invoices/${invoiceId}/`, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+
+export const updateInvoice = async (invoiceId, payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.put(`/sales/invoices/${invoiceId}/`, payload, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
