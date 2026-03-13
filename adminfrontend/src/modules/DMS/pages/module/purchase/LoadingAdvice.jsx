@@ -30,13 +30,13 @@ const ALL_STATUS = [
   "Approved",
   "Dispatched",
   "In-Transit",
-  "Out for Delivery",
+  "Out for delivery",
   "Partially Delivered",
   "Delivered",
 ];
 const SALE_ORDER_STATUS_FLOW = {
-  "In-Transit": ["In-Transit", "Out for Delivery"],
-  "Out for Delivery": ["Out for Delivery", "Delivered"],
+  "In-Transit": ["In-Transit", "Out for delivery"],
+  "Out for delivery": ["Out for delivery", "Delivered"],
   "Delivered": ["Delivered"],
 };
 
@@ -45,8 +45,8 @@ const statusFlow = {
 
   Approved: ["Approved", "Dispatched"],
   Dispatched: ["Dispatched", "In-Transit"],
-  "In-Transit": ["In-Transit", "Out for Delivery"],
-  "Out for Delivery": ["Out for Delivery", "Delivered"],
+  "In-Transit": ["In-Transit", "Out for delivery"],
+  "Out for delivery": ["Out for delivery", "Delivered"],
   "Partially Delivered": ["Partially Delivered", "Delivered"],
   Delivered: ["Delivered"],
 };
@@ -376,8 +376,9 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
           "Pending Approval": "bg-orange-100 text-orange-700",
           Approved: "bg-yellow-100 text-yellow-700",
           Delivered: " bg-green-100 text-green-700",
+          Dispatched: "bg-blue-100 text-blue-700",
           "In-Transit": "bg-orange-100 text-orange-700",
-          "Out for Delivery": "bg-purple-100 text-purple-700 ",
+          "Out for delivery": "bg-purple-100 text-purple-700 ",
           "Partially Delivered": "bg-blue-100 text-blue-700"
 
 
@@ -391,30 +392,42 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
       }
 
     },
-    {
-      title: <span className="text-amber-700 font-semibold">Actions</span>,
-      key: "actions",
-      render: (_, record) => {
-        const showEdit =
-          record.driverName && record.vehicleNo && record.driverName !== "-" && record.vehicleNo !== "-";
+   {
+  title: <span className="text-amber-700 font-semibold">Actions</span>,
+  key: "actions",
+  render: (_, record) => {
 
-        return (
-          <div className="flex gap-3">
-            <EyeOutlined
-              className="cursor-pointer! text-blue-500!"
-              onClick={() => handleOpenEdit(record)}
-            />
+    const restrictedStatus = [
+      "In-Transit",
+      "Out for delivery",
+      "Partially Delivered",
+      "Delivered",
+    ];
 
-            {showEdit && (
-              <EditOutlined
-                className="cursor-pointer! text-red-500!"
-                onClick={() => handleOpenEdit(record)}
-              />
-            )}
-          </div>
-        );
-      },
-    },
+    const showEdit =
+      record.driverName &&
+      record.vehicleNo &&
+      record.driverName !== "-" &&
+      record.vehicleNo !== "-" &&
+      !restrictedStatus.includes(record.status); // 👈 hide edit
+
+    return (
+      <div className="flex gap-3">
+        <EyeOutlined
+          className="cursor-pointer! text-blue-500!"
+          onClick={() => handleOpenEdit(record)}
+        />
+
+        {showEdit && (
+          <EditOutlined
+            className="cursor-pointer! text-red-500!"
+            onClick={() => handleOpenEdit(record)}
+          />
+        )}
+      </div>
+    );
+  },
+}
   ];
   const getAllowedStatus = (formInstance) => {
     const currentStatus = formInstance.getFieldValue("status");
@@ -450,7 +463,7 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
  const renderFormFields = (disabled = false, formInstance) => {
   const status = formInstance.getFieldValue("status");
 
-  const isSalesDisabled = ["In-Transit", "Out for Delivery", "Delivered"].includes(status);
+  const isSalesDisabled = ["In-Transit", "Out for delivery", "Delivered"].includes(status);
 
   return (
     <>
@@ -498,7 +511,7 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
           </Form.Item>
         </Col>
       </Row>
-     {["Dispatched", "In-Transit", "Out for Delivery","Partially Delivered", "Delivered"].includes(
+     {["Dispatched", "In-Transit", "Out for delivery","Partially Delivered", "Delivered"].includes(
   formInstance.getFieldValue("status")
 ) && (  
     <>
@@ -570,9 +583,50 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
                               </Col>
 
                               <Col span={6}>
-                                <Form.Item label="Delivered Qty" name={[n, "delivered_qty"]}>
-                                  <Input disabled={isSalesDisabled}/>
-                                </Form.Item>
+                               <Form.Item
+  label="Delivered Qty"
+  name={[n, "delivered_qty"]}
+  rules={[
+    ({ getFieldValue }) => ({
+      validator(_, value) {
+
+        const orderQty = Number(
+          getFieldValue(["sale_orders", name, "items", n, "qty"])
+        );
+
+        const actualItems = getFieldValue("items") || [];
+
+        const actualQty = Number(actualItems[0]?.actual_qty || 0);
+
+        const allOrders = getFieldValue("sale_orders") || [];
+
+        let totalDelivered = 0;
+
+        allOrders.forEach(so => {
+          so.items?.forEach(it => {
+            totalDelivered += Number(it.delivered_qty || 0);
+          });
+        });
+
+        if (value && Number(value) > orderQty) {
+          return Promise.reject(
+            new Error(`Delivered qty cannot exceed order qty (${orderQty})`)
+          );
+        }
+
+        if (totalDelivered > actualQty) {
+          return Promise.reject(
+            new Error(`Total delivered qty cannot exceed actual qty (${actualQty})`)
+          );
+        }
+
+        return Promise.resolve();
+      },
+    }),
+  ]}
+>
+  <Input disabled={isSalesDisabled}/>
+</Form.Item>
                               </Col>
 
                             </Row>

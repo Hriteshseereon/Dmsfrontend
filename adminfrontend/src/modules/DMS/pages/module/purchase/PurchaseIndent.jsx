@@ -138,12 +138,12 @@ const handleSoudaSelect = async (contractId, formInstance, existingItems = []) =
     setContractItems(data.items || []);
      fetchSalesOrderOptions(data.vendor); 
     // Merge existing items if provided
-    const itemsToSet = existingItems.length
-      ? existingItems.map(it => ({
-          ...it,
-          uom: it.uom_details?.unit_name || it.uom, // ensure uom
-        }))
-      : [];
+   const itemsToSet = existingItems.length
+  ? existingItems.map(it => ({
+      ...it,
+      uom: it.uom_details?.unit_name || it.uom,
+    }))
+  : [{}];   // keep one empty row
 
     formInstance.setFieldsValue({
       vendor: data.vendor,
@@ -705,7 +705,7 @@ setTimeout(() => {
 
       <h6 className=" text-amber-500 mt-4">Item & Pricing Details</h6>
 
-      <Form.List name="items" initialValue={[{}]}>
+      <Form.List name="items">
         {(fields, { add, remove }) => (
           <>
             {fields.map((field, index) => (

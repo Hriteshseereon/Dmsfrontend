@@ -203,10 +203,18 @@ setIsViewModalOpen(true);
     console.log("FINAL ITEMS BEFORE PATCH", items); // ✅ HERE
     const currentRecord = selectedRecord;
      // 🚨 CHECK IF STATUS CHANGED
-    if (values.status === currentRecord.status) {
-      message.warning("Please update status before submitting");
-      return;
-    }
+   const currentStatus = currentRecord.status;
+
+// force change only before In-Transit
+const forceChangeStatuses = ["Approved", "Dispatched"];
+
+if (
+  forceChangeStatuses.includes(currentStatus) &&
+  values.status === currentStatus
+) {
+  message.warning("Please update status before submitting");
+  return;
+}
     const payload = {
       // 🔥 map UI → API fields
       advice_date: values.adviceDate?.format("YYYY-MM-DD"),
@@ -300,8 +308,8 @@ setIsViewModalOpen(true);
   };
 const getSaleOrderAllowedStatus = (currentStatus) => {
   const flow = {
-    "In-Transit": ["Out for Delivery"],
-    "Out for Delivery": ["Delivered"],
+    "In-Transit": ["Out for delivery"],
+    "Out for delivery": ["Delivered"],
     "Delivered": ["Delivered"]
   };
 
@@ -312,8 +320,8 @@ const getAllowedStatusOptions = (currentStatus) => {
   const flow = {
     Approved: ["Dispatched"],
     Dispatched: ["In-Transit"],
-    "In-Transit": ["Out for Delivery"],
-    "Out for Delivery": ["Delivered"],
+    "In-Transit": ["Out for delivery"],
+    "Out for delivery": ["Delivered"],
     "Partially Delivered": ["Partially Delivered", "Delivered"],
     Delivered: ["Delivered"],
   };
@@ -321,6 +329,17 @@ const getAllowedStatusOptions = (currentStatus) => {
   return flow[currentStatus] || [];
 };
 
+const disableAfterTransitStatuses = [
+  "Dispatched",
+  "In-Transit",
+  "Out for delivery",
+  "Partially Delivered",
+  "Delivered",
+];
+
+const isAfterTransit = disableAfterTransitStatuses.includes(
+  selectedRecord?.status
+);
  const updateItem = (key, field, value) => {
   setItems((prev) =>
     prev.map((item) => {
@@ -407,7 +426,7 @@ const renderSaleOrderDetails = () => {
 
   const visibleStatuses = [
     "In-Transit",
-    "Out for Delivery",
+    "Out for delivery",
     "Partially Delivered",
     "Delivered",
   ];
@@ -766,24 +785,7 @@ const renderLoadingDetails = (disabled = false) => (
   </Form.Item>
 </Col>
 
-        <Col span={4}>
-              <Form.Item
-                label="Status"
-                name="status"
-                rules={[{ required: true, message: "Required" }]}
-              >
-               <Select
-                 disabled={disabled} 
-  options={getAllowedStatusOptions(editForm.getFieldValue("status")).map(
-    (status) => ({
-      label: status,
-      value: status,
-    })
-  )}
-/>
-
-              </Form.Item>
-            </Col>
+       
     </Row>
   </>
 );
@@ -992,13 +994,31 @@ const renderLoadingDetails = (disabled = false) => (
                 <Input disabled/>
               </Form.Item>
             </Col>
-           
+            <Col span={4}>
+              <Form.Item
+                label="Status"
+                name="status"
+                rules={[{ required: true, message: "Required" }]}
+              >
+               <Select
+                
+  options={getAllowedStatusOptions(editForm.getFieldValue("status")).map(
+    (status) => ({
+      label: status,
+      value: status,
+    })
+  )}
+/>
+
+              </Form.Item>
+            </Col>
           
           </Row>
   {renderTransportDetails(false)}
-         {renderLoadingDetails(false)}
-       
-{renderItemsTable(false)}
+       {renderLoadingDetails(isAfterTransit)}
+
+{renderItemsTable(isAfterTransit)}
+
 
 {renderVendorPlantDetails(false)}
 
