@@ -15,7 +15,8 @@ import {
   getProductGroupById,
   updateProductGroupById,
 } from "../../../../../api/product";
-
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 export default function ProductGroupMaster() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -107,6 +108,37 @@ export default function ProductGroupMaster() {
     });
   };
 
+  // handle export button
+  const handleExport = () => {
+    if (filteredData.length === 0) {
+      message.warning("No data to export");
+      return;
+    }
+
+    // format data for excel
+    const exportData = filteredData.map((item) => ({
+      "Product Group Name": item.productGroupName,
+    }));
+
+    // create worksheet
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+    // create workbook
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Product Groups");
+
+    // generate excel file
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    });
+
+    const fileData = new Blob([excelBuffer], {
+      type: "application/octet-stream",
+    });
+
+    saveAs(fileData, "Product_Group_List.xlsx");
+  };
   /* ---------------- TABLE COLUMNS ---------------- */
   const columns = [
     {
@@ -204,6 +236,7 @@ export default function ProductGroupMaster() {
         <div className="flex gap-2">
           <Button
             icon={<DownloadOutlined />}
+            onClick={handleExport}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Export
