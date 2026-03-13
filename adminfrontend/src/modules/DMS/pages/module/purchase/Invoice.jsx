@@ -135,24 +135,28 @@ const openDocument = (file) => {
   if (!file) return;
   window.open(file, "_blank");
 };
-const handlePrint = (record) => {
+const handlePrint = async (record) => {
   if (!record.file) {
-    alert("No file uploaded");
+    alert("No file uploaded for this invoice");
     return;
   }
 
-  const fileURL = URL.createObjectURL(record.file);
+  try {
+    const response = await fetch(record.file, { mode: "cors" }); // make sure CORS is enabled
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
 
-  const iframe = document.createElement("iframe");
-  iframe.style.display = "none";
-  iframe.src = fileURL;
+    const printWindow = window.open(url);
+    if (!printWindow) throw new Error("Popup blocked");
 
-  document.body.appendChild(iframe);
-
-  iframe.onload = () => {
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
-  };
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+    };
+  } catch (err) {
+    console.error("Failed to print invoice:", err);
+    alert("Failed to print invoice. Try opening in a new tab.");
+  }
 };
 const openEditModal = async (record) => {
   try {

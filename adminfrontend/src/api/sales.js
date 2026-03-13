@@ -221,3 +221,33 @@ export const updateInvoice = async (invoiceId, payload) => {
   });
   return res.data;
 };
+
+// ---------------- DOWNLOAD INVOICE PDF ----------------
+export const downloadInvoicePDF = async (invoiceId) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get(`/sales/invoices/${invoiceId}/download-pdf/`, {
+    params: { organisation: currentOrgId },
+    responseType: "blob", // Important: tells Axios we want binary data
+  });
+
+  // Trigger browser download
+  const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `invoice_${invoiceId}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+};
+
+export const fetchInvoicePDF = async (invoiceId) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get(`/sales/invoices/${invoiceId}/download-pdf/`, {
+    params: { organisation: currentOrgId },
+    responseType: "blob", // get binary PDF data
+  });
+
+  return res.data; // returns Blob
+};

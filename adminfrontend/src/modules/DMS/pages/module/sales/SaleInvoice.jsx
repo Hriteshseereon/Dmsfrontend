@@ -21,10 +21,11 @@ import {
   DownloadOutlined,
   SearchOutlined,
   FilterOutlined,
-    PrinterOutlined
+    PrinterOutlined,
+    EditOutlined
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { getSalesOrders, getSalesOrderById ,getItemByOrderId,getInvoiceDropdownData,createInvoice,getInvoiceById,getInvoices,updateInvoice} from "../../../../../api/sales";
+import { getSalesOrders, getSalesOrderById ,getItemByOrderId,getInvoiceDropdownData,createInvoice,getInvoiceById,getInvoices,updateInvoice,downloadInvoicePDF,fetchInvoicePDF} from "../../../../../api/sales";
 
 export default function SaleInvoice() {
   const [form] = Form.useForm();
@@ -37,12 +38,15 @@ const [selectedItem, setSelectedItem] = useState(null);
   const [invoiceDate, setInvoiceDate] = useState(null);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [loadingOrder, setLoadingOrder] = useState(false);
-
+const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+const [editingInvoiceId, setEditingInvoiceId] = useState(null);
+const [editItems, setEditItems] = useState([]);
   const [selectedOrderId, setSelectedOrderId] = useState(undefined);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   useEffect(() => {
     fetchOrderOptions();
+    fetchInvoices();
   }, []);
 
   /* ---------------- FETCH ORDERS ---------------- */
@@ -65,15 +69,82 @@ const [selectedItem, setSelectedItem] = useState(null);
       setLoadingOrders(false);
     }
   };
-const handleDownload = (record) => {
-  message.success(`Downloading Invoice ${record.id}`);
-  console.log("Download invoice:", record);
+
+
+const handlePrint = async (record) => {
+  try {
+    message.loading({
+      content: `Preparing Invoice ${record.invoiceNumber} for print...`,
+      key: "print",
+    });
+
+    // Fetch the PDF from your backend
+    const pdfBlob = await fetchInvoicePDF(record.id); // must return Blob
+
+    // Create a blob URL
+    const blobUrl = window.URL.createObjectURL(pdfBlob);
+
+    // Open in new tab
+    const printWindow = window.open(blobUrl, "_blank");
+    if (!printWindow) throw new Error("Popup blocked. Please allow popups.");
+
+    message.success({
+      content: `Invoice ${record.invoiceNumber} ready!`,
+      key: "print",
+      duration: 2,
+    });
+
+    // Optional: you can auto-call print after PDF loads
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+    };
+  } catch (error) {
+    console.error(error);
+    message.error({
+      content: "Failed to open invoice for printing",
+      key: "print",
+      duration: 2,
+    });
+  }
 };
 
-const handlePrint = (record) => {
-  message.success(`Printing Invoice ${record.id}`);
-  console.log("Print invoice:", record);
+const fetchInvoices = async () => {
+  try {
+    const res = await getInvoices();
+
+    const rows = (res || []).map((inv) => ({
+      id: inv.id,
+       sales_order_id: inv.sales_order_id,
+      invoiceNumber: inv.sale_invoice_number,
+      orderNumber: inv.order_number,
+      customerName: inv.customer_name,
+      invoiceDate: inv.invoice_date,
+
+      // ✅ take directly from items
+      deliveredAmount: inv.items?.[0]?.delivered_amount || 0,
+      creditedQuantityAmount: inv.items?.[0]?.credited_amount || 0,
+    }));
+
+    setSavedInvoices(rows);
+
+  } catch (error) {
+    console.error(error);
+    message.error("Failed to load invoices");
+  }
 };
+
+const handleDownload = async (record) => {
+  try {
+    message.loading({ content: `Downloading Invoice ${record.invoiceNumber}...`, key: 'download' });
+    await downloadInvoicePDF(record.id);
+    message.success({ content: `Invoice ${record.invoiceNumber} downloaded!`, key: 'download', duration: 2 });
+  } catch (error) {
+    console.error(error);
+    message.error({ content: `Failed to download invoice`, key: 'download', duration: 2 });
+  }
+};
+
   /* ---------------- ORDER SELECT ---------------- */
 
  const onOrderSelect = async (orderId) => {
@@ -153,53 +224,50 @@ const onItemSelect = async (product_ids) => {
 };
   /* ---------------- DELIVERED CHANGE ---------------- */
 
-const onDeliveredQtyChange = (value, index) => {
+// ---------- Step 1: reusable calculation ----------
+const updateItemAmounts = (items, value, index) => {
   const numVal = Number(value) || 0;
+  const next = [...items];
+  const required = Number(next[index].requiredQty) || 0;
+  const rate = Number(next[index].rate) || 0;
+  const creditedQty = Math.max(0, required - numVal);
 
-  setItemsWithDelivery((prev) => {
-    const next = [...prev];
+  next[index] = {
+    ...next[index],
+    deliveredQty: numVal,
+    creditedQty,
+    deliveredAmount: numVal * rate,
+    creditedAmount: creditedQty * rate,
+  };
 
-    if (next[index]) {
-      const required = Number(next[index].requiredQty) || 0;
-      const rate = Number(next[index].rate) || 0;
-
-      const creditedQty = Math.max(0, required - numVal);
-
-      next[index] = {
-        ...next[index],
-        deliveredQty: numVal,
-        creditedQty,
-        deliveredAmount: numVal * rate,   // ✅ stored
-        creditedAmount: creditedQty * rate // ✅ stored
-      };
-    }
-
-    return next;
-  });
+  return next;
 };
+
+
+const onDeliveredQtyChange = (value, index) => {
+  setItemsWithDelivery(prev => updateItemAmounts(prev, value, index));
+};
+
 
   /* ---------------- TOTALS ---------------- */
 
- const getTotals = () => {
+const getTotals = (items) => {
   let totalAmount = 0;
   let creditedQuantityAmount = 0;
 
-  itemsWithDelivery.forEach((row) => {
-    const delivered = parseFloat(row.deliveredQty) || 0;
-    const rate = parseFloat(row.rate) || 0;
-    const credited = parseFloat(row.creditedQty) || 0;
-
-    totalAmount += delivered * rate;
-    creditedQuantityAmount += credited * rate;
+  items.forEach(row => {
+    totalAmount += Number(row.deliveredAmount) || 0;
+    creditedQuantityAmount += Number(row.creditedAmount) || 0;
   });
 
   return { totalAmount, creditedQuantityAmount };
 };
 
-  const { totalAmount, creditedQuantityAmount } =
-    orderDetails && itemsWithDelivery.length
-      ? getTotals()
-      : { totalAmount: 0, creditedQuantityAmount: 0 };
+
+ const { totalAmount, creditedQuantityAmount } = 
+  orderDetails && itemsWithDelivery.length
+    ? getTotals(itemsWithDelivery)
+    : { totalAmount: 0, creditedQuantityAmount: 0 };
 
   /* ---------------- SAVE INVOICE ---------------- */
 const handleSubmit = async (values) => {
@@ -233,6 +301,7 @@ const handleSubmit = async (values) => {
     await createInvoice(payload);
 
     message.success("Invoice created successfully");
+    fetchInvoices(); 
     closeModal();
 
   } catch (err) {
@@ -242,7 +311,106 @@ const handleSubmit = async (values) => {
 };
 
   /* ---------------- MODAL HELPERS ---------------- */
+const handleEdit = async (record) => {
+  try {
+    const res = await getInvoiceById(record.id);
 
+    setEditingInvoiceId(record.id);
+
+    // Set invoice date
+    setInvoiceDate(dayjs(res.invoice_date));
+
+    // Set order details from invoice
+    const orderInfo = {
+      order_number: res.order_number,
+      order_date: res.order_date,
+      expected_receiving_date: res.delivery_date,
+      customer: { name: res.customer_name },
+    };
+    setOrderDetails(orderInfo); // ✅ important
+
+    // Prepare items
+    const items = res.items || [];
+    const rows = items.map((item, index) => {
+      const rate = Number(item.rate || 0);
+      const deliveredQty = Number(item.delivered_qty || 0);
+      const requiredQty = Number(item.required_qty || 0);
+      const creditedQty = Math.max(0, requiredQty - deliveredQty);
+
+      return {
+        key: index,
+        itemId: item.sales_order_item_id,
+        productId: item.product_id,
+        productName: item.product_name,
+        uom: item.uom_name,
+        hsnCode: item.hsn_code,
+        rate,
+        requiredQty,
+        deliveredQty,
+        creditedQty,
+        deliveredAmount: deliveredQty * rate,
+        creditedAmount: creditedQty * rate
+      };
+    });
+
+    setEditItems(rows);
+
+    setIsEditModalOpen(true);
+  } catch (error) {
+    console.error(error);
+    message.error("Failed to load invoice");
+  }
+};
+const onEditDeliveredQtyChange = (value, index) => {
+  setEditItems(prev => updateItemAmounts(prev, value, index));
+};
+
+const handleUpdateInvoice = async () => {
+  try {
+
+    const res = await getInvoiceById(editingInvoiceId);
+
+    const payload = {
+      sales_order_db_id: res.sales_order_db_id,
+      sales_order_number: res.sales_order_number,
+      order_date: res.order_date,
+      invoice_date: invoiceDate.format("YYYY-MM-DD"),
+      delivery_date: res.delivery_date,
+
+      customer_id: res.customer_id,
+      customer_name: res.customer_name,
+
+      items: editItems.map((row) => ({
+        sales_order_item_id: row.itemId,
+        product_id: row.productId,
+        product_name: row.productName,
+        uom_name: row.uom,
+        hsn_code: row.hsnCode,
+
+        rate: row.rate,
+        required_qty: row.requiredQty,
+
+        delivered_qty: row.deliveredQty,
+        delivered_amount: row.deliveredAmount,
+
+        credited_qty: row.creditedQty,
+        credited_amount: row.creditedAmount
+      }))
+    };
+
+    await updateInvoice(editingInvoiceId, payload);
+
+    message.success("Invoice updated successfully");
+
+    fetchInvoices();
+
+    setIsEditModalOpen(false);
+
+  } catch (error) {
+    console.error(error);
+    message.error("Update failed");
+  }
+};
   const openModal = () => {
     setSelectedOrderId(undefined);
     setOrderDetails(null);
@@ -334,11 +502,11 @@ const handleSubmit = async (values) => {
   /* ---------------- INVOICE LIST COLUMNS ---------------- */
 
   const invoiceColumns = [
-    {
-      title: <span className="text-amber-700 font-semibold">Invoice #</span>,
-      dataIndex: "id",
-      render: (id) => <span className="text-amber-800">{id}</span>,
-    },
+   {
+  title: <span className="text-amber-700 font-semibold">Invoice </span>,
+  dataIndex: "invoiceNumber",
+  render: (t) => <span className="text-amber-800">{t}</span>,
+},
     {
       title: <span className="text-amber-700 font-semibold">Order No</span>,
       dataIndex: "orderNumber",
@@ -359,53 +527,54 @@ const handleSubmit = async (values) => {
       ),
     },
     {
-      title: <span className="text-amber-700 font-semibold">Total Amount</span>,
-      dataIndex: "totalAmount",
+      title: <span className="text-amber-700 font-semibold">Deliverd Amount</span>,
+      dataIndex: "deliveredAmount",
       render: (n) => (
         <span className="text-amber-800 font-medium">
-          {Number(n) != null ? Number(n).toFixed(2) : "0.00"}
+          {n}
         </span>
       ),
     },
     {
       title: (
         <span className="text-amber-700 font-semibold">
-          Credited Qty Amount
+          Credited Amount
         </span>
       ),
       dataIndex: "creditedQuantityAmount",
       render: (n) => (
-        <span
-          className={
-            Number(n) > 0 ? "text-red-600 font-semibold" : "text-amber-600"
-          }
-        >
-          {Number(n) != null ? Number(n).toFixed(2) : "0.00"}
+        <span className="text-amber-800 font-medium"
+          >{n}
         </span>
       ),
     },
-    {
+  {
   title: <span className="text-amber-700 font-semibold">Action</span>,
   key: "action",
   render: (_, record) => (
     <div className="flex gap-2">
-      <Button
-        icon={<DownloadOutlined />}
+
+      <EditOutlined
+        size="small"
+        onClick={() => handleEdit(record)}
+        className=" text-blue-500!"
+      >
+        Edit
+      </EditOutlined>
+
+      <DownloadOutlined
+       
         size="small"
         onClick={() => handleDownload(record)}
-        className="bg-amber-500! text-white!" 
-      >
-       
-      </Button>
+        className=" text-amber-500!"
+      />
 
-      <Button
-        icon={<PrinterOutlined />}
+      <PrinterOutlined
+        
         size="small"
         onClick={() => handlePrint(record)}
-        className="bg-green-600! text-white!"
-      >
-       
-      </Button>
+        className="text-green-500!"
+      />
     </div>
   ),
 }
@@ -459,14 +628,13 @@ const handleSubmit = async (values) => {
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
        
 
-        <Table
-          columns={invoiceColumns}
-          dataSource={savedInvoices}
-          rowKey="id"
-          scroll={{ x: 700 }}
-          pagination={savedInvoices.length > 10 ? { pageSize: 10 } : false}
-         
-        />
+      <Table
+  columns={invoiceColumns}
+  dataSource={savedInvoices}
+  rowKey="id"
+  scroll={{ x: 700 }}
+  pagination={savedInvoices.length > 10 ? { pageSize: 10 } : false}
+/>
       </div>
 
       {/* ADD INVOICE MODAL */}
@@ -654,6 +822,135 @@ const handleSubmit = async (values) => {
           )}
         </Form>
       </Modal>
+    <Modal
+  title={
+    <span className="text-amber-700 font-semibold text-base">
+      Edit Sales Invoice
+    </span>
+  }
+  open={isEditModalOpen}
+  width={960}
+  onCancel={() => setIsEditModalOpen(false)}
+  footer={null}
+  destroyOnClose
+>
+  <Form layout="vertical">
+    {/* Order Details Card */}
+    <Card
+      size="small"
+      className="mb-4 border-amber-200 bg-amber-50/50"
+      title={<span className="text-amber-800 font-semibold">Order Details</span>}
+    >
+      <Row gutter={[16, 8]}>
+        <Col xs={24} sm={12} md={4}>
+          <span className="text-amber-600 text-sm">Order No</span>
+          <p className="text-amber-800 font-medium mb-0">
+            {orderDetails?.order_number || "-"}
+          </p>
+        </Col>
+        <Col xs={24} sm={12} md={4}>
+          <span className="text-amber-600 text-sm">Order Date</span>
+          <p className="text-amber-800 font-medium mb-0">
+            {orderDetails?.order_date
+              ? dayjs(orderDetails.order_date).format("DD-MM-YYYY")
+              : "-"}
+          </p>
+        </Col>
+        <Col xs={24} sm={12} md={4}>
+          <span className="text-amber-600 text-sm">Delivery Date</span>
+          <p className="text-amber-800 font-medium mb-0">
+            {orderDetails?.expected_receiving_date
+              ? dayjs(orderDetails.expected_receiving_date).format("DD-MM-YYYY")
+              : "-"}
+          </p>
+        </Col>
+        <Col xs={24} sm={12} md={4}>
+          <span className="text-amber-600 text-sm">Invoice Date</span>
+          <DatePicker
+            value={invoiceDate}
+            onChange={(d) => setInvoiceDate(d)}
+            className="w-full"
+          />
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <span className="text-amber-600 text-sm">Customer</span>
+          <p className="text-amber-800 font-medium mb-0">
+            {orderDetails?.customer?.name || "-"}
+          </p>
+        </Col>
+      </Row>
+    </Card>
+
+    {/* Items Table */}
+    <div className="mb-4">
+      <h3 className="text-amber-700 font-semibold mb-2">
+        Items – Required vs Delivered
+      </h3>
+      <Table
+        columns={[
+          { title: "Item", dataIndex: "productName" },
+          { title: "UOM", dataIndex: "uom" },
+          { title: "HSN Code", dataIndex: "hsnCode" },
+          { title: "Rate", dataIndex: "rate" },
+          { title: "Required Qty", dataIndex: "requiredQty" },
+          {
+            title: "Delivered Qty",
+            render: (_, record, index) => (
+              <InputNumber
+                min={0}
+                value={record.deliveredQty}
+                onChange={(v) => onEditDeliveredQtyChange(v, index)}
+              />
+            ),
+          },
+          { title: "Credited Qty", dataIndex: "creditedQty" },
+          { title: "Delivered Amount", dataIndex: "deliveredAmount" },
+          { title: "Credited Amount", dataIndex: "creditedAmount" },
+        ]}
+        dataSource={editItems}
+        pagination={false}
+        rowKey="key"
+      />
+    </div>
+
+    {/* Totals Card */}
+    <Card size="small" className="mb-4 border-amber-200 bg-amber-50/30">
+      <Row gutter={24}>
+        <Col xs={24} sm={12} md={8}>
+          <span className="text-amber-600 block text-sm">Delivered Amount</span>
+          <span className="text-amber-800 text-xl font-semibold">
+            {editItems.reduce((sum, r) => sum + r.deliveredAmount, 0).toFixed(2)}
+          </span>
+        </Col>
+        <Col xs={24} sm={12} md={8}>
+          <span className="text-amber-600 block text-sm">Credited Amount</span>
+          <span
+            className={
+              editItems.reduce((sum, r) => sum + r.creditedAmount, 0) > 0
+                ? "text-red-600 text-xl font-semibold"
+                : "text-amber-800 text-xl font-semibold"
+            }
+          >
+            {editItems.reduce((sum, r) => sum + r.creditedAmount, 0).toFixed(2)}
+          </span>
+        </Col>
+      </Row>
+    </Card>
+
+    {/* Actions */}
+    <div className="flex justify-end gap-2">
+      <Button onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
+      <Button
+        type="primary"
+        onClick={handleUpdateInvoice}
+        className="bg-amber-500! hover:bg-amber-600!"
+      >
+        Update Invoice
+      </Button>
+    </div>
+  </Form>
+</Modal>
+
     </div>
   );
 }
