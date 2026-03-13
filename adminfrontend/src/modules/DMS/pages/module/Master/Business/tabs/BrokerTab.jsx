@@ -770,7 +770,7 @@ export default function BrokerTab() {
                       icon={<UploadOutlined />}
                       style={{ width: "100%" }}
                     >
-                      Select File
+                      Upload
                     </Button>
                   </Upload>
                 </Form.Item>
