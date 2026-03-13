@@ -7,6 +7,7 @@ import {
   ReloadOutlined,
   DollarOutlined,
 } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
 import {
   LineChart,
   Line,
@@ -88,13 +89,24 @@ const iconMap = {
 const COLORS = ["#d97706", "#f59e0b", "#fbbf24", "#fcd34d"];
 
 export default function AssetDashboard() {
+  const navigate = useNavigate();
+  const cardRoutes = {
+    "Asset Category": "/ams/assetcategory",
+    "Total Asset": "/ams/assetadd",
+    "Asset On Maintenance": "/ams/assetmaintenance",
+    "Asset Depriciation": "/ams/assetdepreciation",
+  };
   return (
     <div className="p-2">
       {/* Top Cards */}
       <Row gutter={16} className="mb-2 flex flex-wrap">
         {dashboardJSON.topCards.map((card, index) => (
           <Col key={index} flex="1" className="mb-4">
-            <Card className="p-1! h-full! border-1! border-amber-500! bg-amber-50!">
+            <Card
+              hoverable
+              onClick={() => navigate(cardRoutes[card.title])}
+              className="p-1! h-full! border-1! border-amber-500! bg-amber-50! cursor-pointer!"
+            >
               <div className="flex items-center text-amber-800 mb-3 gap-3">
                 {iconMap[card.icon]}
                 <p className="text-amber-800 text-md m-0">{card.title}</p>
@@ -112,9 +124,7 @@ export default function AssetDashboard() {
         <Col span={12}>
           <Card
             title={
-              <span className="text-amber-700 font-bold">
-                Asser Allocation
-              </span>
+              <span className="text-amber-700 font-bold">Asset Allocation</span>
             }
           >
             <ResponsiveContainer width="100%" height={250}>
@@ -136,9 +146,7 @@ export default function AssetDashboard() {
         <Col span={12}>
           <Card
             title={
-              <span className="text-amber-700 font-bold">
-                Asset Disposal
-              </span>
+              <span className="text-amber-700 font-bold">Asset Disposal</span>
             }
           >
             <ResponsiveContainer width="100%" height={250}>
@@ -190,8 +198,8 @@ export default function AssetDashboard() {
               </PieChart>
             </ResponsiveContainer> */}
 
-            {/* Legend */}
-            {/* <div className="flex space-x-12 mt-2 flex-nowrap overflow-auto">
+      {/* Legend */}
+      {/* <div className="flex space-x-12 mt-2 flex-nowrap overflow-auto">
               {dashboardJSON.returnData.map((entry, index) => (
                 <div key={index} className="flex items-center">
                   <div

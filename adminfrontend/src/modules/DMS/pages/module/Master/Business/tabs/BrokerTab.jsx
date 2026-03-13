@@ -747,7 +747,7 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-              <Col span={6}>
+              <Col span={4}>
                 <Form.Item
                   label="PAN Document"
                   name="panDoc"
@@ -757,6 +757,7 @@ export default function BrokerTab() {
                   <Upload
                     beforeUpload={() => false}
                     maxCount={1}
+                    style={{ width: "100%" }}
                     listType="picture"
                     onPreview={(file) =>
                       window.open(
@@ -764,8 +765,12 @@ export default function BrokerTab() {
                       )
                     }
                   >
-                    <Button disabled={viewMode} icon={<UploadOutlined />}>
-                      Select File
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
+                      Upload
                     </Button>
                   </Upload>
                 </Form.Item>
@@ -790,7 +795,7 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-              <Col span={6}>
+              <Col span={4}>
                 <Form.Item
                   label="Aadhar Document"
                   name="aadharDoc"
@@ -801,21 +806,26 @@ export default function BrokerTab() {
                     beforeUpload={() => false}
                     maxCount={1}
                     listType="picture"
+                    style={{ width: "100%" }}
                     onPreview={(file) =>
                       window.open(
                         file.url || URL.createObjectURL(file.originFileObj),
                       )
                     }
                   >
-                    <Button disabled={viewMode} icon={<UploadOutlined />}>
-                      Select File
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
+                      Upload
                     </Button>
                   </Upload>
                 </Form.Item>
               </Col>
 
               {/* Bank Details */}
-              <Col span={6}>
+              <Col span={4}>
                 <Form.Item label="Bank AC number" name="bankDetails">
                   <Input
                     className={inputClass}
@@ -826,7 +836,7 @@ export default function BrokerTab() {
               </Col>
 
               {/* Passport Photo */}
-              <Col span={6}>
+              <Col span={4}>
                 <Form.Item
                   label="Passport Photo"
                   name="passportPhoto"
@@ -836,6 +846,7 @@ export default function BrokerTab() {
                   <Upload
                     beforeUpload={() => false}
                     maxCount={1}
+                    style={{ width: "100%" }}
                     listType="picture"
                     onPreview={(file) =>
                       window.open(
@@ -843,8 +854,12 @@ export default function BrokerTab() {
                       )
                     }
                   >
-                    <Button disabled={viewMode} icon={<UploadOutlined />}>
-                      Select File
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
+                      Upload
                     </Button>
                   </Upload>
                 </Form.Item>
@@ -860,7 +875,7 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-              <Col span={6}>
+              <Col span={4}>
                 <Form.Item
                   label="GSTIN Document"
                   name="gstinDoc"
@@ -870,6 +885,7 @@ export default function BrokerTab() {
                   <Upload
                     beforeUpload={() => false}
                     maxCount={1}
+                    style={{ width: "100%" }}
                     listType="picture"
                     onPreview={(file) =>
                       window.open(
@@ -877,8 +893,12 @@ export default function BrokerTab() {
                       )
                     }
                   >
-                    <Button disabled={viewMode} icon={<UploadOutlined />}>
-                      Select File
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
+                      Upload
                     </Button>
                   </Upload>
                 </Form.Item>

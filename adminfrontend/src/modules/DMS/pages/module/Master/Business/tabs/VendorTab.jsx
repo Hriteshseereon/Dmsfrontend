@@ -761,6 +761,7 @@ export default function VendorTab() {
                   <Upload
                     beforeUpload={() => false}
                     maxCount={1}
+                    style={{ width: "100%" }}
                     listType="picture"
                     onPreview={(file) => {
                       window.open(
@@ -768,7 +769,11 @@ export default function VendorTab() {
                       );
                     }}
                   >
-                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
                       Upload
                     </Button>
                   </Upload>
@@ -794,6 +799,7 @@ export default function VendorTab() {
                   <Upload
                     beforeUpload={() => false}
                     maxCount={1}
+                    style={{ width: "100%" }}
                     listType="picture"
                     onPreview={(file) => {
                       window.open(
@@ -801,7 +807,11 @@ export default function VendorTab() {
                       );
                     }}
                   >
-                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
                       Upload
                     </Button>
                   </Upload>
@@ -843,6 +853,7 @@ export default function VendorTab() {
                   <Upload
                     beforeUpload={() => false}
                     maxCount={1}
+                    style={{ width: "100%" }}
                     listType="picture"
                     onPreview={(file) => {
                       window.open(
@@ -850,7 +861,11 @@ export default function VendorTab() {
                       );
                     }}
                   >
-                    <Button disabled={viewMode} icon={<UploadOutlined />}>
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
                       Upload
                     </Button>
                   </Upload>
