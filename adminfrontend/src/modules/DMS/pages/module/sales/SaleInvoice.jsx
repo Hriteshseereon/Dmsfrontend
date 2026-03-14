@@ -25,7 +25,7 @@ import {
     EditOutlined
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { getSalesOrders, getSalesOrderById ,getItemByOrderId,getInvoiceDropdownData,createInvoice,getInvoiceById,getInvoices,updateInvoice,downloadInvoicePDF,fetchInvoicePDF} from "../../../../../api/sales";
+import { getEligibleOrders, getSalesOrderById ,getItemByOrderId,getInvoiceDropdownData,createInvoice,getInvoiceById,getInvoices,updateInvoice,downloadInvoicePDF,fetchInvoicePDF} from "../../../../../api/sales";
 
 export default function SaleInvoice() {
   const [form] = Form.useForm();
@@ -43,7 +43,9 @@ const [editingInvoiceId, setEditingInvoiceId] = useState(null);
 const [editItems, setEditItems] = useState([]);
   const [selectedOrderId, setSelectedOrderId] = useState(undefined);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-
+const [editOrderId, setEditOrderId] = useState(null);
+const [editItemOptions, setEditItemOptions] = useState([]);
+const [editSelectedItems, setEditSelectedItems] = useState([]);
   useEffect(() => {
     fetchOrderOptions();
     fetchInvoices();
@@ -54,13 +56,11 @@ const [editItems, setEditItems] = useState([]);
   const fetchOrderOptions = async () => {
     setLoadingOrders(true);
     try {
-      const res = await getSalesOrders();
-      const options = (res || []).map((o) => ({
-        value: o.sales_order_id,
-        label: `${o.order_number || o.sales_order_id}${
-          o.customer?.name ? ` - ${o.customer.name}` : ""
-        }`,
-      }));
+      const res = await getEligibleOrders();
+     const options = (res || []).map((o) => ({
+  value: o.sales_order_id,          // ✅ id sent to backend
+  label: `${o.sales_order_number} - ${o.customer_name}`,  // ✅ visible in dropdown
+}));
       setOrderOptions(options);
     } catch (err) {
       console.error("Failed to fetch sales orders:", err);
@@ -157,7 +157,10 @@ const handleDownload = async (record) => {
   try {
     // ✅ fetch order details
     const order = await getSalesOrderById(orderId);
-    setOrderDetails(order);
+   setOrderDetails({
+  ...order,
+  delivery_date: order.delivery_date
+});
 
     // ✅ fetch order items
     const items = await getItemByOrderId(orderId);
@@ -178,9 +181,15 @@ const onItemSelect = async (product_ids) => {
   try {
     setLoadingOrder(true);
 
-    const res = await getInvoiceDropdownData(selectedOrderId, product_ids);
+   const res = await getInvoiceDropdownData(selectedOrderId, product_ids);
 
-    const items = res?.items || res;
+// ✅ SET DELIVERY DATE HERE
+setOrderDetails(prev => ({
+  ...prev,
+  delivery_date: res.delivery_date
+}));
+
+const items = res?.items || res;
 
    const rows = items.map((item, index) => {
   const rate = Number(item.rate || 0);
@@ -309,7 +318,41 @@ const handleSubmit = async (values) => {
     message.error("Failed to create invoice");
   }
 };
+const onEditItemSelect = async (product_ids) => {
+  try {
+    const res = await getInvoiceDropdownData(editOrderId, product_ids);
 
+    const items = res?.items || res;
+
+    const rows = items.map((item, index) => {
+      const rate = Number(item.rate || 0);
+      const deliveredQty = Number(item.suggested_delivered_qty || 0);
+      const requiredQty = Number(item.required_qty || 0);
+      const creditedQty = Math.max(0, requiredQty - deliveredQty);
+
+      return {
+        key: item.sales_order_item_id || index,
+        itemId: item.sales_order_item_id,
+        productId: item.product_id,
+        productName: item.product_name,
+        uom: item.uom_name,
+        rate,
+        requiredQty,
+        deliveredQty,
+        creditedQty,
+        deliveredAmount: deliveredQty * rate,
+        creditedAmount: creditedQty * rate
+      };
+    });
+
+    setEditItems(rows);
+    setEditSelectedItems(product_ids);
+
+  } catch (err) {
+    console.error(err);
+    message.error("Failed to load items");
+  }
+};
   /* ---------------- MODAL HELPERS ---------------- */
 const handleEdit = async (record) => {
   try {
@@ -317,21 +360,35 @@ const handleEdit = async (record) => {
 
     setEditingInvoiceId(record.id);
 
-    // Set invoice date
-    setInvoiceDate(dayjs(res.invoice_date));
+    setEditOrderId(res.sales_order_id);
 
-    // Set order details from invoice
-    const orderInfo = {
+   
+
+    // ✅ SET ORDER DETAILS (this is missing)
+    setOrderDetails({
       order_number: res.order_number,
       order_date: res.order_date,
-      expected_receiving_date: res.delivery_date,
-      customer: { name: res.customer_name },
-    };
-    setOrderDetails(orderInfo); // ✅ important
+      delivery_date: res.delivery_date,
+      invoice_date: res.invoice_date,
+      customer: {
+        name: res.customer_name
+      }
+    });
 
-    // Prepare items
-    const items = res.items || [];
-    const rows = items.map((item, index) => {
+    // fetch items of order for dropdown
+    const items = await getItemByOrderId(res.sales_order_id);
+
+    const options = items.map((item) => ({
+      value: item.product_id,
+      label: item.product_name,
+    }));
+
+    setEditItemOptions(options);
+
+    const selectedProducts = res.items.map((i) => i.product_id);
+    setEditSelectedItems(selectedProducts);
+
+    const rows = res.items.map((item, index) => {
       const rate = Number(item.rate || 0);
       const deliveredQty = Number(item.delivered_qty || 0);
       const requiredQty = Number(item.required_qty || 0);
@@ -356,6 +413,7 @@ const handleEdit = async (record) => {
     setEditItems(rows);
 
     setIsEditModalOpen(true);
+
   } catch (error) {
     console.error(error);
     message.error("Failed to load invoice");
@@ -734,11 +792,11 @@ const handleUpdateInvoice = async () => {
                     <span className="text-amber-600 text-sm">
                       Delivery Date
                     </span>
-                    <p className="text-amber-800 font-medium mb-0">
-                     {orderDetails?.expected_receiving_date
-  ? dayjs(orderDetails.expected_receiving_date).format("DD-MM-YYYY")
-  : "-"}
-                    </p>
+                  <p className="text-amber-800 font-medium mb-0">
+  {orderDetails?.delivery_date
+    ? dayjs(orderDetails.delivery_date).format("DD-MM-YYYY")
+    : "-"}
+</p>
                   </Col>
 <Col xs={24} sm={12} md={4}>
   <span className="text-amber-600 text-sm">Invoice Date</span>
@@ -835,6 +893,28 @@ const handleUpdateInvoice = async () => {
   destroyOnClose
 >
   <Form layout="vertical">
+    <Row gutter={16}>
+  <Col md={8}>
+    <Form.Item label="Sales Order">
+      <Select
+        value={editOrderId}
+        options={orderOptions}
+        disabled
+      />
+    </Form.Item>
+  </Col>
+
+  <Col md={8}>
+    <Form.Item label="Item">
+      <Select
+        mode="multiple"
+        value={editSelectedItems}
+        options={editItemOptions}
+        onChange={onEditItemSelect}
+      />
+    </Form.Item>
+  </Col>
+</Row>
     {/* Order Details Card */}
     <Card
       size="small"
@@ -859,8 +939,8 @@ const handleUpdateInvoice = async () => {
         <Col xs={24} sm={12} md={4}>
           <span className="text-amber-600 text-sm">Delivery Date</span>
           <p className="text-amber-800 font-medium mb-0">
-            {orderDetails?.expected_receiving_date
-              ? dayjs(orderDetails.expected_receiving_date).format("DD-MM-YYYY")
+            {orderDetails?.delivery_date
+              ? dayjs(orderDetails.delivery_date).format("DD-MM-YYYY")
               : "-"}
           </p>
         </Col>

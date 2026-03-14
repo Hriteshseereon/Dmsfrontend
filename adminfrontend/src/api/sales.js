@@ -155,6 +155,17 @@ export const updateLoadingAdvice = async (adviceId, payload) => {
 
 // Invoice API
 
+// Get Order dropdown data for invoice creation
+export const getEligibleOrders = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get("/sales/invoice/eligible-orders/", {
+    params: { organisation: currentOrgId },
+  });
+
+  return res.data;
+};
+
 export const getItemByOrderId = async (sales_order_id) => {
   const { currentOrgId } = useSessionStore.getState();
   const res = await api.get(`/sales/invoices/order-items-dropdown/`, {

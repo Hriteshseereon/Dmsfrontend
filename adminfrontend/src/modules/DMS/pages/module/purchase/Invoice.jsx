@@ -53,7 +53,7 @@ const fetchInvoices = async () => {
 
     const formatted = res.map((item) => ({
       key: item.id,
-      invoiceNo: item.invoice_no,
+      invoiceNo: item.invoice_number,
       vendor: item.vendor,
      file: item.document_url
     }));
