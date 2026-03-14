@@ -30,13 +30,13 @@ const ALL_STATUS = [
   "Approved",
   "Dispatched",
   "In-Transit",
-  "Out for delivery",
+  "Out for Delivery",
   "Partially Delivered",
   "Delivered",
 ];
 const SALE_ORDER_STATUS_FLOW = {
-  "In-Transit": ["In-Transit", "Out for delivery"],
-  "Out for delivery": ["Out for delivery", "Delivered"],
+  "In-Transit": ["In-Transit", "Out for Delivery"],
+  "Out for Delivery": ["Out for Delivery", "Delivered"],
   "Delivered": ["Delivered"],
 };
 
@@ -45,8 +45,8 @@ const statusFlow = {
 
   Approved: ["Approved", "Dispatched"],
   Dispatched: ["Dispatched", "In-Transit"],
-  "In-Transit": ["In-Transit", "Out for delivery"],
-  "Out for delivery": ["Out for delivery", "Delivered"],
+  "In-Transit": ["In-Transit", "Out for Delivery"],
+  "Out for Delivery": ["Out for Delivery", "Delivered"],
   "Partially Delivered": ["Partially Delivered", "Delivered"],
   Delivered: ["Delivered"],
 };
@@ -274,13 +274,94 @@ export default function LoadingAdvice() {
       message.error("Failed to load data");
     }
   };
+const handleOpenView = async (record) => {
+  try {
+    const res = await getLoadingAdviceById(record.id);
 
+    viewForm.setFieldsValue({
+      advice_no: res.advice_no,
+      invoiceNo: res.invoice_number,
+      lodingadvicedate: res.advice_date ? dayjs(res.advice_date) : null,
+      status: res.status,
+
+      companyName: res.vendor_name,
+      companyAddress: res.vendor_addresses?.[0]?.address_line1 || "",
+      contactPerson: res.vendor_details?.contact_person || "",
+      contactNo: res.vendor_details?.contact_person_no || "",
+
+      plantName: res.plant_name,
+      plantAddress: res.plant_details?.address || "",
+      plantContactPerson: res.vendor_details?.contact_person || "",
+      plantPhone: res.plant_details?.phone_number || "",
+
+      transporter: res.transporter_name,
+      vehicleNo: res.vehicle_number,
+      driverName: res.driver_name,
+      driverContact: res.driver_contact,
+
+      insuranceValidUpto: res.insurance_valid_upto
+        ? dayjs(res.insurance_valid_upto)
+        : null,
+
+      puValidUpto: res.pu_valid_upto
+        ? dayjs(res.pu_valid_upto)
+        : null,
+
+      fitnessValidUpto: res.fitness_valid_upto
+        ? dayjs(res.fitness_valid_upto)
+        : null,
+
+      vehicleInTime: res.vehicle_in_time,
+      vehicleOutTime: res.vehicle_out_time,
+      tareWeight: res.tare_weight_kg,
+      netWeight: res.net_weight_kg,
+
+      items: res.items?.map((itm) => ({
+        id: itm.id,
+        product: itm.product,
+        product_name: itm.product_name,
+        required_qty: itm.required_qty,
+        actual_qty: itm.actual_qty,
+        variance: itm.variance,
+      })),
+
+      sale_orders: res.deliveries?.map((delivery) => ({
+        delivery_id: delivery.id,
+        sale_order_no: delivery.sales_order_number,
+        customer_name: delivery.customer_name,
+        delivery_address: delivery.customer_delivery_address,
+        delivery_date: delivery.delivery_date
+          ? dayjs(delivery.delivery_date)
+          : null,
+        status: delivery.status,
+
+        items: delivery.items?.map((itm) => ({
+          item_id: itm.id,
+          product_name: itm.item_name,
+          qty: itm.order_qty,
+          delivered_qty: itm.delivered_qty,
+        })),
+      })),
+    });
+
+    setSelectedRecord(res);
+    setIsViewModalOpen(true);
+
+  } catch (error) {
+    console.error("Error fetching loading advice:", error);
+    message.error("Failed to load data");
+  }
+};
   const handleEdit = async (values) => {
     try {
-       if (values.status === selectedRecord.status) {
-    messageApi.warning("Please change status to update");
+        if (
+      ["Pending Approval", "Dispatched"].includes(selectedRecord.status) &&
+      values.status === selectedRecord.status
+    ) {
+      messageApi.warning("Please change status to update");
       return;
     }
+
       const payload = {
         status: values.status,
 
@@ -378,7 +459,7 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
           Delivered: " bg-green-100 text-green-700",
           Dispatched: "bg-blue-100 text-blue-700",
           "In-Transit": "bg-orange-100 text-orange-700",
-          "Out for delivery": "bg-purple-100 text-purple-700 ",
+          "Out for Delivery": "bg-purple-100 text-purple-700 ",
           "Partially Delivered": "bg-blue-100 text-blue-700"
 
 
@@ -399,7 +480,7 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
 
     const restrictedStatus = [
       "In-Transit",
-      "Out for delivery",
+      "Out for Delivery",
       "Partially Delivered",
       "Delivered",
     ];
@@ -408,14 +489,14 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
       record.driverName &&
       record.vehicleNo &&
       record.driverName !== "-" &&
-      record.vehicleNo !== "-" &&
-      !restrictedStatus.includes(record.status); // 👈 hide edit
+      record.vehicleNo !== "-" 
+     // !restrictedStatus.includes(record.status); // 👈 hide edit
 
     return (
       <div className="flex gap-3">
         <EyeOutlined
           className="cursor-pointer! text-blue-500!"
-          onClick={() => handleOpenEdit(record)}
+          onClick={() => handleOpenView(record)}
         />
 
         {showEdit && (
@@ -463,7 +544,7 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
  const renderFormFields = (disabled = false, formInstance) => {
   const status = formInstance.getFieldValue("status");
 
-  const isSalesDisabled = ["In-Transit", "Out for delivery", "Delivered"].includes(status);
+  const isSalesDisabled = ["In-Transit", "Out for Delivery","Partially Delivered", "Delivered"].includes(status);
 
   return (
     <>
@@ -498,12 +579,14 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
         </Col>
 
         <Col span={6}>
-          <Form.Item label="Status" name="status" rules={[{ required: true }]}>
-            <Select
-              placeholder="Select Status"
-              disabled={disabled && !isEditModalOpen}
-            >
-              {getAllowedStatus(formInstance).map((status) => (<Option key={status} value={status}>
+         <Form.Item label="Status" name="status" rules={[{ required: true }]}>
+  <Select
+    placeholder="Select Status"
+    disabled={
+      ["In-Transit", "Out for Delivery", "Partially Delivered", "Delivered"]
+        .includes(formInstance.getFieldValue("status"))
+    }
+  >     {getAllowedStatus(formInstance).map((status) => (<Option key={status} value={status}>
                 {status}
               </Option>
               ))}
@@ -511,7 +594,7 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
           </Form.Item>
         </Col>
       </Row>
-     {["Dispatched", "In-Transit", "Out for delivery","Partially Delivered", "Delivered"].includes(
+     {["Dispatched", "In-Transit", "Out for Delivery","Partially Delivered", "Delivered"].includes(
   formInstance.getFieldValue("status")
 ) && (  
     <>
@@ -552,7 +635,7 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
                       </Col>
                     <Col span={6}>
   <Form.Item label="Status" name={[name, "status"]}>
-    <Select>
+      <Select disabled={disabled}>
       {getSaleOrderAllowedStatus(
         formInstance.getFieldValue(["sale_orders", name, "status"])
       ).map((st) => (
@@ -560,6 +643,7 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
           {st}
         </Option>
       ))}
+      
     </Select>
   </Form.Item>
 </Col>

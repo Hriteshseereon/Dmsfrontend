@@ -206,7 +206,7 @@ setIsViewModalOpen(true);
    const currentStatus = currentRecord.status;
 
 // force change only before In-Transit
-const forceChangeStatuses = ["Approved", "Dispatched"];
+const forceChangeStatuses = ["Approved"];
 
 if (
   forceChangeStatuses.includes(currentStatus) &&
@@ -274,7 +274,7 @@ if (
       
       case "In-Transit":
         return `${base} bg-blue-100! text-blue-700!`;
-      case "Out for delivery":
+      case "Out for Delivery":
         return `${base} bg-yellow-100! text-yellow-700!`;
         case "Partially Delivered":
         return `${base} bg-purple-100! text-purple-700!`;
@@ -308,8 +308,8 @@ if (
   };
 const getSaleOrderAllowedStatus = (currentStatus) => {
   const flow = {
-    "In-Transit": ["Out for delivery"],
-    "Out for delivery": ["Delivered"],
+    "In-Transit": ["Out for Delivery"],
+    "Out for Delivery": ["Delivered"],
     "Delivered": ["Delivered"]
   };
 
@@ -320,8 +320,8 @@ const getAllowedStatusOptions = (currentStatus) => {
   const flow = {
     Approved: ["Dispatched"],
     Dispatched: ["In-Transit"],
-    "In-Transit": ["Out for delivery"],
-    "Out for delivery": ["Delivered"],
+    "In-Transit": ["Out for Delivery"],
+    "Out for Delivery": ["Delivered"],
     "Partially Delivered": ["Partially Delivered", "Delivered"],
     Delivered: ["Delivered"],
   };
@@ -332,7 +332,7 @@ const getAllowedStatusOptions = (currentStatus) => {
 const disableAfterTransitStatuses = [
   "Dispatched",
   "In-Transit",
-  "Out for delivery",
+  "Out for Delivery",
   "Partially Delivered",
   "Delivered",
 ];
@@ -426,7 +426,7 @@ const renderSaleOrderDetails = () => {
 
   const visibleStatuses = [
     "In-Transit",
-    "Out for delivery",
+    "Out for Delivery",
     "Partially Delivered",
     "Delivered",
   ];
@@ -784,7 +784,25 @@ const renderLoadingDetails = (disabled = false) => (
     />
   </Form.Item>
 </Col>
+ <Col span={4}>
+              <Form.Item
+                label="Status"
+                name="status"
+                rules={[{ required: true, message: "Required" }]}
+              >
+               <Select
+                
+  options={getAllowedStatusOptions(editForm.getFieldValue("status")).map(
+    (status) => ({
+      label: status,
+      value: status,
+    })
+  )}
+    disabled={disabled}
+/>
 
+              </Form.Item>
+            </Col>
        
     </Row>
   </>
@@ -994,24 +1012,7 @@ const renderLoadingDetails = (disabled = false) => (
                 <Input disabled/>
               </Form.Item>
             </Col>
-            <Col span={4}>
-              <Form.Item
-                label="Status"
-                name="status"
-                rules={[{ required: true, message: "Required" }]}
-              >
-               <Select
-                
-  options={getAllowedStatusOptions(editForm.getFieldValue("status")).map(
-    (status) => ({
-      label: status,
-      value: status,
-    })
-  )}
-/>
-
-              </Form.Item>
-            </Col>
+          
           
           </Row>
   {renderTransportDetails(false)}

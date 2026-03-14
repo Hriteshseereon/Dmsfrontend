@@ -15,7 +15,10 @@ export const getLoadingAdviceById = async (loadingdId) => {
 
  //update assigned order
 export const updateLoadingAdvice = async (loadingAdviceId, payload) => {
-  const res = await api.patch(`/transport/portal/loading-advices/${loadingAdviceId}/reached_plant/`,payload, {
+  const currentOrgId = useSessionStore.getState().currentOrgId;
+ 
+  const res = await api.patch(`/transport/loading-advices/${loadingAdviceId}/`,payload, {
+     params: { organisation: currentOrgId }
   });
   return res.data;
 };
