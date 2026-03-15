@@ -19,7 +19,7 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { exportToExcel } from "../../../../../utils/exportToExcel";
-import { getSaleDisputes,getSaleDisputeById ,createSaleDispute,updateSaleDispute,getDisputeById} from "../../../../../api/sales";
+import { getSaleDisputes, getSaleDisputeById, createSaleDispute, updateSaleDispute, getDisputeById } from "../../../../../api/sales";
 const reasonsList = [
   "Quality Issue",
   "Damaged Packaging",
@@ -46,9 +46,9 @@ const generateDisputeNo = (existingRecords) => {
 };
 
 export default function SalesDispute() {
- const [records, setRecords] = useState([]);
-const [filteredData, setFilteredData] = useState([]);
-const [searchText, setSearchText] = useState(""); const [isModalOpen, setIsModalOpen] = useState(false);
+  const [records, setRecords] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
+  const [searchText, setSearchText] = useState(""); const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalRecord, setModalRecord] = useState(null);
   const [modalMode, setModalMode] = useState("view"); // "view" | "edit" | "dispute"
   const [form] = Form.useForm();
@@ -65,113 +65,53 @@ const [searchText, setSearchText] = useState(""); const [isModalOpen, setIsModal
       )
     );
   }, [searchText, records]);
-useEffect(() => {
-  loadDisputes();
-}, []);
+  useEffect(() => {
+    loadDisputes();
+  }, []);
 
-const loadDisputes = async () => {
-  try {
-    const res = await getSaleDisputes();
-
-    const rows = res.map((r, index) => ({
-      key: index,
-       dispute_id: r.dispute_id,
-      sale_invoice_id: r.sale_invoice_id,
-      invoiceNo: r.sale_invoice_number,
-      orderNo: r.order_number,
-      plantName: r.plant_name,
-      returnDate: r.return_date,
-      disputeNo: r.dispute_no,
-     status: r.status === "Dispute Raised" ? "Pending" : r.status,
-      items: r.items?.map((i, idx) => ({
-        id: idx,
-        item: i
-      })) || []
-    }));
-
-    setRecords(rows);
-  } catch (error) {
-    console.error(error);
-  }
-};
-const openModal = async (record, mode = "view") => {
-  try {
-
-    let res;
-
-    // 🔹 VIEW and EDIT → same API
-    if (mode === "view" || mode === "edit") {
-      res = await getDisputeById(record.dispute_id);
-    }
-
-    // 🔹 RAISE DISPUTE → invoice API
-    if (mode === "dispute") {
-      res = await getSaleDisputeById(record.sale_invoice_id);
-    }
-
-    const items = res.items.map((it) => ({
-      id: it.invoice_item_id,
-      item: it.item,
-      itemCode: it.item_code,
-      uom: it.uom_name,
-      rate: it.rate,
-      quantity: it.order_qty,
-      returnQty: it.return_qty,
-      returnReason: it.reason,
-      otherReasonText: it.other_reason
-    }));
-
-    const modalData = {
-      dispute_id: res.dispute_id,
-      sale_invoice_id: res.sale_invoice_id,
-      invoiceNo: res.invoice_no,
-      orderNo: res.order_no,
-      plantName: res.plant_name,
-      disputeNo: res.dispute_number,
-      date: res.date,
-      status: res.status,
-      items
-    };
-
-    setModalRecord(modalData);
-    setModalMode(mode);
-
-    const otherFlag = {};
-    const qtyInit = {};
-
-    items.forEach((it) => {
-      otherFlag[it.id] = it.returnReason === "Other";
-      qtyInit[it.id] = it.returnQty || 0;
-    });
-
-    form.setFieldsValue({
-      status: res.status,
-      ...items.reduce((acc, it) => {
-        acc[`qty_${it.id}`] = it.returnQty;
-        acc[`reason_${it.id}`] = it.returnReason;
-        acc[`other_${it.id}`] = it.otherReasonText;
-        return acc;
-      }, {})
-    });
-
-    setIsOtherReason(otherFlag);
-    setQtyState(qtyInit);
-    setIsModalOpen(true);
-
-  } catch (error) {
-    console.error(error);
-  }
-};
-
-const handleExport = async () => {
-  const exportData = [];
-
-  for (const record of filteredData) {
+  const loadDisputes = async () => {
     try {
-      // Fetch detailed item info for this invoice
-      const res = await getDisputeById(record.dispute_id);
-      
-      const items = res.items.map(it => ({
+      const res = await getSaleDisputes();
+
+      const rows = res.map((r, index) => ({
+        key: index,
+        dispute_id: r.dispute_id,
+        sale_invoice_id: r.sale_invoice_id,
+        invoiceNo: r.sale_invoice_number,
+        orderNo: r.order_number,
+        plantName: r.plant_name,
+        returnDate: r.return_date,
+        disputeNo: r.dispute_no,
+        status: r.status === "Dispute Raised" ? "Pending" : r.status,
+        items: r.items?.map((i, idx) => ({
+          id: idx,
+          item: i
+        })) || []
+      }));
+
+      setRecords(rows);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+  const openModal = async (record, mode = "view") => {
+    try {
+
+      let res;
+
+      // 🔹 VIEW and EDIT → same API
+      if (mode === "view" || mode === "edit") {
+        res = await getDisputeById(record.dispute_id);
+      }
+
+      // 🔹 RAISE DISPUTE → invoice API
+      if (mode === "dispute") {
+        res = await getSaleDisputeById(record.sale_invoice_id);
+      }
+
+      const items = res.items.map((it) => ({
+        id: it.id,                       // dispute item id (used for UPDATE)
+        invoice_item_id: it.invoice_item_id,  // used for CREATE
         item: it.item,
         itemCode: it.item_code,
         uom: it.uom_name,
@@ -182,34 +122,95 @@ const handleExport = async () => {
         otherReasonText: it.other_reason
       }));
 
-      // Flatten items for export
-      items.forEach(item => {
-        exportData.push({
-          "Invoice No": record.invoiceNo,
-          "Order No": record.orderNo,
-          Plant: record.plantName || "N/A",
-          Date: record.returnDate,
-          "Dispute No": record.disputeNo || "N/A",
-          Status: record.status,
-          Item: item.item,
-          "Item Code": item.itemCode || "",
-          UOM: item.uom || "",
-          Rate: item.rate || 0,
-          "Order Qty": item.quantity || 0,
-          "Return Qty": item.returnQty || 0,
-          Reason: item.returnReason === "Other" ? item.otherReasonText : item.returnReason,
-          Total: (item.returnQty || 0) * (item.rate || 0)
-        });
+      const modalData = {
+        dispute_id: res.dispute_id,
+        sale_invoice_id: res.sale_invoice_id,
+        invoiceNo: res.invoice_no,
+        orderNo: res.order_no,
+        plantName: res.plant_name,
+        disputeNo: res.dispute_number,
+        date: res.date,
+        status: res.status,
+        items
+      };
+
+      setModalRecord(modalData);
+      setModalMode(mode);
+
+      const otherFlag = {};
+      const qtyInit = {};
+
+      items.forEach((it) => {
+        otherFlag[it.id] = it.returnReason === "Other";
+        qtyInit[it.id] = it.returnQty || 0;
       });
 
-    } catch (error) {
-      console.error(`Failed to fetch details for invoice ${record.invoiceNo}`, error);
-    }
-  }
+      form.setFieldsValue({
+        status: res.status,
+        ...items.reduce((acc, it) => {
+          acc[`qty_${it.id}`] = it.returnQty;
+          acc[`reason_${it.id}`] = it.returnReason;
+          acc[`other_${it.id}`] = it.otherReasonText;
+          return acc;
+        }, {})
+      });
 
-  // Export to Excel
-  exportToExcel(exportData, "Sales_Disputes");
-};
+      setIsOtherReason(otherFlag);
+      setQtyState(qtyInit);
+      setIsModalOpen(true);
+
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleExport = async () => {
+    const exportData = [];
+
+    for (const record of filteredData) {
+      try {
+        // Fetch detailed item info for this invoice
+        const res = await getDisputeById(record.dispute_id);
+
+        const items = res.items.map(it => ({
+          item: it.item,
+          itemCode: it.item_code,
+          uom: it.uom_name,
+          rate: it.rate,
+          quantity: it.order_qty,
+          returnQty: it.return_qty,
+          returnReason: it.reason,
+          otherReasonText: it.other_reason
+        }));
+
+        // Flatten items for export
+        items.forEach(item => {
+          exportData.push({
+            "Invoice No": record.invoiceNo,
+            "Order No": record.orderNo,
+            Plant: record.plantName || "N/A",
+            Date: record.returnDate,
+            "Dispute No": record.disputeNo || "N/A",
+            Status: record.status,
+            Item: item.item,
+            "Item Code": item.itemCode || "",
+            UOM: item.uom || "",
+            Rate: item.rate || 0,
+            "Order Qty": item.quantity || 0,
+            "Return Qty": item.returnQty || 0,
+            Reason: item.returnReason === "Other" ? item.otherReasonText : item.returnReason,
+            Total: (item.returnQty || 0) * (item.rate || 0)
+          });
+        });
+
+      } catch (error) {
+        console.error(`Failed to fetch details for invoice ${record.invoiceNo}`, error);
+      }
+    }
+
+    // Export to Excel
+    exportToExcel(exportData, "Sales_Disputes");
+  };
   const updateOtherReason = (id, value) => {
     setIsOtherReason((prev) => ({ ...prev, [id]: value === "Other" }));
   };
@@ -219,108 +220,108 @@ const handleExport = async () => {
     form.setFieldsValue({ [`qty_${id}`]: value });
   };
 
- const handleSave = async () => {
-  try {
-    await form.validateFields();
-    const values = form.getFieldsValue();
+  const handleSave = async () => {
+    try {
+      await form.validateFields();
+      const values = form.getFieldsValue();
 
-    const updatedItems = (modalRecord.items || []).map((it) => ({
-      ...it,
-      returnQty: values[`qty_${it.id}`] || 0,
-      returnReason: values[`reason_${it.id}`] || "",
-      otherReasonText: values[`other_${it.id}`] || "",
-      totalAmount: (values[`qty_${it.id}`] || 0) * it.rate,
-    }));
+      const updatedItems = (modalRecord.items || []).map((it) => ({
+        ...it,
+        returnQty: values[`qty_${it.id}`] || 0,
+        returnReason: values[`reason_${it.id}`] || "",
+        otherReasonText: values[`other_${it.id}`] || "",
+        totalAmount: (values[`qty_${it.id}`] || 0) * it.rate,
+      }));
 
-    const hasReturn = updatedItems.some((i) => i.returnQty > 0);
-    if (!hasReturn) {
-      Modal.error({
-        title: "Validation Error",
-        content: "Please enter return quantity for at least one item.",
-      });
-      return;
+      const hasReturn = updatedItems.some((i) => i.returnQty > 0);
+      if (!hasReturn) {
+        Modal.error({
+          title: "Validation Error",
+          content: "Please enter return quantity for at least one item.",
+        });
+        return;
+      }
+
+      const invalidReason = updatedItems.some(
+        (i) =>
+          i.returnQty > 0 &&
+          (!i.returnReason ||
+            (i.returnReason === "Other" && !i.otherReasonText))
+      );
+
+      if (invalidReason) {
+        Modal.error({
+          title: "Validation Error",
+          content: "Please provide a reason for all items with return quantity.",
+        });
+        return;
+      }
+
+      let disputeNo = modalRecord.disputeNo;
+      if (modalMode === "dispute" && !disputeNo) {
+        disputeNo = generateDisputeNo(records);
+      }
+      if (modalMode === "edit") {
+
+        const disputeItems = updatedItems
+          .filter((i) => i.returnQty > 0)
+          .map((i) => ({
+            id: i.id,
+            return_qty: i.returnQty,
+            reason: i.returnReason,
+            other_reason: i.otherReasonText
+          }));
+
+        const payload = {
+          dispute_id: modalRecord.dispute_id,
+          sale_invoice_id: modalRecord.sale_invoice_id,
+          status: values.status,
+          items: disputeItems
+        };
+
+        await updateSaleDispute(modalRecord.dispute_id, payload); // ✅ UPDATE API
+      }
+      // 🔹 API CALL WHEN RAISE DISPUTE
+      if (modalMode === "dispute") {
+        const disputeItems = updatedItems
+          .filter((i) => i.returnQty > 0)
+          .map((i) => ({
+          invoice_item_id: i.invoice_item_id,
+            return_qty: i.returnQty,
+            reason: i.returnReason,
+            other_reason: i.otherReasonText,
+          }));
+
+        const payload = {
+          sale_invoice_id: modalRecord.sale_invoice_id,
+          dispute_no: disputeNo,
+          status: values.status,
+          items: disputeItems,
+        };
+
+        await createSaleDispute(payload);
+      }
+
+      const newRecord = {
+        ...modalRecord,
+        disputeNo,
+        itemsReturned: updatedItems.filter((i) => i.returnQty > 0),
+        status: values.status,
+      };
+
+      setRecords((prev) =>
+        prev.map((r) =>
+          r.invoiceNo === newRecord.invoiceNo ? newRecord : r
+        )
+      );
+
+      await loadDisputes(); // refresh table
+      setIsModalOpen(false);
+
+    } catch (error) {
+      console.error(error);
     }
-
-    const invalidReason = updatedItems.some(
-      (i) =>
-        i.returnQty > 0 &&
-        (!i.returnReason ||
-          (i.returnReason === "Other" && !i.otherReasonText))
-    );
-
-    if (invalidReason) {
-      Modal.error({
-        title: "Validation Error",
-        content: "Please provide a reason for all items with return quantity.",
-      });
-      return;
-    }
-
-    let disputeNo = modalRecord.disputeNo;
-    if (modalMode === "dispute" && !disputeNo) {
-      disputeNo = generateDisputeNo(records);
-    }
-if (modalMode === "edit") {
-
-  const disputeItems = updatedItems
-    .filter((i) => i.returnQty > 0)
-    .map((i) => ({
-      invoice_item_id: i.id,
-      return_qty: i.returnQty,
-      reason: i.returnReason,
-      other_reason: i.otherReasonText
-    }));
-
-  const payload = {
-    dispute_id: modalRecord.dispute_id,
-    sale_invoice_id: modalRecord.sale_invoice_id,
-    status: values.status,
-    items: disputeItems
   };
-
-  await updateSaleDispute(payload); // ✅ UPDATE API
-}
-    // 🔹 API CALL WHEN RAISE DISPUTE
-    if (modalMode === "dispute") {
-      const disputeItems = updatedItems
-        .filter((i) => i.returnQty > 0)
-        .map((i) => ({
-          invoice_item_id: i.id,
-          return_qty: i.returnQty,
-          reason: i.returnReason,
-          other_reason: i.otherReasonText,
-        }));
-
-   const payload = {
-  sale_invoice_id: modalRecord.sale_invoice_id,
-  dispute_no: disputeNo,
-  status: values.status,
-  items: disputeItems,
-};
-
-      await createSaleDispute(payload);
-    }
-
-    const newRecord = {
-      ...modalRecord,
-      disputeNo,
-      itemsReturned: updatedItems.filter((i) => i.returnQty > 0),
-      status: values.status,
-    };
-
-    setRecords((prev) =>
-      prev.map((r) =>
-        r.invoiceNo === newRecord.invoiceNo ? newRecord : r
-      )
-    );
-
-    await loadDisputes(); // refresh table
-    setIsModalOpen(false);
-
-  } catch (error) {
-    console.error(error);
-  }
-};
 
   const statusTag = (status) => {
     const map = {
@@ -352,9 +353,10 @@ if (modalMode === "edit") {
     {
       title: <span className="text-amber-700!">Dispute No</span>,
       dataIndex: "disputeNo",
-      render: (text) => (
-        <span className="text-amber-700!">{text || "-"}</span>
-      ),
+      render: (text, record) =>
+        record.status !== "Delivered" ? (
+          <span className="text-amber-700!">{text || "-"}</span>
+        ) : null,
     },
     {
       title: <span className="text-amber-700!">Return Date</span>,
@@ -376,7 +378,7 @@ if (modalMode === "edit") {
         </span>
       ),
     },
-    
+
     {
       title: <span className="text-amber-700!">Status</span>,
       dataIndex: "status",
@@ -385,39 +387,41 @@ if (modalMode === "edit") {
     {
       title: <span className="text-amber-700!">Actions</span>,
       width: 180,
-   render: (record) => (
-  <div className="flex gap-3 items-center">
-    <EyeOutlined
-      className="cursor-pointer! text-blue-500!"
-      onClick={() => openModal(record, "view")}
-    />
+      render: (_, record) => (
+        <div className="flex gap-3 items-center">
+          {record.status !== "Delivered" && (
+            <EyeOutlined
+              className="cursor-pointer! text-blue-500!"
+              onClick={() => openModal(record, "view")}
+            />
+          )}
 
 
-    {record.status === "Pending" && (
-  <EditOutlined
-    className="cursor-pointer! text-orange-500!"
-    onClick={() => openModal(record, "edit")}
-  />
-)}
+          {record.status === "Pending" && (
+            <EditOutlined
+              className="cursor-pointer! text-orange-500!"
+              onClick={() => openModal(record, "edit")}
+            />
+          )}
 
-    {/* Approved → show credit note */}
-    {record.status === "Approved" && (
-      <span className="text-green-600 font-semibold text-xs">
-        Credit Note Created
-      </span>
-    )}
+          {/* Approved → show credit note */}
+          {record.status === "Approved" && (
+            <span className="text-green-600 font-semibold text-xs">
+              Credit Note Created
+            </span>
+          )}
 
-    {/* Delivered → allow dispute */}
-    {record.status === "Delivered" && (
-      <Button
-        className="bg-amber-500! text-white! text-xs! font-semibold! px-3! py-1! rounded-md!"
-        onClick={() => openModal(record, "dispute")}
-      >
-        Raise Dispute
-      </Button>
-    )}
-  </div>
-)
+          {/* Delivered → allow dispute */}
+          {record.status === "Delivered" && (
+            <Button
+              className="bg-amber-500! text-white! text-xs! font-semibold! px-3! py-1! rounded-md!"
+              onClick={() => openModal(record, "dispute")}
+            >
+              Raise Dispute
+            </Button>
+          )}
+        </div>
+      )
     },
   ];
 
@@ -448,35 +452,35 @@ if (modalMode === "edit") {
         modalMode === "view" ? (
           row.returnQty
         ) : (
-        <Form.Item
-  name={`qty_${row.id}`}
-  style={{ margin: 0 }}
-  rules={[
-    { required: true, message: "Return quantity is required" },
-    ({ getFieldValue }) => ({
-      validator(_, value) {
-        if (value == null) return Promise.resolve();
+          <Form.Item
+            name={`qty_${row.id}`}
+            style={{ margin: 0 }}
+            rules={[
+              { required: true, message: "Return quantity is required" },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (value == null) return Promise.resolve();
 
-        if (value > row.quantity) {
-          return Promise.reject(
-            new Error(
-              `Return quantity cannot be greater than order quantity (${row.quantity})`
-            )
-          );
-        }
+                  if (value > row.quantity) {
+                    return Promise.reject(
+                      new Error(
+                        `Return quantity cannot be greater than order quantity (${row.quantity})`
+                      )
+                    );
+                  }
 
-        return Promise.resolve();
-      },
-    }),
-  ]}
->
-  <InputNumber
-    min={0}
-    value={qtyState[row.id]}
-    onChange={(v) => handleQtyChange(row.id, v)}
-    style={{ width: "100%" }}
-  />
-</Form.Item>
+                  return Promise.resolve();
+                },
+              }),
+            ]}
+          >
+            <InputNumber
+              min={0}
+              value={qtyState[row.id]}
+              onChange={(v) => handleQtyChange(row.id, v)}
+              style={{ width: "100%" }}
+            />
+          </Form.Item>
 
         ),
     },
@@ -537,12 +541,12 @@ if (modalMode === "edit") {
     modalMode === "view"
       ? <span className="text-amber-600!" >View Dispute</span>
       : modalMode === "edit"
-      ? <span className="text-amber-600!" >Edit Dispute</span>
-      : "Dispute Items";
+        ? <span className="text-amber-600!" >Edit Dispute</span>
+        : "Dispute Items";
 
   return (
     <div>
-     
+
 
       <div className="flex justify-between items-center mb-2">
         <div className="flex gap-2">
@@ -562,24 +566,24 @@ if (modalMode === "edit") {
           </Button>
         </div>
         <div className="flex gap-2">
-        <Button
-  icon={<DownloadOutlined />}
-  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-  onClick={handleExport}
->
-  Export
-</Button>
+          <Button
+            icon={<DownloadOutlined />}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            onClick={handleExport}
+          >
+            Export
+          </Button>
         </div>
       </div>
 
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
-      <Table columns={columns} dataSource={filteredData} rowKey="sale_invoice_id" /> </div>
+        <Table columns={columns} dataSource={filteredData} rowKey="sale_invoice_id" /> </div>
 
       <Modal
         title={
           <div className="flex justify-between items-center">
             <span>{modalTitle}</span>
-           
+
           </div>
         }
         open={isModalOpen}
@@ -614,31 +618,28 @@ if (modalMode === "edit") {
                   />
                 </Form.Item>
               </Col>
+              {modalRecord?.status !== "Delivered" && (
+                <Col span={4}>
+                  <Form.Item label="Dispute No">
+                    <Input
+                      value={modalRecord.disputeNo || "N/A"}
+                      disabled
+                    />
+                  </Form.Item>
+                </Col>
+              )}
               <Col span={4}>
-                <Form.Item label="Dispute No">
-                  <Input
-                    value={
-                      modalRecord.disputeNo ||
-                      (modalMode === "dispute"
-                        ? "N/A"
-                        : "N/A")
-                    }
-                    disabled
-                  />
+                <Form.Item label="Status" name="status" rules={[{ required: true, message: "Please select status" }]}>
+                  <Select placeholder="Select Status" disabled={modalMode === "view"}>
+                    <Select.Option value="Pending">Pending</Select.Option>
+                    <Select.Option value="Approved">Approved</Select.Option>
+                    <Select.Option value="Rejected">Rejected</Select.Option>
+                  </Select>
                 </Form.Item>
               </Col>
-              <Col span={4}>
-  <Form.Item label="Status" name="status"  rules={[{ required: true, message: "Please select status" }]}>
-    <Select placeholder="Select Status" >
-      <Select.Option value="Pending">Pending</Select.Option>
-      <Select.Option value="Approved">Approved</Select.Option>
-      <Select.Option value="Rejected">Rejected</Select.Option>
-    </Select>
-  </Form.Item>
-</Col>
             </Row>
 
-            
+
 
             <h6 className="text-amber-500 my-3">
               {modalMode === "view"
@@ -651,7 +652,7 @@ if (modalMode === "edit") {
               dataSource={modalRecord.itemsReturned || modalRecord.items}
               columns={modalColumns}
               pagination={false}
-              scroll={{y:300}}
+              scroll={{ y: 300 }}
               rowKey="id"
             />
           </Form>
