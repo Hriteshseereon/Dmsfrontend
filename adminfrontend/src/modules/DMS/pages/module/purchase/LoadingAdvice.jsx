@@ -594,6 +594,48 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
           </Form.Item>
         </Col>
       </Row>
+         {/* Item Details */}
+      <Row gutter={24} className="mt-2">
+        <Col span={24}>
+          <h6 className="text-amber-600 ">Items Details</h6>
+        </Col>
+
+        <Form.List name="items">
+          {(fields) => (
+            <>
+              {fields.map(({ key, name }) => (
+                <Row gutter={16} key={key} style={{ width: "100%" }} className="mt-2 ml-2! mr-2! border border-amber-200 rounded-lg p-2">
+
+
+                  <Col span={6}>
+                    <Form.Item label="Item Name" name={[name, "product_name"]}>
+                      <Input disabled className="w-full!" />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item label="Req. Qty" name={[name, "required_qty"]}>
+                      <Input disabled className="w-full!" />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item label="Actual Qty" name={[name, "actual_qty"]}>
+                      <Input disabled className="w-full!" />
+                    </Form.Item>
+                  </Col>
+                  <Col span={6}>
+                    <Form.Item label="Variance" name={[name, "variance"]}>
+                      <Input disabled className="w-full!" />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              ))}
+            </>
+          )}
+        </Form.List>
+
+      </Row>
      {["Dispatched", "In-Transit", "Out for Delivery","Partially Delivered", "Delivered"].includes(
   formInstance.getFieldValue("status")
 ) && (  
@@ -629,12 +671,12 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
                         </Form.Item>
                       </Col>
                       <Col span={6}>
-                        <Form.Item label="Delivery Date" name={[name, "delivery_date"]}>
+                        <Form.Item label="Delivery Date" name={[name, "delivery_date"]} rules={[{ required: true }]}>
                           <DatePicker className="w-full" disabled={isSalesDisabled} />
                         </Form.Item>
                       </Col>
                     <Col span={6}>
-  <Form.Item label="Status" name={[name, "status"]}>
+  <Form.Item label="Status" name={[name, "status"]} rules={[{ required: true }]}>
       <Select disabled={disabled}>
       {getSaleOrderAllowedStatus(
         formInstance.getFieldValue(["sale_orders", name, "status"])
@@ -785,53 +827,12 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
         </Col>
       </Row>
 
-      {/* Item Details */}
-      <Row gutter={24} className="mt-2">
-        <Col span={24}>
-          <h6 className="text-amber-600 ">Items Details</h6>
-        </Col>
-
-        <Form.List name="items">
-          {(fields) => (
-            <>
-              {fields.map(({ key, name }) => (
-                <Row gutter={16} key={key} style={{ width: "100%" }} className="mt-2 ml-2! mr-2! border border-amber-200 rounded-lg p-2">
-
-
-                  <Col span={6}>
-                    <Form.Item label="Item Name" name={[name, "product_name"]}>
-                      <Input disabled className="w-full!" />
-                    </Form.Item>
-                  </Col>
-
-                  <Col span={6}>
-                    <Form.Item label="Req. Qty" name={[name, "required_qty"]}>
-                      <Input disabled className="w-full!" />
-                    </Form.Item>
-                  </Col>
-
-                  <Col span={6}>
-                    <Form.Item label="Actual Qty" name={[name, "actual_qty"]}>
-                      <Input disabled className="w-full!" />
-                    </Form.Item>
-                  </Col>
-                  <Col span={6}>
-                    <Form.Item label="Variance" name={[name, "variance"]}>
-                      <Input disabled className="w-full!" />
-                    </Form.Item>
-                  </Col>
-                </Row>
-              ))}
-            </>
-          )}
-        </Form.List>
-
-      </Row>
+   
 
       {/* Transport Details (display-only) */}
       <Row gutter={24} className="mt-2">
         <Col span={24}>
-          <h6 className="text-amber-600 "> Transport Details (from transporter)</h6>
+          <h6 className="text-amber-600 "> Transport Details </h6>
         </Col>
 
         <Col span={6}>

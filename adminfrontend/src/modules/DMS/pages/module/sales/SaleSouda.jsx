@@ -463,7 +463,7 @@ const handleExport = () => {
         key: contract.sale_contract_id,
         saleContractNumber: contract.sale_contract_number,
         customer: contract.customer_name,
-        customerId: contract.customer_id,
+        customerId: contract.customer_business_id || contract.customer_id,
         customerEmail: contract.customer_email,
         customerMobile:contract.customer_mobile,
         status: contract.status,
@@ -1700,8 +1700,7 @@ const handleExport = () => {
     }}
   >
     {customers.map((c) => (
-      <Select.Option key={c.id} value={c.customer_id}>
-        {c.customer_name}
+     <Select.Option key={c.customer_id} value={c.customer_id}>   {c.customer_name}
       </Select.Option>
     ))}
   </Select>

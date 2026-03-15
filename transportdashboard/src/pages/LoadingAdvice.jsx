@@ -830,31 +830,29 @@ const renderLoadingDetails = (disabled = false) => (
            width:20,
       render: (text) => <span>{text}</span>,
     },
-    {
-      title: "Actual Qty",
-      dataIndex: "actualQty",
+   {
+  title: "Actual Qty",
+  dataIndex: "actualQty",
+  width: 20,
+  render: (_, record) => (
+    <Input
+      type="number"
+      value={record.actualQty}
+      disabled={disabled}
+      onChange={(e) => {
+        const value = Number(e.target.value);
 
-         width:20,
-    render: (_, record) => (
-  <Input
-    type="number"
-    value={record.actualQty}
-      disabled={disabled} 
-      rules={[
-      { required: true, message: "Please enter valid Actual Qty" },   
-      {
-        validator: (_, value) =>
-          value >= 0          ? Promise.resolve()
-            : Promise.reject(),
-      },
-    ]}
-    onChange={(e) =>
-      updateItem(record.key, "actualQty", e.target.value)
-    }
-    placeholder="0"
-  />
-)
-    },
+        if (value > record.reqQty) {
+          message.error("Actual Qty cannot be greater than Required Qty");
+          return;
+        }
+
+        updateItem(record.key, "actualQty", value);
+      }}
+      placeholder="0"
+    />
+  ),
+},
     {
       title: "Variance",
       dataIndex: "variance",
