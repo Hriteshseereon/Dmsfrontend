@@ -262,3 +262,45 @@ export const fetchInvoicePDF = async (invoiceId) => {
 
   return res.data; // returns Blob
 };
+
+//Sale Disputes API
+
+export const getSaleDisputes = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("/sales/dispute/invoices/", {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+
+export const getSaleDisputeById = async (invoiceId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/sales/disputes/preview/`, {
+    params: { organisation: currentOrgId  ,sale_invoice_id: invoiceId },
+  });
+  return res.data;
+};
+
+export const createSaleDispute = async (payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.post("/sales/disputes/", payload, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+
+export const updateSaleDispute = async (disputeId, payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.put(`/sales/disputes/${disputeId}/`, payload, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+ 
+export const getDisputeById = async (disputeId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/sales/disputes/${disputeId}/`, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};

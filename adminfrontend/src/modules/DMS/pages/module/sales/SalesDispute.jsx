@@ -18,7 +18,8 @@ import {
   FilterOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-
+import { exportToExcel } from "../../../../../utils/exportToExcel";
+import { getSaleDisputes,getSaleDisputeById ,createSaleDispute,updateSaleDispute,getDisputeById} from "../../../../../api/sales";
 const reasonsList = [
   "Quality Issue",
   "Damaged Packaging",
@@ -26,76 +27,7 @@ const reasonsList = [
   "Wrong Item",
 ];
 
-const saleReturnJSON = {
-  records: [
-    {
-      key: 1,
-      invoiceNo: "INV-001",
-      orderNo: "ORD-1001",
-      plantName: "Plant1",
-      returnDate: "2024-04-01",
-      status: "Approved",
-      disputeNo: "DISP-20240401-0001",
-      items: [
-        {
-          id: "it-1",
-          item: "Sunflower Oil",
-          itemCode: "code1",
-          uom: "Ltr",
-          rate: 500,
-          quantity: 50,
-          returnQty: 10,
-          returnReason: "Quality Issue",
-        },
-        {
-          id: "it-2",
-          item: "Mustard Oil",
-          itemCode: "code2",
-          uom: "Ltr",
-          rate: 600,
-          quantity: 20,
-          returnQty: 5,
-          otherReasonText: "Xyz",
-          returnReason: "Other",
-        },
-      ],
-    },
-    {
-      key: 2,
-      invoiceNo: "INV-002",
-      orderNo: "ORD-1002",
-      plantName: "Plant2",
-      returnDate: "2025-05-15",
-      status: "Delivered",
-      items: [
-        {
-          id: "it-1",
-          item: "Rice",
-          itemCode: "r1",
-          uom: "Kg",
-          rate: 40,
-          quantity: 100,
-        },
-        {
-          id: "it-2",
-          item: "Sunflower Oil",
-          itemCode: "code1",
-          uom: "Ltr",
-          rate: 500,
-          quantity: 50,
-        },
-        {
-          id: "it-3",
-          item: "Mustard Oil",
-          itemCode: "code2",
-          uom: "Ltr",
-          rate: 600,
-          quantity: 20,
-        },
-      ],
-    },
-  ],
-};
+
 
 // generate dispute number like DISP-20241213-0001
 const generateDisputeNo = (existingRecords) => {
@@ -114,11 +46,9 @@ const generateDisputeNo = (existingRecords) => {
 };
 
 export default function SalesDispute() {
-  const [records, setRecords] = useState(saleReturnJSON.records);
-  const [filteredData, setFilteredData] = useState(records);
-  const [searchText, setSearchText] = useState("");
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
+ const [records, setRecords] = useState([]);
+const [filteredData, setFilteredData] = useState([]);
+const [searchText, setSearchText] = useState(""); const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalRecord, setModalRecord] = useState(null);
   const [modalMode, setModalMode] = useState("view"); // "view" | "edit" | "dispute"
   const [form] = Form.useForm();
@@ -135,45 +65,151 @@ export default function SalesDispute() {
       )
     );
   }, [searchText, records]);
+useEffect(() => {
+  loadDisputes();
+}, []);
 
-  const openModal = (record, mode = "view") => {
-    setModalRecord(record);
-    setModalMode(mode);
+const loadDisputes = async () => {
+  try {
+    const res = await getSaleDisputes();
 
-    if (mode !== "view") {
-      const items = (record.itemsReturned || record.items || []).map(
-        (it) => ({
-          ...it,
-          returnQty: it.returnQty || 0,
-          returnReason: it.returnReason || null,
-          otherReasonText: it.otherReasonText || "",
-        })
-      );
+    const rows = res.map((r, index) => ({
+      key: index,
+       dispute_id: r.dispute_id,
+      sale_invoice_id: r.sale_invoice_id,
+      invoiceNo: r.sale_invoice_number,
+      orderNo: r.order_number,
+      plantName: r.plant_name,
+      returnDate: r.return_date,
+      disputeNo: r.dispute_no,
+     status: r.status === "Dispute Raised" ? "Pending" : r.status,
+      items: r.items?.map((i, idx) => ({
+        id: idx,
+        item: i
+      })) || []
+    }));
 
-      const otherFlag = {};
-      const qtyInit = {};
-      items.forEach((it) => {
-        otherFlag[it.id] = it.returnReason === "Other";
-        qtyInit[it.id] = it.returnQty || 0;
-      });
+    setRecords(rows);
+  } catch (error) {
+    console.error(error);
+  }
+};
+const openModal = async (record, mode = "view") => {
+  try {
 
-      form.setFieldsValue(
-        items.reduce((acc, it) => {
-          acc[`qty_${it.id}`] = it.returnQty;
-          acc[`reason_${it.id}`] = it.returnReason;
-          acc[`other_${it.id}`] = it.otherReasonText;
-          
-          return acc;
-        }, {})
-      );
+    let res;
 
-      setIsOtherReason(otherFlag);
-      setQtyState(qtyInit);
+    // 🔹 VIEW and EDIT → same API
+    if (mode === "view" || mode === "edit") {
+      res = await getDisputeById(record.dispute_id);
     }
 
-    setIsModalOpen(true);
-  };
+    // 🔹 RAISE DISPUTE → invoice API
+    if (mode === "dispute") {
+      res = await getSaleDisputeById(record.sale_invoice_id);
+    }
 
+    const items = res.items.map((it) => ({
+      id: it.invoice_item_id,
+      item: it.item,
+      itemCode: it.item_code,
+      uom: it.uom_name,
+      rate: it.rate,
+      quantity: it.order_qty,
+      returnQty: it.return_qty,
+      returnReason: it.reason,
+      otherReasonText: it.other_reason
+    }));
+
+    const modalData = {
+      dispute_id: res.dispute_id,
+      sale_invoice_id: res.sale_invoice_id,
+      invoiceNo: res.invoice_no,
+      orderNo: res.order_no,
+      plantName: res.plant_name,
+      disputeNo: res.dispute_number,
+      date: res.date,
+      status: res.status,
+      items
+    };
+
+    setModalRecord(modalData);
+    setModalMode(mode);
+
+    const otherFlag = {};
+    const qtyInit = {};
+
+    items.forEach((it) => {
+      otherFlag[it.id] = it.returnReason === "Other";
+      qtyInit[it.id] = it.returnQty || 0;
+    });
+
+    form.setFieldsValue({
+      status: res.status,
+      ...items.reduce((acc, it) => {
+        acc[`qty_${it.id}`] = it.returnQty;
+        acc[`reason_${it.id}`] = it.returnReason;
+        acc[`other_${it.id}`] = it.otherReasonText;
+        return acc;
+      }, {})
+    });
+
+    setIsOtherReason(otherFlag);
+    setQtyState(qtyInit);
+    setIsModalOpen(true);
+
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const handleExport = async () => {
+  const exportData = [];
+
+  for (const record of filteredData) {
+    try {
+      // Fetch detailed item info for this invoice
+      const res = await getDisputeById(record.dispute_id);
+      
+      const items = res.items.map(it => ({
+        item: it.item,
+        itemCode: it.item_code,
+        uom: it.uom_name,
+        rate: it.rate,
+        quantity: it.order_qty,
+        returnQty: it.return_qty,
+        returnReason: it.reason,
+        otherReasonText: it.other_reason
+      }));
+
+      // Flatten items for export
+      items.forEach(item => {
+        exportData.push({
+          "Invoice No": record.invoiceNo,
+          "Order No": record.orderNo,
+          Plant: record.plantName || "N/A",
+          Date: record.returnDate,
+          "Dispute No": record.disputeNo || "N/A",
+          Status: record.status,
+          Item: item.item,
+          "Item Code": item.itemCode || "",
+          UOM: item.uom || "",
+          Rate: item.rate || 0,
+          "Order Qty": item.quantity || 0,
+          "Return Qty": item.returnQty || 0,
+          Reason: item.returnReason === "Other" ? item.otherReasonText : item.returnReason,
+          Total: (item.returnQty || 0) * (item.rate || 0)
+        });
+      });
+
+    } catch (error) {
+      console.error(`Failed to fetch details for invoice ${record.invoiceNo}`, error);
+    }
+  }
+
+  // Export to Excel
+  exportToExcel(exportData, "Sales_Disputes");
+};
   const updateOtherReason = (id, value) => {
     setIsOtherReason((prev) => ({ ...prev, [id]: value === "Other" }));
   };
@@ -183,66 +219,108 @@ export default function SalesDispute() {
     form.setFieldsValue({ [`qty_${id}`]: value });
   };
 
-  const handleSave = async () => {
-    try {
-      await form.validateFields();
-      const values = form.getFieldsValue();
+ const handleSave = async () => {
+  try {
+    await form.validateFields();
+    const values = form.getFieldsValue();
 
-      const updatedItems = (modalRecord.items || []).map((it) => ({
-        ...it,
-        returnQty: values[`qty_${it.id}`] || 0,
-        returnReason: values[`reason_${it.id}`] || "",
-        otherReasonText: values[`other_${it.id}`] || "",
-        totalAmount: (values[`qty_${it.id}`] || 0) * it.rate,
-      }));
+    const updatedItems = (modalRecord.items || []).map((it) => ({
+      ...it,
+      returnQty: values[`qty_${it.id}`] || 0,
+      returnReason: values[`reason_${it.id}`] || "",
+      otherReasonText: values[`other_${it.id}`] || "",
+      totalAmount: (values[`qty_${it.id}`] || 0) * it.rate,
+    }));
 
-      const hasReturn = updatedItems.some((i) => i.returnQty > 0);
-      if (!hasReturn) {
-        Modal.error({
-          title: "Validation Error",
-          content: "Please enter return quantity for at least one item.",
-        });
-        return;
-      }
-
-      const invalidReason = updatedItems.some(
-        (i) =>
-          i.returnQty > 0 &&
-          (!i.returnReason ||
-            (i.returnReason === "Other" && !i.otherReasonText))
-      );
-      if (invalidReason) {
-        Modal.error({
-          title: "Validation Error",
-          content:
-            "Please provide a reason for all items with return quantity.",
-        });
-        return;
-      }
-
-      // if this is coming from "Raise Dispute", make sure there is a disputeNo
-      let disputeNo = modalRecord.disputeNo;
-      if (modalMode === "dispute" && !disputeNo) {
-        disputeNo = generateDisputeNo(records);
-      }
-
-      const newRecord = {
-        ...modalRecord,
-        disputeNo,
-        itemsReturned: updatedItems.filter((i) => i.returnQty > 0),
-      status: values.status,
-      };
-
-      setRecords((prev) =>
-        prev.map((r) =>
-          r.invoiceNo === newRecord.invoiceNo ? newRecord : r
-        )
-      );
-      setIsModalOpen(false);
-    } catch (err) {
-      // validation errors handled above
+    const hasReturn = updatedItems.some((i) => i.returnQty > 0);
+    if (!hasReturn) {
+      Modal.error({
+        title: "Validation Error",
+        content: "Please enter return quantity for at least one item.",
+      });
+      return;
     }
+
+    const invalidReason = updatedItems.some(
+      (i) =>
+        i.returnQty > 0 &&
+        (!i.returnReason ||
+          (i.returnReason === "Other" && !i.otherReasonText))
+    );
+
+    if (invalidReason) {
+      Modal.error({
+        title: "Validation Error",
+        content: "Please provide a reason for all items with return quantity.",
+      });
+      return;
+    }
+
+    let disputeNo = modalRecord.disputeNo;
+    if (modalMode === "dispute" && !disputeNo) {
+      disputeNo = generateDisputeNo(records);
+    }
+if (modalMode === "edit") {
+
+  const disputeItems = updatedItems
+    .filter((i) => i.returnQty > 0)
+    .map((i) => ({
+      invoice_item_id: i.id,
+      return_qty: i.returnQty,
+      reason: i.returnReason,
+      other_reason: i.otherReasonText
+    }));
+
+  const payload = {
+    dispute_id: modalRecord.dispute_id,
+    sale_invoice_id: modalRecord.sale_invoice_id,
+    status: values.status,
+    items: disputeItems
   };
+
+  await updateSaleDispute(payload); // ✅ UPDATE API
+}
+    // 🔹 API CALL WHEN RAISE DISPUTE
+    if (modalMode === "dispute") {
+      const disputeItems = updatedItems
+        .filter((i) => i.returnQty > 0)
+        .map((i) => ({
+          invoice_item_id: i.id,
+          return_qty: i.returnQty,
+          reason: i.returnReason,
+          other_reason: i.otherReasonText,
+        }));
+
+   const payload = {
+  sale_invoice_id: modalRecord.sale_invoice_id,
+  dispute_no: disputeNo,
+  status: values.status,
+  items: disputeItems,
+};
+
+      await createSaleDispute(payload);
+    }
+
+    const newRecord = {
+      ...modalRecord,
+      disputeNo,
+      itemsReturned: updatedItems.filter((i) => i.returnQty > 0),
+      status: values.status,
+    };
+
+    setRecords((prev) =>
+      prev.map((r) =>
+        r.invoiceNo === newRecord.invoiceNo ? newRecord : r
+      )
+    );
+
+    await loadDisputes(); // refresh table
+    setIsModalOpen(false);
+
+  } catch (error) {
+    console.error(error);
+  }
+};
 
   const statusTag = (status) => {
     const map = {
@@ -314,13 +392,13 @@ export default function SalesDispute() {
       onClick={() => openModal(record, "view")}
     />
 
-    {/* Only Pending → show Edit */}
+
     {record.status === "Pending" && (
-      <EditOutlined
-        className="cursor-pointer! text-orange-500!"
-        onClick={() => openModal(record, "edit")}
-      />
-    )}
+  <EditOutlined
+    className="cursor-pointer! text-orange-500!"
+    onClick={() => openModal(record, "edit")}
+  />
+)}
 
     {/* Approved → show credit note */}
     {record.status === "Approved" && (
@@ -484,18 +562,18 @@ export default function SalesDispute() {
           </Button>
         </div>
         <div className="flex gap-2">
-          <Button
-            icon={<DownloadOutlined />}
-            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          >
-            Export
-          </Button>
+        <Button
+  icon={<DownloadOutlined />}
+  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+  onClick={handleExport}
+>
+  Export
+</Button>
         </div>
       </div>
 
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
-        <Table columns={columns} dataSource={filteredData} rowKey="key" />
-      </div>
+      <Table columns={columns} dataSource={filteredData} rowKey="sale_invoice_id" /> </div>
 
       <Modal
         title={

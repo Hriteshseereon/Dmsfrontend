@@ -26,7 +26,7 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { getEligibleOrders, getSalesOrderById ,getItemByOrderId,getInvoiceDropdownData,createInvoice,getInvoiceById,getInvoices,updateInvoice,downloadInvoicePDF,fetchInvoicePDF} from "../../../../../api/sales";
-
+import { exportToExcel } from "../../../../../utils/exportToExcel";
 export default function SaleInvoice() {
   const [form] = Form.useForm();
   const [itemOptions, setItemOptions] = useState([]);
@@ -46,6 +46,8 @@ const [editItems, setEditItems] = useState([]);
 const [editOrderId, setEditOrderId] = useState(null);
 const [editItemOptions, setEditItemOptions] = useState([]);
 const [editSelectedItems, setEditSelectedItems] = useState([]);
+const [searchText, setSearchText] = useState("");
+const [filteredInvoices, setFilteredInvoices] = useState([]);
   useEffect(() => {
     fetchOrderOptions();
     fetchInvoices();
@@ -127,13 +129,25 @@ const fetchInvoices = async () => {
     }));
 
     setSavedInvoices(rows);
+    setFilteredInvoices(rows);
+
 
   } catch (error) {
     console.error(error);
     message.error("Failed to load invoices");
   }
 };
+const handleSearch = (value) => {
+  setSearchText(value);
 
+  const filtered = savedInvoices.filter((inv) =>
+    `${inv.invoiceNumber} ${inv.orderNumber} ${inv.customerName}`
+      .toLowerCase()
+      .includes(value.toLowerCase())
+  );
+
+  setFilteredInvoices(filtered);
+};
 const handleDownload = async (record) => {
   try {
     message.loading({ content: `Downloading Invoice ${record.invoiceNumber}...`, key: 'download' });
@@ -361,7 +375,7 @@ const handleEdit = async (record) => {
     setEditingInvoiceId(record.id);
 
     setEditOrderId(res.sales_order_id);
-
+setInvoiceDate(dayjs(res.invoice_date));
    
 
     // ✅ SET ORDER DETAILS (this is missing)
@@ -432,8 +446,10 @@ const handleUpdateInvoice = async () => {
       sales_order_db_id: res.sales_order_db_id,
       sales_order_number: res.sales_order_number,
       order_date: res.order_date,
-      invoice_date: invoiceDate.format("YYYY-MM-DD"),
-      delivery_date: res.delivery_date,
+    invoice_date: invoiceDate
+  ? invoiceDate.format("YYYY-MM-DD")
+  : res.invoice_date,
+    delivery_date: res.delivery_date,
 
       customer_id: res.customer_id,
       customer_name: res.customer_name,
@@ -484,7 +500,47 @@ const handleUpdateInvoice = async () => {
     setItemsWithDelivery([]);
     form.resetFields();
   };
+const handleExport = async () => {
+  try {
 
+    const exportRows = [];
+
+    for (const inv of filteredInvoices) {
+
+      const invoiceDetails = await getInvoiceById(inv.id);
+
+      const items = invoiceDetails.items || [];
+
+      items.forEach((item, index) => {
+        exportRows.push({
+          "Invoice Number": invoiceDetails.sale_invoice_number,
+          "Sales Order": invoiceDetails.order_number,
+          "Customer": invoiceDetails.customer_name,
+          "Order Date": dayjs(invoiceDetails.order_date).format("DD-MM-YYYY"),
+          "Delivery Date": dayjs(invoiceDetails.delivery_date).format("DD-MM-YYYY"),
+          "Invoice Date": dayjs(invoiceDetails.invoice_date).format("DD-MM-YYYY"),
+
+          "Item": item.product_name,
+          "UOM": item.uom_name,
+          "Rate": item.rate,
+          "Required Qty": item.required_qty,
+          "Delivered Qty": item.delivered_qty,
+          "Credited Qty": item.credited_qty,
+
+          "Delivered Amount": item.delivered_amount,
+          "Credited Amount": item.credited_amount
+        });
+      });
+
+    }
+
+    exportToExcel(exportRows, "Sales_Invoices");
+
+  } catch (error) {
+    console.error(error);
+    message.error("Export failed");
+  }
+};
   /* ---------------- ITEMS TABLE COLUMNS ---------------- */
 
   const itemColumns = [
@@ -655,7 +711,7 @@ const handleUpdateInvoice = async () => {
   icon={<FilterOutlined />}
   onClick={() => {
     setSearchText("");
-   // fetchSalesOrders(); // ✅ reload original data
+    setFilteredInvoices(savedInvoices);
   }}
   className="border-amber-400! text-amber-700! hover:bg-amber-100!"
 >
@@ -664,13 +720,13 @@ const handleUpdateInvoice = async () => {
         </div>
 
         <div className="flex gap-2">
-          <Button
-            icon={<DownloadOutlined />}
-           // onClick={handleExport}
-            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          >
-            Export
-          </Button>
+       <Button
+  icon={<DownloadOutlined />}
+  onClick={handleExport}
+  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+>
+  Export
+</Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -688,7 +744,7 @@ const handleUpdateInvoice = async () => {
 
       <Table
   columns={invoiceColumns}
-  dataSource={savedInvoices}
+ dataSource={filteredInvoices}
   rowKey="id"
   scroll={{ x: 700 }}
   pagination={savedInvoices.length > 10 ? { pageSize: 10 } : false}
@@ -944,14 +1000,12 @@ const handleUpdateInvoice = async () => {
               : "-"}
           </p>
         </Col>
-        <Col xs={24} sm={12} md={4}>
-          <span className="text-amber-600 text-sm">Invoice Date</span>
-          <DatePicker
-            value={invoiceDate}
-            onChange={(d) => setInvoiceDate(d)}
-            className="w-full"
-          />
-        </Col>
+      <Col xs={24} sm={12} md={4}>
+  <span className="text-amber-600 text-sm">Invoice Date</span>
+  <p className="text-amber-800 font-medium mb-0">
+    {invoiceDate ? dayjs(invoiceDate).format("DD-MM-YYYY") : "-"}
+  </p>
+</Col>
         <Col xs={24} sm={12} md={6}>
           <span className="text-amber-600 text-sm">Customer</span>
           <p className="text-amber-800 font-medium mb-0">
