@@ -4,7 +4,9 @@ import { Tabs, Card, message } from "antd";
 import ItemMasterTab from "./itemmaster/ItemMasterTab";
 import UnitConversionTab from "./UnitConversion/UnitConversionTab";
 import PriceManagementTab from "./PriceManagement/PriceManagementTab";
-
+// import ProductGroupMaster from "../ProductGroupMaster";
+import ProductGroupMaster from "./productgroup/ProductGroupMaster";
+import HsnSacManager from "./hsnsac/HsnSacManager";
 import { getProducts } from "../../../../../../api/product";
 
 export default function ItemUnitPriceManager() {
@@ -64,6 +66,11 @@ export default function ItemUnitPriceManager() {
             },
             {
               key: "2",
+              label: "Product Master",
+              children: <ProductGroupMaster />,
+            },
+            {
+              key: "3",
               label: "Unit Conversions",
               children: (
                 <UnitConversionTab
@@ -76,7 +83,7 @@ export default function ItemUnitPriceManager() {
               ),
             },
             {
-              key: "3",
+              key: "4",
               label: "Price Management",
               children: (
                 <PriceManagementTab
@@ -88,6 +95,12 @@ export default function ItemUnitPriceManager() {
                   setPrices={setPrices}
                 />
               ),
+            },
+
+            {
+              key: "5",
+              label: "HSN & SAC Manager",
+              children: <HsnSacManager />,
             },
           ]}
         />
