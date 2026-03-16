@@ -1,6 +1,6 @@
 // PurchaseDashboard.jsx
-import React from "react";
-import { Card, Row, Col, Tag, Space } from "antd";
+import React, { useEffect, useState } from "react";
+import { Card, Row, Col, Tag, Space, message } from "antd";
 import {
   FileTextOutlined,
   ShoppingCartOutlined,
@@ -22,58 +22,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-
+import { dashoboardScreenlog } from "../../api/assets";
 // JSON Data
-const dashboardJSON = {
-  topCards: [
-    { title: "Asset Category", value: 5, icon: "FileTextOutlined" },
-    { title: "Total Asset", value: 95, icon: "DollarOutlined" },
-    { title: "Asset On Maintenance", value: 10, icon: "ShoppingCartOutlined" },
-    { title: "Asset Depriciation", value: 7, icon: "ReloadOutlined" },
-  ],
-  contractsData: [
-    { name: "Jan", value: 12 },
-    { name: "Feb", value: 20 },
-    { name: "Mar", value: 25 },
-    { name: "Apr", value: 22 },
-    { name: "May", value: 40 },
-    { name: "Jun", value: 30 },
-    { name: "Jul", value: 24 },
-  ],
-  ordersData: [
-    { name: "Jan", orders: 20 },
-    { name: "Feb", orders: 30 },
-    { name: "Mar", orders: 32 },
-    { name: "Apr", orders: 35 },
-    { name: "May", orders: 45 },
-    { name: "Jun", orders: 38 },
-    { name: "Jul", orders: 42 },
-  ],
-  returnData: [
-    { name: "Damaged", value: 3 },
-    { name: "Expired", value: 2 },
-    { name: "Wrong Item", value: 1 },
-    { name: "Other Reasons", value: 4 },
-  ],
-  quickActions: [
-    { title: "Purchase Order 567", subtitle: "Due Today", tag: "Pending" },
-    {
-      title: "Shipment #789",
-      subtitle: "Expected: 03-Oct-2025",
-      tag: "Nearby",
-    },
-    {
-      title: "Invoice #234",
-      subtitle: "Due in 2 days",
-      tag: "Payment Pending",
-    },
-    {
-      title: "Delivery #321",
-      subtitle: "Location: Nearby Warehouse",
-      tag: "Nearby",
-    },
-  ],
-};
 
 // Mapping icon string to actual components
 const iconMap = {
@@ -89,6 +39,40 @@ const iconMap = {
 const COLORS = ["#d97706", "#f59e0b", "#fbbf24", "#fcd34d"];
 
 export default function AssetDashboard() {
+  const [dashboardData, setDashboardData] = useState(null);
+  const topCards = [
+    {
+      title: "Asset Category",
+      value: dashboardData?.asset_category || 0,
+      icon: "FileTextOutlined",
+    },
+    {
+      title: "Total Asset",
+      value: dashboardData?.total_asset || 0,
+      icon: "DollarOutlined",
+    },
+    {
+      title: "Asset On Maintenance",
+      value: dashboardData?.asset_on_maintenance || 0,
+      icon: "ShoppingCartOutlined",
+    },
+    {
+      title: "Asset Depriciation",
+      value: dashboardData?.asset_depreciation || 0,
+      icon: "ReloadOutlined",
+    },
+  ];
+  const allocationData =
+    dashboardData?.allocation_trend?.map((item) => ({
+      name: item.month,
+      value: item.count,
+    })) || [];
+
+  const disposalData =
+    dashboardData?.disposal_trend?.map((item) => ({
+      name: item.month,
+      orders: item.count,
+    })) || [];
   const navigate = useNavigate();
   const cardRoutes = {
     "Asset Category": "/ams/assetcategory",
@@ -96,11 +80,23 @@ export default function AssetDashboard() {
     "Asset On Maintenance": "/ams/assetmaintenance",
     "Asset Depriciation": "/ams/assetdepreciation",
   };
+
+  const handleDasboardDetails = async () => {
+    try {
+      const res = await dashoboardScreenlog();
+      setDashboardData(res);
+    } catch (err) {
+      message.error("Failed to load the dashboard screen data");
+    }
+  };
+  useEffect(() => {
+    handleDasboardDetails();
+  }, []);
   return (
     <div className="p-2">
       {/* Top Cards */}
       <Row gutter={16} className="mb-2 flex flex-wrap">
-        {dashboardJSON.topCards.map((card, index) => (
+        {topCards.map((card, index) => (
           <Col key={index} flex="1" className="mb-4">
             <Card
               hoverable
@@ -128,7 +124,7 @@ export default function AssetDashboard() {
             }
           >
             <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={dashboardJSON.contractsData}>
+              <LineChart data={allocationData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#fcd34d" />
                 <XAxis dataKey="name" stroke="#92400e" />
                 <YAxis stroke="#92400e" />
@@ -150,7 +146,7 @@ export default function AssetDashboard() {
             }
           >
             <ResponsiveContainer width="100%" height={250}>
-              <AreaChart data={dashboardJSON.ordersData}>
+              <AreaChart data={disposalData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#fcd34d" />
                 <XAxis dataKey="name" stroke="#92400e" />
                 <YAxis stroke="#92400e" />

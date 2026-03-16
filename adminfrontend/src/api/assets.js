@@ -174,3 +174,13 @@ export const deleteAssetDisposal = async (id) => {
   const res = await api.delete(`/assets/disposals/${id}/`);
   return res.data;
 };
+
+
+// asset dashboard api
+export const dashoboardScreenlog = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get('/assets/dashboard/',{
+    params:{organisation:currentOrgId}
+  })
+  return res.data;
+}

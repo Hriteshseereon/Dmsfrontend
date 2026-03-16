@@ -138,7 +138,9 @@ export default function AssetAllocation() {
             id: alloc.id,
 
             allocationId: alloc.allocation_id,
-            asset: alloc.asset, // backend field (uuid)
+            asset: alloc.asset,
+            // backend field (uuid)
+            asset_name: alloc.asset_name,
             assignedTo: alloc.assigned_to,
 
             allocationDate: alloc.allocation_date,
@@ -341,7 +343,7 @@ export default function AssetAllocation() {
     },
     {
       title: <span className="text-amber-700 font-semibold">Asset</span>,
-      dataIndex: "asset",
+      dataIndex: "asset_name",
       width: 220,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
