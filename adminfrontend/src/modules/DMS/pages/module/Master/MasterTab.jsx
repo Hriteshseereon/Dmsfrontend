@@ -31,6 +31,12 @@ export const MASTER_TAB_DEFINITIONS = [
     path: "itemsprice",
     Icon: FaTags,
   },
+  {
+    id: "price-management",
+    label: "Price Management",
+    path: "price-management",
+    Icon: FaTags,
+  },
   // { id: "price", label: "Price Manager", path: "price", Icon: FaTags },
 
   { id: "inventory", label: "Inventory", path: "inventory", Icon: FaList },

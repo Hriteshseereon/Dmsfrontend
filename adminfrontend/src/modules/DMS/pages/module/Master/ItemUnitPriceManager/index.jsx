@@ -82,20 +82,20 @@ export default function ItemUnitPriceManager() {
                 />
               ),
             },
-            {
-              key: "4",
-              label: "Price Management",
-              children: (
-                <PriceManagementTab
-                  items={items}
-                  selectedItem={selectedItem}
-                  setSelectedItem={setSelectedItem}
-                  unitConversions={unitConversions}
-                  prices={prices}
-                  setPrices={setPrices}
-                />
-              ),
-            },
+            // {
+            //   key: "4",
+            //   label: "Price Management",
+            //   children: (
+            //     <PriceManagementTab
+            //       items={items}
+            //       selectedItem={selectedItem}
+            //       setSelectedItem={setSelectedItem}
+            //       unitConversions={unitConversions}
+            //       prices={prices}
+            //       setPrices={setPrices}
+            //     />
+            //   ),
+            // },
 
             {
               key: "5",
