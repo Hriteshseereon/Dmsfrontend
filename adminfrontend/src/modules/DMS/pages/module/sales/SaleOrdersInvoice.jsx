@@ -1645,13 +1645,14 @@ narration: order.narration,      // NEW
                 editForm.resetFields();
                 setSelectedRecord(null);
               }}
+              className="border-amber-500! text-amber-700! "
             >
               Cancel
             </Button>
             <Button
               type="primary"
               htmlType="submit"
-              className="bg-amber-500 hover:bg-amber-600 border-none"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
             >
               Update
             </Button>

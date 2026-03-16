@@ -462,10 +462,12 @@ console.log("Purchase Order Payload:", payload);
             className="cursor-pointer! text-blue-500!"
             onClick={() => handleView(record)}
           />
+            {record.status !== "Approved" && (
           <EditOutlined
             className="cursor-pointer! text-red-500!"
             onClick={() => handleEdit(record)}
           />
+            )}
         </div>
       ),
     },
@@ -1003,7 +1005,33 @@ rules={[
             <InputNumber className="w-full! bg-gray-50" disabled />
           </Form.Item>
         </Col>
+ <Col span={4}>
+          <Form.Item label="GST %" name="igstPercent"          rules={[
+    { required: true, message: "IGST % is required" },
+    {
+      validator: (_, value) =>
+        value >= 0
+          ? Promise.resolve()
+          : Promise.reject("Enter valid positive number"),
+    },
+  ]}>
+            <Input
+              className="w-full"
+              disabled={disabled}
+             onChange={(e) => {
+        const igst = Number(e.target.value || 0);
+        const half = igst / 2;
 
+        formInstance.setFieldsValue({
+          sgstPercent: half,
+          cgstPercent: half,
+        });
+
+        recalcAll(formInstance);
+      }}
+            />
+          </Form.Item>
+        </Col>
         <Col span={4}>
           <Form.Item label="SGST %" name="sgstPercent"
                    rules={[
@@ -1017,7 +1045,7 @@ rules={[
   ]}>
             <Input
               className="w-full"
-             disabled={disabled}
+             disabled
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
@@ -1035,29 +1063,13 @@ rules={[
   ]}>
             <Input
               className="w-full"
-             disabled={disabled}
+             disabled
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
         </Col>
 
-        <Col span={4}>
-          <Form.Item label="IGST %" name="igstPercent"          rules={[
-    { required: true, message: "IGST % is required" },
-    {
-      validator: (_, value) =>
-        value >= 0
-          ? Promise.resolve()
-          : Promise.reject("Enter valid positive number"),
-    },
-  ]}>
-            <Input
-              className="w-full"
-              disabled={disabled}
-              onChange={() => recalcAll(formInstance)}
-            />
-          </Form.Item>
-        </Col>
+       
 
         <Col span={4}>
           <Form.Item label="Total GST (₹)" name="totalGST">

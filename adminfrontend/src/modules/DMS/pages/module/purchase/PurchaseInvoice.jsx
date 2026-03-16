@@ -246,7 +246,9 @@ export default function PurchaseInvoice() {
       render: (record) => (
         <div className="flex gap-3">
           <EyeOutlined className="cursor-pointer! text-blue-500!" onClick={() => openView(record)} />
+              {!record.is_transport_assigned && (
           <EditOutlined className="cursor-pointer! text-red-500!" onClick={() => openEdit(record)} />
+          )}
         </div>
       ),
     },
@@ -875,54 +877,7 @@ export default function PurchaseInvoice() {
               </Form.Item>
             </Col>
           </Row>
-          <h6 className="text-amber-500 pb-2">Sale Order Details</h6>
-
-          {saleOrders.map((order, index) => (
-            <div
-              key={index}
-              className="border border-amber-200 rounded-lg p-3 mb-3"
-            >
-              <Row gutter={24}>
-                <Col span={6}>
-                  <Form.Item label="Sale Order No">
-                    <Input value={order.sales_order_number} disabled />
-                  </Form.Item>
-                </Col>
-
-                <Col span={6}>
-                  <Form.Item label="Customer Name">
-                    <Input value={order.customer_name} disabled />
-                  </Form.Item>
-                </Col>
-
-                <Col span={6}>
-                  <Form.Item label="Delivery Address">
-                    <Input value={order.customer_delivery_address} disabled />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              {order.items?.map((item, i) => (
-                <Row gutter={24} key={i}>
-                  <Col span={6}>
-                    <Form.Item label="Item">
-                      <Input value={item.item_name} disabled />
-                    </Form.Item>
-                  </Col>
-
-                  <Col span={6}>
-                    <Form.Item label="Item Quantity">
-                      <InputNumber
-                        className="w-full!"
-                        value={item.order_qty}
-                        disabled
-                      />
-                    </Form.Item>
-                  </Col>
-                </Row>
-              ))}
-            </div>
-          ))}
+        
         </>
 
       </>

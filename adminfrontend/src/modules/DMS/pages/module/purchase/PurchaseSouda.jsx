@@ -377,11 +377,13 @@ const handleViewClick = async (record) => {
            onClick={() => handleViewClick(record)}
 
           />
+            {record.status !== "Approved" && (
           <EditOutlined
             className="cursor-pointer! text-red-500!"
            onClick={() => handleEditClick(record)}
 
           />
+            )}
         </div>
       ),
     },
@@ -797,28 +799,44 @@ const handleExport = async () => {
                   </Form.Item>
                 </Col>
 
-                <Col span={4}>
+               
+  <Col span={4}>
                   <Form.Item
                     {...field}
-                    label="Gross Amount (₹)"
-                    name={[field.name, "grossAmount"]}
-                    fieldKey={[field.fieldKey, "grossAmount"]}
+                    label="GST %"
+                    name={[field.name, "igstPercent"]}
+                    fieldKey={[field.fieldKey, "igstPercent"]}
+                    rules={[
+                      { required: true, message: "IGST % is required" },
+                      {
+                        validator: (_, value) =>
+                          value >= 0
+                            ? Promise.resolve()
+                            : Promise.reject("Enter valid positive number"),
+                      },
+                    ]}
                   >
-                    <InputNumber className="w-full!" disabled />
+                    <Input
+                    
+                      max={100}
+                      disabled={disabled}
+                    onChange={(e) => {
+  const igst = Number(e.target.value || 0);
+  const half = igst / 2;
+
+  form.setFields([
+    { name: ["items", field.name, "sgstPercent"], value: half },
+    { name: ["items", field.name, "cgstPercent"], value: half },
+  ]);
+
+  const all = form.getFieldsValue();
+  const computed = computeAllFromFormValues(all || {});
+  form.setFieldsValue({ items: computed.items });
+}}
+                      className="w-full!"
+                    />
                   </Form.Item>
                 </Col>
-
-                <Col span={4}>
-                  <Form.Item
-                    {...field}
-                    label="Discount Amt (₹)"
-                    name={[field.name, "discountAmt"]}
-                    fieldKey={[field.fieldKey, "discountAmt"]}
-                  >
-                    <InputNumber className="w-full!" disabled />
-                  </Form.Item>
-                </Col>
-
                 {/* FIX: SGST% with proper validation */}
                 <Col span={4}>
                   <Form.Item
@@ -839,7 +857,7 @@ const handleExport = async () => {
                     <Input
                      
                       max={100}
-                      disabled={disabled}
+                      disabled
                       onChange={() => {
                         const all = form.getFieldsValue();
                         const computed = computeAllFromFormValues(all || {});
@@ -870,7 +888,7 @@ const handleExport = async () => {
                     <Input
                      
                       max={100}
-                      disabled={disabled}
+                      disabled
                       onChange={() => {
                         const all = form.getFieldsValue();
                         const computed = computeAllFromFormValues(all || {});
@@ -882,35 +900,7 @@ const handleExport = async () => {
                 </Col>
 
                 {/* FIX: IGST% with proper validation */}
-                <Col span={4}>
-                  <Form.Item
-                    {...field}
-                    label="IGST %"
-                    name={[field.name, "igstPercent"]}
-                    fieldKey={[field.fieldKey, "igstPercent"]}
-                    rules={[
-                      { required: true, message: "IGST % is required" },
-                      {
-                        validator: (_, value) =>
-                          value >= 0
-                            ? Promise.resolve()
-                            : Promise.reject("Enter valid positive number"),
-                      },
-                    ]}
-                  >
-                    <Input
-                    
-                      max={100}
-                      disabled={disabled}
-                      onChange={() => {
-                        const all = form.getFieldsValue();
-                        const computed = computeAllFromFormValues(all || {});
-                        form.setFieldsValue({ items: computed.items });
-                      }}
-                      className="w-full!"
-                    />
-                  </Form.Item>
-                </Col>
+              
 
                 <Col span={4}>
                   <Form.Item
@@ -922,7 +912,27 @@ const handleExport = async () => {
                     <InputNumber className="w-full!" disabled />
                   </Form.Item>
                 </Col>
+ <Col span={4}>
+                  <Form.Item
+                    {...field}
+                    label="Gross Amount (₹)"
+                    name={[field.name, "grossAmount"]}
+                    fieldKey={[field.fieldKey, "grossAmount"]}
+                  >
+                    <InputNumber className="w-full!" disabled />
+                  </Form.Item>
+                </Col>
 
+                <Col span={4}>
+                  <Form.Item
+                    {...field}
+                    label="Discount Amt (₹)"
+                    name={[field.name, "discountAmt"]}
+                    fieldKey={[field.fieldKey, "discountAmt"]}
+                  >
+                    <InputNumber className="w-full!" disabled />
+                  </Form.Item>
+                </Col>
                 <Col span={6}>
                   <Form.Item
                     {...field}
@@ -1218,7 +1228,7 @@ const handleExport = async () => {
 
       {/* Edit Modal */}
    <Modal
-  title={<span className="text-amber-700 text-2xl font-semibold">Edit Purchase Souda</span>}
+  title={<span className="text-amber-700 text-2xl font-semibold">Edit Purchase Contract</span>}
   open={isEditModalOpen}
   onCancel={() => {
     editForm.resetFields();
@@ -1254,7 +1264,7 @@ const handleExport = async () => {
 
       {/* View Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">View Purchase Souda</span>}
+        title={<span className="text-amber-700 text-2xl font-semibold">View Purchase Contract</span>}
         open={isViewModalOpen}
         onCancel={() => {
           viewForm.resetFields();

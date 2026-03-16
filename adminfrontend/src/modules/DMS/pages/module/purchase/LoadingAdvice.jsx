@@ -355,7 +355,7 @@ const handleOpenView = async (record) => {
   const handleEdit = async (values) => {
     try {
         if (
-      ["Pending Approval", "Dispatched"].includes(selectedRecord.status) &&
+      ["Pending Approval"].includes(selectedRecord.status) &&
       values.status === selectedRecord.status
     ) {
       messageApi.warning("Please change status to update");
@@ -583,7 +583,7 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
   <Select
     placeholder="Select Status"
     disabled={
-      ["In-Transit", "Out for Delivery", "Partially Delivered", "Delivered"]
+      ["Dispatched","In-Transit", "Out for Delivery", "Partially Delivered", "Delivered"]
         .includes(formInstance.getFieldValue("status"))
     }
   >     {getAllowedStatus(formInstance).map((status) => (<Option key={status} value={status}>

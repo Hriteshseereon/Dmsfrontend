@@ -244,6 +244,7 @@ if (
   id: i.key,
   actual_qty: Number(i.actualQty) || 0,
   required_qty: Number(i.reqQty) || 0,
+  variance: Number(i.variance) || 0,
 })),
  deliveries: selectedRecord.deliveries.map((d) => ({
     id: d.id,
