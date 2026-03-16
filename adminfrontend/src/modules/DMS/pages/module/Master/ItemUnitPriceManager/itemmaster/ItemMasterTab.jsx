@@ -442,8 +442,9 @@ export default function ItemMasterTab({ items, setItems }) {
                   style={{ width: "100%" }}
                   value={formData.gstPercent}
                   onChange={handleGstChange}
-                  formatter={(value) => `${value}%`}
+                  formatter={(value) => `${value}`}
                   parser={(value) => value.replace("%", "")}
+                  placeholder="%"
                 />
               </FormField>
             </Col>
