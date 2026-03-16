@@ -7,7 +7,6 @@ import {
   Modal,
   Input,
   InputNumber,
-  Checkbox,
   Row,
   Col,
   message,
@@ -23,7 +22,8 @@ import {
 } from "@/api/product";
 import { useProductUnitConversions } from "@/queries/useProductUnitConversions";
 
-const REFERENCE_TYPES = ["BASE", "UNIT"];
+// Reference type is always "UNIT" — hidden from UI
+const FIXED_REFERENCE_TYPE = "UNIT";
 
 export default function UnitConversionTab({ items }) {
   const [selectedItem, setSelectedItem] = useState(null);
@@ -38,10 +38,10 @@ export default function UnitConversionTab({ items }) {
 
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
-    reference_type: "BASE",
+    reference_type: FIXED_REFERENCE_TYPE,
     set_as_display: false,
   });
-
+  const [baseUnit, setBaseUnit] = useState(null);
   /* ================= NORMALIZER ================= */
   const normalizeReferenceUnits = (res) => {
     console.log("📦 Raw reference units response:", res);
@@ -73,8 +73,17 @@ export default function UnitConversionTab({ items }) {
 
     getProductReferenceUnits(selectedItem.id)
       .then((res) => {
+        const units = res?.data?.units || res?.units || [];
+        const base = units.find((u) => u.is_base_unit);
+        setBaseUnit(base);
         const normalized = normalizeReferenceUnits(res?.data || res);
         setReferenceUnits(normalized);
+        if (base) {
+          setFormData((prev) => ({
+            ...prev,
+            reference_unit_id: base.id,
+          }));
+        }
       })
       .catch((error) => {
         console.error("❌ Error loading reference units:", error);
@@ -83,88 +92,35 @@ export default function UnitConversionTab({ items }) {
       });
   }, [selectedItem]);
 
-  /* ================= SAVE ================= */
-  // const handleSave = async () => {
-  //   console.log("💾 Saving form data:", formData);
-
-  //   if (!formData.unit_name || !formData.multiplier) {
-  //     message.error("Unit name and multiplier are required");
-  //     return;
-  //   }
-
-  //   if (formData.reference_type === "UNIT" && !formData.reference_unit_id) {
-  //     message.error("Reference unit is required");
-  //     return;
-  //   }
-
-  //   const payload = {
-  //     product: selectedItem.id,
-  //     unit_name: formData.unit_name,
-  //     reference_type: formData.reference_type,
-  //     reference_unit_id:
-  //       formData.reference_type === "UNIT" ? formData.reference_unit_id : null,
-  //     multiplier: formData.multiplier,
-  //     set_as_display: formData.set_as_display || false,
-  //   };
-
-  //   console.log("📤 Sending payload:", payload);
-
-  //   try {
-  //     const createResponse = await addProductUnitConversion(payload);
-  //     console.log("✅ Create response:", createResponse);
-  //     message.success("Unit created successfully");
-
-  //     // Reload the data
-  //     const updated = await getProductUnitConversions(selectedItem.id);
-  //     console.log("🔄 Updated unit conversions:", updated);
-
-  //     // Handle different response formats
-  //     const data = updated?.data || updated;
-  //     console.log("✅ Setting unit conversions to:", data);
-
-  //     setUnitConversions(Array.isArray(data) ? data : []);
-
-  //     setOpen(false);
-  //     setFormData({ reference_type: "BASE", set_as_display: false });
-  //   } catch (error) {
-  //     console.error("❌ Error creating unit:", error);
-  //     console.error("❌ Error details:", error.response?.data);
-  //     message.error("Failed to create unit");
-  //   }
-  // };
-  // fuction to add display unit
+  /* ================= SET DISPLAY ================= */
   const handleSetDisplay = async (reference_unit_id) => {
     try {
       await setDisplayUnit(reference_unit_id);
       message.success("Display unit updated");
       refreshData();
-      // refetch unit conversions
-      // since you're using the hook, this should be handled there
-      // assuming addUnitConversion already invalidates/refetches
-      // otherwise you may need an explicit refetch
     } catch (error) {
       console.error("❌ Error setting display unit:", error);
       message.error("Failed to set display unit");
     }
   };
 
+  /* ================= SAVE ================= */
   const handleSave = async () => {
     if (!formData.unit_name || !formData.multiplier) {
-      message.error("Unit name and multiplier are required");
+      message.error("Lower unit name and multiplier are required");
       return;
     }
 
-    if (formData.reference_type === "UNIT" && !formData.reference_unit_id) {
-      message.error("Reference unit is required");
+    if (!formData.reference_unit_id) {
+      message.error("Upper unit is required");
       return;
     }
 
     const payload = {
       product: selectedItem.id,
       unit_name: formData.unit_name,
-      reference_type: formData.reference_type,
-      reference_unit_id:
-        formData.reference_type === "UNIT" ? formData.reference_unit_id : null,
+      reference_type: FIXED_REFERENCE_TYPE,
+      reference_unit_id: formData.reference_unit_id,
       multiplier: formData.multiplier,
       set_as_display: formData.set_as_display || false,
     };
@@ -172,9 +128,11 @@ export default function UnitConversionTab({ items }) {
     try {
       await addUnitConversion(payload);
       message.success("Unit created successfully");
-
       setOpen(false);
-      setFormData({ reference_type: "BASE", set_as_display: false });
+      setFormData({
+        reference_type: FIXED_REFERENCE_TYPE,
+        set_as_display: false,
+      });
     } catch (error) {
       console.error("❌ Error creating unit:", error);
       message.error("Failed to create unit");
@@ -183,109 +141,170 @@ export default function UnitConversionTab({ items }) {
 
   return (
     <>
-      <style>
-        {`
-/* ================= CARD ================= */
-.amber-card .ant-card-head {
-  // background: #fffbeb;
-  color: #92400e;
-  // border-bottom: 2px solid #f59e0b;
-}
+      <style>{`
+        /* ================= CARD ================= */
+        .amber-card .ant-card-head {
+          color: #92400e;
+        }
 
-/* ================= TABLE ================= */
-.amber-table .ant-table {
-  // border: 1px solid #f59e0b;
-  border-radius: 8px;
-  overflow: hidden;
-}
+        /* ================= TABLE ================= */
+        .amber-table .ant-table {
+          border-radius: 8px;
+          overflow: hidden;
+        }
+        .amber-table .ant-table-thead > tr > th {
+          background: #fffbeb;
+          color: #92400e;
+          font-weight: 600;
+        }
+        .amber-table .ant-table-tbody > tr > td {
+          color: #78350f;
+          border-bottom: 1px solid #fde68a;
+        }
+        .amber-table .ant-table-tbody > tr:hover > td {
+          background: #fffbeb;
+        }
 
-.amber-table .ant-table-thead > tr > th {
-  background: #fffbeb;
-  color: #92400e;
-  // border-bottom: 2px solid #f59e0b;
-  font-weight: 600;
-}
+        /* ================= ADD BUTTON ================= */
+        .amber-btn {
+          background-color: #f59e0b !important;
+          border-color: #f59e0b !important;
+        }
+        .amber-btn:hover {
+          background-color: #d97706 !important;
+          border-color: #d97706 !important;
+        }
 
-.amber-table .ant-table-tbody > tr > td {
-  color: #78350f;
-  border-bottom: 1px solid #fde68a;
-}
+        /* ================= DISPLAY BUTTON ================= */
+        .display-btn {
+          color: #16a34a !important;
+          font-weight: 500;
+        }
+        .display-btn:hover {
+          color: #15803d !important;
+        }
 
-.amber-table .ant-table-tbody > tr:hover > td {
-  background: #fffbeb;
-}
+        /* ================= SELECT FOCUS ================= */
+        .ant-select-focused .ant-select-selector {
+          border-color: #f59e0b !important;
+          box-shadow: 0 0 0 2px rgba(245,158,11,0.2) !important;
+        }
 
-/* ================= ADD BUTTON ================= */
-.amber-btn {
-  background-color: #f59e0b !important;
-  border-color: #f59e0b !important;
-}
+        /* ================= MODAL ================= */
+        .amber-modal .ant-modal-title {
+          color: #92400e;
+          font-weight: 600;
+          font-size: 16px;
+        }
+        .amber-modal .ant-modal-content {
+          border-radius: 12px;
+          overflow: hidden;
+          padding: 0;
+        }
+        .amber-modal .ant-modal-header {
+          padding: 16px 24px;
+          border-bottom: 1px solid #fde68a;
+          background: #fffbeb;
+          border-radius: 12px 12px 0 0;
+          margin-bottom: 0;
+        }
+        .amber-modal .ant-modal-body {
+          padding: 24px;
+          background: #ffffff;
+        }
+        .amber-modal .ant-modal-footer {
+          padding: 12px 24px;
+          border-top: 1px solid #fde68a;
+          background: #fffbeb;
+          border-radius: 0 0 12px 12px;
+          margin-top: 0;
+        }
 
-.amber-btn:hover {
-  background-color: #d97706 !important;
-  border-color: #d97706 !important;
-}
+        /* ================= MODAL OK BUTTON ================= */
+        .amber-modal .ant-btn-primary {
+          background-color: #f59e0b !important;
+          border-color: #f59e0b !important;
+          border-radius: 6px;
+          font-weight: 500;
+        }
+        .amber-modal .ant-btn-primary:hover {
+          background-color: #d97706 !important;
+          border-color: #d97706 !important;
+        }
+        .amber-modal .ant-btn-primary:disabled {
+          background-color: #fcd34d !important;
+          border-color: #fcd34d !important;
+          color: #fff !important;
+          opacity: 0.7;
+        }
 
-/* ================= DISPLAY BUTTON ================= */
-.display-btn {
-  color: #16a34a !important;
-  font-weight: 500;
-}
+        /* ================= MODAL CANCEL BUTTON ================= */
+        .amber-modal .ant-btn-default {
+          border-radius: 6px;
+        }
+        .amber-modal .ant-btn-default:hover {
+          color: #92400e !important;
+          border-color: #f59e0b !important;
+        }
 
-.display-btn:hover {
-  color: #15803d !important;
-}
+        /* ================= FORM LABELS ================= */
+        .amber-modal .ant-form-item-label > label {
+          color: #78350f;
+          font-weight: 500;
+          font-size: 13px;
+        }
 
-/* ================= SELECT FOCUS ================= */
-.ant-select-focused .ant-select-selector {
-  border-color: #f59e0b !important;
-  box-shadow: 0 0 0 2px rgba(245,158,11,0.2) !important;
-}
-/* ================= MODAL HEADER ================= */
-.amber-modal .ant-modal-header {
-  // background: #fffbeb;
-  // border-bottom: 2px solid #f59e0b;
-}
+        /* ================= INPUT / INPUT NUMBER FOCUS ================= */
+        .amber-modal .ant-input:focus,
+        .amber-modal .ant-input:hover,
+        .amber-modal .ant-input-focused {
+          border-color: #f59e0b !important;
+          box-shadow: 0 0 0 2px rgba(245,158,11,0.15) !important;
+        }
+        .amber-modal .ant-input-number:hover .ant-input-number-input,
+        .amber-modal .ant-input-number-focused {
+          border-color: #f59e0b !important;
+          box-shadow: 0 0 0 2px rgba(245,158,11,0.15) !important;
+        }
+        .amber-modal .ant-input-number:hover {
+          border-color: #f59e0b !important;
+        }
 
-.amber-modal .ant-modal-title {
-  color: #92400e;
-  font-weight: 600;
-}
+        /* ================= SELECT IN MODAL ================= */
+        .amber-modal .ant-select:not(.ant-select-disabled):hover .ant-select-selector {
+          border-color: #f59e0b !important;
+        }
+        .amber-modal .ant-select-focused:not(.ant-select-disabled) .ant-select-selector {
+          border-color: #f59e0b !important;
+          box-shadow: 0 0 0 2px rgba(245,158,11,0.15) !important;
+        }
 
-/* ================= MODAL BODY ================= */
-.amber-modal .ant-modal-content {
-  border-radius: 10px;
-  overflow: hidden;
-}
+        /* ================= DIVIDER BETWEEN FIELDS ================= */
+        .amber-modal .ant-form-item {
+          margin-bottom: 18px;
+        }
 
-/* ================= OK BUTTON ================= */
-.amber-modal .ant-btn-primary {
-  background-color: #f59e0b;
-  border-color: #f59e0b;
-}
+        /* ================= CONVERSION ARROW HINT ================= */
+        .conversion-hint {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          background: #fffbeb;
+          border: 1px dashed #f59e0b;
+          border-radius: 8px;
+          padding: 8px 12px;
+          margin-bottom: 18px;
+          color: #92400e;
+          font-size: 13px;
+          font-weight: 500;
+        }
+        .conversion-hint .arrow {
+          color: #f59e0b;
+          font-size: 16px;
+        }
+      `}</style>
 
-.amber-modal .ant-btn-primary:hover {
-  background-color: #d97706;
-  border-color: #d97706;
-}
-
-/* ================= CANCEL BUTTON ================= */
-.amber-modal .ant-btn-default:hover {
-  color: #92400e;
-  border-color: #f59e0b;
-}
-
-/* ================= INPUT FOCUS ================= */
-.amber-modal .ant-input:focus,
-.amber-modal .ant-input-focused,
-.amber-modal .ant-input-number-focused,
-.amber-modal .ant-select-focused .ant-select-selector {
-  border-color: #f59e0b !important;
-  box-shadow: 0 0 0 2px rgba(245,158,11,0.2) !important;
-}
-
-`}
-      </style>
       {/* ================= ITEM SEARCH ================= */}
       <Select
         showSearch
@@ -326,8 +345,8 @@ export default function UnitConversionTab({ items }) {
             dataSource={unitConversions?.units || []}
             loading={isUnitConversionsLoading}
             columns={[
-              { title: "Unit Name", dataIndex: "unit_name" },
-              { title: "Reference Unit", dataIndex: "reference" },
+              { title: "Upper Unit", dataIndex: "unit_name" },
+              { title: "Lower Unit", dataIndex: "reference" },
               {
                 title: "Conversion Multiplier",
                 dataIndex: "multiplier",
@@ -350,29 +369,70 @@ export default function UnitConversionTab({ items }) {
                     </Button>
                   ),
               },
-              // {
-              //   title: "Display",
-              //   dataIndex: "set_as_display",
-              //   render: () => <strong>No</strong>,
-              // },
             ]}
           />
 
           {/* ================= MODAL ================= */}
           <Modal
             className="amber-modal"
-            title="Add Unit"
+            title="Add Unit Conversion"
             open={open}
             onOk={handleSave}
-            onCancel={() => setOpen(false)}
-            okText="Add"
-            okButtonProps={{ disabled: isAdding }}
+            onCancel={() => {
+              setOpen(false);
+              setFormData({
+                reference_type: FIXED_REFERENCE_TYPE,
+                set_as_display: false,
+              });
+            }}
+            okText="Add Unit"
+            okButtonProps={{ disabled: isAdding, loading: isAdding }}
+            width={480}
           >
+            {/* Visual hint showing the relationship */}
+            {/* <div className="conversion-hint">
+              <span>Lower Unit</span>
+              <span className="arrow">×&nbsp;multiplier&nbsp;→</span>
+              <span>Upper Unit</span>
+            </div> */}
+
             <Row gutter={16}>
+              {/* Lower Unit (was: New Unit Name) */}
+
+              {/* Upper Unit (was: Reference Unit) — always shown since type is fixed to UNIT */}
               <Col span={12}>
-                <Form.Item label="New Unit Name">
+                <Form.Item label="Base Unit">
                   <Input
-                    placeholder="Enter unit name"
+                    value={baseUnit?.label}
+                    disabled
+                    placeholder="Base unit"
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Lower Unit" required>
+                  <Select
+                    showSearch
+                    placeholder="e.g. kg, litre, box"
+                    optionFilterProp="label"
+                    value={formData.reference_unit_id}
+                    style={{ width: "100%" }}
+                    onChange={(v) =>
+                      setFormData({ ...formData, reference_unit_id: v })
+                    }
+                    options={referenceUnits
+                      .filter((u) => u.type === "UNIT")
+                      .map((u) => ({
+                        value: u.uom_id,
+                        label: u.label,
+                      }))}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item label="Upper Unit" required>
+                  <Input
+                    placeholder="e.g. gram, ml, piece"
                     value={formData.unit_name}
                     onChange={(e) =>
                       setFormData({ ...formData, unit_name: e.target.value })
@@ -380,57 +440,12 @@ export default function UnitConversionTab({ items }) {
                   />
                 </Form.Item>
               </Col>
-
+              {/* Conversion Multiplier */}
               <Col span={12}>
-                <Form.Item label="Reference Type">
-                  <Select
-                    placeholder="Select reference type"
-                    value={formData.reference_type}
-                    style={{ width: "100%" }}
-                    onChange={(v) =>
-                      setFormData({
-                        ...formData,
-                        reference_type: v,
-                        reference_unit_id: null,
-                      })
-                    }
-                  >
-                    {REFERENCE_TYPES.map((r) => (
-                      <Select.Option key={r} value={r}>
-                        {r}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
-
-              {formData.reference_type === "UNIT" && (
-                <Col span={24}>
-                  <Form.Item label="Reference Unit">
-                    <Select
-                      showSearch
-                      placeholder="Select reference unit"
-                      optionFilterProp="label"
-                      value={formData.reference_unit_id}
-                      onChange={(v) =>
-                        setFormData({ ...formData, reference_unit_id: v })
-                      }
-                      options={referenceUnits
-                        .filter((u) => u.type === "UNIT")
-                        .map((u) => ({
-                          value: u.uom_id,
-                          label: u.label,
-                        }))}
-                    />
-                  </Form.Item>
-                </Col>
-              )}
-
-              <Col span={24}>
-                <Form.Item label="Conversion Multiplier">
+                <Form.Item label="Multiplier" required>
                   <InputNumber
                     style={{ width: "100%" }}
-                    placeholder="Enter multiplier value"
+                    placeholder="e.g. 100"
                     min={0}
                     value={formData.multiplier}
                     onChange={(v) =>
