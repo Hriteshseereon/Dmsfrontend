@@ -63,8 +63,8 @@ export default function AssetDepreciation() {
   const statusOptions = ["Active", "Disposed", "Under Repair", "Sold"];
 
   const filteredData = data.filter((row) =>
-    ["assetId", "fiscalYear", "status", "remarks"].some((f) =>
-      (row[f] || "")
+    ["asset_name", "assetId", "fiscalYear", "status", "remarks"].some((field) =>
+      (row[field] || "")
         .toString()
         .toLowerCase()
         .includes(searchText.trim().toLowerCase()),

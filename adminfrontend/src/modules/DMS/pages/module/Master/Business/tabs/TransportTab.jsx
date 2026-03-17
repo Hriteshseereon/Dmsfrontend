@@ -765,7 +765,7 @@ export default function TransportTab() {
               <Button
                 htmlType="submit"
                 type="primary"
-                className="bg-amber-500 border-none"
+                className="bg-amber-500! border-none!"
               >
                 {selected ? "Update" : "Save"}
               </Button>

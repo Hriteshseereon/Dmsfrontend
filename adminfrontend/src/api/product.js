@@ -160,3 +160,31 @@ export const getProductPrice = async (id) => {
 
   return res.data;
 };
+
+
+
+// unit master api
+export const getUnits = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("/product/unit-groups/", {  
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+}
+
+export const addUnit = async (payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.post("/product/unit-groups/", payload, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+}
+
+export const updateUnitById = async (payload, id) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.put(`/product/unit-groups/${id}/`, payload, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+}
+

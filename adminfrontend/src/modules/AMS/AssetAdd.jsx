@@ -714,7 +714,7 @@ export default function AssetManager() {
 
       <h6 className="text-amber-500 mt-4">Depreciating Costs</h6>
       <Row gutter={16}>
-        <Col span={8}>
+        <Col span={5}>
           <Form.Item
             label={
               <span className="text-amber-700 font-medium">
@@ -732,7 +732,7 @@ export default function AssetManager() {
             </Select>
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col span={4}>
           <Form.Item
             label={
               <span className="text-amber-700 font-medium">
@@ -762,7 +762,7 @@ export default function AssetManager() {
             />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col span={6}>
           <Form.Item
             label={
               <span className="text-amber-700 font-medium">

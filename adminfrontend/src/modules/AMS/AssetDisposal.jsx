@@ -61,9 +61,9 @@ export default function AssetDisposal() {
   const statusOptions = ["Pending", "Approved", "Rejected"]; // if needed later
 
   const filteredData = data.filter((row) =>
-    ["assetId", "disposalId", "disposalType", "buyerName", "remarks"].some(
-      (f) =>
-        (row[f] || "")
+    ["asset_name", "disposalId", "disposalType", "buyerName", "remarks"].some(
+      (field) =>
+        (row[field] || "")
           .toString()
           .toLowerCase()
           .includes(searchText.trim().toLowerCase()),

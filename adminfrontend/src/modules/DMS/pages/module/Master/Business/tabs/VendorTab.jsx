@@ -101,6 +101,7 @@ export default function VendorTab() {
   const mapDetailsToForm = (d) => ({
     name: d.name || d.company_name,
     shortName: d.short_name,
+    companyType: d.company_type,
     mobileNo1: d.mobile_no_1,
     mobileNo2: d.mobile_no_2,
     phoneNumber: d.phone_number,
@@ -208,6 +209,7 @@ export default function VendorTab() {
     const payload = {
       name: values.name,
       short_name: values.shortName,
+      company_type: values.companyType,
       mobile_no_1: values.mobileNo1?.toString(),
       mobile_no_2: values.mobileNo2?.toString(),
       phone_number:
@@ -450,7 +452,11 @@ export default function VendorTab() {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          initialValues={{ status: "Active", igstApplicable: "No" }}
+          initialValues={{
+            status: "Active",
+            igstApplicable: "No",
+            companyType: "Supplier",
+          }}
         >
           {/* ================= Vendor / Company Details ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">
@@ -607,6 +613,24 @@ export default function VendorTab() {
                     disabled={viewMode}
                     placeholder="https://www.example.com"
                   />
+                </Form.Item>
+              </Col>
+              <Col span={4}>
+                <Form.Item
+                  label="Supplier Type"
+                  name="companyType"
+                  rules={[
+                    { required: true, message: "Please select supplier type" },
+                  ]}
+                >
+                  <Select
+                    className={selectClass}
+                    disabled={viewMode}
+                    placeholder="Select Type"
+                  >
+                    <Option value="Supplier">Supplier</Option>
+                    <Option value="Both">Both</Option>
+                  </Select>
                 </Form.Item>
               </Col>
             </Row>
@@ -1256,7 +1280,7 @@ export default function VendorTab() {
               <Button
                 htmlType="submit"
                 type="primary"
-                className="bg-amber-500 border-none"
+                className="bg-amber-500! border-none!"
               >
                 {selected ? "Update" : "Save"}
               </Button>

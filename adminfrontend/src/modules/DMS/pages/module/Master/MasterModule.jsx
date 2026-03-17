@@ -13,6 +13,7 @@ import HsnSacManager from "./HsnSacManager";
 import UnitConversionManager from "./UnitConversionManager";
 import AdminPriceManager from "./AdminPriceManager";
 import ItemUnitPriceManager from "./ItemUnitPriceManager/index.jsx";
+import StandalonePriceManagement from "./StandalonePriceManagement";
 const MasterModule = ({ allowedTabs }) => {
   return (
     <Routes>
@@ -29,6 +30,10 @@ const MasterModule = ({ allowedTabs }) => {
         <Route path="inventory" element={<InventoryForm />} />
         <Route path="hsn_sac" element={<HsnSacManager />} />
         <Route path="itemsprice" element={<ItemUnitPriceManager />} />
+        <Route
+          path="price-management"
+          element={<StandalonePriceManagement />}
+        />
 
         {/* add more nested routes if you extend tabs */}
       </Route>
