@@ -117,6 +117,7 @@ export default function SalesDispute() {
         uom: it.uom_name,
         rate: it.rate,
         quantity: it.order_qty,
+        delivered_qty: it.delivered_qty,
         returnQty: it.return_qty,
         returnReason: it.reason,
         otherReasonText: it.other_reason
@@ -178,6 +179,7 @@ export default function SalesDispute() {
           uom: it.uom_name,
           rate: it.rate,
           quantity: it.order_qty,
+          delivered_qty: it.delivered_qty,
           returnQty: it.return_qty,
           returnReason: it.reason,
           otherReasonText: it.other_reason
@@ -198,6 +200,7 @@ export default function SalesDispute() {
             Rate: item.rate || 0,
             "Order Qty": item.quantity || 0,
             "Return Qty": item.returnQty || 0,
+            "Delivered Qty": item.delivered_qty || 0,
             Reason: item.returnReason === "Other" ? item.otherReasonText : item.returnReason,
             Total: (item.returnQty || 0) * (item.rate || 0)
           });
@@ -447,6 +450,10 @@ export default function SalesDispute() {
       dataIndex: "quantity",
     },
     {
+      title: <span className="text-amber-700!">Delivered Qty</span>,
+      dataIndex: "delivered_qty",
+    },
+    {
       title: <span className="text-amber-700!">Return Qty</span>,
       render: (_, row) =>
         modalMode === "view" ? (
@@ -461,11 +468,10 @@ export default function SalesDispute() {
                 validator(_, value) {
                   if (value == null) return Promise.resolve();
 
-                  if (value > row.quantity) {
+                  if (value > row.delivered_qty) {
                     return Promise.reject(
                       new Error(
-                        `Return quantity cannot be greater than order quantity (${row.quantity})`
-                      )
+                       `Return qty cannot exceed (${row.delivered_qty || row.quantity})`    )
                     );
                   }
 

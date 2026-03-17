@@ -219,6 +219,25 @@ export const updateInvoice = async (invoiceId, payload) => {
 };
 
 // PURCHASE RETURNS
+//fetch deliverd advices for dropdown
+export const getDeliveredAdvice = async () => {
+  const res = await api.get("/purchase/returns/delivered-loading-advice-dropdown/");
+  return res.data;
+}
+
+//fetch deliverd advices for dropdown data by id
+export const getDeliveredAdviceById = async (loadingAdviceId) => {
+  const res = await api.get(
+    `/purchase/returns/loading-advice-prefill/`,
+    {
+      params: {
+        loading_advice_id: loadingAdviceId,
+      },
+    }
+  );
+  return res.data;
+};
+
 //fetch all purchase returns
 export const getPurchaseReturn = async () => {
   const res = await api.get("purchase/returns/");
@@ -251,7 +270,7 @@ export const updatePurchaseReturn = async (returnId, payload) => {
   );
   return res.data;
 }
-
+//loding advice
 //get all loading Advices
 export const getLoadingAdvice = async () => 
   {const res = await api.get("/transport/loading-advices/"); 

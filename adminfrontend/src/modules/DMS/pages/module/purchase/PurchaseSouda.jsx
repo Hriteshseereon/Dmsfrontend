@@ -56,7 +56,7 @@ export default function PurchaseSouda() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
-const statusOptions = ["Approved", "Pending", "Rejected"];
+const statusOptions = ["Pending","Approved", "Rejected"];
 
   useEffect(() => {
     fetchDropdownData();
@@ -1118,7 +1118,7 @@ const handleExport = async () => {
 
           <Col span={4}>
             <Form.Item label="Status" name="status" rules={[{ required: true }]}>
-              <Select placeholder="Select Status" disabled={disabled}>
+              <Select placeholder="Select Status"  disabled={disabled || isAddModalOpen} >
                 {statusOptions.map((opt) => (
                   <Option key={opt} value={opt}>
                     {opt}
@@ -1169,6 +1169,7 @@ const handleExport = async () => {
               addForm.resetFields();
               // initialize an empty item row
               addForm.setFieldsValue({
+                  status: "Pending",
                 items: [
                   {
                     lineKey: new Date().getTime(),

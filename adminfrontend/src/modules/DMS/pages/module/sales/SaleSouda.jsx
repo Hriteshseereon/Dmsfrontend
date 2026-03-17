@@ -14,6 +14,7 @@ import {
   Row,
   Col,
   Divider,
+  
 } from "antd";
 import {
   SearchOutlined,
@@ -40,7 +41,7 @@ import { getAdminCustomerDetails } from "../../../../../api/customer";
 
 /** trimmed/embedded seed data (same as you provided) */
 const salesSoudaJSONModified2 = {
-  statusOptions: ["Approved", "Pending", "Rejected"],
+  statusOptions: ["Pending","Approved", "Rejected"],
 
   typeOptions: ["Retail", "Wholesale"],
 
@@ -545,25 +546,7 @@ const handleExport = () => {
       console.error("Failed to fetch contract details", err);
     }
   };
-  // CONTRACT APPROVER
-  const handleApprove = async (record) => {
-    try {
-      // call API
-      const res = await approvedSalesContract(record.key);
-      // key = sale_contract_id (you already mapped this correctly)
-
-      // update UI status optimistically
-      setData((prev) =>
-        prev.map((row) =>
-          row.key === record.key
-            ? { ...row, status: res.status || "Approved" }
-            : row,
-        ),
-      );
-    } catch (err) {
-      console.error("Failed to approve contract", err);
-    }
-  };
+ 
 
   // table columns: replace deliveryDate / company with startDate / endDate
   const columns = [
@@ -1201,6 +1184,7 @@ const handleExport = () => {
             onClick={() => {
               addForm.resetFields();
               addForm.setFieldsValue({
+                status: "Pending",
                 items: [
                   {
                     lineKey: new Date().getTime(),
@@ -1397,7 +1381,7 @@ const handleExport = () => {
                 name="status"
                 rules={[{ required: true }]}
               >
-                <Select placeholder="Select Status">
+                <Select placeholder="Select Status" disabled={isAddModalOpen}>
                   {salesSoudaJSONModified2.statusOptions.map((s) => (
                     <Select.Option key={s} value={s}>
                       {s}
@@ -1436,6 +1420,47 @@ const handleExport = () => {
           {/* Tax & totals */}
           <h6 className="text-amber-500">Tax, Charges & Others</h6>
           <Row gutter={16}>
+                <Col span={6}>
+              <Form.Item
+                label={<span className="text-amber-700">GST %</span>}
+                name={["orderTaxAndTotals", "igstPercent"]}
+                                   rules={[{
+                                    required: true, message: "GST % is required"} , 
+       {
+      validator: (_, value) => {
+          if (value === undefined || value === null) {
+          return Promise.resolve();
+        }
+          if (value >= 0) {
+          return Promise.resolve();
+        }
+        if (isNaN(value)) {
+          return Promise.reject(new Error("Enter a valid number"));
+        }
+      
+      
+      },
+    },
+  ]}
+              >
+              <Input
+  className="w-full"
+  min={0}
+  max={100}
+  onChange={(e) => {
+    const igst = parseFloat(e.target.value) || 0;
+ const split = (igst / 2).toFixed(2);
+
+    addForm.setFieldsValue({
+      orderTaxAndTotals: {
+        cgstPercent: split,
+        sgstPercent: split,
+      },
+    });
+  }}
+/>
+              </Form.Item>
+            </Col>
             <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">SGST %</span>}
@@ -1458,7 +1483,7 @@ const handleExport = () => {
     },
   ]}
               >
-                <Input className="w-full" min={0} max={100} />
+                <Input className="w-full" min={0} max={100} disabled />
               </Form.Item>
             </Col>
 
@@ -1484,35 +1509,11 @@ const handleExport = () => {
     },
   ]}
               >
-                <Input className="w-full" min={0} max={100} />
+                <Input className="w-full" min={0} max={100} disabled />
               </Form.Item>
             </Col>
 
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">IGST %</span>}
-                name={["orderTaxAndTotals", "igstPercent"]}
-                                   rules={[
-       {
-      validator: (_, value) => {
-          if (value === undefined || value === null) {
-          return Promise.resolve();
-        }
-          if (value >= 0) {
-          return Promise.resolve();
-        }
-        if (isNaN(value)) {
-          return Promise.reject(new Error("Enter a valid number"));
-        }
-      
-      
-      },
-    },
-  ]}
-              >
-                <Input className="w-full" min={0} max={100} />
-              </Form.Item>
-            </Col>
+        
 
             <Col span={6}>
               <Form.Item
@@ -1748,6 +1749,14 @@ const handleExport = () => {
 
           <h6 className="text-amber-500">Tax, Charges & Others</h6>
           <Row gutter={16}>
+             <Col span={6}>
+              <Form.Item
+                label={<span className="text-amber-700">GST %</span>}
+                name={["orderTaxAndTotals", "igstPercent"]}
+              >
+                <InputNumber className="w-full" min={0} max={100}  />
+              </Form.Item>
+            </Col>
             <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">SGST %</span>}
@@ -1766,14 +1775,7 @@ const handleExport = () => {
               </Form.Item>
             </Col>
 
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">IGST %</span>}
-                name={["orderTaxAndTotals", "igstPercent"]}
-              >
-                <InputNumber className="w-full" min={0} max={100} />
-              </Form.Item>
-            </Col>
+           
 
             <Col span={6}>
               <Form.Item

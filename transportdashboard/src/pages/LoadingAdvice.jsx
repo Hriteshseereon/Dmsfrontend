@@ -17,10 +17,11 @@ import {
   EyeOutlined,
   EditOutlined,
   FilterOutlined,
-  PlusOutlined,
-  DeleteOutlined,
+ PrinterOutlined,
+ 
 } from "@ant-design/icons";
-import { getLoadingAdvice ,getLoadingAdviceById,updateLoadingAdvice} from "../api/loadingAdvice";
+import { getLoadingAdvice ,getLoadingAdviceById,updateLoadingAdvice,downloadLoadingAdvicePDF, 
+  printLoadingAdvice } from "../api/loadingAdvice";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
@@ -418,9 +419,35 @@ const isAfterTransit = disableAfterTransitStatuses.includes(
             className="cursor-pointer! text-red-500! hover:text-red-700! text-lg!"
             onClick={() => handleEdit(record)}
           />
+          
         </div>
       ),
     },
+   {
+  title: <span className="text-amber-700 font-semibold">Documents</span>,
+  width: 120,
+  render: (record) => (
+    <div className="flex gap-3 justify-center">
+      
+      {record.status === "In-Transit" && (
+        <>
+          <DownloadOutlined
+            className="cursor-pointer! text-green-600! text-lg!"
+            title="Download PDF"
+            onClick={() => downloadLoadingAdvicePDF(record.key)}
+          />
+
+          <PrinterOutlined
+            className="cursor-pointer! text-purple-600! text-lg!"
+            title="Print"
+            onClick={() => printLoadingAdvice(record.key)}
+          />
+        </>
+      )}
+
+    </div>
+  ),
+}
   ];
 
 const renderSaleOrderDetails = () => {
