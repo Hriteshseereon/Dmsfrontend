@@ -105,6 +105,20 @@ export const updatePurchaseOrder = async (orderId, payload) => {
   );
   return res.data;
 }
+// fetch all sales orders for dropdown (by vendor)
+export const getAllSalesOrder = async (vendorId) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get("/sales/orders/by-vendor/", {
+    params: {
+      organisation: currentOrgId,
+      vendor_id: vendorId,
+    },
+  });
+
+  return res.data;
+};
+
 
 // PURCHASE INVOICES
 //fetch all purchase invoices
@@ -112,7 +126,8 @@ export const getPurchaseInvoice = async () => {
   const res = await api.get("/purchase/invoices/");
   return res.data;
 };
-//add purchase invoice
+//Transport Assignments
+//add Transport Assignments
 export const addPurchaseInvoice = async (payload) => {
   const currentOrgId = useSessionStore.getState().currentOrgId;
   const res = await api.post("/purchase/invoices/", payload, {
@@ -120,12 +135,12 @@ export const addPurchaseInvoice = async (payload) => {
   });
   return res.data;
 }
-//fetch purchase invoice by id
+//fetch Transport Assignments by id
 export const getPurchaseInvoiceById = async (invoiceId) => {
   const res = await api.get(`/purchase/invoices/${invoiceId}/`);
   return res.data;
 };
-//update purchase invoice
+//update Transport Assignments
 export const updatePurchaseInvoice = async (invoiceId, payload) => {
   const { currentOrgId } = useSessionStore.getState(); 
   const res = await api.put(
@@ -154,8 +169,75 @@ export const addAssignment= async (payload) => {
   });
   return res.data;
 }
+///Purchase Invoice 
+
+//fetch purchase invoice by id
+export const getInvoiceById = async (invoiceId) => {
+  const res = await api.get(`/purchase/vendor-purchase-invoices/${invoiceId}/`);
+  return res.data;
+};
+//fetch all purchase invoice 
+export const getAllInvoice = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/purchase/vendor-purchase-invoices/`, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+//add purchase invoice
+
+export const addInvoice = async (payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.post(
+    `purchase/vendor-purchase-invoices/`,
+    payload,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      params: { organisation: currentOrgId },
+    }
+  );
+
+  return res.data;
+};
+//update purchase invoice
+export const updateInvoice = async (invoiceId, payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.put(
+    `purchase/vendor-purchase-invoices/${invoiceId}/`,
+    payload,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      params: { organisation: currentOrgId },
+    }
+  );
+  return res.data;
+};
 
 // PURCHASE RETURNS
+//fetch deliverd advices for dropdown
+export const getDeliveredAdvice = async () => {
+  const res = await api.get("/purchase/returns/delivered-loading-advice-dropdown/");
+  return res.data;
+}
+
+//fetch deliverd advices for dropdown data by id
+export const getDeliveredAdviceById = async (loadingAdviceId) => {
+  const res = await api.get(
+    `/purchase/returns/loading-advice-prefill/`,
+    {
+      params: {
+        loading_advice_id: loadingAdviceId,
+      },
+    }
+  );
+  return res.data;
+};
+
 //fetch all purchase returns
 export const getPurchaseReturn = async () => {
   const res = await api.get("purchase/returns/");
@@ -188,7 +270,7 @@ export const updatePurchaseReturn = async (returnId, payload) => {
   );
   return res.data;
 }
-
+//loding advice
 //get all loading Advices
 export const getLoadingAdvice = async () => 
   {const res = await api.get("/transport/loading-advices/"); 

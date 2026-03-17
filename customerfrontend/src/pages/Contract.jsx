@@ -443,7 +443,7 @@ const [data, setData] = useState([]);
         setVendorProducts(prev => ({ ...prev, [vendorId]: products }));
       } catch (error) {
         console.error("Error fetching products:", error);
-        message.error("Failed to load products for selected vendor");
+        message.error("Failed to load products for selected supplier");
       }
     }
 
@@ -490,8 +490,8 @@ const [data, setData] = useState([]);
     const apiPayload = {
       location: finalValues.location || "N/A",
       product_group: null,
-      from_date: finalValues.startDate ? finalValues.startDate.format("YYYY-MM-DD") : undefined,
-      to_date: finalValues.endDate ? finalValues.endDate.format("YYYY-MM-DD") : undefined,
+      from_date: finalValues.startDate ? finalValues.startDate.format("DD-MM-YYYY") : undefined,
+      to_date: finalValues.endDate ? finalValues.endDate.format("DD-MM-YYYY") : undefined,
       broker: null,
       customer_mobile: finalValues.customer_mobile,
       customer_email: finalValues.customer_email,
@@ -592,6 +592,7 @@ const [data, setData] = useState([]);
             rules={[{ required: true, message: "Please select End Date" }]}
           >
                       <DatePicker
+                       format="DD-MM-YYYY"
   className="w-full"
   disabledDate={(current) => {
     const startDate = formInstance.getFieldValue("startDate");
@@ -603,7 +604,7 @@ const [data, setData] = useState([]);
 
         <Col span={8}>
           <Form.Item
-            label="Location"
+            label="Address"
             name="location"
             rules={[{ required: true, message: "Please enter Location" }]}
           >
@@ -668,15 +669,15 @@ const [data, setData] = useState([]);
 
         {/* Company */}
         <Col span={4}>
-          <label>Vendor</label>
+          <label>Supplier</label>
           <Form.Item
             {...field}
             name={[field.name, "vendor_id"]}
             fieldKey={[field.fieldKey, "vendor_id"]}
-            rules={[{ required: true, message: "Select vendor" }]}
+            rules={[{ required: true, message: "Select supplier" }]}
           >
             <Select
-              placeholder="Select Vendor"
+              placeholder="Select Supplier"
               disabled={disabled}
               onChange={(vendorId) =>
                 handleCompanyChange(formInstance, vendorId, field.name)
@@ -874,175 +875,155 @@ const [data, setData] = useState([]);
     </>
   );
 
-  const renderApprovedView = () => (
-    <div >
-      {/* ... (renderApprovedView remains largely the same, but the totalAmount for the contract is correctly calculated) */}
-      <h3 className="text-xl font-semibold text-amber-600 mb-4">Contract & Party Details</h3>
-      <div className="border! p-2! rounded! mb-2! border-amber-300! relative!">
-        <Row gutter={16}>
-          <Col span={6}>
-            <Form.Item label="Contract No.">
-              <Input value={selectedRecord?.key} disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Contract Date">
-              <Input value={selectedRecord?.contractDate} disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Start Date">
-              <Input value={selectedRecord?.startDate} disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="End Date">
-              <Input value={selectedRecord?.endDate} disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Delivery Date">
-              <Input value={selectedRecord?.deliveryDate} disabled />
-            </Form.Item>
-          </Col>
+ const renderApprovedView = () => {
+  const supplierNames =
+    selectedRecord?.items?.map((i) => i.companyName).join(", ") || "";
 
-          <Col span={6}>
-            <Form.Item label="Vendor(s)">
-              <Input value={getCompanyNamesFromItems(selectedRecord?.items)} disabled />
-            </Form.Item>
-          </Col>
+  return (
+    <div>
 
-         
-          <Col span={6}>
-            <Form.Item label="Status">
-              <Input value={selectedRecord?.status} disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Naarration">
-              <Input value={selectedRecord?.naarration} disabled />
-            </Form.Item>
-          </Col>
-        </Row>
-      </div>
+      {/* Contract Details */}
+      <h3 className="text-xl font-semibold text-amber-600 mb-3">
+        Contract Details
+      </h3>
 
+      <Row gutter={16} className="border p-3 rounded border-amber-300 mb-4">
 
+        <Col span={6}>
+          <Form.Item label="Contract No">
+            <Input value={selectedRecord?.key} disabled />
+          </Form.Item>
+        </Col>
 
+        <Col span={6}>
+          <Form.Item label="Contract Date">
+            <Input value={selectedRecord?.contractDate} disabled />
+          </Form.Item>
+        </Col>
 
-      <h3 className="text-xl font-semibold text-amber-600 my-4">Item & Quantity Details</h3>
-      <div className="border! p-2! rounded! mb-2! border-amber-300! relative!">
-        {(selectedRecord?.items || []).map((it, idx) => (
-         <Row gutter={16} key={idx} className="mb-2 border-b border-dashed pb-2">
-  
-  <Col span={6}>
-    <Form.Item label={`Vendor ${idx + 1}`}>
-      <Input value={it.companyName} disabled />
-    </Form.Item>
-  </Col>
+        <Col span={6}>
+          <Form.Item label="Start Date">
+            <Input value={selectedRecord?.startDate} disabled />
+          </Form.Item>
+        </Col>
 
-  <Col span={6}>
-    <Form.Item label={`Item ${idx + 1}`}>
-      <Input value={it.item} disabled />
-    </Form.Item>
-  </Col>
+        <Col span={6}>
+          <Form.Item label="End Date">
+            <Input value={selectedRecord?.endDate} disabled />
+          </Form.Item>
+        </Col>
 
-  <Col span={6}>
-    <Form.Item label="UOM">
-      <Input value={it.uom} disabled />
-    </Form.Item>
-  </Col>
+        <Col span={6}>
+          <Form.Item label="Supplier">
+            <Input value={supplierNames} disabled />
+          </Form.Item>
+        </Col>
 
-  <Col span={6}>
-    <Form.Item label="Qty">
-      <Input value={it.qty} disabled />
-    </Form.Item>
-  </Col>
+        <Col span={6}>
+          <Form.Item label="Status">
+            <Input value={selectedRecord?.status} disabled />
+          </Form.Item>
+        </Col>
 
-  <Col span={6}>
-    <Form.Item label="Rate (per UOM)">
-      <Input value={it.rate} disabled />
-    </Form.Item>
-  </Col>
+        <Col span={12}>
+          <Form.Item label="Narration">
+            <Input value={selectedRecord?.naarration} disabled />
+          </Form.Item>
+        </Col>
 
-  <Col span={6}>
-    <Form.Item label="Item Total Amount">
-      <Input value={it.totalAmount} disabled />
-    </Form.Item>
-  </Col>
+      </Row>
 
-  <Col span={6}>
-    <Form.Item label="Free Qty">
-      <Input value={it.freeQty} disabled />
-    </Form.Item>
-  </Col>
- <Col span={6}>
-      <Form.Item label="Discount %">
-        <Input value={selectedRecord?.discountPercent} disabled />
-      </Form.Item>
-    </Col>
+      {/* Items Section */}
 
-    <Col span={6}>
-      <Form.Item label="Discount Amount">
-        <Input value={selectedRecord?.discountAmt} disabled />
-      </Form.Item>
-    </Col>
-</Row>
-        ))}
+      <h3 className="text-xl font-semibold text-amber-600 mb-3">
+        Item Details
+      </h3>
 
-      </div>
+      <Table
+        bordered
+        pagination={false}
+        dataSource={selectedRecord?.items || []}
+        rowKey={(record, index) => index}
+        columns={[
+          {
+            title: "Supplier",
+            dataIndex: "companyName",
+          },
+          {
+            title: "Item",
+            dataIndex: "item",
+          },
+          {
+            title: "UOM",
+            dataIndex: "uom",
+          },
+          {
+            title: "Qty",
+            dataIndex: "qty",
+          },
+          {
+            title: "Rate",
+            dataIndex: "rate",
+          },
+          {
+            title: "Free Qty",
+            dataIndex: "freeQty",
+          },
+          {
+            title: "Item Total",
+            dataIndex: "totalAmount",
+          },
+        ]}
+      />
 
+      {/* Pricing Section */}
 
-      <h3 className="text-xl font-semibold text-amber-600 my-4">Pricing & Tax Details</h3>
-     <div className="border! p-2! rounded! mb-2! border-amber-300!">
-  <Row gutter={16}>
+      <h3 className="text-xl font-semibold text-amber-600 mt-4 mb-3">
+        Pricing & Taxes
+      </h3>
 
-    <Col span={6}>
-      <Form.Item label="Gross Amount">
-        <Input value={selectedRecord?.grossAmount} disabled />
-      </Form.Item>
-    </Col>
+      <Row gutter={16} className="border p-3 rounded border-amber-300">
 
-   
+        <Col span={6}>
+          <Form.Item label="Gross Amount">
+            <Input value={selectedRecord?.grossAmount} disabled />
+          </Form.Item>
+        </Col>
 
-    {/* ✅ SGST */}
-    <Col span={6}>
-      <Form.Item label="SGST %">
-        <Input value={selectedRecord?.sgstPercent} disabled />
-      </Form.Item>
-    </Col>
+        <Col span={6}>
+          <Form.Item label="SGST %">
+            <Input value={selectedRecord?.sgstPercent} disabled />
+          </Form.Item>
+        </Col>
 
-    {/* ✅ CGST */}
-    <Col span={6}>
-      <Form.Item label="CGST %">
-        <Input value={selectedRecord?.cgstPercent} disabled />
-      </Form.Item>
-    </Col>
+        <Col span={6}>
+          <Form.Item label="CGST %">
+            <Input value={selectedRecord?.cgstPercent} disabled />
+          </Form.Item>
+        </Col>
 
-    {/* ✅ IGST */}
-    <Col span={6}>
-      <Form.Item label="IGST %">
-        <Input value={selectedRecord?.igstPercent} disabled />
-      </Form.Item>
-    </Col>
+        <Col span={6}>
+          <Form.Item label="IGST %">
+            <Input value={selectedRecord?.igstPercent} disabled />
+          </Form.Item>
+        </Col>
 
-    {/* ✅ TCS */}
-    <Col span={6}>
-      <Form.Item label="TCS Amount (₹)">
-        <Input value={selectedRecord?.tcsAmt} disabled />
-      </Form.Item>
-    </Col>
+        <Col span={6}>
+          <Form.Item label="TCS Amount">
+            <Input value={selectedRecord?.tcsAmt} disabled />
+          </Form.Item>
+        </Col>
 
-    {/* ✅ FINAL TOTAL */}
-    <Col span={6}>
-      <Form.Item label="Grand Total">
-        <Input value={selectedRecord?.totalAmount} disabled />
-      </Form.Item>
-    </Col>
+        <Col span={6}>
+          <Form.Item label="Grand Total">
+            <Input value={selectedRecord?.totalAmount} disabled />
+          </Form.Item>
+        </Col>
 
-  </Row>
-</div>
+      </Row>
     </div>
   );
+};
 
   return (
     <div>
@@ -1056,7 +1037,7 @@ const [data, setData] = useState([]);
         <div className="flex gap-2">
           <Input
             prefix={<SearchOutlined className="text-amber-600!" />}
-            placeholder="Search by Contract No, Vendor, Item, Status"
+            placeholder="Search by Contract No, Supplier, Item, Status"
             className="w-96! border-amber-300! focus:border-amber-500!"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}

@@ -2,10 +2,9 @@ import React, { useState ,useEffect} from "react";
 import { Table, Input, Button, Modal, Form, DatePicker, Row, Col, Select } from "antd";
 import { SearchOutlined, DownloadOutlined, EyeOutlined, EditOutlined, FilterOutlined, TruckOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
-import {getAllAssignedOrder,getAssignedOrderById,updateAssignedOrder} from '../api/risedStatus'
+import {getAllAssignedOrder,getAssignedOrderById,updateAssignedOrder,} from '../api/risedStatus'
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
-
 
 export default function PurchaseOrderList() {
   const [modalState, setModalState] = useState({ open: false, mode: null }); 
@@ -34,14 +33,14 @@ const fetchAssignedOrders = async () => {
       deliveryAddress: item.delivery_address,
       plantName: item.plant_name,
 
-      products: [
-        {
-          productName: item.product_name,
-          qty: item.total_qty,
-          productId: item.invoice,
-          uom: item.unit_name,   
-        },
-      ],
+     products: [
+  {
+    productName: item.product_name,
+    qty: item.invoice_items?.[0]?.qty,
+    productId: item.invoice,
+    uom: item.invoice_items?.[0]?.uom_details?.unit_name,
+  },
+],
 
          }));
 
@@ -84,13 +83,13 @@ plantAddress: res.plant_details?.address,
 plantPhoneNumber: res.plant_details?.phone_number,
 
   // ✅ PRODUCT (FIX HERE)
-  products: [
-    {
-      productName: res.product_name,
-      qty: res.total_qty,   // ❗ you used res.qty (wrong)
-      uom: res.invoice_items?.[0]?.uom_details?.unit_name,            // not in API
-    },
-  ],
+ products: [
+  {
+    productName: res.invoice_items?.[0]?.product_name,
+    qty: res.invoice_items?.[0]?.qty,
+    uom: res.invoice_items?.[0]?.uom_details?.unit_name,
+  },
+],
 });
 
 
@@ -137,8 +136,7 @@ plantPhoneNumber: res.plant_details?.phone_number,
   };
 
   const columns = [
-    { title: <span className="text-amber-700 font-semibold">Invoice No</span>, dataIndex: "invoice_number", render: (t) => <span className="text-amber-800 font-medium">{t}</span> },
-    
+  
     {
   title: <span className="text-amber-700 font-semibold">Product Name</span>,
   render: (record) => (
@@ -155,7 +153,6 @@ plantPhoneNumber: res.plant_details?.phone_number,
     </span>
   ),
 },
- { title: <span className="text-amber-700 font-semibold">Delivery Address</span>, dataIndex: "deliveryAddress", render: (d) => <span className="text-amber-800">{d}</span> },
     { title: <span className="text-amber-700 font-semibold">Status</span>,width:180, dataIndex: "status", 
       render: (s) => {
   const displayStatus = s === "Pending" ? "Pending Approval" : s;
@@ -332,14 +329,13 @@ plantPhoneNumber: res.plant_details?.phone_number,
 </Col>
    </>)}
           {renderSection("Order Details", <>
-            <Col span={6}><Form.Item label="Invoice No" name="invoice_number"><Input disabled /></Form.Item></Col>
+            <Col span={6}><Form.Item label="Assign No" name="invoice_number"><Input disabled /></Form.Item></Col>
              <Col span={6}><Form.Item label="Way Bill" name="wayBill"><Input disabled/></Form.Item></Col>
             <Col span={6}><Form.Item label="Status" name="status"><Select disabled={isReadonly || isAssigning} options={[{label: 'Pending', value: 'Pending'}, ]} /></Form.Item></Col>
-            <Col span={6}><Form.Item label="Delivery Address" name="deliveryAddress"><Input disabled /></Form.Item></Col>
-          </>)}
+            </>)}
 
-          {renderSection("Vendor Detail", <>
-            <Col span={6}><Form.Item label="Vendor Name" name="vendorName" ><Input disabled /></Form.Item></Col>
+          {renderSection("Supplier Detail", <>
+            <Col span={6}><Form.Item label="Supplier Name" name="vendorName" ><Input disabled /></Form.Item></Col>
             <Col span={6}><Form.Item label="Address" name="vendorAddress" ><Input disabled /></Form.Item></Col>
             <Col span={6}><Form.Item label="Contact Person" name="vendorContactPerson"><Input disabled /></Form.Item></Col>
             <Col span={6}><Form.Item label="Phone" name="vendorPhoneNumber" ><Input disabled /></Form.Item></Col>

@@ -5,7 +5,8 @@ import SaleOrdersInvoice from "./SaleOrdersInvoice";
 import DeliveryStatus from "./DeliveryStatus";
 import SaleReturn from "./SaleReturn";
 import SalesDispute from "./SalesDispute";
-
+import SaleInvoice from "./SaleInvoice";
+ 
 export default SalesRoutes = () => {
   return (
     <Routes>
@@ -13,10 +14,11 @@ export default SalesRoutes = () => {
       {/* children component path here */}
       <Route path="souda" element={<SalesSouda />} />
       <Route path="orders" element={<SaleOrdersInvoice />} />
+      <Route path="saleinvoice" element={<SaleInvoice />} />
       <Route path="status" element={<DeliveryStatus />} />
       <Route path="return" element={<SaleReturn />} />
       <Route path="dispute" element={<SalesDispute />} />
-
+ 
     </Routes>
   );
 };
