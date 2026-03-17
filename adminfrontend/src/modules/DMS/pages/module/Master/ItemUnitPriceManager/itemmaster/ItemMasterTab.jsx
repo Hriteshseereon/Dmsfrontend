@@ -21,13 +21,14 @@ import {
   getProducts, // ✅ FIX 1
   getProductById,
   updateProductById,
+  getUnits,
 } from "../../../../../../../api/product";
 
 const { Option } = Select;
 
 const ITEM_TYPES = ["CONSUMER", "BULK"];
 const ITEM_CATEGORY = ["GOODS", "SERVICE"];
-const BASE_UNITS = ["LTR", "KG", "PCS", "GM", "ML", "BOX", "PACK"];
+// const BASE_UNITS = ["LTR", "KG", "PCS", "GM", "ML", "BOX", "PACK"];
 
 /* ================= FORM FIELD ================= */
 function FormField({ label, children, required }) {
@@ -45,7 +46,7 @@ export default function ItemMasterTab({ items, setItems }) {
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState(false);
   const [loading, setLoading] = useState(false);
-
+  const [units, setUnits] = useState([]);
   const [groups, setGroups] = useState([]);
   const [vendors, setVendors] = useState([]);
   const [hsnSacCodes, setHsnSacCodes] = useState([]);
@@ -58,11 +59,17 @@ export default function ItemMasterTab({ items, setItems }) {
 
   /* ================= LOAD MASTER DATA ================= */
   useEffect(() => {
-    Promise.all([getProductGroups(), getVendors(), getHSNSACCodes()])
-      .then(([g, v, h]) => {
+    Promise.all([
+      getProductGroups(),
+      getVendors(),
+      getHSNSACCodes(),
+      getUnits(),
+    ])
+      .then(([g, v, h, u]) => {
         setGroups(g);
         setVendors(v);
         setHsnSacCodes(h);
+        setUnits(u);
       })
       .catch(() => message.error("Failed to load master data"));
   }, []);
@@ -95,7 +102,7 @@ export default function ItemMasterTab({ items, setItems }) {
         itemCategory: data.category,
         hsn_code: data.hsn_code,
         sac_code: data.sac_code || null,
-        baseUnit: data.base_unit?.toUpperCase(),
+        base_unit_group: data.base_unit_group,
         gstPercent: Number(data.gst_percentage),
         cgstPercent: Number(data.gst_percentage) / 2,
         sgstPercent: Number(data.gst_percentage) / 2,
@@ -117,7 +124,7 @@ export default function ItemMasterTab({ items, setItems }) {
       !formData.itemName ||
       !formData.product_group ||
       !formData.hsn_code ||
-      !formData.baseUnit ||
+      !formData.base_unit_group ||
       !formData.itemType ||
       !formData.itemCategory ||
       !formData.company
@@ -131,7 +138,7 @@ export default function ItemMasterTab({ items, setItems }) {
       product_group: formData.product_group,
       hsn_code: formData.hsn_code,
       sac_code: formData.itemCategory === "SERVICE" ? formData.sac_code : null,
-      base_unit: formData.baseUnit.toLowerCase(),
+      base_unit_group: formData.base_unit_group,
       product_type: formData.itemType,
       category: formData.itemCategory,
       gst_percentage: formData.gstPercent,
@@ -259,19 +266,27 @@ export default function ItemMasterTab({ items, setItems }) {
 }
 `}
       </style>
-      <Button
-        className="amber-add-btn"
-        type="primary"
-        icon={<PlusOutlined />}
-        onClick={() => {
-          setFormData({});
-          setEditingId(null);
-          setViewMode(false);
-          setOpen(true);
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          marginBottom: 10,
         }}
       >
-        Add Item
-      </Button>
+        <Button
+          className="amber-add-btn"
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => {
+            setFormData({ gstPercent: 0, cgstPercent: 0, sgstPercent: 0 });
+            setEditingId(null);
+            setViewMode(false);
+            setOpen(true);
+          }}
+        >
+          Add Item
+        </Button>
+      </div>
 
       <Table
         className="amber-table"
@@ -286,7 +301,14 @@ export default function ItemMasterTab({ items, setItems }) {
         width={800}
         onCancel={() => setOpen(false)}
         onOk={viewMode ? null : handleSave}
-        okButtonProps={{ disabled: viewMode, loading }}
+        okButtonProps={{
+          disabled: viewMode,
+          loading,
+          style: {
+            backgroundColor: "#f59e0b",
+            borderColor: "#f59e0b",
+          },
+        }}
         title={viewMode ? "View Item" : "Add / Edit Item"}
       >
         <div style={{ paddingTop: 16 }}>
@@ -442,8 +464,9 @@ export default function ItemMasterTab({ items, setItems }) {
                   style={{ width: "100%" }}
                   value={formData.gstPercent}
                   onChange={handleGstChange}
-                  formatter={(value) => `${value}%`}
+                  formatter={(value) => `${value}`}
                   parser={(value) => value.replace("%", "")}
+                  placeholder="%"
                 />
               </FormField>
             </Col>
@@ -475,17 +498,16 @@ export default function ItemMasterTab({ items, setItems }) {
                   disabled={viewMode}
                   placeholder="Select unit"
                   style={{ width: "100%" }}
-                  value={formData.baseUnit}
+                  value={formData.base_unit_group}
                   onChange={(value) =>
-                    setFormData({ ...formData, baseUnit: value })
+                    setFormData({ ...formData, base_unit_group: value })
                   }
-                >
-                  {BASE_UNITS.map((u) => (
-                    <Option key={u} value={u}>
-                      {u}
-                    </Option>
-                  ))}
-                </Select>
+                  optionFilterProp="label"
+                  options={units.map((u) => ({
+                    value: u.id,
+                    label: u.name,
+                  }))}
+                />
               </FormField>
             </Col>
             <Col span={12}>

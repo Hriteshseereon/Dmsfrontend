@@ -8,6 +8,8 @@ import {
   LockOutlined,
   UserOutlined,
 } from "@ant-design/icons";
+import { useAuth } from "../../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 // ===== JSON DATA =====
 const profileData = {
@@ -42,11 +44,16 @@ const profileData = {
 export default function ProfileSetings() {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(profileData.user);
-
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const handleChange = (e, field) => {
     setFormData({ ...formData, [field]: e.target.value });
   };
 
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
   return (
     <div className="p-4">
       {/* Page Title */}
@@ -66,8 +73,11 @@ export default function ProfileSetings() {
               </h2>
               {isEditing ? (
                 <div className="space-x-2">
-                  <Button   className=" text-amber-700! border-amber-300! "
-         size="small" onClick={() => setIsEditing(false)}>
+                  <Button
+                    className=" text-amber-700! border-amber-300! "
+                    size="small"
+                    onClick={() => setIsEditing(false)}
+                  >
                     Cancel
                   </Button>
                   <Button
@@ -181,7 +191,6 @@ export default function ProfileSetings() {
 
         {/* Right Section */}
         <div className="space-y-6">
-          {/* Account Status */}
           <Card className="rounded-2xl shadow-sm border-amber-200">
             <h2 className="text-lg font-semibold mb-4 text-amber-800">
               Account Status
@@ -210,8 +219,7 @@ export default function ProfileSetings() {
             </div>
           </Card>
 
-          {/* Notification Preferences */}
-          <Card className="rounded-2xl shadow-sm border-amber-200">
+          {/* <Card className="rounded-2xl shadow-sm border-amber-200">
             <h2 className="text-lg font-semibold mb-4 text-amber-800">
               Notification Preferences
             </h2>
@@ -239,10 +247,10 @@ export default function ProfileSetings() {
                 </div>
               ))}
             </div>
-          </Card>
+          </Card> */}
 
           {/* Danger Zone */}
-          <Button danger block icon={<LogoutOutlined />}>
+          <Button danger block icon={<LogoutOutlined />} onClick={handleLogout}>
             Logout
           </Button>
         </div>
