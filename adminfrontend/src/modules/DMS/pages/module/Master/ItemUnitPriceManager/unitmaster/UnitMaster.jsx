@@ -120,12 +120,12 @@ export default function UnitMaster() {
       render: (record) => (
         <div className="flex gap-3">
           <EyeOutlined
-            className="cursor-pointer text-red-500 hover:text-red-600"
+            className="cursor-pointer text-red-500! hover:text-red-600!"
             onClick={() => openUnit(record, "view")}
           />
 
           <EditOutlined
-            className="cursor-pointer text-blue-500 hover:text-blue-600"
+            className="cursor-pointer text-blue-500! hover:text-blue-600!"
             onClick={() => openUnit(record, "edit")}
           />
         </div>
@@ -173,7 +173,7 @@ export default function UnitMaster() {
             form.resetFields();
             setIsAddModalOpen(true);
           }}
-          className="bg-amber-500 hover:bg-amber-600 border-none"
+          className="bg-amber-500! hover:bg-amber-600! border-none!"
         >
           Add Unit
         </Button>
@@ -224,7 +224,7 @@ export default function UnitMaster() {
                 setIsEditModalOpen(false);
                 form.resetFields();
               }}
-              className="border-amber-500 text-amber-700 hover:bg-amber-100"
+              className="border-amber-500! text-amber-700! hover:bg-amber-100!"
             >
               Cancel
             </Button>
@@ -232,7 +232,7 @@ export default function UnitMaster() {
             <Button
               type="primary"
               htmlType="submit"
-              className="bg-amber-600 hover:bg-amber-700 border-none text-white"
+              className="bg-amber-600! hover:bg-amber-700! border-none! text-white!"
             >
               {isEditModalOpen ? "Update" : "Add"}
             </Button>
