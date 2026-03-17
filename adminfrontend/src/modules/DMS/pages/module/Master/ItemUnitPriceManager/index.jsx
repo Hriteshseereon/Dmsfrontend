@@ -7,6 +7,7 @@ import PriceManagementTab from "./PriceManagement/PriceManagementTab";
 // import ProductGroupMaster from "../ProductGroupMaster";
 import ProductGroupMaster from "./productgroup/ProductGroupMaster";
 import HsnSacManager from "./hsnsac/HsnSacManager";
+import UnitMaster from "./unitmaster/UnitMaster";
 import { getProducts } from "../../../../../../api/product";
 
 export default function ItemUnitPriceManager() {
@@ -66,11 +67,16 @@ export default function ItemUnitPriceManager() {
             },
             {
               key: "2",
-              label: "Product Master",
+              label: "Product Group",
               children: <ProductGroupMaster />,
             },
             {
               key: "3",
+              label: "Unit Group",
+              children: <UnitMaster />,
+            },
+            {
+              key: "4",
               label: "Unit Conversions",
               children: (
                 <UnitConversionTab
