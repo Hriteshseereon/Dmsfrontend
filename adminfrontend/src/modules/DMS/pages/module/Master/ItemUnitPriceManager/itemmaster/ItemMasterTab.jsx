@@ -266,19 +266,27 @@ export default function ItemMasterTab({ items, setItems }) {
 }
 `}
       </style>
-      <Button
-        className="amber-add-btn"
-        type="primary"
-        icon={<PlusOutlined />}
-        onClick={() => {
-          setFormData({ gstPercent: 0, cgstPercent: 0, sgstPercent: 0 });
-          setEditingId(null);
-          setViewMode(false);
-          setOpen(true);
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          marginBottom: 10,
         }}
       >
-        Add Item
-      </Button>
+        <Button
+          className="amber-add-btn"
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => {
+            setFormData({ gstPercent: 0, cgstPercent: 0, sgstPercent: 0 });
+            setEditingId(null);
+            setViewMode(false);
+            setOpen(true);
+          }}
+        >
+          Add Item
+        </Button>
+      </div>
 
       <Table
         className="amber-table"
@@ -293,7 +301,14 @@ export default function ItemMasterTab({ items, setItems }) {
         width={800}
         onCancel={() => setOpen(false)}
         onOk={viewMode ? null : handleSave}
-        okButtonProps={{ disabled: viewMode, loading }}
+        okButtonProps={{
+          disabled: viewMode,
+          loading,
+          style: {
+            backgroundColor: "#f59e0b",
+            borderColor: "#f59e0b",
+          },
+        }}
         title={viewMode ? "View Item" : "Add / Edit Item"}
       >
         <div style={{ paddingTop: 16 }}>

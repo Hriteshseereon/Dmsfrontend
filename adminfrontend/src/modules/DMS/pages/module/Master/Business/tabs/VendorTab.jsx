@@ -1280,7 +1280,7 @@ export default function VendorTab() {
               <Button
                 htmlType="submit"
                 type="primary"
-                className="bg-amber-500 border-none"
+                className="bg-amber-500! border-none!"
               >
                 {selected ? "Update" : "Save"}
               </Button>
