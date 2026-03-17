@@ -19,6 +19,7 @@ import {
   getProductUnitConversions,
   getProductReferenceUnits,
   setDisplayUnit,
+  getUnits,
 } from "@/api/product";
 import { useProductUnitConversions } from "@/queries/useProductUnitConversions";
 
@@ -42,6 +43,7 @@ export default function UnitConversionTab({ items }) {
     set_as_display: false,
   });
   const [baseUnit, setBaseUnit] = useState(null);
+  const [units, setUnits] = useState([]);
   /* ================= NORMALIZER ================= */
   const normalizeReferenceUnits = (res) => {
     console.log("📦 Raw reference units response:", res);
@@ -71,13 +73,18 @@ export default function UnitConversionTab({ items }) {
   useEffect(() => {
     if (!selectedItem) return;
 
-    getProductReferenceUnits(selectedItem.id)
-      .then((res) => {
-        const units = res?.data?.units || res?.units || [];
+    Promise.all([getProductReferenceUnits(selectedItem.id), getUnits()])
+      .then(([refRes, unitsRes]) => {
+        const units = refRes?.data?.units || refRes?.units || [];
         const base = units.find((u) => u.is_base_unit);
+
         setBaseUnit(base);
-        const normalized = normalizeReferenceUnits(res?.data || res);
+
+        const normalized = normalizeReferenceUnits(refRes?.data || refRes);
         setReferenceUnits(normalized);
+
+        setUnits(unitsRes);
+
         if (base) {
           setFormData((prev) => ({
             ...prev,
@@ -85,11 +92,7 @@ export default function UnitConversionTab({ items }) {
           }));
         }
       })
-      .catch((error) => {
-        console.error("❌ Error loading reference units:", error);
-        message.error("Failed to load reference units");
-        setReferenceUnits([]);
-      });
+      .catch(() => message.error("Failed to load reference units"));
   }, [selectedItem]);
 
   /* ================= SET DISPLAY ================= */
@@ -106,19 +109,19 @@ export default function UnitConversionTab({ items }) {
 
   /* ================= SAVE ================= */
   const handleSave = async () => {
-    if (!formData.unit_name || !formData.multiplier) {
-      message.error("Lower unit name and multiplier are required");
+    if (!formData.unit_group_id || !formData.multiplier) {
+      message.error("Upper unit and multiplier are required");
       return;
     }
 
     if (!formData.reference_unit_id) {
-      message.error("Upper unit is required");
+      message.error("Lower unit is required");
       return;
     }
 
     const payload = {
       product: selectedItem.id,
-      unit_name: formData.unit_name,
+      unit_group_id: formData.unit_group_id,
       reference_type: FIXED_REFERENCE_TYPE,
       reference_unit_id: formData.reference_unit_id,
       multiplier: formData.multiplier,
@@ -132,6 +135,9 @@ export default function UnitConversionTab({ items }) {
       setFormData({
         reference_type: FIXED_REFERENCE_TYPE,
         set_as_display: false,
+        unit_group_id: null,
+        reference_unit_id: null,
+        multiplier: null,
       });
     } catch (error) {
       console.error("❌ Error creating unit:", error);
@@ -431,12 +437,18 @@ export default function UnitConversionTab({ items }) {
               </Col>
               <Col span={12}>
                 <Form.Item label="Upper Unit" required>
-                  <Input
-                    placeholder="e.g. gram, ml, piece"
-                    value={formData.unit_name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, unit_name: e.target.value })
+                  <Select
+                    showSearch
+                    placeholder="Select upper unit"
+                    optionFilterProp="label"
+                    value={formData.unit_group_id}
+                    onChange={(v) =>
+                      setFormData({ ...formData, unit_group_id: v })
                     }
+                    options={units.map((u) => ({
+                      value: u.id,
+                      label: u.name,
+                    }))}
                   />
                 </Form.Item>
               </Col>
