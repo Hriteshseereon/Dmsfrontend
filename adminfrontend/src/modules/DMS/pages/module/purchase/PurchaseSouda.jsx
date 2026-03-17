@@ -36,61 +36,6 @@ import dayjs from "dayjs";
 
 const { Option } = Select;
 
-const purchaseSoudaJSON = {
-  records: [
-    {
-      key: 1,
-      plantName: "Kalinga Oils Pvt. Ltd.",
-      plantCode: "PLT001",
-      soudaDate: "2024-10-01",
-      deliveryDate: "2024-12-09",
-      startDate: "2024-09-01",
-      endDate: "2024-09-30",
-      companyName: "Jay Traders",
-      depoName: "Bhubaneswar Depot",
-      // previously single item; now items array
-      items: [
-        {
-          lineKey: 1,
-          item: "Mustard Oil",
-          itemCode: "It1",
-          qty: 5000,
-          freeQty: 200,
-          totalQty: 5200,
-          uom: "Litre",
-          rate: 120,
-          discountPercent: 2,
-          discountAmt: 12000,
-          grossAmount: 5000 * 120,
-          grossWt: 2100,
-          totalGrossWt: 1020,
-          sgstPercent: 5,
-          cgstPercent: 5,
-          igstPercent: 0,
-          sgst: 3186,
-          cgst: 3186,
-          igst: 0,
-          totalGST: 6372,
-          tcsAmt: 500,
-          totalAmt: 588000,
-        },
-      ],
-      status: "Approved",
-    },
-  ],
-  plantOptions: [
-    { name: "Kalinga Oils Pvt. Ltd.", code: "PA" },
-    { name: "Odisha Edibles", code: "Sunrise Foods" },
-  ],
-  depoOptions: ["Bhubaneswar Depot", "Cuttack Depot", "Sambalpur Depot"],
-  itemOptions: [
-    { name: "Mustard Oil", code: "It1", rate: 120, uom: "Litre" },
-    { name: "Refined Oil", code: "It2", rate: 115, uom: "Litre" },
-    { name: "Sunflower Oil", code: "It3", rate: 100, uom: "Litre" },
-  ],
-  uomOptions: ["Litre", "Kg", "Packet", "Box"],
-  statusOptions: ["Approved", "Pending", "Rejected"],
-};
 
 
 export default function PurchaseSouda() {
@@ -111,7 +56,7 @@ export default function PurchaseSouda() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
-
+const statusOptions = ["Pending","Approved", "Rejected"];
 
   useEffect(() => {
     fetchDropdownData();
@@ -209,7 +154,7 @@ const handleEditClick = async (record) => {
       hsn_code: it.hsn_code || "",
 
       qty: Number(it.qty),
-      freeQty: Number(it.free_qty),
+    //  freeQty: Number(it.free_qty),
       totalQty: Number(it.total_qty),
 
       rate: Number(it.rate),
@@ -285,7 +230,7 @@ const handleEditSubmit = async (values) => {
         hsn_code: it.hsn_code || "",
         item_name: it.item_name || "",
         qty: round2(it.qty),
-        free_qty: round2(it.freeQty),
+      //  free_qty: round2(it.freeQty),
         total_qty: round2(it.totalQty),
 
         rate: round2(it.rate),
@@ -329,7 +274,7 @@ const handleViewClick = async (record) => {
       hsn_code: it.hsn_code || "",
 
       qty: Number(it.qty),
-      freeQty: Number(it.free_qty),
+      //  freeQty: Number(it.free_qty),
       totalQty: Number(it.total_qty),
 
       rate: Number(it.rate),
@@ -375,7 +320,7 @@ const handleViewClick = async (record) => {
   // ---------- Table columns ----------
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Souda No</span>,
+      title: <span className="text-amber-700 font-semibold">Contract No</span>,
       dataIndex: "souda_number",
 
       width: 100,
@@ -388,7 +333,7 @@ const handleViewClick = async (record) => {
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Vendor Name</span>,
+      title: <span className="text-amber-700 font-semibold">Supplier Name</span>,
       dataIndex: "vendor_name",
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
       width: 100,
@@ -432,11 +377,13 @@ const handleViewClick = async (record) => {
            onClick={() => handleViewClick(record)}
 
           />
+            {record.status !== "Approved" && (
           <EditOutlined
             className="cursor-pointer! text-red-500!"
            onClick={() => handleEditClick(record)}
 
           />
+            )}
         </div>
       ),
     },
@@ -447,7 +394,7 @@ const handleViewClick = async (record) => {
   const computeAllFromFormValues = (values) => {
     const items = (values.items || []).map((it = {}, idx) => {
       const qty = Number(it.qty || 0);
-      const freeQty = Number(it.freeQty || 0);
+      // const freeQty = Number(it.freeQty || 0);
       const rate = Number(it.rate || 0);
       const discountPercent = Number(it.discountPercent || 0);
       const sgstPercent = Number(it.sgstPercent || 0);
@@ -456,7 +403,8 @@ const handleViewClick = async (record) => {
       const tcsAmt = Number(it.tcsAmt || 0);
       const grossWt = Number(it.grossWt || 0);
 
-      const totalQty = round2(qty + freeQty);
+      // const totalQty = round2(qty + freeQty);
+      const totalQty = round2(qty);
 
       const grossAmount = round2(qty * rate);
 
@@ -519,9 +467,9 @@ const handleExport = async () => {
     fullData.forEach((record) => {
       record.items?.forEach((item) => {
         exportRows.push({
-          "Vendor Name": record.vendor_name,
+          "Supplier Name": record.vendor_name,
           "Plant Name": record.plant_name,
-          "Souda Date": record.created_at, // or souda_date if exists
+          "Contract Date": record.created_at, // or contract_date if exists
           "Start Date": record.from_date,
           "End Date": record.to_date,
 
@@ -553,7 +501,7 @@ const handleExport = async () => {
       });
     });
 
-    exportToExcel(exportRows, "All_Purchase_Souda_Details", "SoudaData");
+    exportToExcel(exportRows, "All_Purchase_Contract_Details", "SoudaData");
 
   } catch (error) {
     console.error("Export failed:", error);
@@ -588,7 +536,7 @@ const handleExport = async () => {
         uom: it.base_unit || null,
 
         qty: round2(it.qty),
-        free_qty: round2(it.freeQty),
+       // free_qty: round2(it.freeQty),
         total_qty: round2(it.totalQty),
 
         rate: round2(it.rate),
@@ -640,7 +588,7 @@ const handleExport = async () => {
                     item: undefined,
 
                     qty: 0,
-                    freeQty: 0,
+                  // freeQty: 0,
                     totalQty: 0,
                     rate: 0,
                     discountPercent: 0,
@@ -750,7 +698,7 @@ const handleExport = async () => {
                   </Form.Item>
                 </Col>
                 {/* FIX: Free Qty with proper validation */}
-                <Col span={4}>
+                {/* <Col span={4}>
                   <Form.Item
                     {...field}
                     label="Free Qty"
@@ -777,7 +725,7 @@ const handleExport = async () => {
                       className="w-full!"
                     />
                   </Form.Item>
-                </Col>
+                </Col> */}
 
                 <Col span={4}>
                   <Form.Item
@@ -851,28 +799,44 @@ const handleExport = async () => {
                   </Form.Item>
                 </Col>
 
-                <Col span={4}>
+               
+  <Col span={4}>
                   <Form.Item
                     {...field}
-                    label="Gross Amount (₹)"
-                    name={[field.name, "grossAmount"]}
-                    fieldKey={[field.fieldKey, "grossAmount"]}
+                    label="GST %"
+                    name={[field.name, "igstPercent"]}
+                    fieldKey={[field.fieldKey, "igstPercent"]}
+                    rules={[
+                      { required: true, message: "IGST % is required" },
+                      {
+                        validator: (_, value) =>
+                          value >= 0
+                            ? Promise.resolve()
+                            : Promise.reject("Enter valid positive number"),
+                      },
+                    ]}
                   >
-                    <InputNumber className="w-full!" disabled />
+                    <Input
+                    
+                      max={100}
+                      disabled={disabled}
+                    onChange={(e) => {
+  const igst = Number(e.target.value || 0);
+  const half = igst / 2;
+
+  form.setFields([
+    { name: ["items", field.name, "sgstPercent"], value: half },
+    { name: ["items", field.name, "cgstPercent"], value: half },
+  ]);
+
+  const all = form.getFieldsValue();
+  const computed = computeAllFromFormValues(all || {});
+  form.setFieldsValue({ items: computed.items });
+}}
+                      className="w-full!"
+                    />
                   </Form.Item>
                 </Col>
-
-                <Col span={4}>
-                  <Form.Item
-                    {...field}
-                    label="Discount Amt (₹)"
-                    name={[field.name, "discountAmt"]}
-                    fieldKey={[field.fieldKey, "discountAmt"]}
-                  >
-                    <InputNumber className="w-full!" disabled />
-                  </Form.Item>
-                </Col>
-
                 {/* FIX: SGST% with proper validation */}
                 <Col span={4}>
                   <Form.Item
@@ -893,7 +857,7 @@ const handleExport = async () => {
                     <Input
                      
                       max={100}
-                      disabled={disabled}
+                      disabled
                       onChange={() => {
                         const all = form.getFieldsValue();
                         const computed = computeAllFromFormValues(all || {});
@@ -924,7 +888,7 @@ const handleExport = async () => {
                     <Input
                      
                       max={100}
-                      disabled={disabled}
+                      disabled
                       onChange={() => {
                         const all = form.getFieldsValue();
                         const computed = computeAllFromFormValues(all || {});
@@ -936,35 +900,7 @@ const handleExport = async () => {
                 </Col>
 
                 {/* FIX: IGST% with proper validation */}
-                <Col span={4}>
-                  <Form.Item
-                    {...field}
-                    label="IGST %"
-                    name={[field.name, "igstPercent"]}
-                    fieldKey={[field.fieldKey, "igstPercent"]}
-                    rules={[
-                      { required: true, message: "IGST % is required" },
-                      {
-                        validator: (_, value) =>
-                          value >= 0
-                            ? Promise.resolve()
-                            : Promise.reject("Enter valid positive number"),
-                      },
-                    ]}
-                  >
-                    <Input
-                    
-                      max={100}
-                      disabled={disabled}
-                      onChange={() => {
-                        const all = form.getFieldsValue();
-                        const computed = computeAllFromFormValues(all || {});
-                        form.setFieldsValue({ items: computed.items });
-                      }}
-                      className="w-full!"
-                    />
-                  </Form.Item>
-                </Col>
+              
 
                 <Col span={4}>
                   <Form.Item
@@ -976,7 +912,27 @@ const handleExport = async () => {
                     <InputNumber className="w-full!" disabled />
                   </Form.Item>
                 </Col>
+ <Col span={4}>
+                  <Form.Item
+                    {...field}
+                    label="Gross Amount (₹)"
+                    name={[field.name, "grossAmount"]}
+                    fieldKey={[field.fieldKey, "grossAmount"]}
+                  >
+                    <InputNumber className="w-full!" disabled />
+                  </Form.Item>
+                </Col>
 
+                <Col span={4}>
+                  <Form.Item
+                    {...field}
+                    label="Discount Amt (₹)"
+                    name={[field.name, "discountAmt"]}
+                    fieldKey={[field.fieldKey, "discountAmt"]}
+                  >
+                    <InputNumber className="w-full!" disabled />
+                  </Form.Item>
+                </Col>
                 <Col span={6}>
                   <Form.Item
                     {...field}
@@ -1002,12 +958,12 @@ const handleExport = async () => {
         <Row gutter={16}>
           <Col span={4}>
             <Form.Item
-              label="Vendor Name"
+              label="Supplier Name"
               name="vendor"
               rules={[{ required: true }]}
             >
               <Select
-                placeholder="Select Vendor"
+                placeholder="Select Supplier"
                 showSearch
                 optionFilterProp="label"
                 onChange={async (vendorId) => {
@@ -1098,7 +1054,7 @@ const handleExport = async () => {
 
 
           <Col span={4}>
-            <Form.Item label="Souda Date" name="soudaDate" initialValue={dayjs()}>
+            <Form.Item label="Contract Date" name="soudaDate" initialValue={dayjs()}>
               <DatePicker className="w-full" disabled={disabled}  />
             </Form.Item>
           </Col>
@@ -1162,8 +1118,8 @@ const handleExport = async () => {
 
           <Col span={4}>
             <Form.Item label="Status" name="status" rules={[{ required: true }]}>
-              <Select placeholder="Select Status" disabled={disabled}>
-                {purchaseSoudaJSON.statusOptions.map((opt) => (
+              <Select placeholder="Select Status"  disabled={disabled || isAddModalOpen} >
+                {statusOptions.map((opt) => (
                   <Option key={opt} value={opt}>
                     {opt}
                   </Option>
@@ -1213,13 +1169,14 @@ const handleExport = async () => {
               addForm.resetFields();
               // initialize an empty item row
               addForm.setFieldsValue({
+                  status: "Pending",
                 items: [
                   {
                     lineKey: new Date().getTime(),
                     item: undefined,
 
                     qty: 0,
-                    freeQty: 0,
+                   // freeQty: 0,
                     totalQty: 0,
                     rate: 0,
                     discountPercent: 0,
@@ -1272,7 +1229,7 @@ const handleExport = async () => {
 
       {/* Edit Modal */}
    <Modal
-  title={<span className="text-amber-700 text-2xl font-semibold">Edit Purchase Souda</span>}
+  title={<span className="text-amber-700 text-2xl font-semibold">Edit Purchase Contract</span>}
   open={isEditModalOpen}
   onCancel={() => {
     editForm.resetFields();
@@ -1308,7 +1265,7 @@ const handleExport = async () => {
 
       {/* View Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">View Purchase Souda</span>}
+        title={<span className="text-amber-700 text-2xl font-semibold">View Purchase Contract</span>}
         open={isViewModalOpen}
         onCancel={() => {
           viewForm.resetFields();

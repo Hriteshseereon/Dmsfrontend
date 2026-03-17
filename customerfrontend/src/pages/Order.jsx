@@ -208,7 +208,7 @@ const handleStatusChange = async (value, form) => {
 
     // initialize with one contract + one item row to help user
     addForm.setFieldsValue({
-      
+       status: "Pending", 
       contracts: [
         {
           contractNo: undefined,
