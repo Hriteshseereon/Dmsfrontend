@@ -416,7 +416,7 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
 
     },
     {
-      title: <span className="text-amber-700 font-semibold">Invoice No</span>,
+      title: <span className="text-amber-700 font-semibold">Assign No</span>,
       dataIndex: "invoiceNo",
       render: (t) => <span className="text-amber-800">{t}</span>,
     },

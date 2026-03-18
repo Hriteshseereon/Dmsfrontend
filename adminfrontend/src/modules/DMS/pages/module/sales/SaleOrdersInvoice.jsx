@@ -1,6 +1,5 @@
 
-  // SaleOrdersInvoice.jsx 
-import React, { useState, useEffect } from "react";
+ import React, { useState, useEffect } from "react";
 import {
   Table,
   Input,
@@ -1429,6 +1428,18 @@ narration: order.narration,      // NEW
       <Row gutter={16}>
         <Col span={6}>
           <Form.Item
+            label={<span className="text-amber-700">GST %</span>}
+            name={["orderTaxAndTotals", "igstPercent"]}
+          >
+            <InputNumber
+              min={0}
+              max={100}
+              className="w-full"
+             disabled    />
+          </Form.Item>
+        </Col>
+        <Col span={6}>
+          <Form.Item
             label={<span className="text-amber-700">SGST %</span>}
             name={["orderTaxAndTotals", "sgstPercent"]}
           >
@@ -1451,18 +1462,7 @@ narration: order.narration,      // NEW
              disabled  />
           </Form.Item>
         </Col>
-        <Col span={6}>
-          <Form.Item
-            label={<span className="text-amber-700">IGST %</span>}
-            name={["orderTaxAndTotals", "igstPercent"]}
-          >
-            <InputNumber
-              min={0}
-              max={100}
-              className="w-full"
-             disabled    />
-          </Form.Item>
-        </Col>
+        
         <Col span={6}>
           <Form.Item
             label={<span className="text-amber-700">TCS Amt (₹)</span>}
