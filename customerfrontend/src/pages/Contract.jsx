@@ -490,8 +490,8 @@ const [data, setData] = useState([]);
     const apiPayload = {
       location: finalValues.location || "N/A",
       product_group: null,
-      from_date: finalValues.startDate ? finalValues.startDate.format("DD-MM-YYYY") : undefined,
-      to_date: finalValues.endDate ? finalValues.endDate.format("DD-MM-YYYY") : undefined,
+      from_date: finalValues.startDate ? finalValues.startDate.format("YYYY-MM-DD") : undefined,
+      to_date: finalValues.endDate ? finalValues.endDate.format("YYYY-MM-DD") : undefined,
       broker: null,
       customer_mobile: finalValues.customer_mobile,
       customer_email: finalValues.customer_email,
