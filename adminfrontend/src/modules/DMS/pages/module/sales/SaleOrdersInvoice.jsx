@@ -1281,8 +1281,8 @@ narration: order.narration,      // NEW
             className="w-full"
             disabledDate={(current) =>
               current &&
-              addForm.getFieldValue("orderDate") &&
-              current < addForm.getFieldValue("orderDate").startOf("day")
+              form.getFieldValue("orderDate") &&
+              current < form.getFieldValue("orderDate").startOf("day")
             }
             disabled={disabled}
           />   </Form.Item>
