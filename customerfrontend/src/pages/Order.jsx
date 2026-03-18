@@ -38,6 +38,7 @@ import {
  // getCustomersByOrganisation,
   getAllSalesContracts,
 } from "../api/order";
+import useSessionStore from "../store/sessionStore"; // adjust path
 /* ------------------ data (use your salesOrderJSON) ------------------ */
 
 
@@ -61,6 +62,7 @@ export default function SaleOrdersInvoice() {
   const [contractOptions, setContractOptions] = useState([]);
   // const [contractItems, setContractItems] = useState([]);
   const [contractItemsMap, setContractItemsMap] = useState({});
+  const { user } = useSessionStore();
   useEffect(() => {
     fetchContracts();
     fetchSalesOrders();
@@ -107,7 +109,7 @@ const handleSearch = (value) => {
   setData(filtered);
 };
   /* ---------- utilities: compute item and order totals ---------- */
- const computeOrderTotalsFromContracts = (contracts = []) => {
+ const computeOrderTotalsFromContracts = (contracts = [], allValues) => {
   const allItems = [];
 
   contracts.forEach((c) => {
@@ -124,11 +126,18 @@ const handleSearch = (value) => {
     0
   );
 
+  const taxable = grossAmountTotal - discountTotal;
+
+  // ✅ ONLY IGST
+  const igst = Number(allValues?.orderTaxAndTotals?.igstPercent || 0);
+  const gstAmount = (taxable * igst) / 100;
+
   return {
     orderTaxAndTotals: {
       grossAmountTotal,
       discountTotal,
-      grandTotal: grossAmountTotal - discountTotal,
+      totalGST: gstAmount,
+      grandTotal: taxable + gstAmount,
     },
   };
 };
@@ -165,7 +174,7 @@ const onFormValuesChange = (form, allValues) => {
   });
 
   const { orderTaxAndTotals } =
-    computeOrderTotalsFromContracts(updatedContracts);
+  computeOrderTotalsFromContracts(updatedContracts, allValues);
 
   form.setFieldsValue({
     contracts: updatedContracts,
@@ -370,9 +379,14 @@ status: values.status,
       })),
     };
   };
-
+useEffect(() => {
+  if (user?.customer_id) {
+    setCustomerId(user.customer_id);
+  }
+}, [user]);
   const handleAddFinish = async (values) => {
      console.log("ADD bill_mode 👉", values.bill_mode);
+     const customerId = user?.customer_id;
   if (!customerId) {
     message.error("Customer not loaded yet");
     return;

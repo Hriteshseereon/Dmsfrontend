@@ -161,7 +161,7 @@ const handleSearch = (value) => {
   setData(filtered);
 };
   /* ---------- utilities: compute item and order totals ---------- */
- const computeOrderTotalsFromContracts = (contracts = []) => {
+const computeOrderTotalsFromContracts = (contracts = [], allValues) => {
   const allItems = [];
 
   contracts.forEach((c) => {
@@ -178,11 +178,17 @@ const handleSearch = (value) => {
     0
   );
 
+  const taxable = grossAmountTotal - discountTotal;
+
+  // ✅ ONLY IGST
+  const igst = Number(allValues?.orderTaxAndTotals?.igstPercent || 0);
+  const gstAmount = (taxable * igst) / 100;
+
   return {
     orderTaxAndTotals: {
       grossAmountTotal,
       discountTotal,
-      grandTotal: grossAmountTotal - discountTotal,
+      grandTotal: taxable + gstAmount,
     },
   };
 };
@@ -222,7 +228,7 @@ const onFormValuesChange = (form, allValues) => {
   });
 
   const { orderTaxAndTotals } =
-    computeOrderTotalsFromContracts(contracts);
+   computeOrderTotalsFromContracts(contracts, allValues);
 
   form.setFieldsValue({
     contracts,

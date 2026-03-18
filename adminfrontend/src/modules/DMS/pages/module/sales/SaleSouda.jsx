@@ -295,7 +295,7 @@ const handleExport = () => {
     const sgst = (taxableAmount * sgstPercent) / 100;
     const cgst = (taxableAmount * cgstPercent) / 100;
     const igst = (taxableAmount * igstPercent) / 100;
-    const totalGST = sgst + cgst + igst;
+    const totalGST = igst;
 
     const grandTotal = taxableAmount + totalGST + tcsAmt;
 
@@ -395,6 +395,7 @@ const handleExport = () => {
         saleContractNumber: contract.sale_contract_number,
         customer: contract.customer_name,
         customerEmail: contract.customer_email,
+        customerMobile: contract.customer_mobile,
         status: contract.status,
 
         soudaDate: contract.created_at ? dayjs(contract.created_at) : undefined,
@@ -1966,6 +1967,17 @@ const handleExport = () => {
 
           <h6 className="text-amber-500">Tax, Charges & Others</h6>
           <Row gutter={16}>
+             <Col span={6}>
+              <Form.Item
+                label={<span className="text-amber-700">GST %</span>}
+                name={["orderTaxAndTotals", "igstPercent"]}
+              >
+                <Input
+                  disabled
+                  value={selectedRecord?.orderTaxAndTotals?.igstPercent}
+                />
+              </Form.Item>
+            </Col>
             <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">SGST %</span>}
@@ -1990,17 +2002,7 @@ const handleExport = () => {
               </Form.Item>
             </Col>
 
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">IGST %</span>}
-                name={["orderTaxAndTotals", "igstPercent"]}
-              >
-                <Input
-                  disabled
-                  value={selectedRecord?.orderTaxAndTotals?.igstPercent}
-                />
-              </Form.Item>
-            </Col>
+           
 
             <Col span={6}>
               <Form.Item
