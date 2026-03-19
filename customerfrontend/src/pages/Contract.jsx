@@ -23,24 +23,13 @@ import {
   FilterOutlined,
   MinusCircleOutlined,
 } from "@ant-design/icons";
+import { exportToExcel } from "../utils/ExportToExcel";
 import dayjs from "dayjs";
 import { getContracts, getContractById, createContract, updateContract, getVendors, getProductsByVendor } from "../api/contract";
 import useSessionStore from "../store/sessionStore";
 
 // --- Mock Data/JSON Extended ---
-
- 
- 
 const statusOptions = ["Pending", "Approved", "Rejected"];
-
-
-
-
-
-
-
-
-
 export default function Contract() {
   const { user, currentOrgId } = useSessionStore();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -333,6 +322,52 @@ const [data, setData] = useState([]);
       ),
     },
   ];
+
+
+  const handleExport = async () => {
+    try {
+      const res = await getContracts();
+      const list = res.data || res;
+  
+      const exportRows = [];
+  
+      for (const record of list) {
+        // get full details
+       const detailRes = await getContractById(record.sale_contract_id);
+        const detail = detailRes.data || detailRes;
+  
+        detail.items?.forEach((item) => {
+          exportRows.push({
+            "Contract No": detail.sale_contract_number,
+            "Contract Date": detail.created_at ? dayjs(detail.created_at).format("DD-MM-YYYY") : "",
+            "Start Date": detail.from_date ? dayjs(detail.from_date).format("DD-MM-YYYY") : "",
+            "End Date": detail.to_date ? dayjs(detail.to_date).format("DD-MM-YYYY") : "",
+            "Supplier": item.vendor_name || "",
+            "Status": detail.status || "",
+            "Narration": detail.narration || "",
+            "Item Name": item.product?.product_name || "",
+            "UOM": item.uom?.unit_name || "",
+            "Qty": item.net_qty || item.gross_qty || 0,
+            "Rate": item.mrp || 0,
+            "Free Qty": item.free_qty || 0,
+            "Item Total": item.line_total || 0,
+            "Gross Amount": detail.total_amount || 0,
+            "GST %": detail.igst || 0,
+            "SGST %": detail.sgst || 0,
+            "CGST %": detail.cgst || 0,
+            "TCS Amount": detail.tcs_amount || 0,
+            "Grand Total": detail.grand_total || 0,
+
+          });
+        });
+      }
+  
+      exportToExcel(exportRows, "Contract_Details", "Contract_Details");
+  
+    } catch (error) {
+      console.error("Export failed:", error);
+    }
+  };
 
   // 🌟 Logic to update a single item's rate and total amount
   const updateItemCalculations = (formInstance, rowIndex) => {
@@ -627,7 +662,12 @@ const [data, setData] = useState([]);
           <Form.Item
             label="Customer Mobile"
             name="customer_mobile"
-            rules={[{ required: true, message: "Please enter customer mobile" }]}
+            rules={[{ required: true, message: "Please enter customer mobile"} ,
+              {
+                    pattern: /^[6-9]\d{9}$/,
+                    message: "Enter valid 10-digit mobile number",
+                  },
+            ]}
           >
             <Input placeholder="6372770539" disabled={disabled} />
           </Form.Item>
@@ -1055,6 +1095,7 @@ const [data, setData] = useState([]);
           <Button
             icon={<DownloadOutlined />}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+              onClick={handleExport}
           >
             Export
           </Button>

@@ -667,7 +667,7 @@ export default function PurchaseInvoice() {
               <Input disabled={!isAdmin || disabled} />
             </Form.Item>
           </Col>
-
+{/* 
           <Col span={6}>
             <Form.Item label="Status" name="status">
               <Select disabled={!isAdmin || disabled} placeholder="Select Status">
@@ -678,7 +678,7 @@ export default function PurchaseInvoice() {
                 ))}
               </Select>
             </Form.Item>
-          </Col>
+          </Col> */}
           <Col span={6}>
             <Form.Item label="Delivery Date" name="deliveryDate">
               <DatePicker

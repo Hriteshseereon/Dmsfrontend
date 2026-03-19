@@ -495,10 +495,10 @@ const handleExport = () => {
         })),
 
         orderTaxAndTotals: {
-          sgstPercent: Number(contract.sgst),
-          cgstPercent: Number(contract.cgst),
-          igstPercent: Number(contract.igst),
-          tcsAmt: Number(contract.tcs_amount),
+igstPercent: Number(contract.igst),          // GST from API
+  sgstPercent: Number(contract.igst) / 2,      // auto 50%
+  cgstPercent: Number(contract.igst) / 2,      // auto 50%
+  tcsAmt: Number(contract.tcs_amount),
           grossAmountTotal: Number(contract.total_amount),
           discountTotal: Number(
             (contract.items || []).reduce(
@@ -1751,30 +1751,38 @@ const handleExport = () => {
           <h6 className="text-amber-500">Tax, Charges & Others</h6>
           <Row gutter={16}>
              <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">GST %</span>}
-                name={["orderTaxAndTotals", "igstPercent"]}
-              >
-                <InputNumber className="w-full" min={0} max={100}  />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">SGST %</span>}
-                name={["orderTaxAndTotals", "sgstPercent"]}
-              >
-                <InputNumber className="w-full" min={0} max={100} />
-              </Form.Item>
-            </Col>
+  <Form.Item
+    label={<span className="text-amber-700">GST %</span>}
+    name={["orderTaxAndTotals", "igstPercent"]}
+  >
+    <InputNumber
+      className="w-full"
+      min={0}
+      max={100}
+      onChange={(val) => {
+        const gst = parseFloat(val) || 0;
+        const split = parseFloat((gst / 2).toFixed(2));
+        editForm.setFieldsValue({
+          orderTaxAndTotals: {
+            sgstPercent: split,
+            cgstPercent: split,
+          },
+        });
+      }}
+    />
+  </Form.Item>
+</Col>
+           <Col span={6}>
+  <Form.Item label={<span className="text-amber-700">SGST %</span>} name={["orderTaxAndTotals", "sgstPercent"]}>
+    <InputNumber className="w-full" min={0} max={100} disabled />
+  </Form.Item>
+</Col>
 
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">CGST %</span>}
-                name={["orderTaxAndTotals", "cgstPercent"]}
-              >
-                <InputNumber className="w-full" min={0} max={100} />
-              </Form.Item>
-            </Col>
+<Col span={6}>
+  <Form.Item label={<span className="text-amber-700">CGST %</span>} name={["orderTaxAndTotals", "cgstPercent"]}>
+    <InputNumber className="w-full" min={0} max={100} disabled />
+  </Form.Item>
+</Col>
 
            
 
