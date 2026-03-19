@@ -92,6 +92,36 @@ export default function AssetManager() {
     purchaseDate: item.purchase_date ? dayjs(item.purchase_date) : undefined,
 
     purchaseVendor: item.purchase_vendor,
+    purchaseDetails: item.purchase_details,
+    purchaseGst: item.purchase_gst,
+    purchaseAddress: item.purchase_address,
+
+    serviceContractPerson: item.service_contract_person,
+    serviceAddress: item.service_address,
+    other: item.other,
+
+    // ✅ DOCUMENTS
+    warrantyDoc: item.warranty_doc
+      ? [
+          {
+            uid: "-2",
+            name: item.warranty_doc.split("/").pop(),
+            status: "done",
+            url: item.warranty_doc,
+          },
+        ]
+      : [],
+
+    amcDoc: item.amc_doc
+      ? [
+          {
+            uid: "-3",
+            name: item.amc_doc.split("/").pop(),
+            status: "done",
+            url: item.amc_doc,
+          },
+        ]
+      : [],
     purchaseInvoice: item.purchase_invoice,
     purchaseDoc: item.purchase_doc
       ? [
@@ -362,7 +392,16 @@ export default function AssetManager() {
       formData.append("serial_number", values.serialNumber || "");
       formData.append("model_number", values.modelNumber || "");
       formData.append("brand", values.brand || "");
+      formData.append("purchase_details", values.purchaseDetails || "");
+      formData.append("purchase_gst", values.purchaseGst || "");
+      formData.append("purchase_address", values.purchaseAddress || "");
 
+      formData.append(
+        "service_contract_person",
+        values.serviceContractPerson || "",
+      );
+      formData.append("service_address", values.serviceAddress || "");
+      formData.append("other", values.other || "");
       formData.append(
         "purchase_date",
         values.purchaseDate?.format("YYYY-MM-DD"),
@@ -377,7 +416,14 @@ export default function AssetManager() {
       if (values.purchaseDoc?.length) {
         formData.append("purchase_doc", values.purchaseDoc[0].originFileObj);
       }
+      // ✅ FILES
+      if (values.warrantyDoc?.length) {
+        formData.append("warranty_doc", values.warrantyDoc[0].originFileObj);
+      }
 
+      if (values.amcDoc?.length) {
+        formData.append("amc_doc", values.amcDoc[0].originFileObj);
+      }
       formData.append("assigned_to_employee", values.assignedTo || "");
       formData.append("cost_price", values.costPrice?.toString());
       formData.append(
@@ -463,7 +509,33 @@ export default function AssetManager() {
           formData.append("purchase_doc", fileObj.originFileObj);
         }
       }
+      // warranty
+      if (values.warrantyDoc?.length) {
+        const f = values.warrantyDoc[0];
+        if (f.originFileObj instanceof File) {
+          formData.append("warranty_doc", f.originFileObj);
+        }
+      }
 
+      // amc
+      if (values.amcDoc?.length) {
+        const f = values.amcDoc[0];
+        if (f.originFileObj instanceof File) {
+          formData.append("amc_doc", f.originFileObj);
+        }
+      }
+
+      // other fields
+      formData.append("purchase_details", values.purchaseDetails || "");
+      formData.append("purchase_gst", values.purchaseGst || "");
+      formData.append("purchase_address", values.purchaseAddress || "");
+
+      formData.append(
+        "service_contract_person",
+        values.serviceContractPerson || "",
+      );
+      formData.append("service_address", values.serviceAddress || "");
+      formData.append("other", values.other || "");
       formData.append("assigned_to_employee", values.assignedTo || "");
       formData.append("cost_price", values.costPrice);
       formData.append("current_value", values.currentValue);
@@ -674,8 +746,45 @@ export default function AssetManager() {
           </Form.Item>
         </Col>
       </Row>
-
       <Row gutter={16}>
+        <Col span={8}>
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Purchase Details
+              </span>
+            }
+            name="purchaseDetails"
+          >
+            <Input disabled={disabled} />
+          </Form.Item>
+        </Col>
+
+        <Col span={8}>
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">Purchase GST</span>
+            }
+            name="purchaseGst"
+          >
+            <Input disabled={disabled} />
+          </Form.Item>
+        </Col>
+
+        <Col span={8}>
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Purchase Address
+              </span>
+            }
+            name="purchaseAddress"
+          >
+            <Input disabled={disabled} />
+          </Form.Item>
+        </Col>
+      </Row>
+      <Row gutter={24}>
         <Col span={8}>
           <Form.Item
             label={
@@ -688,6 +797,39 @@ export default function AssetManager() {
             <Input placeholder="Enter Invoice Number" disabled={disabled} />
           </Form.Item>
         </Col>
+
+        <Col span={8}>
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Warranty Document
+              </span>
+            }
+            name="warrantyDoc"
+            valuePropName="fileList"
+            getValueFromEvent={(e) => e?.fileList}
+          >
+            <Upload beforeUpload={() => false} maxCount={1}>
+              {!disabled && <Button icon={<UploadOutlined />}>Upload</Button>}
+            </Upload>
+          </Form.Item>
+        </Col>
+
+        <Col span={8}>
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">AMC Document</span>
+            }
+            name="amcDoc"
+            valuePropName="fileList"
+            getValueFromEvent={(e) => e?.fileList}
+          >
+            <Upload beforeUpload={() => false} maxCount={1}>
+              {!disabled && <Button icon={<UploadOutlined />}>Upload</Button>}
+            </Upload>
+          </Form.Item>
+        </Col>
+
         <Col span={6}>
           <Form.Item
             label={
@@ -779,7 +921,44 @@ export default function AssetManager() {
           </Form.Item>
         </Col>
       </Row>
+      <h6 className="text-amber-500 mt-4">Service Details</h6>
 
+      <Row gutter={16}>
+        <Col span={8}>
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Contract Person
+              </span>
+            }
+            name="serviceContractPerson"
+          >
+            <Input disabled={disabled} />
+          </Form.Item>
+        </Col>
+
+        <Col span={8}>
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Service Address
+              </span>
+            }
+            name="serviceAddress"
+          >
+            <Input disabled={disabled} />
+          </Form.Item>
+        </Col>
+
+        <Col span={8}>
+          <Form.Item
+            label={<span className="text-amber-700 font-medium">Other</span>}
+            name="other"
+          >
+            <Input disabled={disabled} />
+          </Form.Item>
+        </Col>
+      </Row>
       <h6 className="text-amber-500 mt-4">Depreciating Costs</h6>
       <Row gutter={16}>
         <Col span={5}>
@@ -1187,7 +1366,7 @@ export default function AssetManager() {
         </Form>
 
         {/* ✅ FILE PREVIEW */}
-        {selectedRecord?.purchaseDoc?.length > 0 && (
+        {/* {selectedRecord?.purchaseDoc?.length > 0 && (
           <div className="mt-4">
             <h6 className="text-amber-500 font-semibold mb-2">
               Invoice Preview
@@ -1234,7 +1413,26 @@ export default function AssetManager() {
               );
             })()}
           </div>
-        )}
+        )} */}
+        {/* WARRANTY */}
+        {/* {selectedRecord?.warrantyDoc?.length > 0 && (
+          <div className="mt-4">
+            <h6 className="text-amber-500">Warranty Document</h6>
+            <a href={selectedRecord.warrantyDoc[0].url} target="_blank">
+              View Warranty
+            </a>
+          </div>
+        )} */}
+
+        {/* AMC */}
+        {/* {selectedRecord?.amcDoc?.length > 0 && (
+          <div className="mt-4">
+            <h6 className="text-amber-500">AMC Document</h6>
+            <a href={selectedRecord.amcDoc[0].url} target="_blank">
+              View AMC
+            </a>
+          </div>
+        )} */}
       </Modal>
     </div>
   );
