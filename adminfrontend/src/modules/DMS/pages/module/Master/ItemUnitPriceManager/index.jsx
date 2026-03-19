@@ -72,7 +72,7 @@ export default function ItemUnitPriceManager() {
             },
             {
               key: "3",
-              label: "Unit Group",
+              label: "Unit Master",
               children: <UnitMaster />,
             },
             {

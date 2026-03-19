@@ -580,12 +580,12 @@ const handleEditClick = async (record) => {
   className="cursor-pointer! text-blue-500!"
   onClick={() => handleViewClick(record)}
 />
-
+{record.status !== "Approved" && (
           <EditOutlined
   className="cursor-pointer! text-red-500!"
   onClick={() => handleEditClick(record)}
 />
-
+)}
         </div>
       ),
     },
