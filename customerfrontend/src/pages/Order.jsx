@@ -1336,6 +1336,18 @@ narration: order.narration,      // NEW
       {/* order-level taxes and totals */}
       <h6 className="text-amber-500">Tax & Totals</h6>
       <Row gutter={16}>
+         <Col span={6}>
+          <Form.Item
+            label={<span className="text-amber-700">GST %</span>}
+            name={["orderTaxAndTotals", "igstPercent"]}
+          >
+            <InputNumber
+              min={0}
+              max={100}
+              className="w-full"
+             disabled    />
+          </Form.Item>
+        </Col>
         <Col span={6}>
           <Form.Item
             label={<span className="text-amber-700">SGST %</span>}
@@ -1360,18 +1372,7 @@ narration: order.narration,      // NEW
              disabled  />
           </Form.Item>
         </Col>
-        <Col span={6}>
-          <Form.Item
-            label={<span className="text-amber-700">IGST %</span>}
-            name={["orderTaxAndTotals", "igstPercent"]}
-          >
-            <InputNumber
-              min={0}
-              max={100}
-              className="w-full"
-             disabled    />
-          </Form.Item>
-        </Col>
+       
         <Col span={6}>
           <Form.Item
             label={<span className="text-amber-700">TCS Amt (₹)</span>}
@@ -1507,7 +1508,7 @@ narration: order.narration,      // NEW
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            Add New Sales Order & Invoice
+            Add New Sales Order 
           </span>
         }
         open={isAddModalOpen}
@@ -1554,7 +1555,7 @@ narration: order.narration,      // NEW
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            Edit Sales Order & Invoice
+            Edit Sales Order 
           </span>
         }
         open={isEditModalOpen}
@@ -1602,7 +1603,7 @@ narration: order.narration,      // NEW
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            View Sales Order & Invoice
+            View Sales Order 
           </span>
         }
         open={isViewModalOpen}

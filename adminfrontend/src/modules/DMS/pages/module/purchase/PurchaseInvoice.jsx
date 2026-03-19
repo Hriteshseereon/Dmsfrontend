@@ -368,11 +368,11 @@ export default function PurchaseInvoice() {
 
             "SGST %": detail.sgst_percent,
             "CGST %": detail.cgst_percent,
-            "IGST %": detail.igst_percent,
+            "GST %": detail.igst_percent,
 
             "SGST (₹)": detail.sgst_amount,
             "CGST (₹)": detail.cgst_amount,
-            "IGST (₹)": detail.igst_amount,
+            "GST (₹)": detail.igst_amount,
 
             "Total GST (₹)": detail.total_gst_amount,
             "TCS Amt (₹)": detail.tcs_amount,
@@ -819,7 +819,11 @@ export default function PurchaseInvoice() {
                 <InputNumber className="w-full! " disabled />
               </Form.Item>
             </Col>
-
+ <Col span={6}>
+              <Form.Item label="GST %" name="igstPercent">
+                <InputNumber className="w-full!" disabled />
+              </Form.Item>
+            </Col>
             <Col span={6}>
               <Form.Item label="SGST %" name="sgstPercent">
                 <InputNumber className="w-full!" disabled />
@@ -832,14 +836,15 @@ export default function PurchaseInvoice() {
               </Form.Item>
             </Col>
 
-            <Col span={6}>
-              <Form.Item label="IGST %" name="igstPercent">
-                <InputNumber className="w-full!" disabled />
-              </Form.Item>
-            </Col>
+           
           </Row>
 
           <Row gutter={24}>
+             <Col span={6}>
+              <Form.Item label="GST (₹)" name="igst">
+                <InputNumber className="w-full! " disabled />
+              </Form.Item>
+            </Col>
             <Col span={6}>
               <Form.Item label="SGST (₹)" name="sgst">
                 <InputNumber className="w-full! " disabled />
@@ -851,11 +856,7 @@ export default function PurchaseInvoice() {
               </Form.Item>
             </Col>
 
-            <Col span={6}>
-              <Form.Item label="IGST (₹)" name="igst">
-                <InputNumber className="w-full! " disabled />
-              </Form.Item>
-            </Col>
+           
 
             <Col span={6}>
               <Form.Item label="Total GST (₹)" name="totalGST">

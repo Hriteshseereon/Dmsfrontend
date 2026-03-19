@@ -375,7 +375,7 @@ const isAfterTransit = disableAfterTransitStatuses.includes(
       render: (text) => <span className="text-amber-800 font-medium">{text}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Invoice No</span>,
+      title: <span className="text-amber-700 font-semibold">Assign No</span>,
       dataIndex: "invoice_number",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
@@ -1025,7 +1025,7 @@ const renderLoadingDetails = (disabled = false) => (
             </Col>
             
             <Col span={4}>
-              <Form.Item label="Invoice No" name="invoice_number">
+              <Form.Item label="Assign No" name="invoice_number">
                 <Input disabled />
               </Form.Item>
             </Col>
@@ -1096,7 +1096,7 @@ const renderLoadingDetails = (disabled = false) => (
               </Form.Item>
             </Col>
              <Col span={4}>
-              <Form.Item label="Invoice No" name="invoice_number">
+              <Form.Item label="Assign No" name="invoice_number">
                 <Input disabled />
               </Form.Item>
             </Col>

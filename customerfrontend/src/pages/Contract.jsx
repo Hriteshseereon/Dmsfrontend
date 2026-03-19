@@ -989,7 +989,11 @@ const [data, setData] = useState([]);
             <Input value={selectedRecord?.grossAmount} disabled />
           </Form.Item>
         </Col>
-
+ <Col span={6}>
+          <Form.Item label="GST %">
+            <Input value={selectedRecord?.igstPercent} disabled />
+          </Form.Item>
+        </Col>
         <Col span={6}>
           <Form.Item label="SGST %">
             <Input value={selectedRecord?.sgstPercent} disabled />
@@ -1002,11 +1006,7 @@ const [data, setData] = useState([]);
           </Form.Item>
         </Col>
 
-        <Col span={6}>
-          <Form.Item label="IGST %">
-            <Input value={selectedRecord?.igstPercent} disabled />
-          </Form.Item>
-        </Col>
+       
 
         <Col span={6}>
           <Form.Item label="TCS Amount">
