@@ -29,21 +29,7 @@ const reasonsList = [
 
 
 
-// generate dispute number like DISP-20241213-0001
-const generateDisputeNo = (existingRecords) => {
-  const today = dayjs().format("YYYYMMDD");
-  const prefix = `DISP-${today}-`;
-  const todayNos = existingRecords
-    .map((r) => r.disputeNo)
-    .filter((n) => typeof n === "string" && n.startsWith(prefix));
-  const maxSeq =
-    todayNos
-      .map((n) => parseInt(n.replace(prefix, ""), 10))
-      .filter((n) => !isNaN(n))
-      .reduce((m, n) => (n > m ? n : m), 0) || 0;
-  const nextSeq = String(maxSeq + 1).padStart(4, "0");
-  return `${prefix}${nextSeq}`;
-};
+
 
 export default function SalesDispute() {
   const [records, setRecords] = useState([]);
@@ -260,10 +246,7 @@ export default function SalesDispute() {
         return;
       }
 
-      let disputeNo = modalRecord.disputeNo;
-      if (modalMode === "dispute" && !disputeNo) {
-        disputeNo = generateDisputeNo(records);
-      }
+     let disputeNo = modalRecord.disputeNo; // keep only this if needed
       if (modalMode === "edit") {
 
         const disputeItems = updatedItems
@@ -297,7 +280,6 @@ export default function SalesDispute() {
 
         const payload = {
           sale_invoice_id: modalRecord.sale_invoice_id,
-          dispute_no: disputeNo,
           status: values.status,
           items: disputeItems,
         };
