@@ -25,10 +25,10 @@ import {
 // JSON Data
 const dashboardJSON = {
   topCards: [
-    { title: "Asset Category", value: 5, icon: "FileTextOutlined" },
-    { title: "Total Asset", value: 95, icon: "DollarOutlined" },
-    { title: "Asset On Maintenance", value: 10, icon: "ShoppingCartOutlined" },
-    { title: "Asset Depriciation", value: 7, icon: "ReloadOutlined" },
+    { title: "Stock", value: 5, icon: "FileTextOutlined" },
+    { title: "Mutual Funds", value: 95, icon: "DollarOutlined" },
+    { title: "Property", value: 10, icon: "ShoppingCartOutlined" },
+    { title: "Bank", value: 7, icon: "ReloadOutlined" },
   ],
   contractsData: [
     { name: "Jan", value: 12 },
@@ -111,11 +111,7 @@ export default function WealthDashboard() {
       <Row gutter={16} className="mb-6">
         <Col span={12}>
           <Card
-            title={
-              <span className="text-amber-700 font-bold">
-                Asser Allocation
-              </span>
-            }
+            title={<span className="text-amber-700 font-bold">Stock </span>}
           >
             <ResponsiveContainer width="100%" height={250}>
               <LineChart data={dashboardJSON.contractsData}>
@@ -134,13 +130,7 @@ export default function WealthDashboard() {
           </Card>
         </Col>
         <Col span={12}>
-          <Card
-            title={
-              <span className="text-amber-700 font-bold">
-                Asset Disposal
-              </span>
-            }
-          >
+          <Card title={<span className="text-amber-700 font-bold">ETF</span>}>
             <ResponsiveContainer width="100%" height={250}>
               <AreaChart data={dashboardJSON.ordersData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#fcd34d" />
@@ -190,8 +180,8 @@ export default function WealthDashboard() {
               </PieChart>
             </ResponsiveContainer> */}
 
-            {/* Legend */}
-            {/* <div className="flex space-x-12 mt-2 flex-nowrap overflow-auto">
+      {/* Legend */}
+      {/* <div className="flex space-x-12 mt-2 flex-nowrap overflow-auto">
               {dashboardJSON.returnData.map((entry, index) => (
                 <div key={index} className="flex items-center">
                   <div

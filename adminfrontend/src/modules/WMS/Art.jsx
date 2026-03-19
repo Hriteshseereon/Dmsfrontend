@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { addWealthEntry, getWealthEntries, getWealthEntryById, updateWealthEntry } from "../../api/wealth";
+import {
+  addWealthEntry,
+  getWealthEntries,
+  getWealthEntryById,
+  updateWealthEntry,
+} from "../../api/wealth";
 import {
   Table,
   Input,
@@ -39,7 +44,10 @@ export default function Art() {
       const response = await getWealthEntries({ asset_category: "ART" });
       const mappedData = response.map((item) => ({
         key: item.id,
-        transactionType: item.transaction_type ? item.transaction_type.charAt(0).toUpperCase() + item.transaction_type.slice(1).toLowerCase() : "Investment",
+        transactionType: item.transaction_type
+          ? item.transaction_type.charAt(0).toUpperCase() +
+            item.transaction_type.slice(1).toLowerCase()
+          : "Investment",
         lotDescription: item.lot_description || item.asset_name,
         refNumber: item.ref_number,
         sellerName: item.bank_or_seller_name,
@@ -50,7 +58,7 @@ export default function Art() {
         interestType: item.interest_type,
         interestPayment: item.interest_payment,
         transactionDate: item.transaction_date,
-        quantity: item.quantity_grams,
+        quantity: item.quantity_grams || 0,
         ratePerGram: item.rate_per_gram,
         amount: item.amount,
         narration: item.narration,
@@ -77,7 +85,12 @@ export default function Art() {
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
 
-  const txnTypes = ["Interest", "Interest (payout)", "Investment", "Withdrawal"];
+  const txnTypes = [
+    "Interest",
+    "Interest (payout)",
+    "Investment",
+    "Withdrawal",
+  ];
   const interestTypes = ["Cumulative", "Payout"];
   const interestPayments = ["Monthly", "Quarterly", "Half Yearly", "Yearly"];
 
@@ -90,8 +103,11 @@ export default function Art() {
       "brokerName",
       "narration",
     ].some((f) =>
-      (row[f] || "").toString().toLowerCase().includes(searchText.trim().toLowerCase())
-    )
+      (row[f] || "")
+        .toString()
+        .toLowerCase()
+        .includes(searchText.trim().toLowerCase()),
+    ),
   );
 
   const computeAmount = (values) => {
@@ -111,10 +127,16 @@ export default function Art() {
       title: <span className="text-amber-700 font-semibold">Date</span>,
       dataIndex: "transactionDate",
       width: 110,
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
+      render: (d) => (
+        <span className="text-amber-800">
+          {d ? dayjs(d).format("YYYY-MM-DD") : ""}
+        </span>
+      ),
     },
     {
-      title: <span className="text-amber-700 font-semibold">Lot / Property</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Lot / Property</span>
+      ),
       dataIndex: "lotDescription",
       width: 220,
       render: (t) => <span className="text-amber-800">{t}</span>,
@@ -125,24 +147,24 @@ export default function Art() {
       width: 130,
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
+    // {
+    //   title: <span className="text-amber-700 font-semibold">Qty (g)</span>,
+    //   dataIndex: "quantity",
+    //   width: 90,
+    //   render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
+    // },
     {
-      title: <span className="text-amber-700 font-semibold">Qty (g)</span>,
-      dataIndex: "quantity",
-      width: 90,
-      render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Rate / g (₹)</span>,
+      title: <span className="text-amber-700 font-semibold">Rate(₹)</span>,
       dataIndex: "ratePerGram",
       width: 130,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
     },
-    {
-      title: <span className="text-amber-700 font-semibold">Amount (₹)</span>,
-      dataIndex: "amount",
-      width: 150,
-      render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
-    },
+    // {
+    //   title: <span className="text-amber-700 font-semibold">Amount (₹)</span>,
+    //   dataIndex: "amount",
+    //   width: 150,
+    //   render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
+    // },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       width: 110,
@@ -155,7 +177,10 @@ export default function Art() {
               try {
                 const data = await getWealthEntryById(record.key);
                 const mappedData = {
-                  transactionType: data.transaction_type ? data.transaction_type.charAt(0).toUpperCase() + data.transaction_type.slice(1).toLowerCase() : "Investment",
+                  transactionType: data.transaction_type
+                    ? data.transaction_type.charAt(0).toUpperCase() +
+                      data.transaction_type.slice(1).toLowerCase()
+                    : "Investment",
                   lotDescription: data.lot_description || data.asset_name,
                   refNumber: data.ref_number,
                   sellerName: data.bank_or_seller_name,
@@ -165,11 +190,13 @@ export default function Art() {
                   interestRate: data.interest_rate,
                   interestType: data.interest_type,
                   interestPayment: data.interest_payment,
-                  quantity: data.quantity_grams,
+                  quantity: data.quantity_grams || 0,
                   ratePerGram: data.rate_per_gram,
                   amount: data.amount,
                   narration: data.narration,
-                  transactionDate: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                  transactionDate: data.transaction_date
+                    ? dayjs(data.transaction_date)
+                    : undefined,
                 };
                 viewForm.setFieldsValue(mappedData);
                 setIsViewModalOpen(true);
@@ -186,7 +213,10 @@ export default function Art() {
               try {
                 const data = await getWealthEntryById(record.key);
                 const mappedData = {
-                  transactionType: data.transaction_type ? data.transaction_type.charAt(0).toUpperCase() + data.transaction_type.slice(1).toLowerCase() : "Investment",
+                  transactionType: data.transaction_type
+                    ? data.transaction_type.charAt(0).toUpperCase() +
+                      data.transaction_type.slice(1).toLowerCase()
+                    : "Investment",
                   lotDescription: data.lot_description || data.asset_name,
                   refNumber: data.ref_number,
                   sellerName: data.bank_or_seller_name,
@@ -196,11 +226,13 @@ export default function Art() {
                   interestRate: data.interest_rate,
                   interestType: data.interest_type,
                   interestPayment: data.interest_payment,
-                  quantity: data.quantity_grams,
+                  quantity: data.quantity_grams || 0,
                   ratePerGram: data.rate_per_gram,
                   amount: data.amount,
                   narration: data.narration,
-                  transactionDate: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                  transactionDate: data.transaction_date
+                    ? dayjs(data.transaction_date)
+                    : undefined,
                 };
                 editForm.setFieldsValue(mappedData);
                 setIsEditModalOpen(true);
@@ -255,7 +287,11 @@ export default function Art() {
       (r.narration || "").replace(/[\n\r]/g, " "),
     ]);
     const csvContent = [headers, ...rows]
-      .map((row) => row.map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`).join(","))
+      .map((row) =>
+        row
+          .map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`)
+          .join(","),
+      )
       .join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -301,7 +337,9 @@ export default function Art() {
 
         <Col span={8}>
           <Form.Item
-            label={<span className="text-amber-700">Lot Description / Property</span>}
+            label={
+              <span className="text-amber-700">Lot Description / Property</span>
+            }
             name="lotDescription"
             rules={[{ required: true, message: "Enter or select lot" }]}
           >
@@ -326,19 +364,28 @@ export default function Art() {
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Ref Number</span>} name="refNumber">
+          <Form.Item
+            label={<span className="text-amber-700">Ref Number</span>}
+            name="refNumber"
+          >
             <Input placeholder="Reference number" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Seller Name</span>} name="sellerName">
+          <Form.Item
+            label={<span className="text-amber-700">Seller Name</span>}
+            name="sellerName"
+          >
             <Input placeholder="Seller / Bank / Vendor" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Seller Address</span>} name="sellerAddress">
+          <Form.Item
+            label={<span className="text-amber-700">Seller Address</span>}
+            name="sellerAddress"
+          >
             <Input placeholder="Seller address" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -346,27 +393,45 @@ export default function Art() {
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Broker Name</span>} name="brokerName">
+          <Form.Item
+            label={<span className="text-amber-700">Broker Name</span>}
+            name="brokerName"
+          >
             <Input placeholder="Broker name" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Broker Address</span>} name="brokerAddress">
+          <Form.Item
+            label={<span className="text-amber-700">Broker Address</span>}
+            name="brokerAddress"
+          >
             <Input placeholder="Broker address" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Interest Rate (%)</span>} name="interestRate">
-            <InputNumber className="w-full" min={0} step={0.01} disabled={disabled} />
+          <Form.Item
+            label={<span className="text-amber-700">Interest Rate (%)</span>}
+            name="interestRate"
+          >
+            <InputNumber
+              className="w-full"
+              min={0}
+              step={0.01}
+              disabled={disabled}
+            />
           </Form.Item>
         </Col>
       </Row>
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Interest Type</span>} name="interestType" initialValue={interestTypes[0]}>
+          <Form.Item
+            label={<span className="text-amber-700">Interest Type</span>}
+            name="interestType"
+            initialValue={interestTypes[0]}
+          >
             <Select disabled={disabled}>
               {interestTypes.map((t) => (
                 <Option key={t} value={t}>
@@ -378,7 +443,11 @@ export default function Art() {
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Interest Payment</span>} name="interestPayment" initialValue={interestPayments[3]}>
+          <Form.Item
+            label={<span className="text-amber-700">Interest Payment</span>}
+            name="interestPayment"
+            initialValue={interestPayments[3]}
+          >
             <Select disabled={disabled}>
               {interestPayments.map((p) => (
                 <Option key={p} value={p}>
@@ -388,8 +457,16 @@ export default function Art() {
             </Select>
           </Form.Item>
         </Col>
-
         <Col span={8}>
+          <Form.Item
+            label={<span className="text-amber-700">Rate(₹)</span>}
+            name="ratePerGram"
+            rules={[{ required: true, message: "Enter rate per gram" }]}
+          >
+            <InputNumber className="w-full" min={0} disabled={disabled} />
+          </Form.Item>
+        </Col>
+        {/* <Col span={8}>
           <Form.Item
             label={<span className="text-amber-700">Quantity (g)</span>}
             name="quantity"
@@ -397,28 +474,21 @@ export default function Art() {
           >
             <InputNumber className="w-full" min={0} disabled={disabled} />
           </Form.Item>
-        </Col>
+        </Col> */}
       </Row>
 
       <Row gutter={16}>
-        <Col span={8}>
-          <Form.Item
-            label={<span className="text-amber-700">Rate Per Gram (₹)</span>}
-            name="ratePerGram"
-            rules={[{ required: true, message: "Enter rate per gram" }]}
-          >
-            <InputNumber className="w-full" min={0} disabled={disabled} />
-          </Form.Item>
-        </Col>
-
-        <Col span={8}>
+        {/* <Col span={8}>
           <Form.Item label={<span className="text-amber-700">Amount (₹)</span>} name="amount">
             <InputNumber className="w-full" disabled />
           </Form.Item>
-        </Col>
+        </Col> */}
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Narration</span>} name="narration">
+          <Form.Item
+            label={<span className="text-amber-700">Narration</span>}
+            name="narration"
+          >
             <Input placeholder="Optional notes" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -427,7 +497,6 @@ export default function Art() {
   );
 
   // txnTypes variable used in form initialValue
-
 
   return (
     <div>
@@ -451,14 +520,18 @@ export default function Art() {
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} onClick={exportCSV} className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={exportCSV}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Export
           </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            className="bg-amber-500! hover:bg-amber-600! border-none!" onClick={() => {
+            className="bg-amber-500! hover:bg-amber-600! border-none!"
+            onClick={() => {
               addForm.resetFields();
               setIsAddModalOpen(true);
             }}
@@ -470,14 +543,26 @@ export default function Art() {
 
       {/* Table */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
-        <h2 className="text-lg font-semibold text-amber-700 mb-0">Art Investments</h2>
-        <p className="text-amber-600 mb-3">Track artwork acquisitions and portfolio value</p>
-        <Table columns={columns} dataSource={filteredData} pagination={{ pageSize: 8 }} />
+        <h2 className="text-lg font-semibold text-amber-700 mb-0">
+          Art Investments
+        </h2>
+        <p className="text-amber-600 mb-3">
+          Track artwork acquisitions and portfolio value
+        </p>
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          pagination={{ pageSize: 8 }}
+        />
       </div>
 
       {/* Add Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Add Art Investment</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Add Art Investment
+          </span>
+        }
         open={isAddModalOpen}
         onCancel={() => {
           setIsAddModalOpen(false);
@@ -494,8 +579,12 @@ export default function Art() {
             try {
               const payload = {
                 asset_category: "ART",
-                transaction_type: values.transactionType ? values.transactionType.toUpperCase() : "INVESTMENT",
-                transaction_date: values.transactionDate ? dayjs(values.transactionDate).format("YYYY-MM-DD") : null,
+                transaction_type: values.transactionType
+                  ? values.transactionType.toUpperCase()
+                  : "INVESTMENT",
+                transaction_date: values.transactionDate
+                  ? dayjs(values.transactionDate).format("YYYY-MM-DD")
+                  : null,
                 lot_description: values.lotDescription,
 
                 ref_number: values.refNumber,
@@ -510,7 +599,7 @@ export default function Art() {
                 interest_type: values.interestType,
                 interest_payment: values.interestPayment,
 
-                quantity_grams: values.quantity,
+                quantity_grams: values.quantity || 0,
                 rate_per_gram: values.ratePerGram,
                 narration: values.narration,
               };
@@ -539,11 +628,14 @@ export default function Art() {
                 addForm.resetFields();
               }}
               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-
             >
               Cancel
             </Button>
-            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button
+              type="primary"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit"
+            >
               Add
             </Button>
           </div>
@@ -552,7 +644,11 @@ export default function Art() {
 
       {/* Edit Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Edit Art Investment</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Edit Art Investment
+          </span>
+        }
         open={isEditModalOpen}
         onCancel={() => {
           setIsEditModalOpen(false);
@@ -570,8 +666,12 @@ export default function Art() {
             try {
               const payload = {
                 asset_category: "ART",
-                transaction_type: values.transactionType ? values.transactionType.toUpperCase() : "INVESTMENT",
-                transaction_date: values.transactionDate ? dayjs(values.transactionDate).format("YYYY-MM-DD") : null,
+                transaction_type: values.transactionType
+                  ? values.transactionType.toUpperCase()
+                  : "INVESTMENT",
+                transaction_date: values.transactionDate
+                  ? dayjs(values.transactionDate).format("YYYY-MM-DD")
+                  : null,
                 lot_description: values.lotDescription,
 
                 ref_number: values.refNumber,
@@ -618,11 +718,14 @@ export default function Art() {
                 setSelectedRecord(null);
               }}
               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-
             >
               Cancel
             </Button>
-            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button
+              type="primary"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit"
+            >
               Save Changes
             </Button>
           </div>
@@ -631,7 +734,11 @@ export default function Art() {
 
       {/* View Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">View Art Investment Details</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            View Art Investment Details
+          </span>
+        }
         open={isViewModalOpen}
         onCancel={() => {
           setIsViewModalOpen(false);

@@ -39,7 +39,12 @@ export const MASTER_TAB_DEFINITIONS = [
   },
   // { id: "price", label: "Price Manager", path: "price", Icon: FaTags },
 
-  { id: "inventory", label: "Inventory", path: "inventory", Icon: FaList },
+  {
+    id: "inventory",
+    label: "Inventory Management",
+    path: "inventory",
+    Icon: FaList,
+  },
 
   // add more if needed
 ];
