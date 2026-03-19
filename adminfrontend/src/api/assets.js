@@ -24,7 +24,15 @@ export const getAllAssets = async () => {
 };
 // CREATE
 export const addAsset = async (payload) => {
-  const res = await api.post("/assets/assets/", payload);
+   const { currentOrgId } = useSessionStore.getState();
+  const res = await api.post("/assets/assets/", payload,
+    {
+      params: { organisation: currentOrgId },
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  );
   return res.data;
 };
 // get asset by id
@@ -36,7 +44,11 @@ export const getAssetById = async (id) => {
 export const updateAsset = async (id, payload) => {
   const { currentOrgId } = useSessionStore.getState();
   const res = await api.patch(`/assets/assets/${id}/`, payload, {
+
     params: { organisation: currentOrgId },
+    headers: {
+        "Content-Type": "multipart/form-data",
+      },
   });
   return res.data;
 };
