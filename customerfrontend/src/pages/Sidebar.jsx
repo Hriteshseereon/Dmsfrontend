@@ -21,8 +21,8 @@ export default function Sidebar() {
     { key: "/dashboard", label: "Dashboard", icon: <DashboardOutlined /> },
     { key: "/contract", label: "Contract", icon: <FileTextOutlined /> },
     { key: "/order", label: "Order", icon: <ShoppingCartOutlined /> },
+     { key: "/deliverey-status", label: "Delivery Status", icon: <FileTextOutlined /> },
     { key: "/rise-dispute", label: "Rise Dispute", icon: <RiseOutlined /> },
-   { key: "/deliverey-status", label: "Delivery Status", icon: <FileTextOutlined /> },
      { key: "/wallet", label: "Wallet", icon: <WalletOutlined /> },
    { key: "/reports", label: "Reports", icon: <BarChartOutlined /> },
      ];
