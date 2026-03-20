@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { getAssetCategories, addAssetCategory } from "../../api/assets";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
@@ -23,7 +23,7 @@ import {
   DownloadOutlined,
 } from "@ant-design/icons";
 import useSessionStore from "../../store/sessionStore";
-
+import { globalSearch } from "../../utils/globalSearch";
 const { Option } = Select;
 const { TextArea } = Input;
 
@@ -41,7 +41,7 @@ export default function AssetCategory() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [data, setData] = useState([]);
-  const [filteredData, setFilteredData] = useState([]);
+  // const [filteredData, setFilteredData] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -108,7 +108,7 @@ export default function AssetCategory() {
       }));
 
       setData(transformedData);
-      setFilteredData(transformedData);
+      // setFilteredData(transformedData);
     } catch (error) {
       console.error("Error fetching asset categories:", error);
       message.error("Failed to fetch asset categories");
@@ -117,18 +117,20 @@ export default function AssetCategory() {
     }
   };
 
-  const handleSearch = (value) => {
-    setSearchText(value);
-    if (!value) {
-      setFilteredData(data);
-      return;
-    }
-    const filtered = data.filter((item) =>
-      Object.values(item).join(" ").toLowerCase().includes(value.toLowerCase()),
-    );
-    setFilteredData(filtered);
-  };
-
+  // const handleSearch = (value) => {
+  //   setSearchText(value);
+  //   if (!value) {
+  //     setFilteredData(data);
+  //     return;
+  //   }
+  //   const filtered = data.filter((item) =>
+  //     Object.values(item).join(" ").toLowerCase().includes(value.toLowerCase()),
+  //   );
+  //   setFilteredData(filtered);
+  // };
+  const filteredData = useMemo(() => {
+    return globalSearch(data, searchText);
+  }, [data, searchText]);
   const handleAddCategory = async (values) => {
     setLoading(true);
     try {
@@ -356,12 +358,12 @@ export default function AssetCategory() {
             placeholder="Search assets..."
             className="w-64! border-amber-300! focus:border-amber-500!"
             value={searchText}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={(e) => setSearchText(e.target.value)}
           />
           <Button
             icon={<FilterOutlined />}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-            onClick={() => handleSearch("")}
+            onClick={() => setSearchText("")}
           >
             Reset
           </Button>

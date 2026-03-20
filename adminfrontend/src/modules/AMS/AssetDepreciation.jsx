@@ -1,5 +1,5 @@
 // AssetDepreciation.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Table,
   Input,
@@ -33,7 +33,7 @@ import {
   getAssetdepriciationByID,
 } from "../../api/assets";
 import useSessionStore from "../../store/sessionStore";
-
+import { globalSearch } from "../../utils/globalSearch";
 const { Option } = Select;
 const { TextArea } = Input;
 
@@ -62,14 +62,9 @@ export default function AssetDepreciation() {
 
   const statusOptions = ["Active", "Disposed", "Under Repair", "Sold"];
 
-  const filteredData = data.filter((row) =>
-    ["asset_name", "assetId", "fiscalYear", "status", "remarks"].some((field) =>
-      (row[field] || "")
-        .toString()
-        .toLowerCase()
-        .includes(searchText.trim().toLowerCase()),
-    ),
-  );
+  const filteredData = useMemo(() => {
+    return globalSearch(data, searchText);
+  }, [data, searchText]);
 
   const fetchAssets = async () => {
     const res = await getAssets(currentOrgId);

@@ -1,6 +1,11 @@
 // MutualFunds.jsx
 import React, { useState, useEffect } from "react";
-import { addWealthEntry, getWealthEntries, getWealthEntryById, updateWealthEntry } from "../../api/wealth";
+import {
+  addWealthEntry,
+  getWealthEntries,
+  getWealthEntryById,
+  updateWealthEntry,
+} from "../../api/wealth";
 import {
   Table,
   Input,
@@ -49,10 +54,15 @@ export default function MutualFunds() {
 
   const fetchData = async () => {
     try {
-      const response = await getWealthEntries({ asset_category: "MUTUAL_FUND" });
+      const response = await getWealthEntries({
+        asset_category: "MUTUAL_FUND",
+      });
       const mappedData = response.map((item) => ({
         key: item.id,
-        transactionType: item.transaction_type === "SUBSCRIPTION" ? "Purchase" : item.transaction_type,
+        transactionType:
+          item.transaction_type === "SUBSCRIPTION"
+            ? "Purchase"
+            : item.transaction_type,
         date: item.transaction_date,
         mfName: item.asset_name,
         remarks: item.remarks,
@@ -78,13 +88,30 @@ export default function MutualFunds() {
     fetchData();
   }, []);
 
+  const formatValue = (value) => {
+    if (!value) return "";
+
+    // handle dayjs objects
+    if (dayjs.isDayjs(value)) {
+      return value.format("YYYY-MM-DD");
+    }
+
+    // handle date strings
+    if (typeof value === "string" && dayjs(value).isValid()) {
+      return dayjs(value).format("YYYY-MM-DD");
+    }
+
+    return value.toString();
+  };
+
   const filteredData = data.filter((row) =>
-    ["transactionType", "mfName", "folioNo", "agentName", "remarks"].some((f) =>
-      (row[f] || "")
-        .toString()
+    Object.entries(row).some(([key, value]) => {
+      if (key === "key") return false;
+
+      return formatValue(value)
         .toLowerCase()
-        .includes(searchText.trim().toLowerCase())
-    )
+        .includes(searchText.trim().toLowerCase());
+    }),
   );
 
   const computeAmounts = (values) => {
@@ -107,7 +134,11 @@ export default function MutualFunds() {
       title: <span className="text-amber-700 font-semibold">Date</span>,
       dataIndex: "date",
       width: 110,
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
+      render: (d) => (
+        <span className="text-amber-800">
+          {d ? dayjs(d).format("YYYY-MM-DD") : ""}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">MF Name</span>,
@@ -140,13 +171,17 @@ export default function MutualFunds() {
       render: (n) => <span className="text-amber-800">{n ?? "-"}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Net Amount (₹)</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Net Amount (₹)</span>
+      ),
       dataIndex: "netAmount",
       width: 140,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Gross Amount (₹)</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Gross Amount (₹)</span>
+      ),
       dataIndex: "grossAmount",
       width: 150,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
@@ -163,12 +198,19 @@ export default function MutualFunds() {
               try {
                 const data = await getWealthEntryById(record.key);
                 const mappedData = {
-                  transactionType: data.transaction_type === "SUBSCRIPTION" ? "Purchase" : data.transaction_type,
-                  date: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                  transactionType:
+                    data.transaction_type === "SUBSCRIPTION"
+                      ? "Purchase"
+                      : data.transaction_type,
+                  date: data.transaction_date
+                    ? dayjs(data.transaction_date)
+                    : undefined,
                   mfName: data.asset_name,
                   folioNo: data.folio_no,
                   type: data.mf_type,
-                  lockInDate: data.lock_in_period_date ? dayjs(data.lock_in_period_date) : undefined,
+                  lockInDate: data.lock_in_period_date
+                    ? dayjs(data.lock_in_period_date)
+                    : undefined,
                   agentName: data.agent_name,
                   agentAddress: data.agent_address,
                   quantity: data.quantity,
@@ -193,12 +235,19 @@ export default function MutualFunds() {
               try {
                 const data = await getWealthEntryById(record.key);
                 const mappedData = {
-                  transactionType: data.transaction_type === "SUBSCRIPTION" ? "Purchase" : data.transaction_type,
-                  date: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                  transactionType:
+                    data.transaction_type === "SUBSCRIPTION"
+                      ? "Purchase"
+                      : data.transaction_type,
+                  date: data.transaction_date
+                    ? dayjs(data.transaction_date)
+                    : undefined,
                   mfName: data.asset_name,
                   folioNo: data.folio_no,
                   type: data.mf_type,
-                  lockInDate: data.lock_in_period_date ? dayjs(data.lock_in_period_date) : undefined,
+                  lockInDate: data.lock_in_period_date
+                    ? dayjs(data.lock_in_period_date)
+                    : undefined,
                   agentName: data.agent_name,
                   agentAddress: data.agent_address,
                   quantity: data.quantity,
@@ -258,10 +307,11 @@ export default function MutualFunds() {
       r.grossAmount,
       (r.remarks || "").replace(/[\n\r]/g, " "),
     ]);
-    const csvContent =
-      [headers, ...rows]
-        .map((e) => e.map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`).join(","))
-        .join("\n");
+    const csvContent = [headers, ...rows]
+      .map((e) =>
+        e.map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`).join(","),
+      )
+      .join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -328,7 +378,10 @@ export default function MutualFunds() {
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Folio No</span>} name="folioNo">
+          <Form.Item
+            label={<span className="text-amber-700">Folio No</span>}
+            name="folioNo"
+          >
             <Input placeholder="Folio number" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -347,7 +400,10 @@ export default function MutualFunds() {
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Lock In Period Date</span>} name="lockInDate">
+          <Form.Item
+            label={<span className="text-amber-700">Lock In Period Date</span>}
+            name="lockInDate"
+          >
             <DatePicker className="w-full" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -356,13 +412,19 @@ export default function MutualFunds() {
       <h6 className="text-amber-500">Agent Details</h6>
       <Row gutter={16}>
         <Col span={12}>
-          <Form.Item label={<span className="text-amber-700">Agent Name</span>} name="agentName">
+          <Form.Item
+            label={<span className="text-amber-700">Agent Name</span>}
+            name="agentName"
+          >
             <Input placeholder="Agent / Broker Name" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={12}>
-          <Form.Item label={<span className="text-amber-700">Agent Address</span>} name="agentAddress">
+          <Form.Item
+            label={<span className="text-amber-700">Agent Address</span>}
+            name="agentAddress"
+          >
             <Input placeholder="Agent address" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -391,13 +453,19 @@ export default function MutualFunds() {
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Net Amount (₹)</span>} name="netAmount">
+          <Form.Item
+            label={<span className="text-amber-700">Net Amount (₹)</span>}
+            name="netAmount"
+          >
             <InputNumber className="w-full" disabled />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Stamp Charges (₹)</span>} name="stampCharges">
+          <Form.Item
+            label={<span className="text-amber-700">Stamp Charges (₹)</span>}
+            name="stampCharges"
+          >
             <InputNumber className="w-full" min={0} disabled={disabled} />
           </Form.Item>
         </Col>
@@ -405,13 +473,19 @@ export default function MutualFunds() {
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Gross Amount (₹)</span>} name="grossAmount">
+          <Form.Item
+            label={<span className="text-amber-700">Gross Amount (₹)</span>}
+            name="grossAmount"
+          >
             <InputNumber className="w-full" disabled />
           </Form.Item>
         </Col>
 
         <Col span={16}>
-          <Form.Item label={<span className="text-amber-700">Remarks</span>} name="remarks">
+          <Form.Item
+            label={<span className="text-amber-700">Remarks</span>}
+            name="remarks"
+          >
             <Input placeholder="Optional notes" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -441,14 +515,18 @@ export default function MutualFunds() {
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} onClick={exportCSV} className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={exportCSV}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Export
           </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            className="bg-amber-500! hover:bg-amber-600! border-none!" onClick={() => {
+            className="bg-amber-500! hover:bg-amber-600! border-none!"
+            onClick={() => {
               addForm.resetFields();
               setIsAddModalOpen(true);
             }}
@@ -460,14 +538,27 @@ export default function MutualFunds() {
 
       {/* Table */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
-        <h2 className="text-lg font-semibold text-amber-700 mb-0">Mutual Fund Transactions</h2>
-        <p className="text-amber-600 mb-3">Monitor investments &fund performance</p>
-        <Table columns={columns} dataSource={filteredData} pagination={{ pageSize: 10 }} scroll={{ y: 300 }} />
+        <h2 className="text-lg font-semibold text-amber-700 mb-0">
+          Mutual Fund Transactions
+        </h2>
+        <p className="text-amber-600 mb-3">
+          Monitor investments &fund performance
+        </p>
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          pagination={{ pageSize: 10 }}
+          scroll={{ y: 300 }}
+        />
       </div>
 
       {/* Add Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Add Mutual Fund Transaction</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Add Mutual Fund Transaction
+          </span>
+        }
         open={isAddModalOpen}
         onCancel={() => {
           setIsAddModalOpen(false);
@@ -484,14 +575,21 @@ export default function MutualFunds() {
               const calcs = computeAmounts(values);
               const payload = {
                 asset_category: "MUTUAL_FUND",
-                transaction_type: values.transactionType === "Purchase" ? "SUBSCRIPTION" : values.transactionType.toUpperCase(),
-                transaction_date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : null,
+                transaction_type:
+                  values.transactionType === "Purchase"
+                    ? "SUBSCRIPTION"
+                    : values.transactionType.toUpperCase(),
+                transaction_date: values.date
+                  ? dayjs(values.date).format("YYYY-MM-DD")
+                  : null,
                 asset_name: values.mfName,
                 remarks: values.remarks,
 
                 folio_no: values.folioNo,
                 mf_type: values.type,
-                lock_in_period_date: values.lockInDate ? dayjs(values.lockInDate).format("YYYY-MM-DD") : null,
+                lock_in_period_date: values.lockInDate
+                  ? dayjs(values.lockInDate).format("YYYY-MM-DD")
+                  : null,
 
                 quantity: (values.quantity || 0).toFixed(4),
                 nav: (values.nav || 0).toFixed(4),
@@ -505,13 +603,19 @@ export default function MutualFunds() {
               const response = await addWealthEntry(payload);
 
               const newRecord = {
-                key: response.id || (data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1),
+                key:
+                  response.id ||
+                  (data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1),
                 transactionType: values.transactionType,
-                date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : undefined,
+                date: values.date
+                  ? dayjs(values.date).format("YYYY-MM-DD")
+                  : undefined,
                 mfName: values.mfName,
                 folioNo: values.folioNo,
                 type: values.type,
-                lockInDate: values.lockInDate ? dayjs(values.lockInDate).format("YYYY-MM-DD") : undefined,
+                lockInDate: values.lockInDate
+                  ? dayjs(values.lockInDate).format("YYYY-MM-DD")
+                  : undefined,
                 agentName: values.agentName,
                 agentAddress: values.agentAddress,
                 quantity: values.quantity,
@@ -546,11 +650,14 @@ export default function MutualFunds() {
                 addForm.resetFields();
               }}
               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-
             >
               Cancel
             </Button>
-            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button
+              type="primary"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit"
+            >
               Add
             </Button>
           </div>
@@ -559,7 +666,11 @@ export default function MutualFunds() {
 
       {/* Edit Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Edit Mutual Fund Transaction</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Edit Mutual Fund Transaction
+          </span>
+        }
         open={isEditModalOpen}
         onCancel={() => {
           setIsEditModalOpen(false);
@@ -577,14 +688,21 @@ export default function MutualFunds() {
               const calcs = computeAmounts(values);
               const payload = {
                 asset_category: "MUTUAL_FUND",
-                transaction_type: values.transactionType === "Purchase" ? "SUBSCRIPTION" : values.transactionType.toUpperCase(),
-                transaction_date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : null,
+                transaction_type:
+                  values.transactionType === "Purchase"
+                    ? "SUBSCRIPTION"
+                    : values.transactionType.toUpperCase(),
+                transaction_date: values.date
+                  ? dayjs(values.date).format("YYYY-MM-DD")
+                  : null,
                 asset_name: values.mfName,
                 remarks: values.remarks,
 
                 folio_no: values.folioNo,
                 mf_type: values.type,
-                lock_in_period_date: values.lockInDate ? dayjs(values.lockInDate).format("YYYY-MM-DD") : null,
+                lock_in_period_date: values.lockInDate
+                  ? dayjs(values.lockInDate).format("YYYY-MM-DD")
+                  : null,
 
                 quantity: Number(values.quantity || 0).toFixed(4),
                 nav: Number(values.nav || 0).toFixed(4),
@@ -604,11 +722,15 @@ export default function MutualFunds() {
                         ...selectedRecord,
                         ...values,
                         ...calcs,
-                        date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : undefined,
-                        lockInDate: values.lockInDate ? dayjs(values.lockInDate).format("YYYY-MM-DD") : undefined,
+                        date: values.date
+                          ? dayjs(values.date).format("YYYY-MM-DD")
+                          : undefined,
+                        lockInDate: values.lockInDate
+                          ? dayjs(values.lockInDate).format("YYYY-MM-DD")
+                          : undefined,
                       }
-                    : d
-                )
+                    : d,
+                ),
               );
               setIsEditModalOpen(false);
               editForm.resetFields();
@@ -635,11 +757,14 @@ export default function MutualFunds() {
                 setSelectedRecord(null);
               }}
               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-
             >
               Cancel
             </Button>
-            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button
+              type="primary"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit"
+            >
               Save Changes
             </Button>
           </div>
@@ -648,8 +773,11 @@ export default function MutualFunds() {
 
       {/* View Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">View Mutual Fund Details</span>}
-
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            View Mutual Fund Details
+          </span>
+        }
         open={isViewModalOpen}
         onCancel={() => {
           setIsViewModalOpen(false);
@@ -663,6 +791,6 @@ export default function MutualFunds() {
           {renderFormFields(viewForm, true)}
         </Form>
       </Modal>
-    </div >
+    </div>
   );
 }
