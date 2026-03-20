@@ -10,7 +10,12 @@ import {
   Col,
   InputNumber,
 } from "antd";
-import { getRiseDisputes, getSaleDisputeById, createSaleDispute, getDisputeById } from "../api/raiseDispute" ;
+import {
+  getRiseDisputes,
+  getSaleDisputeById,
+  createSaleDispute,
+  getDisputeById,
+} from "../api/raiseDispute";
 import {
   SearchOutlined,
   DownloadOutlined,
@@ -19,7 +24,7 @@ import {
   FilterOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { exportToExcel } from "../utils/exportToExcel";
+import { exporttoxl } from "../utils/exporttoxl";
 const reasonsList = [
   "Quality Issue",
   "Damaged Packaging",
@@ -27,13 +32,11 @@ const reasonsList = [
   "Wrong Item",
 ];
 
-
-
-
 export default function RaiseDispute() {
   const [records, setRecords] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
-  const [searchText, setSearchText] = useState(""); const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalRecord, setModalRecord] = useState(null);
   const [modalMode, setModalMode] = useState("view"); // "view" | "edit" | "dispute"
   const [form] = Form.useForm();
@@ -46,15 +49,15 @@ export default function RaiseDispute() {
       records.filter((r) =>
         `${r.invoiceNo} ${r.orderNo} ${r.plantName}`
           .toLowerCase()
-          .includes(val)
-      )
+          .includes(val),
+      ),
     );
   }, [searchText, records]);
   useEffect(() => {
     loadDisputes();
   }, []);
 
- const loadDisputes = async () => {
+  const loadDisputes = async () => {
     try {
       const res = await getRiseDisputes();
 
@@ -68,10 +71,11 @@ export default function RaiseDispute() {
         returnDate: r.return_date,
         disputeNo: r.dispute_no,
         status: r.status === "Dispute Raised" ? "Pending" : r.status,
-        items: r.items?.map((i, idx) => ({
-          id: idx,
-          item: i
-        })) || []
+        items:
+          r.items?.map((i, idx) => ({
+            id: idx,
+            item: i,
+          })) || [],
       }));
 
       setRecords(rows);
@@ -81,7 +85,6 @@ export default function RaiseDispute() {
   };
   const openModal = async (record, mode = "view") => {
     try {
-
       let res;
 
       // 🔹 VIEW and EDIT → same API
@@ -95,8 +98,8 @@ export default function RaiseDispute() {
       }
 
       const items = res.items.map((it) => ({
-        id: it.id,                       // dispute item id (used for UPDATE)
-        invoice_item_id: it.invoice_item_id,  // used for CREATE
+        id: it.id, // dispute item id (used for UPDATE)
+        invoice_item_id: it.invoice_item_id, // used for CREATE
         item: it.item,
         itemCode: it.item_code,
         uom: it.uom_name,
@@ -105,7 +108,7 @@ export default function RaiseDispute() {
         delivered_qty: it.delivered_qty,
         returnQty: it.return_qty,
         returnReason: it.reason,
-        otherReasonText: it.other_reason
+        otherReasonText: it.other_reason,
       }));
 
       const modalData = {
@@ -117,7 +120,7 @@ export default function RaiseDispute() {
         disputeNo: res.dispute_number,
         date: res.date,
         status: res.status,
-        items
+        items,
       };
 
       setModalRecord(modalData);
@@ -138,80 +141,84 @@ export default function RaiseDispute() {
           acc[`reason_${it.id}`] = it.returnReason;
           acc[`other_${it.id}`] = it.otherReasonText;
           return acc;
-        }, {})
+        }, {}),
       });
 
       setIsOtherReason(otherFlag);
       setQtyState(qtyInit);
       setIsModalOpen(true);
-
     } catch (error) {
       console.error(error);
     }
   };
-const handleSearch = (value) => {
-  setSearchText(value);
+  const handleSearch = (value) => {
+    setSearchText(value);
 
-  if (!value) {
-    loadDisputes();
-    return;
-  }
+    if (!value) {
+      loadDisputes();
+      return;
+    }
 
-  const filtered = data.filter((item) =>
-    JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
-  );
+    const filtered = data.filter((item) =>
+      JSON.stringify(item).toLowerCase().includes(value.toLowerCase()),
+    );
 
-  setData(filtered);
-};
-   const handleExport = async () => {
-      const exportData = [];
-  
-      for (const record of filteredData) {
-        try {
-          // Fetch detailed item info for this invoice
-          const res = await getDisputeById(record.dispute_id);
-  
-          const items = res.items.map(it => ({
-            item: it.item,
-            itemCode: it.item_code,
-            uom: it.uom_name,
-            rate: it.rate,
-            quantity: it.order_qty,
-            delivered_qty: it.delivered_qty,
-            returnQty: it.return_qty,
-            returnReason: it.reason,
-            otherReasonText: it.other_reason
-          }));
-  
-          // Flatten items for export
-          items.forEach(item => {
-            exportData.push({
-              "Invoice No": record.invoiceNo,
-              "Order No": record.orderNo,
-              Plant: record.plantName || "N/A",
-              Date: record.returnDate,
-              "Dispute No": record.disputeNo || "N/A",
-              Status: record.status,
-              Item: item.item,
-              "Item Code": item.itemCode || "",
-              UOM: item.uom || "",
-              Rate: item.rate || 0,
-              "Order Qty": item.quantity || 0,
-              "Return Qty": item.returnQty || 0,
-              "Delivered Qty": item.delivered_qty || 0,
-              Reason: item.returnReason === "Other" ? item.otherReasonText : item.returnReason,
-              Total: (item.returnQty || 0) * (item.rate || 0)
-            });
+    setData(filtered);
+  };
+  const handleExport = async () => {
+    const exportData = [];
+
+    for (const record of filteredData) {
+      try {
+        // Fetch detailed item info for this invoice
+        const res = await getDisputeById(record.dispute_id);
+
+        const items = res.items.map((it) => ({
+          item: it.item,
+          itemCode: it.item_code,
+          uom: it.uom_name,
+          rate: it.rate,
+          quantity: it.order_qty,
+          delivered_qty: it.delivered_qty,
+          returnQty: it.return_qty,
+          returnReason: it.reason,
+          otherReasonText: it.other_reason,
+        }));
+
+        // Flatten items for export
+        items.forEach((item) => {
+          exportData.push({
+            "Invoice No": record.invoiceNo,
+            "Order No": record.orderNo,
+            Plant: record.plantName || "N/A",
+            Date: record.returnDate,
+            "Dispute No": record.disputeNo || "N/A",
+            Status: record.status,
+            Item: item.item,
+            "Item Code": item.itemCode || "",
+            UOM: item.uom || "",
+            Rate: item.rate || 0,
+            "Order Qty": item.quantity || 0,
+            "Return Qty": item.returnQty || 0,
+            "Delivered Qty": item.delivered_qty || 0,
+            Reason:
+              item.returnReason === "Other"
+                ? item.otherReasonText
+                : item.returnReason,
+            Total: (item.returnQty || 0) * (item.rate || 0),
           });
-  
-        } catch (error) {
-          console.error(`Failed to fetch details for invoice ${record.invoiceNo}`, error);
-        }
+        });
+      } catch (error) {
+        console.error(
+          `Failed to fetch details for invoice ${record.invoiceNo}`,
+          error,
+        );
       }
-  
-      // Export to Excel
-      exportToExcel(exportData, "Raise_Disputes");
-    };
+    }
+
+    // Export to Excel
+    exporttoxl(exportData, "Raise_Disputes");
+  };
   const updateOtherReason = (id, value) => {
     setIsOtherReason((prev) => ({ ...prev, [id]: value === "Other" }));
   };
@@ -247,34 +254,34 @@ const handleSearch = (value) => {
         (i) =>
           i.returnQty > 0 &&
           (!i.returnReason ||
-            (i.returnReason === "Other" && !i.otherReasonText))
+            (i.returnReason === "Other" && !i.otherReasonText)),
       );
 
       if (invalidReason) {
         Modal.error({
           title: "Validation Error",
-          content: "Please provide a reason for all items with return quantity.",
+          content:
+            "Please provide a reason for all items with return quantity.",
         });
         return;
       }
 
-     let disputeNo = modalRecord.disputeNo; // keep only this if needed
+      let disputeNo = modalRecord.disputeNo; // keep only this if needed
       if (modalMode === "edit") {
-
         const disputeItems = updatedItems
           .filter((i) => i.returnQty > 0)
           .map((i) => ({
             id: i.id,
             return_qty: i.returnQty,
             reason: i.returnReason,
-            other_reason: i.otherReasonText
+            other_reason: i.otherReasonText,
           }));
 
         const payload = {
           dispute_id: modalRecord.dispute_id,
           sale_invoice_id: modalRecord.sale_invoice_id,
           status: values.status,
-          items: disputeItems
+          items: disputeItems,
         };
 
         await updateSaleDispute(modalRecord.dispute_id, payload); // ✅ UPDATE API
@@ -284,7 +291,7 @@ const handleSearch = (value) => {
         const disputeItems = updatedItems
           .filter((i) => i.returnQty > 0)
           .map((i) => ({
-          invoice_item_id: i.invoice_item_id,
+            invoice_item_id: i.invoice_item_id,
             return_qty: i.returnQty,
             reason: i.returnReason,
             other_reason: i.otherReasonText,
@@ -307,14 +314,11 @@ const handleSearch = (value) => {
       };
 
       setRecords((prev) =>
-        prev.map((r) =>
-          r.invoiceNo === newRecord.invoiceNo ? newRecord : r
-        )
+        prev.map((r) => (r.invoiceNo === newRecord.invoiceNo ? newRecord : r)),
       );
 
       await loadDisputes(); // refresh table
       setIsModalOpen(false);
-
     } catch (error) {
       console.error(error);
     }
@@ -335,7 +339,7 @@ const handleSearch = (value) => {
     );
   };
 
-   const columns = [
+  const columns = [
     {
       title: <span className="text-amber-700!">Invoice No</span>,
       dataIndex: "invoiceNo",
@@ -368,9 +372,7 @@ const handleSearch = (value) => {
       title: <span className="text-amber-700!">Items</span>,
       render: (_, r) => (
         <span className="text-amber-700!">
-          {(r.itemsReturned || r.items || [])
-            .map((x) => x.item)
-            .join(", ")}
+          {(r.itemsReturned || r.items || []).map((x) => x.item).join(", ")}
         </span>
       ),
     },
@@ -392,9 +394,6 @@ const handleSearch = (value) => {
             />
           )}
 
-
-      
-
           {/* Approved → show credit note */}
           {record.status === "Approved" && (
             <span className="text-green-600 font-semibold text-xs">
@@ -412,7 +411,7 @@ const handleSearch = (value) => {
             </Button>
           )}
         </div>
-      )
+      ),
     },
   ];
 
@@ -459,7 +458,8 @@ const handleSearch = (value) => {
                   if (value > row.delivered_qty) {
                     return Promise.reject(
                       new Error(
-                       `Return qty cannot exceed (${row.delivered_qty || row.quantity})`    )
+                        `Return qty cannot exceed (${row.delivered_qty || row.quantity})`,
+                      ),
                     );
                   }
 
@@ -475,7 +475,6 @@ const handleSearch = (value) => {
               style={{ width: "100%" }}
             />
           </Form.Item>
-
         ),
     },
     {
@@ -499,10 +498,7 @@ const handleSearch = (value) => {
                 <Select.Option value="Other">Other</Select.Option>
               </Select>
               {isOtherReason[row.id] && (
-                <Form.Item
-                  name={`other_${row.id}`}
-                  style={{ marginTop: 5 }}
-                >
+                <Form.Item name={`other_${row.id}`} style={{ marginTop: 5 }}>
                   <Input
                     placeholder="Other reason"
                     value={form.getFieldValue(`other_${row.id}`)}
@@ -523,27 +519,25 @@ const handleSearch = (value) => {
       title: <span className="text-amber-700!">Total</span>,
       render: (_, row) => {
         const qty =
-          modalMode === "view"
-            ? row.returnQty || 0
-            : qtyState[row.id] || 0;
+          modalMode === "view" ? row.returnQty || 0 : qtyState[row.id] || 0;
         return (qty * row.rate).toFixed(2);
       },
     },
   ];
 
   const modalTitle =
-    modalMode === "view"
-      ? <span className="text-amber-600!" >View Dispute</span>
-      : modalMode === "edit"
-      ? <span className="text-amber-600!" >Edit Dispute</span>
-      : "Dispute Items";
+    modalMode === "view" ? (
+      <span className="text-amber-600!">View Dispute</span>
+    ) : modalMode === "edit" ? (
+      <span className="text-amber-600!">Edit Dispute</span>
+    ) : (
+      "Dispute Items"
+    );
 
   return (
     <div>
       <h1 className="text-3xl font-bold text-amber-700">Raise Dispute</h1>
-      <p className="text-amber-600 mb-3">
-        Manage your dispute easily
-      </p>
+      <p className="text-amber-600 mb-3">Manage your dispute easily</p>
 
       <div className="flex justify-between items-center mb-2">
         <div className="flex gap-2">
@@ -552,11 +546,15 @@ const handleSearch = (value) => {
             className="border-amber-300! w-64! focus:border-amber-500!"
             prefix={<SearchOutlined className="text-amber-600!" />}
             value={searchText}
-           onChange={(e) => handleSearch(e.target.value)}   />
-        
+            onChange={(e) => handleSearch(e.target.value)}
+          />
+
           <Button
             icon={<FilterOutlined />}
-            onClick={() => {setSearchText("") ; loadDisputes()   ;}}
+            onClick={() => {
+              setSearchText("");
+              loadDisputes();
+            }}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Reset
@@ -566,7 +564,7 @@ const handleSearch = (value) => {
           <Button
             icon={<DownloadOutlined />}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-             onClick={handleExport}
+            onClick={handleExport}
           >
             Export
           </Button>
@@ -581,7 +579,6 @@ const handleSearch = (value) => {
         title={
           <div className="flex justify-between items-center">
             <span>{modalTitle}</span>
-           
           </div>
         }
         open={isModalOpen}
@@ -610,10 +607,7 @@ const handleSearch = (value) => {
               </Col>
               <Col span={4}>
                 <Form.Item label="Date">
-                  <Input
-                    value={dayjs().format("YYYY-MM-DD")}
-                    disabled
-                  />
+                  <Input value={dayjs().format("YYYY-MM-DD")} disabled />
                 </Form.Item>
               </Col>
               <Col span={4}>
@@ -621,9 +615,7 @@ const handleSearch = (value) => {
                   <Input
                     value={
                       modalRecord.disputeNo ||
-                      (modalMode === "dispute"
-                        ? "N/A"
-                        : "N/A")
+                      (modalMode === "dispute" ? "N/A" : "N/A")
                     }
                     disabled
                   />
@@ -631,12 +623,8 @@ const handleSearch = (value) => {
               </Col>
             </Row>
 
-            
-
             <h6 className="text-amber-500 my-3">
-              {modalMode === "view"
-                ? "Items"
-                : "Enter qty & reason"}
+              {modalMode === "view" ? "Items" : "Enter qty & reason"}
             </h6>
 
             <Table
@@ -644,7 +632,7 @@ const handleSearch = (value) => {
               dataSource={modalRecord.itemsReturned || modalRecord.items}
               columns={modalColumns}
               pagination={false}
-              scroll={{y:300}}
+              scroll={{ y: 300 }}
               rowKey="id"
             />
           </Form>
