@@ -189,14 +189,17 @@ setIsViewModalOpen(true);
   }
 };
 
-  const filteredData = data.filter(
-    (item) =>
-      item.adviceNo?.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.poNo?.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.vendorName?.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.plantName?.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.status?.toLowerCase().includes(searchText.toLowerCase())
+ const filteredData = data.filter((item) => {
+  const val = searchText.toLowerCase();
+  return (
+    item.adviceNo?.toLowerCase().includes(val) ||
+    item.invoice_number?.toLowerCase().includes(val) ||
+    item.vendorName?.toLowerCase().includes(val) ||
+    item.plantName?.toLowerCase().includes(val) ||
+    item.status?.toLowerCase().includes(val) ||
+    item.items?.some((i) => i.itemName?.toLowerCase().includes(val))
   );
+});
 
  const handleFormSubmit = async () => {
   try {
@@ -954,7 +957,7 @@ const renderLoadingDetails = (disabled = false) => (
    <div className="flex gap-2">
           <Input
             prefix={<SearchOutlined className="text-amber-600!" />}
-            placeholder="Search Advice No, PO, Vendor..."
+            placeholder="Search..."
             className="w-64! border-amber-300! focus:border-amber-500!"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}

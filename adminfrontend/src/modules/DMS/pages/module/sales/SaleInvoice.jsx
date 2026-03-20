@@ -137,17 +137,23 @@ const fetchInvoices = async () => {
     message.error("Failed to load invoices");
   }
 };
+
 const handleSearch = (value) => {
   setSearchText(value);
 
-  const filtered = savedInvoices.filter((inv) =>
-    `${inv.invoiceNumber} ${inv.orderNumber} ${inv.customerName}`
-      .toLowerCase()
-      .includes(value.toLowerCase())
+  if (!value) {
+    setFilteredInvoices(savedInvoices);
+    return;
+  }
+
+  const filtered = savedInvoices.filter((item) =>
+    JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
   );
 
   setFilteredInvoices(filtered);
 };
+
+
 const handleDownload = async (record) => {
   try {
     message.loading({ content: `Downloading Invoice ${record.invoiceNumber}...`, key: 'download' });
@@ -706,14 +712,16 @@ const handleExport = async () => {
             placeholder="Search..."
             className="w-64! border-amber-300! focus:border-amber-500!"
            // value={searchText}
-           onChange={(e) => handleSearch(e.target.value)}   />
-         <Button
+         value={searchText}
+  onChange={(e) => handleSearch(e.target.value)}  />
+       <Button
   icon={<FilterOutlined />}
   onClick={() => {
     setSearchText("");
     setFilteredInvoices(savedInvoices);
   }}
-  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+   className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+
 >
   Reset
 </Button>
