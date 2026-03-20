@@ -88,20 +88,30 @@ export default function Privatequity() {
 
   const txnTypes = ["Subscription", "Redemption", "Transfer"];
 
+  const formatValue = (value) => {
+    if (!value) return "";
+
+    // handle dayjs objects
+    if (dayjs.isDayjs(value)) {
+      return value.format("YYYY-MM-DD");
+    }
+
+    // handle date strings
+    if (typeof value === "string" && dayjs(value).isValid()) {
+      return dayjs(value).format("YYYY-MM-DD");
+    }
+
+    return value.toString();
+  };
+
   const filteredData = data.filter((row) =>
-    [
-      "transactionType",
-      "assetName",
-      "refNumber",
-      "insuranceCompany",
-      "brokerName",
-      "narration",
-    ].some((f) =>
-      (row[f] || "")
-        .toString()
+    Object.entries(row).some(([key, value]) => {
+      if (key === "key") return false;
+
+      return formatValue(value)
         .toLowerCase()
-        .includes(searchText.trim().toLowerCase()),
-    ),
+        .includes(searchText.trim().toLowerCase());
+    }),
   );
 
   const computeAmounts = (values) => {
