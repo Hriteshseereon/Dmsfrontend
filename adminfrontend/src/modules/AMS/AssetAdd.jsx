@@ -36,7 +36,7 @@ import {
   updateAsset,
   getAssetById,
 } from "../../api/assets";
-
+import { globalSearch } from "../../utils/globalSearch";
 import useSessionStore from "../../store/sessionStore";
 const { Option } = Select;
 const { TextArea } = Input;
@@ -368,15 +368,7 @@ export default function AssetManager() {
     },
   };
 
-  const filteredData = data.filter((row) =>
-    ["assetName", "assetId", "assetCategory", "assignedTo", "status"].some(
-      (field) =>
-        (row[field] || "")
-          .toString()
-          .toLowerCase()
-          .includes(searchText.trim().toLowerCase()),
-    ),
-  );
+  const filteredData = globalSearch(data, searchText);
 
   const handleAdd = async (values) => {
     try {
