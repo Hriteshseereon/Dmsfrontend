@@ -69,8 +69,7 @@ export default function DeliveryStatus() {
     setSearchText(value);
 
     if (!value) {
-      fetchData();
-      return;
+setData(formattedData);      return;
     }
 
     const filtered = data.filter((item) =>
@@ -405,7 +404,10 @@ export default function DeliveryStatus() {
           />
           <Button
             icon={<FilterOutlined />}
-            onClick={() => handleSearch(searchText)}
+ onClick={() => {
+    setSearchText("");
+    setData(formattedData);
+  }}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Reset

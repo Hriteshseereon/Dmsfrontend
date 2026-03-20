@@ -7,6 +7,7 @@ import {
   FaUndo,
   FaShoppingCart,
   FaTachometerAlt,
+  FaWallet,
 } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import SaleSouda from "./SaleSouda";
@@ -17,6 +18,7 @@ import SaleDashboard from "./SaleDashboard";
 import SalesDispute from "./SalesDispute";
 import LoadingDetails from "./LoadingDetails";
 import SaleInvoice from "./SaleInvoice";
+import Wallet from "./Wallet";
 
 export const SALES_TAB_DEFINITIONS = [
   {
@@ -64,6 +66,14 @@ export const SALES_TAB_DEFINITIONS = [
     Component: SalesDispute,
 
   },
+  {
+    id: "wallet",
+    label: "Wallet",
+    path: "wallet",
+    Icon: FaWallet,
+    Component: Wallet,
+  }
+
 ];
 
 const normalize = (values = []) =>

@@ -32,7 +32,7 @@ const walletData = [
     id: 2,
     noteNo: "CN-1002",
     amount: 3000,
-    customerName: "Customer A",
+    customerName: "Customer B",
    disputNo: "DIS-2291",
     date: "2025-01-20",
     status: "Partially Paid",
@@ -41,7 +41,7 @@ const walletData = [
     id: 3,  
     noteNo: "CN-1003",
     amount: 1500,
-    customerName: "Customer A",
+    customerName: "Customer C",
     disputNo: "DIS-2292",
     date: "2025-01-25",
     status: "Unpaid",
@@ -113,12 +113,6 @@ const WalletPage = () => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-0">
-        <div>
-          <h1 className="text-3xl font-bold text-amber-700">Wallet</h1>
-          <p className="text-amber-600">Manage your Wallet easily</p>
-        </div>
-      </div>
 
       {/* Search */}
       <div className="flex justify-between mb-2">

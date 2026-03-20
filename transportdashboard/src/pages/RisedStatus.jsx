@@ -99,6 +99,10 @@ plantPhoneNumber: res.plant_details?.phone_number,
 };
 
 
+  // SEARCH
+ const handleSearch = (value) => {
+  setSearchText(value);
+};
  
 
 
@@ -202,15 +206,17 @@ plantPhoneNumber: res.plant_details?.phone_number,
         <h1 className="text-3xl font-bold text-amber-700">Orders Assign</h1>
         <p className="text-amber-600 mb-2">Manage your pending and approved assign requests.</p>
         <Input 
+        value={searchText}
           prefix={<SearchOutlined className="text-amber-600!" />} 
-          placeholder="Search by Order No..." 
+          placeholder="Search..." 
           className="w-64! border-amber-300! focus:border-amber-500!" 
-          value={searchText} 
-          onChange={e => setSearchText(e.target.value)} 
+            onChange={(e) =>
+              handleSearch(e.target.value)
+            }
         />
          <Button
                     icon={<FilterOutlined />}
-                    onClick={() => setSearchText("")}
+                      onClick={() => setSearchText("")}
                     className="border-amber-400! text-amber-700! hover:bg-amber-100!"
                   >
                     Reset
@@ -218,11 +224,16 @@ plantPhoneNumber: res.plant_details?.phone_number,
       </div>
 
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
-        <Table columns={columns}dataSource={data.filter(i =>
-  (i.invoice_number || "")
-    .toLowerCase()
-    .includes(searchText.toLowerCase())
-)}
+        <Table columns={columns}
+     dataSource={data.filter(i => {
+  const val = searchText.toLowerCase();
+  return (
+     
+    (i.status || "").toLowerCase().includes(val)||
+    (i.products?.[0]?.productName || "").toLowerCase().includes(val) ||
+    (i.products?.[0]?.qty?.toString() || "").toLowerCase().includes(val)
+  );
+})}
  pagination={false} rowKey="id"/>
       </div>
 
@@ -265,6 +276,10 @@ plantPhoneNumber: res.plant_details?.phone_number,
     name="driverName"
     rules={[
       { required: true, message: "Please enter the Driver Name" },
+      {
+        pattern: /^[A-Za-z\s]+$/,
+        message: "Only alphabets are allowed",
+      },
         ]}
   >
     <Input disabled={isReadonly} />

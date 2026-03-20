@@ -137,14 +137,14 @@ export default function Contract() {
     {
       title: <span className="text-amber-700 font-semibold">Contract No</span>,
       dataIndex: "sale_contract_number",
-      width: 150,
+      width: 100,
       render: (text, record) => (
         <span className="text-amber-800 ">{text || "N/A"}</span>
       ),
     },
     {
-      title: <span className="text-amber-700 font-semibold">Vendor</span>,
-      width: 150,
+      title: <span className="text-amber-700 font-semibold">Supplier</span>,
+      width: 100,
       render: (_, r) => (
         <span className="text-amber-800">
           {r.vendor_names?.join(", ") || "N/A"}
@@ -154,7 +154,7 @@ export default function Contract() {
 
     {
       title: <span className="text-amber-700 font-semibold">Items</span>,
-      width: 250,
+      width: 100,
       render: (_, r) => {
         const productList = r.product_names || [];
         const short = productList.slice(0, 2).join(", ");
@@ -171,7 +171,7 @@ export default function Contract() {
     },
     {
       title: <span className="text-amber-700 font-semibold">Date Range</span>,
-      width: 180,
+      width: 150,
       render: (_, r) => (
         <div className="text-xs text-amber-800">
           <div>From: {r.from_date || "N/A"}</div>
@@ -182,7 +182,7 @@ export default function Contract() {
     {
       title: <span className="text-amber-700 font-semibold">Grand Total</span>,
       dataIndex: "grand_total",
-      width: 120,
+      width: 100,
       render: (value) => (
         <span className="text-amber-800 ">
           ₹ {Number(value || 0).toFixed(2)}

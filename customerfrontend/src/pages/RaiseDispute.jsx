@@ -47,7 +47,7 @@ export default function RaiseDispute() {
     const val = searchText.toLowerCase();
     setFilteredData(
       records.filter((r) =>
-        `${r.invoiceNo} ${r.orderNo} ${r.plantName}`
+        `${r.invoiceNo} ${r.orderNo} ${r.plantName} ${r.disputeNo} ${r.status} ${r.items?.map((i) => i.item).join(" ")} ${r.returnDate}`
           .toLowerCase()
           .includes(val),
       ),
@@ -397,7 +397,7 @@ export default function RaiseDispute() {
           {/* Approved → show credit note */}
           {record.status === "Approved" && (
             <span className="text-green-600 font-semibold text-xs">
-              Credit Note Created
+              Debit Note Created
             </span>
           )}
 
