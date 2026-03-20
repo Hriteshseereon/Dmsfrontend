@@ -41,16 +41,16 @@ export default function SalesDispute() {
   const [isOtherReason, setIsOtherReason] = useState({});
   const [qtyState, setQtyState] = useState({}); // store live quantities
 
-  useEffect(() => {
-    const val = searchText.toLowerCase();
-    setFilteredData(
-      records.filter((r) =>
-        `${r.invoiceNo} ${r.orderNo} ${r.plantName}`
-          .toLowerCase()
-          .includes(val)
-      )
-    );
-  }, [searchText, records]);
+ useEffect(() => {
+  const val = searchText.toLowerCase();
+  setFilteredData(
+    records.filter((r) =>
+      `${r.invoiceNo} ${r.orderNo} ${r.plantName} ${r.status} ${r.disputeNo} ${r.returnDate} ${r.items?.map(i => i.item).join(" ")} `
+        .toLowerCase()
+        .includes(val)
+    )
+  );
+}, [searchText, records]);
   useEffect(() => {
     loadDisputes();
   }, []);
@@ -80,6 +80,9 @@ export default function SalesDispute() {
       console.error(error);
     }
   };
+
+
+
   const openModal = async (record, mode = "view") => {
     try {
 
@@ -542,12 +545,15 @@ export default function SalesDispute() {
             placeholder="Search"
             className="border-amber-300! w-64! focus:border-amber-500!"
             prefix={<SearchOutlined className="text-amber-600!" />}
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-          />
+                 value={searchText}
+ onChange={(e) => setSearchText(e.target.value)}  />
+   
           <Button
             icon={<FilterOutlined />}
-            onClick={() => setSearchText("")}
+           onClick={() => {
+    setSearchText("");
+   
+  }}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Reset

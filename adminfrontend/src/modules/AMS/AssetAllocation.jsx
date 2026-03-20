@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Table,
   Input,
@@ -30,6 +30,7 @@ import {
   updateAssetAllocation,
 } from "../../api/assets";
 import useSessionStore from "../../store/sessionStore";
+import { globalSearch } from "../../utils/globalSearch";
 
 const { Option } = Select;
 
@@ -183,14 +184,7 @@ export default function AssetAllocation() {
     fetchAssets();
   }, [currentOrgId]);
 
-  const filteredData = data.filter((row) =>
-    ["allocationId", "asset", "assignedTo", "remarks"].some((f) =>
-      (row[f] || "")
-        .toString()
-        .toLowerCase()
-        .includes(searchText.trim().toLowerCase()),
-    ),
-  );
+  const filteredData = globalSearch(data, searchText);
   // handle  view option
   const handleView = async (record) => {
     try {

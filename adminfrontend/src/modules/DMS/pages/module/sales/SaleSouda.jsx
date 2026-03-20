@@ -124,7 +124,9 @@ export default function SalesSouda() {
   // fetch all sales contract groups
   // Add this useEffect to fetch existing contracts on mount
   useEffect(() => {
-    const fetchSalesContracts = async () => {
+    fetchSalesContracts();
+  }, []);
+  const fetchSalesContracts = async () => {
       try {
         const res = await getSalescontractGroups(); // or whatever API fetches all contracts
         console.log("Fetched sales contracts:", res);
@@ -152,10 +154,6 @@ export default function SalesSouda() {
         console.error("Failed to fetch sales contracts", err);
       }
     };
-
-    fetchSalesContracts();
-  }, []);
-
   // payload for create sales contract
   const buildCreateContractPayload = (values) => {
     // First, build items to calculate taxable amount
@@ -208,6 +206,22 @@ export default function SalesSouda() {
       items,
     };
   };
+
+  
+const handleSearch = (value) => {
+  setSearchText(value);
+
+  if (!value) {
+    fetchSalesContracts();
+    return;
+  }
+
+  const filtered = data.filter((item) =>
+    JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
+  );
+
+  setData(filtered);
+};
 const handleExport = () => {
     const exportData = [];
 
@@ -1160,11 +1174,11 @@ igstPercent: Number(contract.igst),          // GST from API
             placeholder="Search..."
             className="w-64! border-amber-300! focus:border-amber-500!"
             value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-          />
+           onChange={(e) => handleSearch(e.target.value)}   />
+         
           <Button
             icon={<FilterOutlined />}
-            onClick={() => setSearchText("")}
+            onClick={() => {setSearchText("");fetchSalesContracts();}}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Reset

@@ -1,6 +1,6 @@
-// PurchaseDashboard.jsx
-import React from "react";
-import { Card, Row, Col, Tag, Space } from "antd";
+// WealthDashboard.jsx
+import React, { useEffect, useState } from "react";
+import { Card, Row, Col, message } from "antd";
 import {
   FileTextOutlined,
   ShoppingCartOutlined,
@@ -12,92 +12,72 @@ import {
   Line,
   AreaChart,
   Area,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { dashboardData } from "../../api/wealth";
 
-// JSON Data
-const dashboardJSON = {
-  topCards: [
-    { title: "Stock", value: 5, icon: "FileTextOutlined" },
-    { title: "Mutual Funds", value: 95, icon: "DollarOutlined" },
-    { title: "Property", value: 10, icon: "ShoppingCartOutlined" },
-    { title: "Bank", value: 7, icon: "ReloadOutlined" },
-  ],
-  contractsData: [
-    { name: "Jan", value: 12 },
-    { name: "Feb", value: 20 },
-    { name: "Mar", value: 25 },
-    { name: "Apr", value: 22 },
-    { name: "May", value: 40 },
-    { name: "Jun", value: 30 },
-    { name: "Jul", value: 24 },
-  ],
-  ordersData: [
-    { name: "Jan", orders: 20 },
-    { name: "Feb", orders: 30 },
-    { name: "Mar", orders: 32 },
-    { name: "Apr", orders: 35 },
-    { name: "May", orders: 45 },
-    { name: "Jun", orders: 38 },
-    { name: "Jul", orders: 42 },
-  ],
-  returnData: [
-    { name: "Damaged", value: 3 },
-    { name: "Expired", value: 2 },
-    { name: "Wrong Item", value: 1 },
-    { name: "Other Reasons", value: 4 },
-  ],
-  quickActions: [
-    { title: "Purchase Order 567", subtitle: "Due Today", tag: "Pending" },
-    {
-      title: "Shipment #789",
-      subtitle: "Expected: 03-Oct-2025",
-      tag: "Nearby",
-    },
-    {
-      title: "Invoice #234",
-      subtitle: "Due in 2 days",
-      tag: "Payment Pending",
-    },
-    {
-      title: "Delivery #321",
-      subtitle: "Location: Nearby Warehouse",
-      tag: "Nearby",
-    },
-  ],
-};
-
-// Mapping icon string to actual components
+// Icon mapping based on API titles
 const iconMap = {
-  FileTextOutlined: <FileTextOutlined className="text-amber-700 text-2xl" />,
-  DollarOutlined: <DollarOutlined className="text-amber-700 text-2xl" />,
-  ShoppingCartOutlined: (
-    <ShoppingCartOutlined className="text-amber-700 text-2xl" />
-  ),
-  ReloadOutlined: <ReloadOutlined className="text-amber-700 text-2xl" />,
+  Stock: <FileTextOutlined className="text-amber-700 text-2xl" />,
+  "Mutual Funds": <DollarOutlined className="text-amber-700 text-2xl" />,
+  Property: <ShoppingCartOutlined className="text-amber-700 text-2xl" />,
+  Bank: <ReloadOutlined className="text-amber-700 text-2xl" />,
 };
-
-// Amber palette
-const COLORS = ["#d97706", "#f59e0b", "#fbbf24", "#fcd34d"];
 
 export default function WealthDashboard() {
+  const [data, setData] = useState(null);
+
+  // Fetch API
+  const fetchDashboard = async () => {
+    try {
+      const res = await dashboardData();
+      setData(res);
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to load dashboard data");
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboard();
+  }, []);
+
+  // Top cards from API
+  const topCards =
+    data?.cards?.map((card) => ({
+      title: card.title,
+      value: card.value,
+      icon: iconMap[card.title],
+    })) || [];
+
+  // Stock chart
+  const stockData =
+    data?.charts?.stock?.map((item) => ({
+      name: item.month,
+      value: item.total,
+    })) || [];
+
+  // ETF chart
+  const etfData =
+    data?.charts?.etf?.map((item) => ({
+      name: item.month,
+      orders: item.total,
+    })) || [];
+
   return (
     <div className="p-2">
       {/* Top Cards */}
       <Row gutter={16} className="mb-2 flex flex-wrap">
-        {dashboardJSON.topCards.map((card, index) => (
+        {topCards.map((card, index) => (
           <Col key={index} flex="1" className="mb-4">
             <Card className="p-1! h-full! border-1! border-amber-500! bg-amber-50!">
               <div className="flex items-center text-amber-800 mb-3 gap-3">
-                {iconMap[card.icon]}
-                <p className="text-amber-800 text-md m-0">{card.title}</p>
+                {card.icon}
+                <p className="text-md m-0">{card.title}</p>
               </div>
               <h2 className="text-3xl text-amber-700 font-bold m-0">
                 {card.value}
@@ -107,14 +87,13 @@ export default function WealthDashboard() {
         ))}
       </Row>
 
-      {/* Charts Row */}
+      {/* Charts */}
       <Row gutter={16} className="mb-6">
+        {/* Stock */}
         <Col span={12}>
-          <Card
-            title={<span className="text-amber-700 font-bold">Stock </span>}
-          >
+          <Card title={<span className="text-amber-700 font-bold">Stock</span>}>
             <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={dashboardJSON.contractsData}>
+              <LineChart data={stockData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#fcd34d" />
                 <XAxis dataKey="name" stroke="#92400e" />
                 <YAxis stroke="#92400e" />
@@ -129,10 +108,12 @@ export default function WealthDashboard() {
             </ResponsiveContainer>
           </Card>
         </Col>
+
+        {/* ETF */}
         <Col span={12}>
           <Card title={<span className="text-amber-700 font-bold">ETF</span>}>
             <ResponsiveContainer width="100%" height={250}>
-              <AreaChart data={dashboardJSON.ordersData}>
+              <AreaChart data={etfData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#fcd34d" />
                 <XAxis dataKey="name" stroke="#92400e" />
                 <YAxis stroke="#92400e" />
@@ -148,83 +129,6 @@ export default function WealthDashboard() {
           </Card>
         </Col>
       </Row>
-
-      {/* PieChart + Quick Actions */}
-      {/* <Row gutter={16} className="mb-6">
-        <Col span={12}>
-          <Card
-            title={
-              <span className="text-amber-700 font-bold">
-                Purchase Returns Breakdown
-              </span>
-            }
-          >
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={dashboardJSON.returnData}
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={90}
-                  dataKey="value"
-                  label
-                >
-                  {dashboardJSON.returnData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={COLORS[index % COLORS.length]}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer> */}
-
-      {/* Legend */}
-      {/* <div className="flex space-x-12 mt-2 flex-nowrap overflow-auto">
-              {dashboardJSON.returnData.map((entry, index) => (
-                <div key={index} className="flex items-center">
-                  <div
-                    className="w-3 h-3 rounded-full mr-2"
-                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                  />
-                  <span className="text-amber-800 text-sm">{entry.name}</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </Col>
-        <Col span={12}>
-          <Card
-            title={
-              <span className="text-amber-700 font-bold">Quick Action</span>
-            }
-          >
-            <Space direction="vertical" className="w-full">
-              {dashboardJSON.quickActions.map((action, index) => (
-                <div
-                  key={index}
-                  className={`flex justify-between items-center py-2 px-3 ${
-                    index !== dashboardJSON.quickActions.length - 1
-                      ? "border-b border-amber-200"
-                      : ""
-                  }`}
-                >
-                  <div>
-                    <p className="font-medium text-amber-700 text-sm m-0">
-                      {action.title}
-                    </p>
-                    <p className="text-xs text-red-500 m-0">
-                      {action.subtitle}
-                    </p>
-                  </div>
-                  <Tag color="red">{action.tag}</Tag>
-                </div>
-              ))}
-            </Space>
-          </Card>
-        </Col>
-      </Row> */}
     </div>
   );
 }

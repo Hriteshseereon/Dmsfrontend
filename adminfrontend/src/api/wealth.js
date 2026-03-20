@@ -46,3 +46,16 @@ export const updateWealthEntry = async (id, payload) => {
     });
     return res.data;
 };
+
+// wealth dashboard api 
+
+export const dashboardData = async () => {
+    const {currentOrgId} =  useSessionStore.getState();
+    const res =  await api.get('/wealth/dashboard/',{
+        params: {
+            organisation: currentOrgId,
+        },
+    }
+    )
+    return res.data;
+}

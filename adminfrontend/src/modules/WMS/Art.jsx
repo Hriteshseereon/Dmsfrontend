@@ -94,17 +94,25 @@ export default function Art() {
   const interestTypes = ["Cumulative", "Payout"];
   const interestPayments = ["Monthly", "Quarterly", "Half Yearly", "Yearly"];
 
+  const formatValue = (value) => {
+    if (!value) return "";
+
+    // handle dayjs dates
+    if (dayjs.isDayjs(value)) {
+      return value.format("YYYY-MM-DD");
+    }
+
+    // handle normal date strings
+    if (typeof value === "string" && dayjs(value).isValid()) {
+      return dayjs(value).format("YYYY-MM-DD");
+    }
+
+    return value.toString();
+  };
+
   const filteredData = data.filter((row) =>
-    [
-      "transactionType",
-      "lotDescription",
-      "refNumber",
-      "sellerName",
-      "brokerName",
-      "narration",
-    ].some((f) =>
-      (row[f] || "")
-        .toString()
+    Object.values(row).some((value) =>
+      formatValue(value)
         .toLowerCase()
         .includes(searchText.trim().toLowerCase()),
     ),

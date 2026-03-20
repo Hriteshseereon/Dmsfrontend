@@ -145,6 +145,7 @@ const handleExport = () => {
   exportToExcel(exportData, "Sales_Orders_Export");
   message.success("Excel exported successfully");
 };
+
 const handleSearch = (value) => {
   setSearchText(value);
 
@@ -370,9 +371,10 @@ status: values.status,
  order_date: values.orderDate
         ? dayjs(values.orderDate).format("YYYY-MM-DD")
         : null,
-      expected_receiving_date: values.deliveryDate
-        ? dayjs(values.deliveryDate).format("YYYY-MM-DD")
-        : null,
+    expected_receiving_date:
+  values.deliveryDate && dayjs(values.deliveryDate).isValid()
+    ? dayjs(values.deliveryDate).format("YYYY-MM-DD")
+    : null,
       delivery_address: values.deliveryAddress || "",
       cash_discount: 0,
       cgst: Number(orderTaxAndTotals?.cgstPercent || 0),

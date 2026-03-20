@@ -1,5 +1,5 @@
 // AssetMaintenance.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Table,
   Input,
@@ -33,6 +33,7 @@ import {
   updateAssetMaintenance,
 } from "../../api/assets";
 import useSessionStore from "../../store/sessionStore";
+import { globalSearch } from "../../utils/globalSearch";
 const { Option } = Select;
 const { TextArea } = Input;
 
@@ -62,14 +63,9 @@ export default function AssetMaintenance() {
   const serviceTypeOptions = ["Preventive", "Corrective", "Calibration"];
   const statusOptions = ["Scheduled", "In Progress", "Completed", "Cancelled"];
 
-  const filteredData = data.filter((row) =>
-    ["maintenanceId", "assetId", "serviceProvider", "status"].some((f) =>
-      (row[f] || "")
-        .toString()
-        .toLowerCase()
-        .includes(searchText.trim().toLowerCase()),
-    ),
-  );
+  const filteredData = useMemo(() => {
+    return globalSearch(data, searchText);
+  }, [data, searchText]);
 
   const fetchMaintenances = async () => {
     setLoading(true);

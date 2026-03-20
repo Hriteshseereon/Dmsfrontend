@@ -1,6 +1,11 @@
 // Bank.jsx
 import React, { useState, useEffect } from "react";
-import { addWealthEntry, getWealthEntries, getWealthEntryById, updateWealthEntry } from "../../api/wealth";
+import {
+  addWealthEntry,
+  getWealthEntries,
+  getWealthEntryById,
+  updateWealthEntry,
+} from "../../api/wealth";
 import {
   Table,
   Input,
@@ -47,7 +52,8 @@ export default function Bank() {
         // Convert 'DEPOSIT' -> 'Deposit', otherwise just capitalize first letter if needed
         // Here we can simply title-case or use as is if backend matches frontend options
         transactionType: item.transaction_type
-          ? item.transaction_type.charAt(0).toUpperCase() + item.transaction_type.slice(1).toLowerCase()
+          ? item.transaction_type.charAt(0).toUpperCase() +
+            item.transaction_type.slice(1).toLowerCase()
           : "-",
         date: item.transaction_date,
         bankName: item.bank_name,
@@ -69,14 +75,30 @@ export default function Bank() {
 
   const txnTypes = ["Deposit", "Withdrawal", "OD"];
 
+  const formatValue = (value) => {
+    if (!value) return "";
+
+    // handle dayjs objects
+    if (dayjs.isDayjs(value)) {
+      return value.format("YYYY-MM-DD");
+    }
+
+    // handle date strings
+    if (typeof value === "string" && dayjs(value).isValid()) {
+      return dayjs(value).format("YYYY-MM-DD");
+    }
+
+    return value.toString();
+  };
+
   const filteredData = data.filter((row) =>
-    ["transactionType", "bankName", "accountNo", "chequeRef", "narration"].some(
-      (f) =>
-        (row[f] || "")
-          .toString()
-          .toLowerCase()
-          .includes(searchText.trim().toLowerCase())
-    )
+    Object.entries(row).some(([key, value]) => {
+      if (key === "key") return false; // skip internal key
+
+      return formatValue(value)
+        .toLowerCase()
+        .includes(searchText.trim().toLowerCase());
+    }),
   );
 
   const columns = [
@@ -90,7 +112,11 @@ export default function Bank() {
       title: <span className="text-amber-700 font-semibold">Date</span>,
       dataIndex: "date",
       width: 120,
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
+      render: (d) => (
+        <span className="text-amber-800">
+          {d ? dayjs(d).format("YYYY-MM-DD") : ""}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Bank Name</span>,
@@ -135,9 +161,12 @@ export default function Bank() {
                 const data = await getWealthEntryById(record.key);
                 const mappedData = {
                   transactionType: data.transaction_type
-                    ? data.transaction_type.charAt(0).toUpperCase() + data.transaction_type.slice(1).toLowerCase()
+                    ? data.transaction_type.charAt(0).toUpperCase() +
+                      data.transaction_type.slice(1).toLowerCase()
                     : "-",
-                  date: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                  date: data.transaction_date
+                    ? dayjs(data.transaction_date)
+                    : undefined,
                   bankName: data.bank_name,
                   accountNo: data.bank_account_no,
                   amount: data.amount,
@@ -160,9 +189,12 @@ export default function Bank() {
                 const data = await getWealthEntryById(record.key);
                 const mappedData = {
                   transactionType: data.transaction_type
-                    ? data.transaction_type.charAt(0).toUpperCase() + data.transaction_type.slice(1).toLowerCase()
+                    ? data.transaction_type.charAt(0).toUpperCase() +
+                      data.transaction_type.slice(1).toLowerCase()
                     : "-",
-                  date: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                  date: data.transaction_date
+                    ? dayjs(data.transaction_date)
+                    : undefined,
                   bankName: data.bank_name,
                   accountNo: data.bank_account_no,
                   amount: data.amount,
@@ -187,7 +219,15 @@ export default function Bank() {
       message.info("No data to export");
       return;
     }
-    const headers = ["Txn Type", "Date", "Bank Name", "Account No", "Amount", "Cheque Ref", "Narration"];
+    const headers = [
+      "Txn Type",
+      "Date",
+      "Bank Name",
+      "Account No",
+      "Amount",
+      "Cheque Ref",
+      "Narration",
+    ];
     const rows = data.map((r) => [
       r.transactionType,
       r.date,
@@ -198,7 +238,11 @@ export default function Bank() {
       (r.narration || "").replace(/[\n\r]/g, " "),
     ]);
     const csvContent = [headers, ...rows]
-      .map((row) => row.map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`).join(","))
+      .map((row) =>
+        row
+          .map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`)
+          .join(","),
+      )
       .join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -274,7 +318,10 @@ export default function Bank() {
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Cheque Ref</span>} name="chequeRef">
+          <Form.Item
+            label={<span className="text-amber-700">Cheque Ref</span>}
+            name="chequeRef"
+          >
             <Input placeholder="Cheque / reference" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -282,8 +329,15 @@ export default function Bank() {
 
       <Row gutter={16}>
         <Col span={24}>
-          <Form.Item label={<span className="text-amber-700">Narration</span>} name="narration">
-            <Input.TextArea rows={2} placeholder="Transaction narration" disabled={disabled} />
+          <Form.Item
+            label={<span className="text-amber-700">Narration</span>}
+            name="narration"
+          >
+            <Input.TextArea
+              rows={2}
+              placeholder="Transaction narration"
+              disabled={disabled}
+            />
           </Form.Item>
         </Col>
       </Row>
@@ -312,13 +366,18 @@ export default function Bank() {
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} onClick={exportCSV} className="border-amber-400! text-amber-700! hover:bg-amber-100!">
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={exportCSV}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
             Export
           </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            className="bg-amber-500! hover:bg-amber-600! border-none!" onClick={() => {
+            className="bg-amber-500! hover:bg-amber-600! border-none!"
+            onClick={() => {
               addForm.resetFields();
               setIsAddModalOpen(true);
             }}
@@ -330,14 +389,27 @@ export default function Bank() {
 
       {/* Table */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
-        <h2 className="text-lg font-semibold text-amber-700 mb-0">Bank Transactions Records </h2>
-        <p className="text-amber-600 mb-3">Manage balances, deposits, and account transactions</p>
-        <Table columns={columns} dataSource={filteredData} pagination={{ pageSize: 10 }} scroll={{ y: 300 }} />
+        <h2 className="text-lg font-semibold text-amber-700 mb-0">
+          Bank Transactions Records{" "}
+        </h2>
+        <p className="text-amber-600 mb-3">
+          Manage balances, deposits, and account transactions
+        </p>
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          pagination={{ pageSize: 10 }}
+          scroll={{ y: 300 }}
+        />
       </div>
 
       {/* Add Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Add Bank Transaction</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Add Bank Transaction
+          </span>
+        }
         open={isAddModalOpen}
         onCancel={() => {
           setIsAddModalOpen(false);
@@ -354,7 +426,9 @@ export default function Bank() {
               const payload = {
                 asset_category: "BANK",
                 transaction_type: values.transactionType.toUpperCase(),
-                transaction_date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : null,
+                transaction_date: values.date
+                  ? dayjs(values.date).format("YYYY-MM-DD")
+                  : null,
                 asset_name: values.bankName,
                 remarks: "Bank Entry",
 
@@ -368,9 +442,13 @@ export default function Bank() {
               const response = await addWealthEntry(payload);
 
               const newRecord = {
-                key: response.id || (data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1),
+                key:
+                  response.id ||
+                  (data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1),
                 transactionType: values.transactionType,
-                date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : undefined,
+                date: values.date
+                  ? dayjs(values.date).format("YYYY-MM-DD")
+                  : undefined,
                 bankName: values.bankName,
                 accountNo: values.accountNo,
                 amount: values.amount,
@@ -398,11 +476,14 @@ export default function Bank() {
                 addForm.resetFields();
               }}
               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-
             >
               Cancel
             </Button>
-            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button
+              type="primary"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit"
+            >
               Add
             </Button>
           </div>
@@ -411,7 +492,11 @@ export default function Bank() {
 
       {/* Edit Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Edit Bank Transaction</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Edit Bank Transaction
+          </span>
+        }
         open={isEditModalOpen}
         onCancel={() => {
           setIsEditModalOpen(false);
@@ -429,7 +514,9 @@ export default function Bank() {
               const payload = {
                 asset_category: "BANK",
                 transaction_type: values.transactionType.toUpperCase(),
-                transaction_date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : null,
+                transaction_date: values.date
+                  ? dayjs(values.date).format("YYYY-MM-DD")
+                  : null,
                 asset_name: values.bankName,
                 remarks: "Bank Entry",
 
@@ -446,12 +533,14 @@ export default function Bank() {
                 prev.map((d) =>
                   d.key === selectedRecord.key
                     ? {
-                      ...selectedRecord,
-                      ...values,
-                      date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : undefined,
-                    }
-                    : d
-                )
+                        ...selectedRecord,
+                        ...values,
+                        date: values.date
+                          ? dayjs(values.date).format("YYYY-MM-DD")
+                          : undefined,
+                      }
+                    : d,
+                ),
               );
               setIsEditModalOpen(false);
               editForm.resetFields();
@@ -474,11 +563,14 @@ export default function Bank() {
                 setSelectedRecord(null);
               }}
               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-
             >
               Cancel
             </Button>
-            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button
+              type="primary"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit"
+            >
               Save Changes
             </Button>
           </div>
@@ -487,7 +579,11 @@ export default function Bank() {
 
       {/* View Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">View Bank Transaction Details</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            View Bank Transaction Details
+          </span>
+        }
         open={isViewModalOpen}
         onCancel={() => {
           setIsViewModalOpen(false);
@@ -501,6 +597,6 @@ export default function Bank() {
           {renderFormFields(viewForm, true)}
         </Form>
       </Modal>
-    </div >
+    </div>
   );
 }

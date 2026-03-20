@@ -124,6 +124,8 @@ const openViewModal = async (record) => {
   }
 };
 2
+
+
   // ADD
   const openAddModal = () => {
     setVendor("");
@@ -179,19 +181,21 @@ const openEditModal = async (record) => {
 };
 
   // SEARCH
-  const handleSearch = (value) => {
-
-    const filtered = data.filter((item) =>
-      item.vendor.toLowerCase().includes(value.toLowerCase())
-    );
-
-    setFilteredData(filtered);
-
-  };
-
-  const handleReset = () => {
+ const handleSearch = (value) => {
+  if (!value) {
     setFilteredData(data);
-  };
+    return;
+  }
+  const filtered = data.filter((item) => {
+    const vendorName = vendors.find((v) => v.id === item.vendor)?.name || "";
+    return (
+      vendorName.toLowerCase().includes(value.toLowerCase()) ||
+      item.invoiceNo?.toString().toLowerCase().includes(value.toLowerCase())
+    );
+  });
+  setFilteredData(filtered);
+};
+ 
 
  const columns = [
   {
@@ -279,7 +283,8 @@ const openEditModal = async (record) => {
           />
 
           <Button icon={<FilterOutlined />}   className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-    onClick={handleReset}>
+    onClick={() => handleSearch("")}
+    >
             Reset
           </Button>
 
