@@ -7,7 +7,7 @@ import { saveAs } from "file-saver";
  * @param {String} fileName - file name without extension
  * @param {String} sheetName - sheet name
  */
-export const exportToExcel = (data = [], fileName = "data", sheetName = "Sheet1") => {
+export const exporttoxl = (data = [], fileName = "data", sheetName = "Sheet1") => {
   if (!data.length) {
     console.warn("No data available for export");
     return;
