@@ -1,127 +1,303 @@
 // DeliveryStatus.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Table, Input, Button, Modal, Form, Row, Col } from "antd";
-import { SearchOutlined, DownloadOutlined, EyeOutlined, FilterOutlined } from "@ant-design/icons";
+import {
+  SearchOutlined,
+  DownloadOutlined,
+  EyeOutlined,
+  FilterOutlined,
+  PrinterOutlined,
+} from "@ant-design/icons";
 import dayjs from "dayjs";
-
-// 🔹 Sample Data
-const deliveryDataJSON = {
-  initialData: [
-    {
-      key: 1,
-      orderNo: "SC-001",
-      companyName: "ABC Oils Ltd",
-      itemName: "Sunflower Oil",
-      transporter: "Blue Transport",
-      vehicleNo: "OD-02-1234",
-      driverName: "Ramesh Kumar",
-      contactNo: "9876543210",
-      dispatchDate: "2025-10-10",
-      deliveryDate: "2025-10-12",
-      deliveredDate: "2025-10-12",
-      status: "Delivered",
-      route: "Cuttack → Bhubaneswar",
-      totalQty: 2100,
-      uom: "Ltrs",
-      totalAmount: 420000,
-    },
-    {
-      key: 2,
-      orderNo: "SC-002",
-      companyName: "XYZ Oils Ltd",
-      itemName: "Mustard Oil",
-      transporter: "Red Transport",
-      vehicleNo: "OD-02-1234",
-      driverName: "Ramesh Kumar",
-      contactNo: "9876543210",
-      dispatchDate: "2025-10-10",
-      deliveryDate: "2025-10-12",
-      deliveredDate: "2025-10-12",
-      status: "In Transit",
-      route: "Cuttack → Bhubaneswar",
-      totalQty: 2100,
-      uom: "Ltrs",
-      totalAmount: 420000,
-    },
-
-  ],
-};
-
+import api from "../api/axios";
+import {
+  getAllDeliveryStatus,
+  getDeliveryStatusByOrderNo,
+  downloadInvoice,
+  getInvoicePrintUrl,
+} from "../api/deliveryStatus";
+import { exporttoxl } from "../utils/exporttoxl";
 export default function DeliveryStatus() {
-  const [data] = useState(deliveryDataJSON.initialData);
+  const [data, setData] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [viewForm] = Form.useForm();
 
-  const filteredData = data.filter(
-    (item) =>
-      item.orderNo?.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.companyName?.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.itemName?.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.status?.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.route?.toLowerCase().includes(searchText.toLowerCase())
-  );
+  useEffect(() => {
+    fetchData();
+  }, []);
 
+  const fetchData = async () => {
+    try {
+      const res = await getAllDeliveryStatus();
+
+      const formattedData = res.flatMap((invoice) =>
+        invoice.items.map((item) => ({
+          key: item.id,
+          sale_invoice_id: invoice.sale_invoice_id,
+
+          order_no: invoice.order_no,
+          invoice_date: invoice.invoice_date,
+
+          item_name: item.item_name,
+          quantity: item.quantity,
+          uom: item.uom,
+          total_amount: item.total_amount,
+          company: item.company,
+
+          deliveryDate: item.delivery_date,
+          dispatchDate: item.dispatch_date,
+          deliveredDate: item.delivered_date,
+
+          vehicleNo: item.vehicle_no,
+          driverName: item.driver_name,
+          contactNo: item.phone_no,
+          route: item.route,
+          transporter: item.transporter,
+
+          status: item.status || invoice.current_delivery_status,
+        })),
+      );
+      setData(formattedData);
+    } catch (error) {
+      console.error("Error fetching delivery status:", error);
+    }
+  };
+
+  const handleSearch = (value) => {
+    setSearchText(value);
+
+    if (!value) {
+setData(formattedData);      return;
+    }
+
+    const filtered = data.filter((item) =>
+      JSON.stringify(item).toLowerCase().includes(value.toLowerCase()),
+    );
+
+    setData(filtered);
+  };
+
+  const handleView = async (record) => {
+    try {
+      // 🔥 Call API
+      const res = await getDeliveryStatusByOrderNo({
+        sale_invoice_id: record.sale_invoice_id,
+      });
+
+      // 🔥 Prepare data (take first item or handle multiple later)
+      const item = res.items?.[0];
+
+      const fullData = {
+        order_no: res.order_no,
+        invoice_date: res.invoice_date,
+
+        item_name: item?.item_name,
+        quantity: item?.quantity,
+        uom: item?.uom,
+        total_amount: item?.total_amount,
+        company: item?.company,
+
+        deliveryDate: item?.delivery_date,
+        dispatchDate: item?.dispatch_date,
+        deliveredDate: item?.delivered_date,
+
+        vehicleNo: item?.vehicle_no,
+        driverName: item?.driver_name,
+        contactNo: item?.phone_no,
+        route: item?.route,
+        transporter: item?.transporter,
+        status: item?.status || res.current_delivery_status,
+      };
+
+      // 🔥 Set state
+      setSelectedRecord(fullData);
+
+      // 🔥 Set form values
+      viewForm.setFieldsValue({
+        ...fullData,
+        dispatchDate: fullData.dispatchDate
+          ? dayjs(fullData.dispatchDate)
+          : null,
+        deliveryDate: fullData.deliveryDate
+          ? dayjs(fullData.deliveryDate)
+          : null,
+        deliveredDate: fullData.deliveredDate
+          ? dayjs(fullData.deliveredDate)
+          : null,
+      });
+
+      // 🔥 Open modal
+      setIsViewModalOpen(true);
+    } catch (error) {
+      console.error("Error fetching delivery details:", error);
+    }
+  };
+  // ✅ Download handler
+  const handleDownload = async (record) => {
+    try {
+      const blob = await downloadInvoice({
+        sale_invoice_id: record.sale_invoice_id,
+      });
+
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Invoice-${record.order_no}.pdf`;
+      a.click();
+
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Download error:", error);
+    }
+  };
+
+  const handlePrint = async (record) => {
+    try {
+      const blob = await downloadInvoice({
+        sale_invoice_id: record.sale_invoice_id,
+      });
+
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      const printWindow = window.open(blobUrl);
+
+      if (!printWindow) {
+        alert("Popup blocked! Please allow popups.");
+        return;
+      }
+
+      printWindow.onload = () => {
+        printWindow.focus();
+        printWindow.print();
+      };
+    } catch (error) {
+      console.error("Print error:", error);
+    }
+  };
+
+  const handleExport = () => {
+    const exportData = data.map((item) => ({
+      Order_No: item.order_no,
+      Invoice_Date: item.invoice_date,
+
+      Item_Name: item.item_name,
+      Quantity: item.quantity,
+      UOM: item.uom,
+      Total_Amount: item.total_amount,
+      Company: item.company,
+      Delivered_Date: item.deliveredDate,
+      Vehicle_No: item.vehicleNo,
+      Driver_Name: item.driverName,
+      Phone_No: item.contactNo,
+      Route: item.route,
+      Transporter: item.transporter,
+      Status: item.status,
+    }));
+
+    exporttoxl(exportData, "Delivery_Status");
+  };
   const columns = [
-    { title: <span className="text-amber-700 font-semibold">Order No</span>, dataIndex: "orderNo", width: 100, render: (text) => <span className="text-amber-800">{text}</span> },
-    { title: <span className="text-amber-700 font-semibold">Company Name </span>, dataIndex: "companyName", width: 100, render: (text) => <span className="text-amber-800">{text}</span> },
     {
-      title: <span className="text-amber-700 font-semibold">Transporter</span>,
-      dataIndex: "transporter",
+      title: <span className="text-amber-700 font-semibold">Order No</span>,
+      dataIndex: "order_no",
       width: 100,
-      render: (t) => <span className="text-amber-800">{t}</span>,
+      render: (text) => <span className="text-amber-800">{text}</span>,
     },
-    { title: <span className="text-amber-700 font-semibold">Item</span>, dataIndex: "itemName", width: 100, render: (text) => <span className="text-amber-800">{text || "—"}</span> },
+    {
+      title: <span className="text-amber-700 font-semibold">Company Name</span>,
+      dataIndex: "company",
+      width: 100,
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
 
     {
-      title: (
-        <span className="text-amber-700 font-semibold">Quantity</span>
-      ),
+      title: <span className="text-amber-700 font-semibold">Item</span>,
+      dataIndex: "item_name",
+      width: 100,
+      render: (text) => <span className="text-amber-800">{text || "—"}</span>,
+    },
+
+    {
+      title: <span className="text-amber-700 font-semibold">Quantity</span>,
       width: 100,
       render: (_, record) => (
         <span className="text-amber-800">
-          {record.totalQty} {record.uom}
+          {record.quantity} {record.uom}
         </span>
       ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Total Amount</span>,
-      dataIndex: "totalAmount",
+      dataIndex: "total_amount",
       width: 100,
       render: (t) => <span className="text-amber-800">₹{t}</span>,
-    }, {
+    },
+    {
       title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
-      width: 120,
+      width: 150,
       render: (status) => {
         const base = "px-3 py-1 rounded-full text-sm font-semibold";
         switch (status) {
-          case "Delivered": return <span className={`${base} bg-green-100 text-green-700`}>{status}</span>;
-          case "In Transit": return <span className={`${base} bg-yellow-100 text-yellow-700`}>{status}</span>;
-          case "Pending": return <span className={`${base} bg-gray-100 text-gray-700`}>{status}</span>;
-          case "Delayed": return <span className={`${base} bg-red-100 text-red-700`}>{status}</span>;
-          default: return <span className={`${base} bg-amber-100 text-amber-700`}>{status}</span>;
+          case "Delivered":
+            return (
+              <span className={`${base} bg-green-100 text-green-700`}>
+                {status}
+              </span>
+            );
+          case "In-Transit":
+            return (
+              <span className={`${base} bg-yellow-100 text-yellow-700`}>
+                {status}
+              </span>
+            );
+          case "Pending":
+            return (
+              <span className={`${base} bg-amber-100 text-amber-700`}>
+                {status}
+              </span>
+            );
+          case "Out for Delivery":
+            return (
+              <span className={`${base} bg-blue-100 text-blue-700`}>
+                {status}
+              </span>
+            );
+          default:
+            return (
+              <span className={`${base} bg-red-100 text-red-700`}>
+                {status}
+              </span>
+            );
         }
       },
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
-      width: 80,
+      width: 120,
       render: (record) => (
-        <EyeOutlined
-          className="cursor-pointer! text-blue-500!"
-          onClick={() => {
-            setSelectedRecord(record);
-            viewForm.setFieldsValue({
-              ...record,
-              dispatchDate: record.dispatchDate ? dayjs(record.dispatchDate) : null,
-              deliveryDate: record.deliveryDate ? dayjs(record.deliveryDate) : null,
-              deliveredDate: record.deliveredDate ? dayjs(record.deliveredDate) : null,
-            });
-            setIsViewModalOpen(true);
-          }}
-        />
+        <div className="flex gap-3">
+          {/* View */}
+          <EyeOutlined
+            className="cursor-pointer! text-blue-500!"
+            onClick={() => handleView(record)}
+          />
+
+          {/* Download */}
+          <DownloadOutlined
+            className="cursor-pointer! text-green-600!"
+            onClick={() => handleDownload(record)}
+          />
+
+          {/* Print */}
+          <PrinterOutlined
+            className="cursor-pointer! text-purple-600!"
+            onClick={() => handlePrint(record)}
+          />
+        </div>
       ),
     },
   ];
@@ -132,17 +308,17 @@ export default function DeliveryStatus() {
       <Row gutter={16}>
         <Col span={6}>
           <Form.Item label="Order No">
-            <Input value={selectedRecord?.orderNo} disabled />
+            <Input value={selectedRecord?.order_no} disabled />
           </Form.Item>
         </Col>
         <Col span={6}>
           <Form.Item label="Item Name">
-            <Input value={selectedRecord?.itemName} disabled />
+            <Input value={selectedRecord?.item_name} disabled />
           </Form.Item>
         </Col>
         <Col span={6}>
           <Form.Item label="Quantity">
-            <Input value={selectedRecord?.totalQty} disabled />
+            <Input value={selectedRecord?.quantity} disabled />
           </Form.Item>
         </Col>
         <Col span={6}>
@@ -153,17 +329,17 @@ export default function DeliveryStatus() {
         <Col span={6}>
           <Form.Item label="Total Amount">
             <Input
-              value={`₹${selectedRecord?.totalAmount?.toLocaleString()}`}
+              value={`₹${selectedRecord?.total_amount?.toLocaleString()}`}
               disabled
             />
           </Form.Item>
         </Col>
         <Col span={6}>
           <Form.Item label="Company">
-            <Input value={selectedRecord?.companyName} disabled />
+            <Input value={selectedRecord?.company} disabled />
           </Form.Item>
         </Col>
-      
+
         <Col span={6}>
           <Form.Item label="Delivery Date">
             <Input value={selectedRecord?.deliveryDate} disabled />
@@ -174,16 +350,6 @@ export default function DeliveryStatus() {
       {/* 🔹 Transport Details Section */}
       <h6 className=" text-amber-500 ">Transport Details</h6>
       <Row gutter={16}>
-        <Col span={6}>
-          <Form.Item label="Dispatch Date">
-            <Input value={selectedRecord?.dispatchDate} disabled />
-          </Form.Item>
-        </Col>
-        <Col span={6}>
-          <Form.Item label="Delivered Date">
-            <Input value={selectedRecord?.deliveredDate || "—"} disabled />
-          </Form.Item>
-        </Col>
         <Col span={6}>
           <Form.Item label="Vehicle No">
             <Input value={selectedRecord?.vehicleNo} disabled />
@@ -218,7 +384,6 @@ export default function DeliveryStatus() {
     </div>
   );
 
-
   return (
     <div>
       <div className="flex justify-between items-center mb-0">
@@ -239,7 +404,10 @@ export default function DeliveryStatus() {
           />
           <Button
             icon={<FilterOutlined />}
-            onClick={() => setSearchText("")}
+ onClick={() => {
+    setSearchText("");
+    setData(formattedData);
+  }}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Reset
@@ -248,6 +416,7 @@ export default function DeliveryStatus() {
         <div className="flex gap-2">
           <Button
             icon={<DownloadOutlined />}
+            onClick={handleExport}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Export
@@ -258,7 +427,7 @@ export default function DeliveryStatus() {
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <Table
           columns={columns}
-          dataSource={filteredData}
+          dataSource={data}
           pagination={10}
           scroll={{ y: 350 }}
         />
@@ -266,7 +435,11 @@ export default function DeliveryStatus() {
 
       {/* View Modal */}
       <Modal
-        title={<span className="text-amber-700  text-2xl font-semibold">View Delivery Details</span>}
+        title={
+          <span className="text-amber-700  text-2xl font-semibold">
+            View Delivery Details
+          </span>
+        }
         open={isViewModalOpen}
         onCancel={() => setIsViewModalOpen(false)}
         footer={null}

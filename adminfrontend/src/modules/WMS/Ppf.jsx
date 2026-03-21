@@ -1,6 +1,11 @@
 // Ppf.jsx
 import React, { useState, useEffect } from "react";
-import { addWealthEntry, getWealthEntries, getWealthEntryById, updateWealthEntry } from "../../api/wealth";
+import {
+  addWealthEntry,
+  getWealthEntries,
+  getWealthEntryById,
+  updateWealthEntry,
+} from "../../api/wealth";
 import {
   Table,
   Input,
@@ -50,7 +55,11 @@ export default function Ppf() {
       const response = await getWealthEntries({ asset_category: "PPF" });
       const mappedData = response.map((item) => ({
         key: item.id,
-        transactionType: item.transaction_type === "DEPOSIT" ? "Investment" : (item.transaction_type.charAt(0).toUpperCase() + item.transaction_type.slice(1).toLowerCase()),
+        transactionType:
+          item.transaction_type === "DEPOSIT"
+            ? "Investment"
+            : item.transaction_type.charAt(0).toUpperCase() +
+              item.transaction_type.slice(1).toLowerCase(),
         assetName: item.asset_name,
         refNumber: item.ref_number,
         bankSellerName: item.bank_or_seller_name,
@@ -77,23 +86,40 @@ export default function Ppf() {
     fetchData();
   }, []);
 
-  const txnTypes = ["Interest", "Interest (payout)", "Investment", "Withdrawal"];
+  const txnTypes = [
+    "Interest",
+    "Interest (payout)",
+    "Investment",
+    "Withdrawal",
+  ];
   const interestTypes = ["Cumulative", "Payout"];
   const interestPayments = ["Monthly", "Quarterly", "Half Yearly", "Yearly"];
 
-  const filteredData = data.filter((row) =>
-    [
-      "transactionType",
-      "assetName",
-      "refNumber",
-      "bankSellerName",
-      "brokerName",
-      "narration",
-    ].some((f) =>
-      (row[f] || "").toString().toLowerCase().includes(searchText.trim().toLowerCase())
-    )
-  );
+  const formatValue = (value) => {
+    if (!value) return "";
 
+    // handle dayjs objects
+    if (dayjs.isDayjs(value)) {
+      return value.format("YYYY-MM-DD");
+    }
+
+    // handle date strings
+    if (typeof value === "string" && dayjs(value).isValid()) {
+      return dayjs(value).format("YYYY-MM-DD");
+    }
+
+    return value.toString();
+  };
+
+  const filteredData = data.filter((row) =>
+    Object.entries(row).some(([key, value]) => {
+      if (key === "key") return false;
+
+      return formatValue(value)
+        .toLowerCase()
+        .includes(searchText.trim().toLowerCase());
+    }),
+  );
   const columns = [
     {
       title: <span className="text-amber-700 font-semibold">Txn Type</span>,
@@ -105,7 +131,11 @@ export default function Ppf() {
       title: <span className="text-amber-700 font-semibold">Date</span>,
       dataIndex: "transactionDate",
       width: 110,
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
+      render: (d) => (
+        <span className="text-amber-800">
+          {d ? dayjs(d).format("YYYY-MM-DD") : ""}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Asset Name</span>,
@@ -120,7 +150,9 @@ export default function Ppf() {
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Interest Rate (%)</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Interest Rate (%)</span>
+      ),
       dataIndex: "interestRate",
       width: 150,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
@@ -149,7 +181,11 @@ export default function Ppf() {
               try {
                 const data = await getWealthEntryById(record.key);
                 const mappedData = {
-                  transactionType: data.transaction_type === "DEPOSIT" ? "Investment" : (data.transaction_type.charAt(0).toUpperCase() + data.transaction_type.slice(1).toLowerCase()),
+                  transactionType:
+                    data.transaction_type === "DEPOSIT"
+                      ? "Investment"
+                      : data.transaction_type.charAt(0).toUpperCase() +
+                        data.transaction_type.slice(1).toLowerCase(),
                   assetName: data.asset_name,
                   refNumber: data.ref_number,
                   bankSellerName: data.bank_or_seller_name,
@@ -159,9 +195,13 @@ export default function Ppf() {
                   interestRate: data.interest_rate,
                   interestType: data.interest_type,
                   interestPayment: data.interest_payment,
-                  maturityDate: data.maturity_date ? dayjs(data.maturity_date) : undefined,
+                  maturityDate: data.maturity_date
+                    ? dayjs(data.maturity_date)
+                    : undefined,
                   lockInPeriod: data.lock_in_period,
-                  transactionDate: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                  transactionDate: data.transaction_date
+                    ? dayjs(data.transaction_date)
+                    : undefined,
                   amount: data.amount,
                   narration: data.narration,
                 };
@@ -180,7 +220,11 @@ export default function Ppf() {
               try {
                 const data = await getWealthEntryById(record.key);
                 const mappedData = {
-                  transactionType: data.transaction_type === "DEPOSIT" ? "Investment" : (data.transaction_type.charAt(0).toUpperCase() + data.transaction_type.slice(1).toLowerCase()),
+                  transactionType:
+                    data.transaction_type === "DEPOSIT"
+                      ? "Investment"
+                      : data.transaction_type.charAt(0).toUpperCase() +
+                        data.transaction_type.slice(1).toLowerCase(),
                   assetName: data.asset_name,
                   refNumber: data.ref_number,
                   bankSellerName: data.bank_or_seller_name,
@@ -190,9 +234,13 @@ export default function Ppf() {
                   interestRate: data.interest_rate,
                   interestType: data.interest_type,
                   interestPayment: data.interest_payment,
-                  maturityDate: data.maturity_date ? dayjs(data.maturity_date) : undefined,
+                  maturityDate: data.maturity_date
+                    ? dayjs(data.maturity_date)
+                    : undefined,
                   lockInPeriod: data.lock_in_period,
-                  transactionDate: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                  transactionDate: data.transaction_date
+                    ? dayjs(data.transaction_date)
+                    : undefined,
                   amount: data.amount,
                   narration: data.narration,
                 };
@@ -249,7 +297,11 @@ export default function Ppf() {
       (r.narration || "").replace(/[\n\r]/g, " "),
     ]);
     const csvContent = [headers, ...rows]
-      .map((row) => row.map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`).join(","))
+      .map((row) =>
+        row
+          .map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`)
+          .join(","),
+      )
       .join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -320,19 +372,28 @@ export default function Ppf() {
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Ref Number</span>} name="refNumber">
+          <Form.Item
+            label={<span className="text-amber-700">Ref Number</span>}
+            name="refNumber"
+          >
             <Input placeholder="Reference number" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Bank / Seller Name</span>} name="bankSellerName">
+          <Form.Item
+            label={<span className="text-amber-700">Bank / Seller Name</span>}
+            name="bankSellerName"
+          >
             <Input placeholder="Bank or seller name" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Address</span>} name="bankSellerAddress">
+          <Form.Item
+            label={<span className="text-amber-700">Address</span>}
+            name="bankSellerAddress"
+          >
             <Input placeholder="Address" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -340,13 +401,19 @@ export default function Ppf() {
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Broker Name</span>} name="brokerName">
+          <Form.Item
+            label={<span className="text-amber-700">Broker Name</span>}
+            name="brokerName"
+          >
             <Input placeholder="Broker name" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Broker Address</span>} name="brokerAddress">
+          <Form.Item
+            label={<span className="text-amber-700">Broker Address</span>}
+            name="brokerAddress"
+          >
             <Input placeholder="Broker address" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -356,14 +423,23 @@ export default function Ppf() {
             label={<span className="text-amber-700">Interest Rate (%)</span>}
             name="interestRate"
           >
-            <InputNumber className="w-full" min={0} step={0.01} disabled={disabled} />
+            <InputNumber
+              className="w-full"
+              min={0}
+              step={0.01}
+              disabled={disabled}
+            />
           </Form.Item>
         </Col>
       </Row>
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Interest Type</span>} name="interestType" initialValue={interestTypes[0]}>
+          <Form.Item
+            label={<span className="text-amber-700">Interest Type</span>}
+            name="interestType"
+            initialValue={interestTypes[0]}
+          >
             <Select disabled={disabled}>
               {interestTypes.map((t) => (
                 <Option key={t} value={t}>
@@ -375,7 +451,11 @@ export default function Ppf() {
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Interest Payment</span>} name="interestPayment" initialValue={interestPayments[3]}>
+          <Form.Item
+            label={<span className="text-amber-700">Interest Payment</span>}
+            name="interestPayment"
+            initialValue={interestPayments[3]}
+          >
             <Select disabled={disabled}>
               {interestPayments.map((p) => (
                 <Option key={p} value={p}>
@@ -387,7 +467,10 @@ export default function Ppf() {
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Maturity Date</span>} name="maturityDate">
+          <Form.Item
+            label={<span className="text-amber-700">Maturity Date</span>}
+            name="maturityDate"
+          >
             <DatePicker className="w-full" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -395,7 +478,10 @@ export default function Ppf() {
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Lockin Period</span>} name="lockInPeriod">
+          <Form.Item
+            label={<span className="text-amber-700">Lockin Period</span>}
+            name="lockInPeriod"
+          >
             <Input placeholder="e.g. 6 months / 1 year" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -411,7 +497,10 @@ export default function Ppf() {
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Narration</span>} name="narration">
+          <Form.Item
+            label={<span className="text-amber-700">Narration</span>}
+            name="narration"
+          >
             <Input placeholder="Optional notes" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -441,14 +530,18 @@ export default function Ppf() {
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} onClick={exportCSV} className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={exportCSV}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Export
           </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            className="bg-amber-500! hover:bg-amber-600! border-none!" onClick={() => {
+            className="bg-amber-500! hover:bg-amber-600! border-none!"
+            onClick={() => {
               addForm.resetFields();
               setIsAddModalOpen(true);
             }}
@@ -460,14 +553,27 @@ export default function Ppf() {
 
       {/* Table */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
-        <h2 className="text-lg font-semibold text-amber-700 mb-0">PPF Transactions</h2>
-        <p className="text-amber-600 mb-3">Track contributions, interest, and maturity status</p>
-        <Table columns={columns} scroll={{ y: 300 }} dataSource={filteredData} pagination={{ pageSize: 10 }} />
+        <h2 className="text-lg font-semibold text-amber-700 mb-0">
+          PPF Transactions
+        </h2>
+        <p className="text-amber-600 mb-3">
+          Track contributions, interest, and maturity status
+        </p>
+        <Table
+          columns={columns}
+          scroll={{ y: 300 }}
+          dataSource={filteredData}
+          pagination={{ pageSize: 10 }}
+        />
       </div>
 
       {/* Add Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Add PPF Transaction</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Add PPF Transaction
+          </span>
+        }
         open={isAddModalOpen}
         onCancel={() => {
           setIsAddModalOpen(false);
@@ -483,8 +589,13 @@ export default function Ppf() {
             try {
               const payload = {
                 asset_category: "PPF",
-                transaction_type: values.transactionType === "Investment" ? "DEPOSIT" : values.transactionType.toUpperCase(),
-                transaction_date: values.transactionDate ? dayjs(values.transactionDate).format("YYYY-MM-DD") : null,
+                transaction_type:
+                  values.transactionType === "Investment"
+                    ? "DEPOSIT"
+                    : values.transactionType.toUpperCase(),
+                transaction_date: values.transactionDate
+                  ? dayjs(values.transactionDate).format("YYYY-MM-DD")
+                  : null,
                 asset_name: values.assetName,
 
                 ref_number: values.refNumber,
@@ -499,7 +610,9 @@ export default function Ppf() {
                 interest_type: values.interestType,
                 interest_payment: values.interestPayment,
 
-                maturity_date: values.maturityDate ? dayjs(values.maturityDate).format("YYYY-MM-DD") : null,
+                maturity_date: values.maturityDate
+                  ? dayjs(values.maturityDate).format("YYYY-MM-DD")
+                  : null,
                 lock_in_period: values.lockInPeriod,
                 narration: values.narration,
               };
@@ -525,11 +638,14 @@ export default function Ppf() {
                 addForm.resetFields();
               }}
               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-
             >
               Cancel
             </Button>
-            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button
+              type="primary"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit"
+            >
               Add
             </Button>
           </div>
@@ -538,7 +654,11 @@ export default function Ppf() {
 
       {/* Edit Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Edit PPF Transaction</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Edit PPF Transaction
+          </span>
+        }
         open={isEditModalOpen}
         onCancel={() => {
           setIsEditModalOpen(false);
@@ -555,23 +675,30 @@ export default function Ppf() {
             try {
               const payload = {
                 asset_category: "PPF",
-                transaction_type: values.transactionType === "Investment" ? "DEPOSIT" : values.transactionType.toUpperCase(),
-                transaction_date: values.transactionDate ? dayjs(values.transactionDate).format("YYYY-MM-DD") : null,
+                transaction_type:
+                  values.transactionType === "Investment"
+                    ? "DEPOSIT"
+                    : values.transactionType.toUpperCase(),
+                transaction_date: values.transactionDate
+                  ? dayjs(values.transactionDate).format("YYYY-MM-DD")
+                  : null,
                 asset_name: values.assetName,
-                
+
                 ref_number: values.refNumber,
                 bank_or_seller_name: values.bankSellerName,
                 address: values.bankSellerAddress,
-                
+
                 broker_name: values.brokerName,
                 broker_address: values.brokerAddress,
-                
+
                 amount: Number(values.amount || 0).toFixed(2),
                 interest_rate: values.interestRate,
                 interest_type: values.interestType,
                 interest_payment: values.interestPayment,
-                
-                maturity_date: values.maturityDate ? dayjs(values.maturityDate).format("YYYY-MM-DD") : null,
+
+                maturity_date: values.maturityDate
+                  ? dayjs(values.maturityDate).format("YYYY-MM-DD")
+                  : null,
                 lock_in_period: values.lockInPeriod,
                 narration: values.narration,
               };
@@ -599,11 +726,14 @@ export default function Ppf() {
                 setSelectedRecord(null);
               }}
               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-
             >
               Cancel
             </Button>
-            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button
+              type="primary"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit"
+            >
               Save Changes
             </Button>
           </div>
@@ -612,7 +742,11 @@ export default function Ppf() {
 
       {/* View Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">View PPF Transaction Details</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            View PPF Transaction Details
+          </span>
+        }
         open={isViewModalOpen}
         onCancel={() => {
           setIsViewModalOpen(false);

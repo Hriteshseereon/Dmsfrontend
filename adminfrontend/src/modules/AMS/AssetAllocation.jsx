@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Table,
   Input,
@@ -30,6 +30,7 @@ import {
   updateAssetAllocation,
 } from "../../api/assets";
 import useSessionStore from "../../store/sessionStore";
+import { globalSearch } from "../../utils/globalSearch";
 
 const { Option } = Select;
 
@@ -138,7 +139,9 @@ export default function AssetAllocation() {
             id: alloc.id,
 
             allocationId: alloc.allocation_id,
-            asset: alloc.asset, // backend field (uuid)
+            asset: alloc.asset,
+            // backend field (uuid)
+            asset_name: alloc.asset_name,
             assignedTo: alloc.assigned_to,
 
             allocationDate: alloc.allocation_date,
@@ -181,14 +184,7 @@ export default function AssetAllocation() {
     fetchAssets();
   }, [currentOrgId]);
 
-  const filteredData = data.filter((row) =>
-    ["allocationId", "asset", "assignedTo", "remarks"].some((f) =>
-      (row[f] || "")
-        .toString()
-        .toLowerCase()
-        .includes(searchText.trim().toLowerCase()),
-    ),
-  );
+  const filteredData = globalSearch(data, searchText);
   // handle  view option
   const handleView = async (record) => {
     try {
@@ -341,7 +337,7 @@ export default function AssetAllocation() {
     },
     {
       title: <span className="text-amber-700 font-semibold">Asset</span>,
-      dataIndex: "asset",
+      dataIndex: "asset_name",
       width: 220,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },

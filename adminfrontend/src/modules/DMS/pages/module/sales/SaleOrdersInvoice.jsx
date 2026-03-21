@@ -1,5 +1,5 @@
-// SaleOrdersInvoice.jsx
-import React, { useState, useEffect } from "react";
+
+ import React, { useState, useEffect } from "react";
 import {
   Table,
   Input,
@@ -24,10 +24,10 @@ import {
   FilterOutlined,
   DeleteOutlined,
 } from "@ant-design/icons";
+import { exportToExcel } from "../../../../../utils/exportToExcel";
 import dayjs from "dayjs";
 import {
-  getContractpersonName,
-  getContractDetailsbyPerson,
+ 
   salesContractItems,
   createSalesOrder,
   getSalesOrders,
@@ -36,165 +36,18 @@ import {
   getCustomersByOrganisation,
   getAllSalesContracts,
 } from "../../../../../api/sales";
-import { getAdminCustomerDetails } from "../../../../../api/customer";
 /* ------------------ data (use your salesOrderJSON) ------------------ */
-const salesOrderJSON = {
-  initialData: [
-    {
-      key: 1,
-      soudaNo: "SOUDA-001",
-      companyName: "ABC Oils Ltd",
-      customerName: "Bhubaneswar Market",
-      customerEmail: "contact@bhubaneswarmarket.com",
-      orderDate: "2025-10-01",
-      deliveryAddress: "Plot 12, Industrial Estate, Bhubaneswar, Odisha",
-      deliveryDate: "2025-10-05",
-      depoName: "Depo A",
-      brokerName: "Broker 1",
-      saleType: "Local",
-      transporter: "Blue Transport",
-      vehicleNo: "OD-05-AB-1234",
-      driverName: "Rajesh Kumar",
-      phoneNo: "9876543210",
-      route: "Bhubaneswar to Cuttack",
-      billType: "Tax Invoice",
-      waybillNo: "WB-001",
-      billMode: "Credit",
-      uom: "Ltrs",
-      status: "Approved",
-      location: "Warehouse A",
-      type: "Retail",
-      contracts: [
-        {
-          contractNo: "CNT-001",
-          items: [
-            {
-              lineKey: 1,
-              item: "Mustard Oil",
-              itemCode: "ITM001",
-              uom: "Ltrs",
-              qty: 2000,
-              freeQty: 100,
-              totalQty: 2100,
-              grossWt: 2100,
-              totalGrossWt: 2100,
-              rate: 125,
-              amount: 2000 * 125,
-              discountPercent: 5,
-              discountAmt: Math.round((2000 * 125 * 5) / 100),
-              totalAmount: Math.round(2000 * 125 - (2000 * 125 * 5) / 100),
-            },
-            {
-              lineKey: 2,
-              item: "Sunflower Oil",
-              itemCode: "ITM002",
-              uom: "Ltrs",
-              qty: 500,
-              freeQty: 0,
-              totalQty: 500,
-              grossWt: 500,
-              totalGrossWt: 500,
-              rate: 95,
-              amount: 500 * 95,
-              discountPercent: 2,
-              discountAmt: Math.round((500 * 95 * 2) / 100),
-              totalAmount: Math.round(500 * 95 - (500 * 95 * 2) / 100),
-            },
-          ],
-        },
-        {
-          contractNo: "CNT-002",
-          items: [
-            {
-              lineKey: 3,
-              item: "Coconut Oil",
-              itemCode: "ITM003",
-              uom: "Ltrs",
-              qty: 300,
-              freeQty: 0,
-              totalQty: 300,
-              grossWt: 300,
-              totalGrossWt: 300,
-              rate: 150,
-              amount: 300 * 150,
-              discountPercent: 0,
-              discountAmt: 0,
-              totalAmount: 45000,
-            },
-          ],
-        },
-      ],
-      orderTaxAndTotals: {
-        grossAmountTotal: 342500,
-        discountTotal: 13450,
-        taxableAmount: 329050,
-        sgstPercent: 5,
-        cgstPercent: 5,
-        igstPercent: 0,
-        sgst: 16452,
-        cgst: 16452,
-        igst: 0,
-        totalGST: 32905,
-        tcsAmt: 500,
-        grandTotal: 362455,
-      },
-      orderTotals: {
-        qtyTotal: 2800,
-        freeQtyTotal: 100,
-        totalQty: 2900,
-      },
-    },
-  ],
-  itemOptions: [
-    { name: "Mustard Oil", code: "ITM001" },
-    { name: "Sunflower Oil", code: "ITM002" },
-    { name: "Coconut Oil", code: "ITM003" },
-  ],
-  uomOptions: ["Ltrs", "Kg"],
-  statusOptions: ["Approved", "Pending", "Rejected"],
-  typeOptions: ["Retail", "Wholesale"],
-  locationOptions: ["Warehouse A", "Warehouse B", "Warehouse C"],
-  depoOptions: ["Depo A", "Depo B", "Depo C"],
-  brokerOptions: ["Broker 1", "Broker 2", "Broker 3"],
-  saleTypeOptions: ["Local", "Interstate"],
-  billTypeOptions: ["Tax Invoice", "Retail Invoice"],
-  billModeOptions: ["Credit", "Cash"],
-  transporterOptions: ["Blue Transport", "Green Express", "Fast Logistics"],
-  routeOptions: [
-    "Bhubaneswar to Cuttack",
-    "Cuttack to Puri",
-    "Puri to Bhubaneswar",
-    "Bhubaneswar to Rourkela",
-  ],
-  soudaOptions: [
-    {
-      soudaNo: "SOUDA-001",
-      companyName: "ABC Oils Ltd",
-      customerName: "Bhubaneswar Market",
-      items: [
-        { item: "Mustard Oil", itemCode: "ITM001", rate: 125, uom: "Ltrs" },
-      ],
-    },
-    {
-      soudaNo: "SOUDA-002",
-      companyName: "XYZ Oils Ltd",
-      customerName: "Cuttack Market",
-      items: [
-        { item: "Sunflower Oil", itemCode: "ITM002", rate: 135, uom: "Ltrs" },
-      ],
-    },
-  ],
-};
+
 
 /* ------------------ component ------------------ */
 export default function SaleOrdersInvoice() {
-  const [data, setData] = useState(salesOrderJSON.initialData);
+  const [data, setData] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
-
+  const [formMode, setFormMode] = useState(null); 
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
@@ -202,7 +55,12 @@ export default function SaleOrdersInvoice() {
   const [contractOptions, setContractOptions] = useState([]);
   // const [contractItems, setContractItems] = useState([]);
   const [contractItemsMap, setContractItemsMap] = useState({});
-
+  useEffect(() => {
+    fetchContracts();
+    fetchSalesOrders();
+     fetchContractPersons();
+  }, []);
+   
   /* ---------- search filter ---------- */
   const fetchContractPersons = async () => {
     try {
@@ -213,133 +71,194 @@ export default function SaleOrdersInvoice() {
       console.error("Error fetching customers:", error);
     }
   };
-  useEffect(() => {
-    fetchContractPersons();
-  }, []);
+ 
 
   const fetchContracts = async () => {
     try {
       const res = await getAllSalesContracts();
-      console.log("Fetched All Sales Contracts:", res);
-      setContractOptions(res || []);
+        const filtered = res.filter((item) =>
+      ["Approved"].includes(item.status)
+    );
+      console.log("Fetched All Sales Contracts:", filtered);
+      setContractOptions(filtered || []);
     } catch (err) {
       console.error("Failed to fetch all sales contracts:", err);
     }
   };
 
-  useEffect(() => {
-    fetchContracts();
-  }, []);
+const handleExport = () => {
+  if (!data || data.length === 0) {
+    message.warning("No data available to export");
+    return;
+  }
 
-  // filtering keys (customerName rather than customer)
-  const filteredData = data.filter((d) =>
-    ["companyName", "customerName", "status"].some((k) =>
-      (d[k] || "").toString().toLowerCase().includes(searchText.toLowerCase()),
-    ),
+  const exportData = [];
+
+  data.forEach((order) => {
+    (order.contracts || []).forEach((contract) => {
+      (contract.items || []).forEach((item) => {
+
+        exportData.push({
+          "Order Number": order.orderNumber,
+          "Order Date": order.orderDate
+            ? dayjs(order.orderDate).format("YYYY-MM-DD")
+            : "",
+
+          "Customer Name": order.customerName || "",
+          "Status": order.status || "",
+          "Bill Mode": order.bill_mode || "",
+
+          "Contract No": contract.contractNo || "",
+
+          "Item Name": item.item || "",
+          "Item Code": item.itemCode || "",
+          "HSN Code": item.hsnCode || "",
+          "UOM": item.uom || "",
+
+          "Quantity": item.qty || 0,
+          "Free Quantity": item.freeQty || 0,
+          "Total Quantity": item.totalQty || 0,
+
+          "Rate": item.rate || 0,
+
+          "Amount": item.amount || 0,
+          "Discount %": item.discountPercent || 0,
+          "Discount Amount": item.discountAmt || 0,
+
+          "Taxable Amount": item.totalAmount || 0,
+
+          "SGST %": order.orderTaxAndTotals?.sgstPercent || 0,
+          "CGST %": order.orderTaxAndTotals?.cgstPercent || 0,
+          "IGST %": order.orderTaxAndTotals?.igstPercent || 0,
+
+          "TCS Amount": order.orderTaxAndTotals?.tcsAmt || 0,
+
+          "Gross Amount": order.orderTaxAndTotals?.grossAmountTotal || 0,
+          "Discount Total": order.orderTaxAndTotals?.discountTotal || 0,
+          "Grand Total": order.orderTaxAndTotals?.grandTotal || 0,
+        });
+
+      });
+    });
+  });
+
+  exportToExcel(exportData, "Sales_Orders_Export");
+  message.success("Excel exported successfully");
+};
+
+const handleSearch = (value) => {
+  setSearchText(value);
+
+  if (!value) {
+    fetchSalesOrders();
+    return;
+  }
+
+  const filtered = data.filter((item) =>
+    JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
   );
 
+  setData(filtered);
+};
   /* ---------- utilities: compute item and order totals ---------- */
-  const computeOrderTotalsFromContracts = (contracts = [], orderTax = {}) => {
-    const allItems = [];
-    contracts.forEach((c) => {
-      (c.items || []).forEach((it) => allItems.push(it));
-    });
+const computeOrderTotalsFromContracts = (contracts = [], allValues) => {
+  const allItems = [];
 
-    const grossAmountTotal = allItems.reduce(
-      (s, it) => s + Number(it.amount || 0),
-      0,
-    );
-    const discountTotal = allItems.reduce(
-      (s, it) => s + Number(it.discountAmt || 0),
-      0,
-    );
-    const taxableAmount = grossAmountTotal - discountTotal;
+  contracts.forEach((c) => {
+    (c.items || []).forEach((it) => allItems.push(it));
+  });
 
-    const sgstPercent = Number(orderTax.sgstPercent || 0);
-    const cgstPercent = Number(orderTax.cgstPercent || 0);
-    const igstPercent = Number(orderTax.igstPercent || 0);
-    const tcsAmt = Number(orderTax.tcsAmt || 0);
+  const grossAmountTotal = allItems.reduce(
+    (s, it) => s + Number(it.amount || 0),
+    0
+  );
 
-    const sgst = Math.round((taxableAmount * sgstPercent) / 100);
-    const cgst = Math.round((taxableAmount * cgstPercent) / 100);
-    const igst = Math.round((taxableAmount * igstPercent) / 100);
-    const totalGST = sgst + cgst + igst;
-    const grandTotal = Math.round(taxableAmount + totalGST + tcsAmt);
+  const discountTotal = allItems.reduce(
+    (s, it) => s + Number(it.discountAmt || 0),
+    0
+  );
 
-    const qtyTotal = allItems.reduce((s, it) => s + Number(it.qty || 0), 0);
-    const freeQtyTotal = allItems.reduce(
-      (s, it) => s + Number(it.freeQty || 0),
-      0,
-    );
+  const taxable = grossAmountTotal - discountTotal;
 
-    return {
-      orderTaxAndTotals: {
-        grossAmountTotal,
-        discountTotal,
-        taxableAmount,
-        sgstPercent,
-        cgstPercent,
-        igstPercent,
-        sgst,
-        cgst,
-        igst,
-        totalGST,
-        tcsAmt,
-        grandTotal,
-      },
-      orderTotals: {
-        qtyTotal,
-        freeQtyTotal,
-        totalQty: qtyTotal + freeQtyTotal,
-      },
-      items: allItems,
-    };
+  // ✅ ONLY IGST
+  const igst = Number(allValues?.orderTaxAndTotals?.igstPercent || 0);
+  const gstAmount = (taxable * igst) / 100;
+
+  return {
+    orderTaxAndTotals: {
+      grossAmountTotal,
+      discountTotal,
+      grandTotal: taxable + gstAmount,
+    },
   };
+};
 
   /* ---------- when form values change (add/edit) ---------- */
-  const onFormValuesChange = (form, allValues) => {
-    // compute per-item fields for any item changed
-    const contracts = (allValues.contracts || []).map((c, ci) => {
-      const items = (c.items || []).map((it, ii) => {
-        const qty = Number(it.qty || 0);
-        const freeQty = Number(it.freeQty || 0);
-        const rate = Number(it.rate || 0);
-        const discountPercent = Number(it.discountPercent || 0);
-        const amount = Math.round(qty * rate);
-        const discountAmt = Math.round((amount * discountPercent) / 100);
-        const totalAmount = Math.round(amount - discountAmt);
-        const totalQty = qty + freeQty;
-        const totalGrossWt = Number(it.grossWt || 0);
+const onFormValuesChange = (form, allValues) => {
+  const contracts = (allValues.contracts || []).map((c) => {
+    const items = (c.items || []).map((it) => {
+      const orderQty = Number(it.orderQuantity || 0);
+      const rate = Number(it.rate || 0);
+      const discountPercent = Number(it.discountPercent || 0);
+
+      if (!orderQty || !rate) {
         return {
           ...it,
-          amount,
-          discountAmt,
-          totalAmount,
-          totalQty,
-          totalGrossWt,
+          amount: 0,
+          discountAmt: 0,
+          totalAmount: 0,
         };
-      });
-      return { ...c, items };
+      }
+
+      const amount = Math.round(orderQty * rate);
+      const discountAmt = Math.round(
+        (amount * discountPercent) / 100
+      );
+      const totalAmount = amount - discountAmt;
+
+      return {
+        ...it,
+        amount,
+        discountAmt,
+        totalAmount,
+      };
     });
 
-    const { orderTaxAndTotals, orderTotals } = computeOrderTotalsFromContracts(
-      contracts,
-      allValues.orderTaxAndTotals || {},
-    );
+    return { ...c, items };
+  });
 
-    // set computed fields back into the form
-    form.setFieldsValue({
-      contracts,
-      orderTaxAndTotals,
-      orderTotals,
-    });
-  };
+  const { orderTaxAndTotals } =
+   computeOrderTotalsFromContracts(contracts, allValues);
+
+  form.setFieldsValue({
+    contracts,
+    orderTaxAndTotals,
+  });
+};
+
+const handleStatusChange = async (value, form) => {
+  // call API
+  const res = await getTaxByStatus(value); // your API
+
+  form.setFieldsValue({
+    orderTaxAndTotals: {
+      sgstPercent: res.sgst,
+      cgstPercent: res.cgst,
+      igstPercent: res.igst,
+      tcsAmt: res.tcs,
+    },
+  });
+ 
+};
 
   /* ---------- Add handlers ---------- */
   const openAddModal = () => {
+     setFormMode("add"); 
     addForm.resetFields();
+
     // initialize with one contract + one item row to help user
     addForm.setFieldsValue({
+      
       contracts: [
         {
           contractNo: undefined,
@@ -372,9 +291,7 @@ export default function SaleOrdersInvoice() {
     });
     setIsAddModalOpen(true);
   };
-  useEffect(() => {
-    fetchSalesOrders();
-  }, []);
+ 
 
   const fetchSalesOrders = async () => {
     try {
@@ -413,40 +330,26 @@ export default function SaleOrdersInvoice() {
         });
 
         const contracts = Object.values(contractsMap);
+const totals = computeOrderTotalsFromContracts(contracts);
 
-        return {
-          key: order.sales_order_id, // REQUIRED by antd table
+const orderTaxAndTotals = {
+  ...totals.orderTaxAndTotals,
+  sgstPercent: Number(order.sgst || 0),
+  cgstPercent: Number(order.cgst || 0),
+  igstPercent: Number(order.igst || 0),
+  tcsAmt: Number(order.tcs_amount || 0),
+};
 
-          orderNumber: order.order_number,
-          orderDate: order.order_date,
-          deliveryDate: order.expected_receiving_date,
-
-          customerName: order.customer?.name || "-",
-          customerId: order.customer?.customer_id,
-          customer_id: order.customer?.customer_id,
-          customerEmail: order.customer?.email_id,
-          deliveryAddress: order.customer?.address_line1,
-
-          status: order.status,
-          billMode: order.bill_mode,
-          purchaseType: order.purchase_type,
-
-          totalAmount: order.total_amount,
-          grandTotal: order.grand_total,
-
-          contracts,
-          orderTaxAndTotals: {
-            sgstPercent: Number(order.sgst || 0),
-            cgstPercent: Number(order.cgst || 0),
-            igstPercent: Number(order.igst || 0),
-            tcsAmt: Number(order.tcs_amount || 0),
-            grandTotal: Number(order.grand_total || 0),
-            grossAmountTotal: Number(order.total_amount || 0),
-          },
-
-          createdAt: order.created_at,
-          companyName: "-",
-        };
+return {
+  key: order.sales_order_id,
+  orderNumber: order.order_number,
+  orderDate: order.order_date,
+  deliveryDate: order.expected_receiving_date,
+  customerName: order.customer?.name || "-",
+  status: order.status,
+  contracts,
+  orderTaxAndTotals
+};
       });
 
       setData(mappedData);
@@ -458,15 +361,20 @@ export default function SaleOrdersInvoice() {
 
   const buildSalesOrderPayload = (values) => {
     const { orderTaxAndTotals } = values;
-
+console.log("PAYLOAD bill_mode 👉", values.bill_mode);
     return {
-      customer_id: values.customerName || values.customer_id,
-      order_date: values.orderDate
+customer_id: values.customer_id,
+status: values.status, 
+ purchase_type: values.purchaseType,   // ✅ NEW
+ bill_mode: values.bill_mode,
+  narration: values.narration || "", 
+ order_date: values.orderDate
         ? dayjs(values.orderDate).format("YYYY-MM-DD")
         : null,
-      expected_receiving_date: values.deliveryDate
-        ? dayjs(values.deliveryDate).format("YYYY-MM-DD")
-        : null,
+    expected_receiving_date:
+  values.deliveryDate && dayjs(values.deliveryDate).isValid()
+    ? dayjs(values.deliveryDate).format("YYYY-MM-DD")
+    : null,
       delivery_address: values.deliveryAddress || "",
       cash_discount: 0,
       cgst: Number(orderTaxAndTotals?.cgstPercent || 0),
@@ -499,6 +407,8 @@ export default function SaleOrdersInvoice() {
   };
 
   const handleAddFinish = async (values) => {
+     console.log("ADD bill_mode 👉", values.bill_mode);
+
     try {
       values.contracts.forEach((c, idx) => {
         console.log(`🧾 Contract[${idx}] ID:`, c.contract_id);
@@ -517,6 +427,7 @@ export default function SaleOrdersInvoice() {
 
       setIsAddModalOpen(false);
       addForm.resetFields();
+      fetchSalesOrders();
     } catch (error) {
       console.error("❌ Sales Order API Error");
 
@@ -525,7 +436,7 @@ export default function SaleOrdersInvoice() {
         console.error("Status:", error.response.status);
         console.error("Data:", error.response.data);
         console.error("Headers:", error.response.headers);
-
+        console.log("bill_mode value 👉", values.bill_mode);
         message.error(error.response.data?.message || "Server error occurred");
       } else if (error.request) {
         // Request was sent but no response received
@@ -539,26 +450,10 @@ export default function SaleOrdersInvoice() {
     }
   };
 
-  /* ---------- Edit handlers ---------- */
-  // useEffect(() => {
-  //   if (isEditModalOpen && selectedRecord) {
-  //     // prepare values with dayjs dates
-  //     const pre = {
-  //       ...selectedRecord,
-  //       customerName: selectedRecord.customer_id, // Ensure select shows correct value
-  //       orderDate: selectedRecord.orderDate
-  //         ? dayjs(selectedRecord.orderDate)
-  //         : undefined,
-  //       deliveryDate: selectedRecord.deliveryDate
-  //         ? dayjs(selectedRecord.deliveryDate)
-  //         : undefined,
-  //     };
-  //     editForm.setFieldsValue(pre);
-  //   }
-  //   // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, [isEditModalOpen, selectedRecord]);
+
 
   const openEdit = async (record) => {
+     setFormMode("edit");
     try {
       const order = await getSalesOrderById(record.key);
 
@@ -618,20 +513,21 @@ export default function SaleOrdersInvoice() {
       const mappedData = {
         key: order.sales_order_id,
         orderNumber: order.order_number,
+      status: order.status,
         orderDate: order.order_date ? dayjs(order.order_date) : undefined,
         deliveryDate: order.expected_receiving_date
           ? dayjs(order.expected_receiving_date)
           : undefined,
 
-        customerName: order.customer?.customer_id, // For Select to show name
-        customerId: order.customer?.customer_id,
-        customer_id: order.customer?.customer_id,
+      customer_id: order.customer?.customer_id,
         customerEmail: order.customer?.email_id,
+        customerPhone: order.customer?.phone_number,
         deliveryAddress: order.customer?.address_line1,
 
-        status: order.status,
-        billMode: order.bill_mode,
-        purchaseType: order.purchase_type,
+      bill_mode: order.bill_mode || "Cash",
+purchaseType: order.purchase_type,
+ // NEW
+narration: order.narration,      // NEW
 
         contracts,
         orderTaxAndTotals: {
@@ -668,6 +564,7 @@ export default function SaleOrdersInvoice() {
   };
 
   const handleEditFinish = async (values) => {
+     console.log("EDIT bill_mode 👉", values.bill_mode);
     try {
       const payload = buildSalesOrderPayload(values);
       console.log("FINAL UPDATE PAYLOAD 🔥", payload);
@@ -686,6 +583,7 @@ export default function SaleOrdersInvoice() {
 
   /* ---------- View ---------- */
   const openView = async (record) => {
+    setFormMode("view"); 
     try {
       const order = await getSalesOrderById(record.key);
 
@@ -752,40 +650,39 @@ export default function SaleOrdersInvoice() {
           ? dayjs(order.expected_receiving_date)
           : undefined,
 
-        customerName: order.customer?.name || "-",
-        customerId: order.customer?.customer_id,
+       customerName:
+  order.customer?.name ||
+  order.customer_name ||
+ 
+  "-", customerId: order.customer?.customer_id,
         customer_id: order.customer?.customer_id,
         customerEmail: order.customer?.email_id,
+         customerPhone: order.customer?.phone_number,
         deliveryAddress: order.customer?.address_line1,
 
         status: order.status,
-        billMode: order.bill_mode,
-        purchaseType: order.purchase_type,
+     bill_mode: order.bill_mode || "Cash",
+purchaseType: order.purchase_type,
+narration: order.narration,      // NEW
 
         contracts,
-        orderTaxAndTotals: {
-          sgstPercent: Number(order.sgst || 0),
-          cgstPercent: Number(order.cgst || 0),
-          igstPercent: Number(order.igst || 0),
-          tcsAmt: Number(order.tcs_amount || 0),
-          grandTotal: Number(order.grand_total || 0),
-          grossAmountTotal: Number(order.total_amount || 0),
-          // Calculate if missing
-          discountTotal: (order.items || []).reduce(
-            (acc, curr) =>
-              acc + (Number(curr.total_amount) - Number(curr.line_total)),
-            0,
-          ),
-          totalGST:
-            Number(order.grand_total || 0) -
-            Number(order.tcs_amount || 0) -
-            (Number(order.total_amount || 0) -
-              (order.items || []).reduce(
-                (acc, curr) =>
-                  acc + (Number(curr.total_amount) - Number(curr.line_total)),
-                0,
-              )),
-        },
+      orderTaxAndTotals: {
+  sgstPercent: Number(order.sgst || 0),
+  cgstPercent: Number(order.cgst || 0),
+  igstPercent: Number(order.igst || 0),
+  tcsAmt: Number(order.tcs_amount || 0),
+
+  grandTotal: Number(order.grand_total || 0),
+  grossAmountTotal: Number(order.total_amount || 0),
+
+  discountTotal: (order.items || []).reduce(
+    (acc, curr) =>
+      acc + (Number(curr.total_amount) - Number(curr.line_total)),
+    0
+  ),
+
+  totalGST: Number(order.total_gst_amount || 0),
+}
       };
 
       setSelectedRecord(mappedData);
@@ -824,25 +721,13 @@ export default function SaleOrdersInvoice() {
         </span>
       ),
     },
-    // {
-    //   title: <span className="text-amber-700 font-semibold">Company</span>,
-    //   dataIndex: "companyName",
-    //   render: (t) => <span className="text-amber-800">{t}</span>,
-    // },
+
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
       dataIndex: "customerName",
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
-    // {
-    //   title: <span className="text-amber-700 font-semibold">Contracts</span>,
-    //   dataIndex: "contracts",
-    //   render: (contracts = []) => (
-    //     <span className="text-amber-800">
-    //       {(contracts || []).map((c) => c.contractNo).join(", ")}
-    //     </span>
-    //   ),
-    // },
+   
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
@@ -873,10 +758,12 @@ export default function SaleOrdersInvoice() {
             className="cursor-pointer! text-blue-500!"
             onClick={() => openView(record)}
           />
-          <EditOutlined
-            className="cursor-pointer! text-red-500!"
-            onClick={() => openEdit(record)}
-          />
+          {record.status !== "Approved" && (
+        <EditOutlined
+          className="cursor-pointer! text-red-500!"
+          onClick={() => openEdit(record)}
+        />
+      )}
         </div>
       ),
     },
@@ -934,68 +821,70 @@ export default function SaleOrdersInvoice() {
               >
                 <div className="flex justify-between items-center mb-3">
                   <Form.Item
-                    label="Contract ID"
+                    label={<span className="text-amber-700">Contract Id</span>}
+       
                     name={[cf.name, "contract_id"]}
                   >
                     <Select
                       placeholder="Select Contract"
                       disabled={disabled}
-                      onChange={async (contractId) => {
-                        let items = [];
+                     onChange={async (contractId) => {
+  let items = [];
 
-                        // Try to find items locally first
-                        const selectedContract = contractOptions.find(
-                          (c) => c.sale_contract_id === contractId,
-                        );
-                        console.log("Selected Contract:", selectedContract);
+  const selectedContract = contractOptions.find(
+    (c) => c.sale_contract_id === contractId
+  );
 
-                        if (
-                          selectedContract &&
-                          selectedContract.items &&
-                          selectedContract.items.length > 0
-                        ) {
-                          items = selectedContract.items;
-                        } else {
-                          // Fallback to API
-                          items = await salesContractItems(contractId);
-                        }
+  if (selectedContract && selectedContract.items?.length > 0) {
+    items = selectedContract.items;
+  } else {
+    items = await salesContractItems(contractId);
+  }
 
-                        console.log("Contract Items for Dropdown:", items);
+  // ✅ SET TAX VALUES FROM CONTRACT (NO CALCULATION)
+  if (selectedContract) {
+    form.setFieldsValue({
+      orderTaxAndTotals: {
+        sgstPercent: Number(selectedContract.sgst || 0),
+        cgstPercent: Number(selectedContract.cgst || 0),
+        igstPercent: Number(selectedContract.igst || 0),
+        tcsAmt: Number(selectedContract.tcs_amount || 0),
+      },
+    });
+  }
 
-                        // Update options for this specific contract row (using stable key)
-                        setContractItemsMap((prev) => ({
-                          ...prev,
-                          [cf.key]: items,
-                        }));
+  // update items dropdown
+  setContractItemsMap((prev) => ({
+    ...prev,
+    [cf.key]: items,
+  }));
 
-                        // Reset items to a single empty row to allow user to select
-                        const contracts = form.getFieldValue("contracts") || [];
-                        contracts[ci] = {
-                          ...(contracts[ci] || {}),
-                          contract_id: contractId,
-                          items: [
-                            {
-                              lineKey: Date.now(),
-                              item: undefined,
-                              itemCode: undefined,
-                              uom: undefined,
-                              qty: 0,
-                              freeQty: 0,
-                              totalQty: 0,
-                              grossWt: 0,
-                              totalGrossWt: 0,
-                              rate: 0,
-                              amount: 0,
-                              discountPercent: 0,
-                              discountAmt: 0,
-                              totalAmount: 0,
-                            },
-                          ],
-                        };
+  // reset contract row items
+  const contracts = form.getFieldValue("contracts") || [];
+  contracts[ci] = {
+    ...(contracts[ci] || {}),
+    contract_id: contractId,
+    items: [
+      {
+        lineKey: Date.now(),
+        item: undefined,
+        itemCode: undefined,
+        uom: undefined,
+        qty: 0,
+        freeQty: 0,
+        totalQty: 0,
+        rate: 0,
+        amount: 0,
+        discountPercent: 0,
+        discountAmt: 0,
+        totalAmount: 0,
+      },
+    ],
+  };
 
-                        form.setFieldsValue({ contracts });
-                        onFormValuesChange(form, form.getFieldsValue());
-                      }}
+  form.setFieldsValue({ contracts });
+
+}}
                     >
                       {contractOptions.map((c) => (
                         <Select.Option
@@ -1031,7 +920,7 @@ export default function SaleOrdersInvoice() {
                             <Col span={8}>
                               <Form.Item
                                 name={[itf.name, "item"]}
-                                label="Item"
+                                label={<span className="text-amber-700">Item</span>}
                                 rules={[{ required: true }]}
                               >
                                 <Select
@@ -1130,7 +1019,7 @@ export default function SaleOrdersInvoice() {
                             <Col span={4}>
                               <Form.Item
                                 name={[itf.name, "hsnCode"]}
-                                label="Code"
+                                label={<span className="text-amber-700">Code</span>}
                               >
                                 <Input disabled />
                               </Form.Item>
@@ -1138,7 +1027,8 @@ export default function SaleOrdersInvoice() {
 
                             {/* UOM */}
                             <Col span={4}>
-                              <Form.Item name={[itf.name, "uom"]} label="UOM">
+                              <Form.Item name={[itf.name, "uom"]}  label={<span className="text-amber-700">UOM</span>}
+       >
                                 <Input disabled />
                               </Form.Item>
                             </Col>
@@ -1147,7 +1037,8 @@ export default function SaleOrdersInvoice() {
                             <Col span={3}>
                               <Form.Item
                                 name={[itf.name, "qty"]}
-                                label="Qty"
+                                label={<span className="text-amber-700">Qty</span>}
+       
                                 rules={[{ required: true }]}
                               >
                                 <InputNumber
@@ -1168,7 +1059,7 @@ export default function SaleOrdersInvoice() {
                             <Col span={3}>
                               <Form.Item
                                 name={[itf.name, "freeQty"]}
-                                label="Free"
+                                label={<span className="text-amber-700">Free Qty</span>}
                               >
                                 <InputNumber
                                   min={0}
@@ -1188,7 +1079,7 @@ export default function SaleOrdersInvoice() {
                             <Col span={4}>
                               <Form.Item
                                 name={[itf.name, "rate"]}
-                                label="Rate"
+                                label={<span className="text-amber-700">Rate</span>}
                                 rules={[{ required: true }]}
                               >
                                 <InputNumber
@@ -1209,7 +1100,7 @@ export default function SaleOrdersInvoice() {
                             <Col span={3}>
                               <Form.Item
                                 name={[itf.name, "discountPercent"]}
-                                label="Disc %"
+                                label={<span className="text-amber-700">Disc %</span>}
                               >
                                 <InputNumber
                                   min={0}
@@ -1230,7 +1121,7 @@ export default function SaleOrdersInvoice() {
                             <Col span={3}>
                               <Form.Item
                                 name={[itf.name, "amount"]}
-                                label="Amount"
+                                label={<span className="text-amber-700">Amount</span>}
                               >
                                 <InputNumber className="w-full" disabled />
                               </Form.Item>
@@ -1240,7 +1131,7 @@ export default function SaleOrdersInvoice() {
                             <Col span={3}>
                               <Form.Item
                                 name={[itf.name, "discountAmt"]}
-                                label="Disc Amt"
+                                label={<span className="text-amber-700">Disc Amt</span>}
                               >
                                 <InputNumber className="w-full" disabled />
                               </Form.Item>
@@ -1250,69 +1141,75 @@ export default function SaleOrdersInvoice() {
                             <Col span={3}>
                               <Form.Item
                                 name={[itf.name, "totalAmount"]}
-                                label="Total Amount"
+                                label={<span className="text-amber-700">Total Amount</span>}
                               >
                                 <InputNumber className="w-full" disabled />
                               </Form.Item>
                             </Col>
 
-                            {/* TOTAL QTY */}
-                            <Col span={3}>
-                              <Form.Item
-                                name={[itf.name, "totalQty"]}
-                                label="Total Qty"
-                              >
-                                <InputNumber className="w-full" disabled />
-                              </Form.Item>
-                            </Col>
+                           
 
                             <Col span={3}>
-                              <Form.Item
-                                name={[itf.name, "orderQuantity"]}
-                                label="Order Qty"
-                              >
-                                <InputNumber
-                                  min={0}
-                                  className="w-full"
-                                  disabled={disabled}
-                                  onChange={() =>
-                                    onFormValuesChange(
-                                      form,
-                                      form.getFieldsValue(),
-                                    )
-                                  }
-                                />
-                              </Form.Item>
+                             
+
+                   <Form.Item
+  name={[itf.name, "orderQuantity"]}
+  label={<span className="text-amber-700">Order Qty</span>}
+  validateTrigger="onChange"   // ✅ IMPORTANT
+  rules={[
+    {
+      required: true,
+      message: "Please enter order quantity",
+    },
+    {
+      validator: (_, value) => {
+        const qty = form.getFieldValue([
+          "contracts",
+          ci,
+          "items",
+          itf.name,
+          "qty",
+        ]);
+
+        // ❌ don't show error initially
+        if (value === undefined || value === null) {
+          return Promise.resolve();
+        }
+
+        if (isNaN(value)) {
+          return Promise.reject(new Error("Enter a valid number"));
+        }
+
+        if (value <= 0) {
+          return Promise.reject(
+            new Error("Order quantity must be greater than zero")
+          );
+        }
+
+        if (qty && value > qty) {
+          return Promise.reject(
+            new Error(
+              "Order quantity cannot be greater than available quantity"
+            )
+          );
+        }
+
+        return Promise.resolve();
+      },
+    },
+  ]}
+>
+  <Input
+    min={1}
+    className="w-full"
+    disabled={disabled}
+    onChange={() =>
+      onFormValuesChange(form, form.getFieldsValue())
+    }
+  />
+</Form.Item>
                             </Col>
-                            {/* GROSS WT */}
-                            {/* <Col span={3}>
-                              <Form.Item
-                                name={[itf.name, "grossWt"]}
-                                label="Gross Wt"
-                              >
-                                <InputNumber
-                                  className="w-full"
-                                  onChange={() =>
-                                    onFormValuesChange(
-                                      form,
-                                      form.getFieldsValue(),
-                                    )
-                                  }
-                                />
-                              </Form.Item>
-                            </Col> */}
-
-                            {/* TOTAL GROSS WT */}
-                            {/* <Col span={3}>
-                              <Form.Item
-                                name={[itf.name, "totalGrossWt"]}
-                                label="Total Gross Wt"
-                              >
-                                <InputNumber className="w-full" disabled />
-                              </Form.Item>
-                            </Col> */}
-
-                            {/* DELETE BUTTON */}
+                           
                           </Row>
                           {!disabled && (
                             <Button
@@ -1320,8 +1217,7 @@ export default function SaleOrdersInvoice() {
                               icon={<DeleteOutlined />}
                               onClick={() => {
                                 removeItem(itf.name);
-                                onFormValuesChange(form, form.getFieldsValue());
-                              }}
+                                  }}
                             />
                           )}
                         </div>
@@ -1337,8 +1233,8 @@ export default function SaleOrdersInvoice() {
                               lineKey: Date.now(),
                               item: undefined,
                               itemCode: undefined,
-                              uom: salesOrderJSON.uomOptions[0],
-                              qty: 0,
+                             uom: undefined,
+                             qty: 0,
                               freeQty: 0,
                               totalQty: 0,
                               grossWt: 0,
@@ -1370,44 +1266,7 @@ export default function SaleOrdersInvoice() {
     <>
       <h6 className="text-amber-500">Header</h6>
       <Row gutter={16}>
-        <Col span={6}>
-          <Form.Item label="Customer Name" name="customerName">
-            <Select
-              placeholder="Select Customer"
-              onChange={async (customerId) => {
-                const customer = contractPersonOptions.find(
-                  (c) => c.customer_id === customerId,
-                );
-
-                if (customer) {
-                  console.log("Selected User for Autofill:", customer);
-                  form.setFieldsValue({
-                    customerName: customer.name,
-                    customerEmail:
-                      customer.email_address || customer.email || "",
-                    customerMobile:
-                      customer.mobile_number || customer.mobile || "",
-                  });
-                }
-
-                // fetch contracts for this customer
-                // const contracts = await getContractDetailsbyPerson(customerId);
-                // setContractOptions(contracts);
-
-                // reset downstream data
-                setContractItems([]);
-                form.setFieldsValue({ contract_id: undefined });
-              }}
-              disabled={disabled}
-            >
-              {contractPersonOptions.map((c) => (
-                <Select.Option key={c.customer_id} value={c.customer_id}>
-                  {c.name}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-        </Col>
+      
 
         <Col span={6}>
           <Form.Item
@@ -1416,7 +1275,7 @@ export default function SaleOrdersInvoice() {
             rules={[{ required: true }]}
             initialValue={dayjs()}
           >
-            <DatePicker className="w-full" disabled={disabled} />
+            <DatePicker className="w-full" disabled />
           </Form.Item>
         </Col>
 
@@ -1425,28 +1284,75 @@ export default function SaleOrdersInvoice() {
             label={<span className="text-amber-700">Delivery Date</span>}
             name="deliveryDate"
           >
-            <DatePicker className="w-full" disabled={disabled} />
-          </Form.Item>
+           <DatePicker
+            className="w-full"
+            disabledDate={(current) =>
+              current &&
+              form.getFieldValue("orderDate") &&
+              current < form.getFieldValue("orderDate").startOf("day")
+            }
+            disabled={disabled}
+          />   </Form.Item>
         </Col>
+  <Col span={6}>
+ <Form.Item
+  label={<span className="text-amber-700">Customer</span>}
+       name="customer_id"
+  rules={[{ required: true, message: "Please select customer" }]}
+>
+<Select
+  placeholder="Select Customer"
+  showSearch
+  disabled={disabled}
+  optionFilterProp="label"
+  onChange={(value) => {
+    const selectedCustomer = contractPersonOptions.find(
+      (c) => c.customer_id === value
+    );
 
-        {/* <Col span={6}>
-          <Form.Item
-            label={<span className="text-amber-700">Company</span>}
-            name="companyName"
-            rules={[{ required: true }]}
-          >
-            <Input placeholder="Company" disabled={disabled} />
-          </Form.Item>
-        </Col> */}
+    if (selectedCustomer) {
+      form.setFieldsValue({
+        customer_id: selectedCustomer.customer_id,
+
+        // ✅ correct fields from your API
+        customerEmail: selectedCustomer.email_address,
+        customerPhone:
+          selectedCustomer.phone_number || selectedCustomer.mobile_number,
+
+        deliveryAddress: selectedCustomer.address,
+      });
+    }
+  }}
+>
+   {contractPersonOptions.map((c) => (
+  <Select.Option
+    key={c.customer_id}
+    value={c.customer_id}   // ✅ correct ID
+    label={c.customer_name}
+  >
+    {c.customer_name}
+  </Select.Option>
+))}
+  </Select>
+</Form.Item>
+        </Col>
+       
         <Col span={6}>
           <Form.Item
             label={<span className="text-amber-700">Customer Email</span>}
             name="customerEmail"
           >
-            <Input placeholder="Email" disabled={disabled} />
+            <Input placeholder="Email" disabled />
           </Form.Item>
         </Col>
-
+          <Col span={6}>
+  <Form.Item
+    label={<span className="text-amber-700">Customer Phone</span>}
+    name="customerPhone"
+  >
+    <Input placeholder="Phone Number" disabled/>
+  </Form.Item>
+</Col>
         <Col span={6}>
           <Form.Item
             label={<span className="text-amber-700">Delivery Address</span>}
@@ -1456,28 +1362,59 @@ export default function SaleOrdersInvoice() {
           </Form.Item>
         </Col>
 
-        {/* <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Depo Name</span>} name="depoName">
-            <Select placeholder="Depo" disabled={disabled}>
-              {salesOrderJSON.depoOptions.map((d) => <Select.Option key={d} value={d}>{d}</Select.Option>)}
-            </Select>
-          </Form.Item>
-        </Col> */}
+       <Col span={6}>
+  <Form.Item
+    label={<span className="text-amber-700">Purchase Type</span>}
+    name="purchaseType"
+    rules={[{ required: true, message: "Select Purchase Type" }]}
+  >
+    <Select disabled={disabled}>
+      <Select.Option value="Transit">Transit</Select.Option>
+      <Select.Option value="Interstate">Interstate</Select.Option>
+      <Select.Option value="Local">Local</Select.Option>
+    </Select>
+  </Form.Item>
+</Col>
 
-        {/* <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Broker Name</span>} name="brokerName">
-            <Select placeholder="Broker" disabled={disabled}>
-              {salesOrderJSON.brokerOptions.map((b) => <Select.Option key={b} value={b}>{b}</Select.Option>)}
-            </Select>
-          </Form.Item>
-        </Col> */}
+<Col span={6}>
+ <Form.Item
+  label={<span className="text-amber-700">Bill Mode</span>}
+  name="bill_mode"
+  rules={[{ required: true }]}
+>
+  <Select disabled={disabled}>
+    <Select.Option value="Cash">Cash</Select.Option>
+    <Select.Option value="Credit">Credit</Select.Option>
+    <Select.Option value="Online">Online</Select.Option>
+  </Select>
+</Form.Item>
+</Col>
+
+
+
+<Col span={12}>
+  <Form.Item
+    label={<span className="text-amber-700">Narration</span>}
+       
+    name="narration"
+  >
+    <Input.TextArea
+      rows={2}
+      placeholder="Enter narration"
+      disabled={disabled}
+    />
+  </Form.Item>
+</Col>
+
         <Col span={6}>
-          <Form.Item
-            label={<span className="text-amber-700">Status</span>}
-            name="status"
+          <Form.Item name="status" label={<span className="text-amber-700">Status</span>}     rules={[{ required: true, message: "Select Status" }]}
           >
-            <Select placeholder="pending" disabled={disabled}></Select>
-          </Form.Item>
+  <Select disabled={disabled} onChange={(val) => handleStatusChange(val, form)}>
+    <Select.Option value="Approved">Approved</Select.Option>
+    <Select.Option value="Pending">Pending</Select.Option>
+     <Select.Option value="Rejected">Rejected</Select.Option>
+  </Select>
+</Form.Item>
         </Col>
       </Row>
 
@@ -1493,6 +1430,18 @@ export default function SaleOrdersInvoice() {
       <Row gutter={16}>
         <Col span={6}>
           <Form.Item
+            label={<span className="text-amber-700">GST %</span>}
+            name={["orderTaxAndTotals", "igstPercent"]}
+          >
+            <InputNumber
+              min={0}
+              max={100}
+              className="w-full"
+             disabled    />
+          </Form.Item>
+        </Col>
+        <Col span={6}>
+          <Form.Item
             label={<span className="text-amber-700">SGST %</span>}
             name={["orderTaxAndTotals", "sgstPercent"]}
           >
@@ -1500,9 +1449,7 @@ export default function SaleOrdersInvoice() {
               min={0}
               max={100}
               className="w-full"
-              disabled={disabled}
-              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
-            />
+             disabled  />
           </Form.Item>
         </Col>
         <Col span={6}>
@@ -1514,25 +1461,10 @@ export default function SaleOrdersInvoice() {
               min={0}
               max={100}
               className="w-full"
-              disabled={disabled}
-              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
-            />
+             disabled  />
           </Form.Item>
         </Col>
-        <Col span={6}>
-          <Form.Item
-            label={<span className="text-amber-700">IGST %</span>}
-            name={["orderTaxAndTotals", "igstPercent"]}
-          >
-            <InputNumber
-              min={0}
-              max={100}
-              className="w-full"
-              disabled={disabled}
-              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
-            />
-          </Form.Item>
-        </Col>
+        
         <Col span={6}>
           <Form.Item
             label={<span className="text-amber-700">TCS Amt (₹)</span>}
@@ -1541,9 +1473,8 @@ export default function SaleOrdersInvoice() {
             <InputNumber
               min={0}
               className="w-full"
-              disabled={disabled}
-              onChange={() => onFormValuesChange(form, form.getFieldsValue())}
-            />
+              disabled
+                  />
           </Form.Item>
         </Col>
 
@@ -1565,14 +1496,7 @@ export default function SaleOrdersInvoice() {
           </Form.Item>
         </Col>
 
-        <Col span={6}>
-          <Form.Item
-            label={<span className="text-amber-700">Total GST (₹)</span>}
-            name={["orderTaxAndTotals", "totalGST"]}
-          >
-            <InputNumber className="w-full" disabled />
-          </Form.Item>
-        </Col>
+        
 
         <Col span={6}>
           <Form.Item
@@ -1586,61 +1510,7 @@ export default function SaleOrdersInvoice() {
 
       <Divider />
 
-      {/* <h6 className="text-amber-500">Transport & Status</h6>
-      <Row gutter={16}>
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Transporter</span>} name="transporter">
-            <Select disabled={disabled}>
-              {salesOrderJSON.transporterOptions.map((t) => <Select.Option key={t} value={t}>{t}</Select.Option>)}
-            </Select>
-          </Form.Item>
-        </Col>
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Vehicle No</span>} name="vehicleNo">
-            <Input disabled={disabled} />
-          </Form.Item>
-        </Col>
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Driver Name</span>} name="driverName">
-            <Input disabled={disabled} />
-          </Form.Item>
-        </Col>
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Phone No</span>} name="phoneNo">
-            <Input disabled={disabled} />
-          </Form.Item>
-        </Col>
-
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Route</span>} name="route">
-            <Select disabled={disabled}>
-              {salesOrderJSON.routeOptions.map((r) => <Select.Option key={r} value={r}>{r}</Select.Option>)}
-            </Select>
-          </Form.Item>
-        </Col>
-
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Bill Type</span>} name="billType">
-            <Select disabled={disabled}>
-              {salesOrderJSON.billTypeOptions.map((b) => <Select.Option key={b} value={b}>{b}</Select.Option>)}
-            </Select>
-          </Form.Item>
-        </Col>
-
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Waybill No</span>} name="waybillNo">
-            <Input disabled={disabled} />
-          </Form.Item>
-        </Col>
-
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Status</span>} name="status">
-            <Select disabled={disabled}>
-              {salesOrderJSON.statusOptions.map((s) => <Select.Option key={s} value={s}>{s}</Select.Option>)}
-            </Select>
-          </Form.Item>
-        </Col>
-      </Row> */}
+     
     </>
   );
 
@@ -1654,20 +1524,23 @@ export default function SaleOrdersInvoice() {
             placeholder="Search..."
             className="w-64! border-amber-300! focus:border-amber-500!"
             value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-          />
-          <Button
-            icon={<FilterOutlined />}
-            onClick={() => setSearchText("")}
-            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          >
-            Reset
-          </Button>
+           onChange={(e) => handleSearch(e.target.value)}   />
+         <Button
+  icon={<FilterOutlined />}
+  onClick={() => {
+    setSearchText("");
+    fetchSalesOrders(); // ✅ reload original data
+  }}
+  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+>
+  Reset
+</Button>
         </div>
 
         <div className="flex gap-2">
           <Button
             icon={<DownloadOutlined />}
+            onClick={handleExport}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Export
@@ -1685,14 +1558,14 @@ export default function SaleOrdersInvoice() {
 
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
-          Sales Order & Invoice Records
+          Sales Order Records
         </h2>
         <p className="text-amber-600 mb-3">
-          Manage your sales Order & Invoice data
+          Manage your sales Order
         </p>
         <Table
           columns={columns}
-          dataSource={filteredData}
+          dataSource={data}
           pagination={false}
           scroll={{ y: 300 }}
           rowKey="key"
@@ -1703,7 +1576,7 @@ export default function SaleOrdersInvoice() {
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            Add New Sales Order & Invoice
+            Add New Sales Order 
           </span>
         }
         open={isAddModalOpen}
@@ -1718,9 +1591,11 @@ export default function SaleOrdersInvoice() {
           layout="vertical"
           form={addForm}
           onFinish={handleAddFinish}
-          onValuesChange={() =>
-            onFormValuesChange(addForm, addForm.getFieldsValue())
-          }
+           onValuesChange={(_, allValues) => {
+    if (formMode === "add") {
+      onFormValuesChange(addForm, allValues);
+    }
+  }}
         >
           {renderFormFields(addForm)}
           <div className="flex justify-end gap-2 mt-4">
@@ -1748,7 +1623,7 @@ export default function SaleOrdersInvoice() {
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            Edit Sales Order & Invoice
+            Edit Sales Order 
           </span>
         }
         open={isEditModalOpen}
@@ -1764,9 +1639,11 @@ export default function SaleOrdersInvoice() {
           layout="vertical"
           form={editForm}
           onFinish={handleEditFinish}
-          onValuesChange={() =>
-            onFormValuesChange(editForm, editForm.getFieldsValue())
-          }
+           onValuesChange={(_, allValues) => {
+    if (formMode === "edit") {
+      onFormValuesChange(editForm, allValues);
+    }
+  }}
         >
           {renderFormFields(editForm)}
           <div className="flex justify-end gap-2 mt-4">
@@ -1776,13 +1653,14 @@ export default function SaleOrdersInvoice() {
                 editForm.resetFields();
                 setSelectedRecord(null);
               }}
+              className="border-amber-500! text-amber-700! "
             >
               Cancel
             </Button>
             <Button
               type="primary"
               htmlType="submit"
-              className="bg-amber-500 hover:bg-amber-600 border-none"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
             >
               Update
             </Button>
@@ -1794,7 +1672,7 @@ export default function SaleOrdersInvoice() {
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            View Sales Order & Invoice
+            View Sales Order 
           </span>
         }
         open={isViewModalOpen}
@@ -1812,4 +1690,5 @@ export default function SaleOrdersInvoice() {
       </Modal>
     </div>
   );
-}
+    }
+  

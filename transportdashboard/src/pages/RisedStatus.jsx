@@ -2,10 +2,9 @@ import React, { useState ,useEffect} from "react";
 import { Table, Input, Button, Modal, Form, DatePicker, Row, Col, Select } from "antd";
 import { SearchOutlined, DownloadOutlined, EyeOutlined, EditOutlined, FilterOutlined, TruckOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
-import {getAllAssignedOrder,getAssignedOrderById,updateAssignedOrder} from '../api/risedStatus'
+import {getAllAssignedOrder,getAssignedOrderById,updateAssignedOrder,} from '../api/risedStatus'
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
-
 
 export default function PurchaseOrderList() {
   const [modalState, setModalState] = useState({ open: false, mode: null }); 
@@ -34,14 +33,14 @@ const fetchAssignedOrders = async () => {
       deliveryAddress: item.delivery_address,
       plantName: item.plant_name,
 
-      products: [
-        {
-          productName: item.product_name,
-          qty: item.total_qty,
-          productId: item.invoice,
-          uom: item.unit_name,   
-        },
-      ],
+     products: [
+  {
+    productName: item.product_name,
+    qty: item.invoice_items?.[0]?.qty,
+    productId: item.invoice,
+    uom: item.invoice_items?.[0]?.uom_details?.unit_name,
+  },
+],
 
          }));
 
@@ -84,13 +83,13 @@ plantAddress: res.plant_details?.address,
 plantPhoneNumber: res.plant_details?.phone_number,
 
   // ✅ PRODUCT (FIX HERE)
-  products: [
-    {
-      productName: res.product_name,
-      qty: res.total_qty,   // ❗ you used res.qty (wrong)
-      uom: res.invoice_items?.[0]?.uom_details?.unit_name,            // not in API
-    },
-  ],
+ products: [
+  {
+    productName: res.invoice_items?.[0]?.product_name,
+    qty: res.invoice_items?.[0]?.qty,
+    uom: res.invoice_items?.[0]?.uom_details?.unit_name,
+  },
+],
 });
 
 
@@ -100,6 +99,10 @@ plantPhoneNumber: res.plant_details?.phone_number,
 };
 
 
+  // SEARCH
+ const handleSearch = (value) => {
+  setSearchText(value);
+};
  
 
 
@@ -137,8 +140,7 @@ plantPhoneNumber: res.plant_details?.phone_number,
   };
 
   const columns = [
-    { title: <span className="text-amber-700 font-semibold">Invoice No</span>, dataIndex: "invoice_number", render: (t) => <span className="text-amber-800 font-medium">{t}</span> },
-    
+  
     {
   title: <span className="text-amber-700 font-semibold">Product Name</span>,
   render: (record) => (
@@ -155,7 +157,6 @@ plantPhoneNumber: res.plant_details?.phone_number,
     </span>
   ),
 },
- { title: <span className="text-amber-700 font-semibold">Delivery Address</span>, dataIndex: "deliveryAddress", render: (d) => <span className="text-amber-800">{d}</span> },
     { title: <span className="text-amber-700 font-semibold">Status</span>,width:180, dataIndex: "status", 
       render: (s) => {
   const displayStatus = s === "Pending" ? "Pending Approval" : s;
@@ -205,15 +206,17 @@ plantPhoneNumber: res.plant_details?.phone_number,
         <h1 className="text-3xl font-bold text-amber-700">Orders Assign</h1>
         <p className="text-amber-600 mb-2">Manage your pending and approved assign requests.</p>
         <Input 
+        value={searchText}
           prefix={<SearchOutlined className="text-amber-600!" />} 
-          placeholder="Search by Order No..." 
+          placeholder="Search..." 
           className="w-64! border-amber-300! focus:border-amber-500!" 
-          value={searchText} 
-          onChange={e => setSearchText(e.target.value)} 
+            onChange={(e) =>
+              handleSearch(e.target.value)
+            }
         />
          <Button
                     icon={<FilterOutlined />}
-                    onClick={() => setSearchText("")}
+                      onClick={() => setSearchText("")}
                     className="border-amber-400! text-amber-700! hover:bg-amber-100!"
                   >
                     Reset
@@ -221,11 +224,16 @@ plantPhoneNumber: res.plant_details?.phone_number,
       </div>
 
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
-        <Table columns={columns}dataSource={data.filter(i =>
-  (i.invoice_number || "")
-    .toLowerCase()
-    .includes(searchText.toLowerCase())
-)}
+        <Table columns={columns}
+     dataSource={data.filter(i => {
+  const val = searchText.toLowerCase();
+  return (
+     
+    (i.status || "").toLowerCase().includes(val)||
+    (i.products?.[0]?.productName || "").toLowerCase().includes(val) ||
+    (i.products?.[0]?.qty?.toString() || "").toLowerCase().includes(val)
+  );
+})}
  pagination={false} rowKey="id"/>
       </div>
 
@@ -268,6 +276,10 @@ plantPhoneNumber: res.plant_details?.phone_number,
     name="driverName"
     rules={[
       { required: true, message: "Please enter the Driver Name" },
+      {
+        pattern: /^[A-Za-z\s]+$/,
+        message: "Only alphabets are allowed",
+      },
         ]}
   >
     <Input disabled={isReadonly} />
@@ -332,14 +344,13 @@ plantPhoneNumber: res.plant_details?.phone_number,
 </Col>
    </>)}
           {renderSection("Order Details", <>
-            <Col span={6}><Form.Item label="Invoice No" name="invoice_number"><Input disabled /></Form.Item></Col>
+            <Col span={6}><Form.Item label="Assign No" name="invoice_number"><Input disabled /></Form.Item></Col>
              <Col span={6}><Form.Item label="Way Bill" name="wayBill"><Input disabled/></Form.Item></Col>
             <Col span={6}><Form.Item label="Status" name="status"><Select disabled={isReadonly || isAssigning} options={[{label: 'Pending', value: 'Pending'}, ]} /></Form.Item></Col>
-            <Col span={6}><Form.Item label="Delivery Address" name="deliveryAddress"><Input disabled /></Form.Item></Col>
-          </>)}
+            </>)}
 
-          {renderSection("Vendor Detail", <>
-            <Col span={6}><Form.Item label="Vendor Name" name="vendorName" ><Input disabled /></Form.Item></Col>
+          {renderSection("Supplier Detail", <>
+            <Col span={6}><Form.Item label="Supplier Name" name="vendorName" ><Input disabled /></Form.Item></Col>
             <Col span={6}><Form.Item label="Address" name="vendorAddress" ><Input disabled /></Form.Item></Col>
             <Col span={6}><Form.Item label="Contact Person" name="vendorContactPerson"><Input disabled /></Form.Item></Col>
             <Col span={6}><Form.Item label="Phone" name="vendorPhoneNumber" ><Input disabled /></Form.Item></Col>

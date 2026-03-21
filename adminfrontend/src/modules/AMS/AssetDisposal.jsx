@@ -1,5 +1,5 @@
 // AssetDisposal.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Table,
   Input,
@@ -33,6 +33,7 @@ import {
   getAssetDisposalById,
 } from "../../api/assets";
 import useSessionStore from "../../store/sessionStore";
+import { globalSearch } from "../../utils/globalSearch";
 const { Option } = Select;
 const { TextArea } = Input;
 
@@ -60,15 +61,9 @@ export default function AssetDisposal() {
   const disposalTypeOptions = ["Scrap", "Sold", "Donation", "Write-off"];
   const statusOptions = ["Pending", "Approved", "Rejected"]; // if needed later
 
-  const filteredData = data.filter((row) =>
-    ["assetId", "disposalId", "disposalType", "buyerName", "remarks"].some(
-      (f) =>
-        (row[f] || "")
-          .toString()
-          .toLowerCase()
-          .includes(searchText.trim().toLowerCase()),
-    ),
-  );
+  const filteredData = useMemo(() => {
+    return globalSearch(data, searchText);
+  }, [data, searchText]);
 
   const fetchAssets = async () => {
     try {

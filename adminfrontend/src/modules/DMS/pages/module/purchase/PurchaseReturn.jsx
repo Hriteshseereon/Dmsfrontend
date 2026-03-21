@@ -25,7 +25,7 @@ import {
 import dayjs from "dayjs";
 
 import { exportToExcel } from "../../../../../utils/exportToExcel";
-import { getPurchaseReturn,addPurchaseReturn,getPurchaseReturnById,updatePurchaseReturn ,getPurchaseInvoice,getPurchaseInvoiceById} from "../../../../../api/purchase";
+import { getPurchaseReturn,addPurchaseReturn,getPurchaseReturnById,updatePurchaseReturn ,getPurchaseInvoice,getPurchaseInvoiceById,getDeliveredAdvice,getDeliveredAdviceById} from "../../../../../api/purchase";
 // 🔹 JSON Data
 const returnReasons = [
   "Quality Issue",
@@ -35,74 +35,6 @@ const returnReasons = [
   "Other",
 ];
 
-const purchaseReturnJSON = {
-  records: [
-    {
-      key: 1,
-      invoiceNo: "INV-001",
-      item: "Sunflower Oil",
-      itemCode: "It1",
-      plantName: "Ramesh",
-      plantCode: "P1",
-      quantity: 50,
-      freeQty: 10,
-      uom: "Ltr",
-      rate: 500,
-      totalAmount: 25000,
-      returnDate: "2024-04-01",
-      returnReason: "Damaged Packaging",
-      status: "Approved",
-      companyName: "Odisha Edibles",
-      branchName: "Cuttack",
-      depo: "Cuttack Depot",
-      grossAmount: 25000,
-      discountPercent: 10,
-      discountAmount: 10,
-      sgstPercent: 9,
-      cgstPercent: 1,
-      igstPercent: 6,
-      otherCharges: 7,
-      roundOff: 8,
-      grandTotal: 29500,
-    },
-    {
-      key: 2,
-      invoiceNo: "INV-002",
-      item: "Soya",
-      itemCode: "It2",
-      plantName: "Suresh",
-      plantCode: "P2",
-      quantity: 150,
-      freeQty: 1,
-      uom: "kg",
-      rate: 300,
-      totalAmount: 2000,
-      returnDate: "2025-05-09",
-      returnReason: "Damaged Packaging",
-      status: "Pending",
-      companyName: "Kalinga Mills",
-      branchName: "Bhubneswar",
-      depo: "Bhubneswar Depot",
-      grossAmount: 200,
-      discountPercent: 11,
-      discountAmount: 18,
-      sgstPercent: 17,
-      cgstPercent: 10,
-      igstPercent: 19,
-      otherCharges: 7,
-      roundOff: 8,
-      grandTotal: 29500,
-    },
-  ],
-  options: {
-    returnReasonOptions: [
-      "Quality Issue",
-      "Damaged Packaging",
-      "Expired",
-      "Wrong Item",
-    ],
-  },
-};
 const statusOptions = ["Pending", "Approved", "Reject"];
 
 export default function PurchaseReturn() {
@@ -208,25 +140,24 @@ const handleExport = async () => {
 if (mode === "add") {
   try {
    
-    const payload = {
-      invoice: values.invoiceNo,
-      vendor: selectedVendorId,
-      status: values.status || "Pending",
-      return_date: values.returnDate
-        ? values.returnDate.format("YYYY-MM-DD")
-        : null,
+   const payload = {
+  loading_advice: values.invoiceNo, // ✅ FIXED
+  vendor: selectedVendorId,
+  status: values.status || "Pending",
+  return_date: values.returnDate
+    ? values.returnDate.format("YYYY-MM-DD")
+    : null,
 
-  
-      items: values.items.map((item) => ({
-        product: item.product,
-        quantity: Number(item.quantity || 0),
-      item_return_reason:
+  items: values.items.map((item) => ({
+    product: item.product,
+    quantity: Number(item.quantity || 0),
+    return_qty: Number(item.return_qty || 0),
+    item_return_reason:
       item.item_return_reason === "Other"
-    ? item.other_reason
-    : item.item_return_reason,
-
-      })),
-    };
+        ? item.other_reason
+        : item.item_return_reason,
+  })),
+};
 
     await addPurchaseReturn(payload);
 
@@ -239,21 +170,22 @@ if (mode === "add") {
 }
 if (mode === "edit") {
   try {
-    const payload = {
-      invoice: values.invoiceNo,
-      status: values.status,
-      return_date: values.returnDate
-        ? values.returnDate.format("YYYY-MM-DD")
-        : null,
-      items: values.items.map((item) => ({
-        product: item.product,
-        quantity: Number(item.quantity || 0),
-        item_return_reason:
-          item.item_return_reason === "Other"
-            ? item.other_reason
-            : item.item_return_reason,
-      })),
-    };
+   const payload = {
+  loading_advice: values.invoiceNo, // ✅ FIX HERE ALSO
+  status: values.status,
+  return_date: values.returnDate
+    ? values.returnDate.format("YYYY-MM-DD")
+    : null,
+  items: values.items.map((item) => ({
+    product: item.product,
+    quantity: Number(item.quantity || 0),
+    return_qty: Number(item.return_qty || 0),
+    item_return_reason:
+      item.item_return_reason === "Other"
+        ? item.other_reason
+        : item.item_return_reason,
+  })),
+};
 
     await updatePurchaseReturn(selectedRecord.id, payload);
 
@@ -282,7 +214,7 @@ const handleViewClick = async (record) => {
       item_name: item.item_name,
       hsn_code: item.hsn_code,
       uom: item.uom_details?.unit_name,
-
+       return_qty: Number(item.return_quantity), 
       quantity: Number(item.quantity),
       item_return_reason: item.item_return_reason,
     })) || [];
@@ -309,7 +241,7 @@ const handleViewClick = async (record) => {
 
 const handleAddClick = async () => {
   try {
-    const res = await getPurchaseInvoice();
+    const res = await getDeliveredAdvice();
     const invoices = res.data || res;
 
     setInvoiceList(invoices);
@@ -326,28 +258,31 @@ const handleAddClick = async () => {
   }
 };
 
-const onInvoiceSelectForAdd = async (invoiceId) => {
+const onInvoiceSelectForAdd = async (adviceId) => {
   try {
-    const res = await getPurchaseInvoiceById(invoiceId);
+    const res = await getDeliveredAdviceById(adviceId);
     const invoice = res.data || res;
-   setSelectedVendorId(invoice.vendor);
-   const items = invoice.items?.map((it) => ({
-      product: it.product,
-      item_name: it.item_name,
-      hsn_code: it.hsn_code,
-      uom: it?.uom_details?.unit_name,
-      quantity: it.qty,
-      item_return_reason: "",
-    })) || [];
 
-    // ✅ set form values
+    setSelectedVendorId(invoice.vendor);
+
+    const items =
+      invoice.items?.map((it) => ({
+        product: it.product,        // ✅ correct
+        item_name: it.item_name,
+        hsn_code: it.item_code,
+        uom: it.uom_display || "",  // ✅ FIXED
+        quantity: it.quantity,      // ✅ FIXED
+        return_qty: 0,
+        item_return_reason: "",
+      })) || [];
+
     addForm.setFieldsValue({
-      invoiceNo: invoice.id,
+      invoiceNo: invoice.loading_advice, // ✅ use correct key
       companyName: invoice.vendor_name,
       plantName: invoice.plant_name,
       returnDate: dayjs(),
       status: "Pending",
-      items: items, 
+      items: items,
     });
 
   } catch (error) {
@@ -359,7 +294,7 @@ const handleEditClick = async (record) => {
   try {
     setLoading(true);
 
-    const invoiceRes = await getPurchaseInvoice();
+    const invoiceRes = await getDeliveredAdvice();
     const invoices = invoiceRes.data || invoiceRes;
     setInvoiceList(invoices);
 
@@ -372,11 +307,12 @@ const handleEditClick = async (record) => {
       hsn_code: item.hsn_code,
       uom: item.uom_details?.unit_name,
       quantity: Number(item.quantity),
+      return_qty: Number(item.return_quantity),
       item_return_reason: item.item_return_reason,
     })) || [];
 
     editForm.setFieldsValue({
-      invoiceNo: data.invoice,   // ⚠️ IMPORTANT → must match option value
+   invoiceNo: data.loading_advice,  // ⚠️ IMPORTANT → must match option value
       companyName: data.vendor_name,
       returnDate: data.return_date ? dayjs(data.return_date) : null,
       status: data.status,
@@ -401,43 +337,37 @@ const handleEditClick = async (record) => {
     const isAdd = mode === "add";
     const isEdit = mode === "edit";
 
-    const disabledFor = (field) => {
-      if (isView) return true;
-      if (isAdd)
-        return !["invoiceNo", "quantity", "returnReason"].includes(field);
-      if (isEdit)
-        return !["invoiceNo", "quantity", "returnReason"].includes(field);
-      return true;
-    };
-
+    
     return (
       <>
         <h6 className="text-amber-500">Invoice & Party Details</h6>
         <Row gutter={16}>
           <Col span={6}>
             <Form.Item
-              label="Invoice No"
+              label="Advice No"
               name="invoiceNo"
               rules={[{ required: true }]}
             >
        <Select
   onChange={(val) => isAdd && onInvoiceSelectForAdd(val)}
-  disabled={isView || isEdit} 
+  disabled={isView || isEdit}
+  optionLabelProp="label"   // ✅ ADD THIS
 >
-
-
-               {invoiceList.map((inv) => (
-  <Select.Option key={inv.id} value={inv.id}>
-    {inv.invoice_no || inv.invoice_number}
-  </Select.Option>
-))}
-
-              </Select>
+  {invoiceList.map((inv) => (
+    <Select.Option
+      key={inv.loading_advice_id}
+      value={inv.loading_advice}   // ✅ match backend
+      label={inv.advice_no}   // ✅ IMPORTANT
+    >
+      {inv.advice_no}
+    </Select.Option>
+  ))}
+</Select>
             </Form.Item>
           </Col>
 
           <Col span={6}>
-            <Form.Item label="Company" name="companyName">
+            <Form.Item label="Supplier" name="companyName">
               <Select disabled />
             </Form.Item>
           </Col>
@@ -496,18 +426,10 @@ const handleEditClick = async (record) => {
 
             <Col span={6}>
              <Form.Item {...restField} name={[name, "quantity"]} label="Quantity"
-                            rules={[
-                 { required: true, message: "Quantity is required" },
-                 {
-                   validator: (_, value) =>
-                     value >= 0
-                       ? Promise.resolve()
-                       : Promise.reject("Enter valid positive number"),
-                 },
-               ]}>
+            >
   <Input
     className="w-full"
-    disabled={isView}
+    disabled
   />
 </Form.Item>
 
@@ -518,7 +440,29 @@ const handleEditClick = async (record) => {
 
           <Row gutter={16}>
       
-
+<Col span={6}>
+<Form.Item
+  {...restField}  
+  name={[name, "return_qty"]}
+  label="Return Quantity"
+  rules={[
+    { required: true, message: "Return quantity is required" },
+    {
+      validator: (_, value) => {  
+        const originalQty = editForm.getFieldValue(["items", name, "quantity"]) || addForm.getFieldValue(["items", name, "quantity"]);
+        return value >= 0 && value <= originalQty
+          ? Promise.resolve()
+          : Promise.reject(`Enter a value between 0 and ${originalQty}`);
+      },
+    },
+  ]}
+>
+  <Input
+    className="w-full"
+    disabled={isView}
+  />
+</Form.Item>
+</Col>
            <Col span={6}>
  <Form.Item
   {...restField}
@@ -636,12 +580,12 @@ const handleEditClick = async (record) => {
   className="cursor-pointer! text-blue-500!"
   onClick={() => handleViewClick(record)}
 />
-
+{record.status !== "Approved" && (
           <EditOutlined
   className="cursor-pointer! text-red-500!"
   onClick={() => handleEditClick(record)}
 />
-
+)}
         </div>
       ),
     },

@@ -1,6 +1,11 @@
 // StockEtf.jsx
 import React, { useState, useEffect } from "react";
-import { addWealthEntry, getWealthEntries, getWealthEntryById, updateWealthEntry } from "../../api/wealth";
+import {
+  addWealthEntry,
+  getWealthEntries,
+  getWealthEntryById,
+  updateWealthEntry,
+} from "../../api/wealth";
 import {
   Table,
   Input,
@@ -20,6 +25,7 @@ import {
   EditOutlined,
   FilterOutlined,
 } from "@ant-design/icons";
+import dayjs from "dayjs";
 
 /**
  * StockEtf.jsx
@@ -116,10 +122,20 @@ export default function Etf() {
     };
   };
 
+  const formatValue = (value) => {
+    if (!value) return "";
+
+    return value.toString();
+  };
+
   const filteredData = data.filter((row) =>
-    ["assetName", "remarks"]
-      .some((f) => (row[f] || "").toString().toLowerCase()
-        .includes(searchText.trim().toLowerCase()))
+    Object.entries(row).some(([key, value]) => {
+      if (key === "key") return false; // skip internal key
+
+      return formatValue(value)
+        .toLowerCase()
+        .includes(searchText.trim().toLowerCase());
+    }),
   );
 
   const columns = [
@@ -142,25 +158,35 @@ export default function Etf() {
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Purchase Amount (₹)</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Purchase Amount (₹)
+        </span>
+      ),
       dataIndex: "purchaseAmount",
       width: 150,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Brokerage (₹)</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Brokerage (₹)</span>
+      ),
       dataIndex: "brokerage",
       width: 120,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">GST / S.Tax (₹)</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">GST / S.Tax (₹)</span>
+      ),
       dataIndex: "gstAndSTax",
       width: 140,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Total Amount (₹)</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Total Amount (₹)</span>
+      ),
       dataIndex: "totalAmount",
       width: 150,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
@@ -265,7 +291,9 @@ export default function Etf() {
       (r.remarks || "").replace(/[\n\r]/g, " "),
     ]);
     const csvContent = [headers, ...rows]
-      .map((e) => e.map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`).join(","))
+      .map((e) =>
+        e.map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`).join(","),
+      )
       .join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -311,67 +339,94 @@ export default function Etf() {
           </Form.Item>
         </Col>
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Brokerage (₹)</span>} name="brokerage">
+          <Form.Item
+            label={<span className="text-amber-700">Brokerage (₹)</span>}
+            name="brokerage"
+          >
             <InputNumber className="w-full!" min={0} disabled={disabled} />
           </Form.Item>
         </Col>
-
-      </Row>
-
-      <Row gutter={24}>
-
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">STT (₹)</span>} name="stt">
-            <InputNumber className="w-full!" min={0} disabled={disabled} />
-          </Form.Item>
-        </Col>
-
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Stamp Charges (₹)</span>} name="stampCharges">
-            <InputNumber className="w-full!" min={0} disabled={disabled} />
-          </Form.Item>
-        </Col>
-
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Other charges (₹)</span>} name="otherCharges">
-            <InputNumber className="w-full!" min={0} disabled={disabled} />
-          </Form.Item>
-        </Col>
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">GST / S.Tax (₹)</span>} name="gstAndSTax">
-            <InputNumber className="w-full!" min={0} disabled={disabled} />
-          </Form.Item>
-        </Col>
-
-
       </Row>
 
       <Row gutter={24}>
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Transactional Charges (₹)</span>} name="transactionalCharges">
+          <Form.Item
+            label={<span className="text-amber-700">STT (₹)</span>}
+            name="stt"
+          >
             <InputNumber className="w-full!" min={0} disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Purchase Amount (₹)</span>} name="purchaseAmount">
-            <InputNumber className="w-full!" disabled />
-          </Form.Item>
-        </Col>
-        <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Total Amount (₹)</span>} name="totalAmount">
-            <InputNumber className="w-full!" disabled />
+          <Form.Item
+            label={<span className="text-amber-700">Stamp Charges (₹)</span>}
+            name="stampCharges"
+          >
+            <InputNumber className="w-full!" min={0} disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Remarks</span>} name="remarks">
-            <Input placeholder="Optional notes" className="w-full!" disabled={disabled} />
+          <Form.Item
+            label={<span className="text-amber-700">Other charges (₹)</span>}
+            name="otherCharges"
+          >
+            <InputNumber className="w-full!" min={0} disabled={disabled} />
+          </Form.Item>
+        </Col>
+        <Col span={6}>
+          <Form.Item
+            label={<span className="text-amber-700">GST / S.Tax (₹)</span>}
+            name="gstAndSTax"
+          >
+            <InputNumber className="w-full!" min={0} disabled={disabled} />
           </Form.Item>
         </Col>
       </Row>
 
+      <Row gutter={24}>
+        <Col span={6}>
+          <Form.Item
+            label={
+              <span className="text-amber-700">Transactional Charges (₹)</span>
+            }
+            name="transactionalCharges"
+          >
+            <InputNumber className="w-full!" min={0} disabled={disabled} />
+          </Form.Item>
+        </Col>
 
+        <Col span={6}>
+          <Form.Item
+            label={<span className="text-amber-700">Purchase Amount (₹)</span>}
+            name="purchaseAmount"
+          >
+            <InputNumber className="w-full!" disabled />
+          </Form.Item>
+        </Col>
+        <Col span={6}>
+          <Form.Item
+            label={<span className="text-amber-700">Total Amount (₹)</span>}
+            name="totalAmount"
+          >
+            <InputNumber className="w-full!" disabled />
+          </Form.Item>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item
+            label={<span className="text-amber-700">Remarks</span>}
+            name="remarks"
+          >
+            <Input
+              placeholder="Optional notes"
+              className="w-full!"
+              disabled={disabled}
+            />
+          </Form.Item>
+        </Col>
+      </Row>
     </>
   );
 
@@ -397,7 +452,11 @@ export default function Etf() {
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} onClick={exportCSV} className="border-amber-400! text-amber-700! hover:bg-amber-100!">
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={exportCSV}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
             Export
           </Button>
           <Button
@@ -416,14 +475,27 @@ export default function Etf() {
 
       {/* Table */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
-        <h2 className="text-lg font-semibold text-amber-700 mb-0">ETF Transactions</h2>
-        <p className="text-amber-600 mb-3">Track exchange-traded fund investments and movements</p>
-        <Table columns={columns} scroll={{ y: 300 }} dataSource={filteredData} pagination={{ pageSize: 10 }} />
+        <h2 className="text-lg font-semibold text-amber-700 mb-0">
+          ETF Transactions
+        </h2>
+        <p className="text-amber-600 mb-3">
+          Track exchange-traded fund investments and movements
+        </p>
+        <Table
+          columns={columns}
+          scroll={{ y: 300 }}
+          dataSource={filteredData}
+          pagination={{ pageSize: 10 }}
+        />
       </div>
 
       {/* Add Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Add ETF Transaction</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Add ETF Transaction
+          </span>
+        }
         open={isAddModalOpen}
         onCancel={() => {
           setIsAddModalOpen(false);
@@ -450,7 +522,9 @@ export default function Etf() {
                 stamp_charges: (values.stampCharges || 0).toFixed(2),
                 other_charges: (values.otherCharges || 0).toFixed(2),
                 gst_tax: (values.gstAndSTax || 0).toFixed(2),
-                transactional_charges: (values.transactionalCharges || 0).toFixed(2),
+                transactional_charges: (
+                  values.transactionalCharges || 0
+                ).toFixed(2),
 
                 purchase_amount: (calcs.purchaseAmount || 0).toFixed(2),
                 total_amount: (calcs.totalAmount || 0).toFixed(2),
@@ -460,7 +534,9 @@ export default function Etf() {
 
               // Update local state with the new record
               const newRecord = {
-                key: response.id || (data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1),
+                key:
+                  response.id ||
+                  (data.length ? Math.max(...data.map((d) => d.key)) + 1 : 1),
                 assetName: values.assetName,
                 purchaseQuantity: values.purchaseQuantity,
                 purchasePrice: values.purchasePrice,
@@ -502,8 +578,11 @@ export default function Etf() {
             >
               Cancel
             </Button>
-            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!"
-              htmlType="submit">
+            <Button
+              type="primary"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit"
+            >
               Add
             </Button>
           </div>
@@ -512,7 +591,11 @@ export default function Etf() {
 
       {/* Edit Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Edit ETF Transaction</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Edit ETF Transaction
+          </span>
+        }
         open={isEditModalOpen}
         onCancel={() => {
           setIsEditModalOpen(false);
@@ -533,14 +616,18 @@ export default function Etf() {
                 asset_name: values.assetName,
                 remarks: values.remarks,
 
-                purchase_quantity: Number(values.purchaseQuantity || 0).toFixed(4),
+                purchase_quantity: Number(values.purchaseQuantity || 0).toFixed(
+                  4,
+                ),
                 purchase_price: Number(values.purchasePrice || 0).toFixed(2),
                 brokerage: Number(values.brokerage || 0).toFixed(2),
                 stt: Number(values.stt || 0).toFixed(2),
                 stamp_charges: Number(values.stampCharges || 0).toFixed(2),
                 other_charges: Number(values.otherCharges || 0).toFixed(2),
                 gst_tax: Number(values.gstAndSTax || 0).toFixed(2),
-                transactional_charges: Number(values.transactionalCharges || 0).toFixed(2),
+                transactional_charges: Number(
+                  values.transactionalCharges || 0,
+                ).toFixed(2),
 
                 purchase_amount: (calcs.purchaseAmount || 0).toFixed(2),
                 total_amount: (calcs.totalAmount || 0).toFixed(2),
@@ -549,7 +636,11 @@ export default function Etf() {
               await updateWealthEntry(selectedRecord.key, payload);
 
               setData((prev) =>
-                prev.map((d) => (d.key === selectedRecord.key ? { ...selectedRecord, ...values, ...calcs } : d))
+                prev.map((d) =>
+                  d.key === selectedRecord.key
+                    ? { ...selectedRecord, ...values, ...calcs }
+                    : d,
+                ),
               );
               setIsEditModalOpen(false);
               editForm.resetFields();
@@ -579,8 +670,11 @@ export default function Etf() {
             >
               Cancel
             </Button>
-            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!"
-              htmlType="submit">
+            <Button
+              type="primary"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit"
+            >
               Save Changes
             </Button>
           </div>

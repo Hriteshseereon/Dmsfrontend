@@ -16,7 +16,10 @@ export const getAssignedOrderById = async (assignedId) => {
 
  //update assigned order
 export const updateAssignedOrder = async (assignedId, payload) => {
-  const res = await api.patch(`/transport/portal/assignments/${assignedId}/update_vehicle/`,payload, {
+   const currentOrgId = useSessionStore.getState().currentOrgId;
+ 
+  const res = await api.patch(`/transport/assignments/${assignedId}/vehicle-details/`,payload, {
+     params: { organisation: currentOrgId }
   });
   return res.data;
 };

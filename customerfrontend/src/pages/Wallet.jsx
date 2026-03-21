@@ -21,29 +21,30 @@ const amber = {
 const walletData = [
   {
     id: 1,
-    type: "Debit",
     noteNo: "CN-1001",
-    item: "Item A",
     amount: 4500,
-    qty: 10,
-    uom: "PCS",
-    refType: "Order",
-    refId: "ORD-9852",
+    customerName: "Customer A",
+    disputNo: "DIS-2290",
     date: "2025-01-15",
-    status: " Not Applied",
+    status: "Paid",
   },
   {
     id: 2,
-    type: "Credit",
     noteNo: "CN-1002",
-    item: "Item B",
     amount: 3000,
-    qty: 5,
-    uom: "BOX",
-    refType: "Dispute",
-    refId: "DIS-2291",
+    customerName: "Customer A",
+   disputNo: "DIS-2291",
     date: "2025-01-20",
-    status: "Applied",
+    status: "Partially Paid",
+  },
+  {
+    id: 3,  
+    noteNo: "CN-1003",
+    amount: 1500,
+    customerName: "Customer A",
+    disputNo: "DIS-2292",
+    date: "2025-01-25",
+    status: "Unpaid",
   },
 ];
 
@@ -55,51 +56,23 @@ const WalletPage = () => {
   const filterData = walletData.filter((row) => {
     return (
       row.noteNo.toLowerCase().includes(search.toLowerCase()) &&
-      (filterType ? row.type === filterType : true) &&
-      (filterRef ? row.refType === filterRef : true)
+      (filterType ? row.status === filterType : true) &&
+      (filterRef ? row.disputNo === filterRef : true)
     );
   });
 
   const columns = [
+   
+   
     {
-      title: <span className="text-amber-700! font-semibold!">Note No</span>,
-      dataIndex: "noteNo",
+      title: <span className="text-amber-700! font-semibold!">Dispute No</span>,
+      dataIndex: "disputNo",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Reference</span>,
-      dataIndex: "refType",
+      title: <span className="text-amber-700! font-semibold!">Customer Name</span>,
+      dataIndex: "customerName",
       render: (text) => <span className="text-amber-800">{text}</span>,
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Type</span>,
-      dataIndex: "type",
-      render: (type) => {
-        const base = "px-3 py-1 rounded-full text-sm font-semibold";
-        if (type === "Credit")
-          return <span className={`${base} text-green-600`}>Credit</span>;
-        return <span className={`${base} text-blue-700`}>Debit</span>;
-      },
-    },
-    {
-      title: <span className="text-amber-700! font-semibold!">Order/Dispute No</span>,
-      dataIndex: "refId",
-      render: (text) => <span className="text-amber-800">{text}</span>,
-    },
-    {
-      title: <span className="text-amber-700! font-semibold!">Item</span>,
-      dataIndex: "item",
-      render: (text) => <span className="text-amber-800">{text}</span>,
-    },
-    {
-      title: <span className="text-amber-700! font-semibold!">Qty</span>,
-      dataIndex: "qty",
-      render: (_, text) => (
-        <span className="text-amber-800">
-          {text.qty}
-          {text.uom}
-        </span>
-      ),
     },
     {
       title: <span className="text-amber-700! font-semibold!">Amount</span>,
@@ -117,15 +90,21 @@ const WalletPage = () => {
       width: 150,
       render: (status) => {
         const base = "px-3 py-1 rounded-full text-sm font-semibold";
-        if (status === "Applied")
+        if (status === "Unpaid")
           return (
             <span className={`${base} bg-red-100 text-red-700`}>
-              Applied
+              Unpaid
+            </span>
+          );
+        if (status === "Partially Paid")
+          return (
+            <span className={`${base} bg-yellow-100 text-yellow-700`}>
+              Partially Paid
             </span>
           );
         return (
           <span className={`${base} bg-green-100 text-green-700`}>
-            Not Applied
+            Paid
           </span>
         );
       },
@@ -154,40 +133,41 @@ const WalletPage = () => {
 
           {/* CREDIT / DEBIT FILTER AS BUTTONS */}
           <div className="flex gap-2">
-            <Button
-              type={filterType === "" ? "primary" : "default"}
+        
+ <Button
+              type={filterType === "Paid" ? "primary" : "default"}
               className={
-                filterType === ""
+                filterType === "Paid"
                   ? "bg-amber-500! text-white! border-none!"
                   : "border-amber-400! text-amber-700! hover:bg-amber-100!"
               }
-              onClick={() => setFilterType("")}
+              onClick={() => setFilterType("Paid")}
             >
-              All
+              Paid
+            </Button>
+            <Button
+              type={filterType === "Partially Paid" ? "primary" : "default"}
+              className={
+                filterType === "Partially Paid"
+                  ? "bg-amber-500! text-white! border-none!"
+                  : "border-amber-400! text-amber-700! hover:bg-amber-100!"
+              }
+              onClick={() => setFilterType("Partially Paid")}
+            >
+              Partially Paid
             </Button>
 
-            <Button
-              type={filterType === "Credit" ? "primary" : "default"}
+           
+            <Button 
+              type={filterType === "Unpaid" ? "primary" : "default"}
               className={
-                filterType === "Credit"
+                filterType === "Unpaid"
                   ? "bg-amber-500! text-white! border-none!"
                   : "border-amber-400! text-amber-700! hover:bg-amber-100!"
               }
-              onClick={() => setFilterType("Credit")}
+              onClick={() => setFilterType("Unpaid")}
             >
-              Credit
-            </Button>
-
-            <Button
-              type={filterType === "Debit" ? "primary" : "default"}
-              className={
-                filterType === "Debit"
-                  ? "bg-amber-500! text-white! border-none!"
-                  : "border-amber-400! text-amber-700! hover:bg-amber-100!"
-              }
-              onClick={() => setFilterType("Debit")}
-            >
-              Debit
+              Unpaid
             </Button>
           </div>
 

@@ -36,7 +36,7 @@ import {
   updateAsset,
   getAssetById,
 } from "../../api/assets";
-
+import { globalSearch } from "../../utils/globalSearch";
 import useSessionStore from "../../store/sessionStore";
 const { Option } = Select;
 const { TextArea } = Input;
@@ -92,8 +92,47 @@ export default function AssetManager() {
     purchaseDate: item.purchase_date ? dayjs(item.purchase_date) : undefined,
 
     purchaseVendor: item.purchase_vendor,
-    purchaseInvoice: item.purchase_invoice,
+    purchaseDetails: item.purchase_details,
+    purchaseGst: item.purchase_gst,
+    purchaseAddress: item.purchase_address,
 
+    serviceContractPerson: item.service_contract_person,
+    serviceAddress: item.service_address,
+    other: item.other,
+
+    // ✅ DOCUMENTS
+    warrantyDoc: item.warranty_doc
+      ? [
+          {
+            uid: "-2",
+            name: item.warranty_doc.split("/").pop(),
+            status: "done",
+            url: item.warranty_doc,
+          },
+        ]
+      : [],
+
+    amcDoc: item.amc_doc
+      ? [
+          {
+            uid: "-3",
+            name: item.amc_doc.split("/").pop(),
+            status: "done",
+            url: item.amc_doc,
+          },
+        ]
+      : [],
+    purchaseInvoice: item.purchase_invoice,
+    purchaseDoc: item.purchase_doc
+      ? [
+          {
+            uid: "-1",
+            name: item.purchase_doc.split("/").pop(),
+            status: "done",
+            url: item.purchase_doc,
+          },
+        ]
+      : [],
     assignedTo: item.assigned_to_employee,
 
     costPrice: Number(item.cost_price),
@@ -329,62 +368,92 @@ export default function AssetManager() {
     },
   };
 
-  const filteredData = data.filter((row) =>
-    ["assetName", "assetId", "assetCategory", "assignedTo", "status"].some(
-      (field) =>
-        (row[field] || "")
-          .toString()
-          .toLowerCase()
-          .includes(searchText.trim().toLowerCase()),
-    ),
-  );
+  const filteredData = globalSearch(data, searchText);
 
   const handleAdd = async (values) => {
     try {
       setLoading(true);
 
-      await addAsset({
-        organisation: currentOrgId, // UUID string
+      const formData = new FormData();
 
-        asset_name: values.assetName,
-        asset_code: values.assetId,
+      formData.append("asset_name", values.assetName);
+      formData.append("asset_code", values.assetId);
+      formData.append("category", values.assetCategoryId || "");
+      formData.append("asset_type", values.assetType);
 
-        category: values.assetCategoryId || null, // ✅ important
-        asset_type: values.assetType,
+      formData.append("serial_number", values.serialNumber || "");
+      formData.append("model_number", values.modelNumber || "");
+      formData.append("brand", values.brand || "");
+      formData.append("purchase_details", values.purchaseDetails || "");
+      formData.append("purchase_gst", values.purchaseGst || "");
+      formData.append("purchase_address", values.purchaseAddress || "");
 
-        serial_number: values.serialNumber || null,
-        model_number: values.modelNumber || null,
-        brand: values.brand || null,
+      formData.append(
+        "service_contract_person",
+        values.serviceContractPerson || "",
+      );
+      formData.append("service_address", values.serviceAddress || "");
+      formData.append("other", values.other || "");
+      formData.append(
+        "purchase_date",
+        values.purchaseDate?.format("YYYY-MM-DD"),
+      );
 
-        purchase_date: values.purchaseDate?.format("YYYY-MM-DD"),
+      formData.append("purchase_vendor", values.purchaseVendor || "");
 
-        purchase_vendor: values.purchaseVendor,
-        purchase_invoice: values.purchaseInvoice,
-        assigned_to_employee: values.assignedTo,
+      // ✅ invoice number (string)
+      formData.append("purchase_invoice", values.purchaseInvoice || "");
 
-        cost_price: values.costPrice?.toString(),
-        current_value: values.currentValue
-          ? values.currentValue.toString()
-          : values.costPrice?.toString(),
+      // ✅ FILE upload
+      if (values.purchaseDoc?.length) {
+        formData.append("purchase_doc", values.purchaseDoc[0].originFileObj);
+      }
+      // ✅ FILES
+      if (values.warrantyDoc?.length) {
+        formData.append("warranty_doc", values.warrantyDoc[0].originFileObj);
+      }
 
-        depreciation_method: values.depreciationMethod || "StraightLine",
-        depreciation_rate: values.depreciationRate?.toString() || "0.00",
+      if (values.amcDoc?.length) {
+        formData.append("amc_doc", values.amcDoc[0].originFileObj);
+      }
+      formData.append("assigned_to_employee", values.assignedTo || "");
+      formData.append("cost_price", values.costPrice?.toString());
+      formData.append(
+        "current_value",
+        values.currentValue?.toString() || values.costPrice?.toString(),
+      );
 
-        warranty_expiry_date: values.warrantyExpiryDate
-          ? values.warrantyExpiryDate.format("YYYY-MM-DD")
-          : null,
+      formData.append(
+        "depreciation_method",
+        values.depreciationMethod || "StraightLine",
+      );
+      formData.append(
+        "depreciation_rate",
+        values.depreciationRate?.toString() || "0",
+      );
 
-        insurance_policy: values.insurancePolicy || null,
+      if (values.warrantyExpiryDate) {
+        formData.append(
+          "warranty_expiry_date",
+          values.warrantyExpiryDate.format("YYYY-MM-DD"),
+        );
+      }
 
-        insurance_expiry_date: values.insuranceExpiryDate
-          ? values.insuranceExpiryDate.format("YYYY-MM-DD")
-          : null,
+      formData.append("insurance_policy", values.insurancePolicy || "");
 
-        barcode_number: values.barcodeNumber || null,
-        location_description: values.assetLocation || null,
-        additional_info: values.additionalInfo || null,
-        status: values.status || "Active",
-      });
+      if (values.insuranceExpiryDate) {
+        formData.append(
+          "insurance_expiry_date",
+          values.insuranceExpiryDate.format("YYYY-MM-DD"),
+        );
+      }
+
+      formData.append("barcode_number", values.barcodeNumber || "");
+      formData.append("location_description", values.assetLocation || "");
+      formData.append("additional_info", values.additionalInfo || "");
+      formData.append("status", values.status || "Active");
+
+      await addAsset(formData);
 
       message.success("Asset created successfully");
       setIsAddModalOpen(false);
@@ -402,41 +471,78 @@ export default function AssetManager() {
     try {
       setLoading(true);
 
-      await updateAsset(selectedRecord.id, {
-        asset_name: values.assetName,
-        asset_code: values.assetId,
-        category: values.assetCategoryId,
-        asset_type: values.assetType,
+      const formData = new FormData();
 
-        serial_number: values.serialNumber || null,
-        model_number: values.modelNumber || null,
-        brand: values.brand || null,
+      formData.append("asset_name", values.assetName);
+      formData.append("asset_code", values.assetId);
+      formData.append("category", values.assetCategoryId);
+      formData.append("asset_type", values.assetType);
 
-        purchase_date: values.purchaseDate?.format("YYYY-MM-DD"),
-        cost_price: values.costPrice,
-        current_value: values.currentValue,
-        purchase_vendor: values.purchaseVendor,
-        purchase_invoice: values.purchaseInvoice,
-        assigned_to_employee: values.assignedTo,
-        depreciation_method: values.depreciationMethod,
-        depreciation_rate: values.depreciationRate,
+      formData.append("serial_number", values.serialNumber || "");
+      formData.append("model_number", values.modelNumber || "");
+      formData.append("brand", values.brand || "");
 
-        location_description: values.assetLocation,
+      formData.append(
+        "purchase_date",
+        values.purchaseDate?.format("YYYY-MM-DD"),
+      );
 
-        status: values.status,
+      formData.append("purchase_vendor", values.purchaseVendor || "");
 
-        warranty_expiry_date: values.warrantyExpiryDate?.format("YYYY-MM-DD"),
-        insurance_policy: values.insurancePolicy,
-        insurance_expiry_date: values.insuranceExpiryDate?.format("YYYY-MM-DD"),
-        barcode_number: values.barcodeNumber,
-      });
+      // ✅ string
+      formData.append("purchase_invoice", values.purchaseInvoice || "");
+
+      // ✅ optional file update
+      if (values.purchaseDoc?.length) {
+        const fileObj = values.purchaseDoc[0];
+
+        // ✅ only send if NEW file uploaded
+        if (fileObj.originFileObj instanceof File) {
+          formData.append("purchase_doc", fileObj.originFileObj);
+        }
+      }
+      // warranty
+      if (values.warrantyDoc?.length) {
+        const f = values.warrantyDoc[0];
+        if (f.originFileObj instanceof File) {
+          formData.append("warranty_doc", f.originFileObj);
+        }
+      }
+
+      // amc
+      if (values.amcDoc?.length) {
+        const f = values.amcDoc[0];
+        if (f.originFileObj instanceof File) {
+          formData.append("amc_doc", f.originFileObj);
+        }
+      }
+
+      // other fields
+      formData.append("purchase_details", values.purchaseDetails || "");
+      formData.append("purchase_gst", values.purchaseGst || "");
+      formData.append("purchase_address", values.purchaseAddress || "");
+
+      formData.append(
+        "service_contract_person",
+        values.serviceContractPerson || "",
+      );
+      formData.append("service_address", values.serviceAddress || "");
+      formData.append("other", values.other || "");
+      formData.append("assigned_to_employee", values.assignedTo || "");
+      formData.append("cost_price", values.costPrice);
+      formData.append("current_value", values.currentValue);
+      formData.append("depreciation_method", values.depreciationMethod);
+      formData.append("depreciation_rate", values.depreciationRate);
+
+      formData.append("location_description", values.assetLocation || "");
+      formData.append("status", values.status);
+
+      await updateAsset(selectedRecord.id, formData);
 
       message.success("Asset updated successfully");
       setIsEditModalOpen(false);
-      editForm.resetFields();
-      setSelectedRecord(null);
       fetchAssets();
-    } catch {
+    } catch (err) {
       message.error("Failed to update asset");
     } finally {
       setLoading(false);
@@ -632,8 +738,45 @@ export default function AssetManager() {
           </Form.Item>
         </Col>
       </Row>
-
       <Row gutter={16}>
+        <Col span={8}>
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Purchase Details
+              </span>
+            }
+            name="purchaseDetails"
+          >
+            <Input disabled={disabled} />
+          </Form.Item>
+        </Col>
+
+        <Col span={8}>
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">Purchase GST</span>
+            }
+            name="purchaseGst"
+          >
+            <Input disabled={disabled} />
+          </Form.Item>
+        </Col>
+
+        <Col span={8}>
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Purchase Address
+              </span>
+            }
+            name="purchaseAddress"
+          >
+            <Input disabled={disabled} />
+          </Form.Item>
+        </Col>
+      </Row>
+      <Row gutter={24}>
         <Col span={8}>
           <Form.Item
             label={
@@ -646,7 +789,66 @@ export default function AssetManager() {
             <Input placeholder="Enter Invoice Number" disabled={disabled} />
           </Form.Item>
         </Col>
+
         <Col span={8}>
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Warranty Document
+              </span>
+            }
+            name="warrantyDoc"
+            valuePropName="fileList"
+            getValueFromEvent={(e) => e?.fileList}
+          >
+            <Upload beforeUpload={() => false} maxCount={1}>
+              {!disabled && <Button icon={<UploadOutlined />}>Upload</Button>}
+            </Upload>
+          </Form.Item>
+        </Col>
+
+        <Col span={8}>
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">AMC Document</span>
+            }
+            name="amcDoc"
+            valuePropName="fileList"
+            getValueFromEvent={(e) => e?.fileList}
+          >
+            <Upload beforeUpload={() => false} maxCount={1}>
+              {!disabled && <Button icon={<UploadOutlined />}>Upload</Button>}
+            </Upload>
+          </Form.Item>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Invoice Document
+              </span>
+            }
+            name="purchaseDoc"
+            valuePropName="fileList"
+            getValueFromEvent={(e) => e?.fileList}
+          >
+            <Upload
+              beforeUpload={() => false}
+              maxCount={1}
+              listType="picture"
+              onPreview={(file) => {
+                const url = file.url || URL.createObjectURL(file.originFileObj);
+                window.open(url, "_blank");
+              }}
+            >
+              {!disabled && (
+                <Button icon={<UploadOutlined />}>Upload File</Button>
+              )}
+            </Upload>
+          </Form.Item>
+        </Col>
+        <Col span={4}>
           <Form.Item
             label={
               <span className="text-amber-700 font-medium">Cost Price</span>
@@ -682,7 +884,7 @@ export default function AssetManager() {
             />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col span={4}>
           <Form.Item
             label={
               <span className="text-amber-700 font-medium">Current Value</span>
@@ -711,10 +913,47 @@ export default function AssetManager() {
           </Form.Item>
         </Col>
       </Row>
+      <h6 className="text-amber-500 mt-4">Service Details</h6>
 
-      <h6 className="text-amber-500 mt-4">Depreciating Costs</h6>
       <Row gutter={16}>
         <Col span={8}>
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Contract Person
+              </span>
+            }
+            name="serviceContractPerson"
+          >
+            <Input disabled={disabled} />
+          </Form.Item>
+        </Col>
+
+        <Col span={8}>
+          <Form.Item
+            label={
+              <span className="text-amber-700 font-medium">
+                Service Address
+              </span>
+            }
+            name="serviceAddress"
+          >
+            <Input disabled={disabled} />
+          </Form.Item>
+        </Col>
+
+        <Col span={8}>
+          <Form.Item
+            label={<span className="text-amber-700 font-medium">Other</span>}
+            name="other"
+          >
+            <Input disabled={disabled} />
+          </Form.Item>
+        </Col>
+      </Row>
+      <h6 className="text-amber-500 mt-4">Depreciating Costs</h6>
+      <Row gutter={16}>
+        <Col span={5}>
           <Form.Item
             label={
               <span className="text-amber-700 font-medium">
@@ -732,7 +971,7 @@ export default function AssetManager() {
             </Select>
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col span={4}>
           <Form.Item
             label={
               <span className="text-amber-700 font-medium">
@@ -762,7 +1001,7 @@ export default function AssetManager() {
             />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col span={6}>
           <Form.Item
             label={
               <span className="text-amber-700 font-medium">
@@ -1117,6 +1356,75 @@ export default function AssetManager() {
         <Form form={viewForm} layout="vertical">
           {renderFormFields(viewForm, true)}
         </Form>
+
+        {/* ✅ FILE PREVIEW */}
+        {/* {selectedRecord?.purchaseDoc?.length > 0 && (
+          <div className="mt-4">
+            <h6 className="text-amber-500 font-semibold mb-2">
+              Invoice Preview
+            </h6>
+
+            {(() => {
+              const file = selectedRecord.purchaseDoc[0];
+              const url = file.url;
+
+              // IMAGE PREVIEW
+              if (url.match(/\.(jpg|jpeg|png|webp)$/i)) {
+                return (
+                  <img
+                    src={url}
+                    alt="invoice"
+                    className="w-72 border rounded shadow"
+                  />
+                );
+              }
+
+              // PDF PREVIEW
+              if (url.match(/\.pdf$/i)) {
+                return (
+                  <iframe
+                    src={url}
+                    title="PDF Preview"
+                    width="100%"
+                    height="400px"
+                    className="border rounded"
+                  />
+                );
+              }
+
+              // OTHER FILE
+              return (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline"
+                >
+                  View Document
+                </a>
+              );
+            })()}
+          </div>
+        )} */}
+        {/* WARRANTY */}
+        {/* {selectedRecord?.warrantyDoc?.length > 0 && (
+          <div className="mt-4">
+            <h6 className="text-amber-500">Warranty Document</h6>
+            <a href={selectedRecord.warrantyDoc[0].url} target="_blank">
+              View Warranty
+            </a>
+          </div>
+        )} */}
+
+        {/* AMC */}
+        {/* {selectedRecord?.amcDoc?.length > 0 && (
+          <div className="mt-4">
+            <h6 className="text-amber-500">AMC Document</h6>
+            <a href={selectedRecord.amcDoc[0].url} target="_blank">
+              View AMC
+            </a>
+          </div>
+        )} */}
       </Modal>
     </div>
   );

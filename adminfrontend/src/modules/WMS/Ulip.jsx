@@ -1,6 +1,11 @@
 // Nps.jsx
 import React, { useState, useEffect } from "react";
-import { addWealthEntry, getWealthEntries, getWealthEntryById, updateWealthEntry } from "../../api/wealth";
+import {
+  addWealthEntry,
+  getWealthEntries,
+  getWealthEntryById,
+  updateWealthEntry,
+} from "../../api/wealth";
 import {
   Table,
   Input,
@@ -46,7 +51,11 @@ export default function Ulip() {
       const response = await getWealthEntries({ asset_category: "ULIP" });
       const mappedData = response.map((item) => ({
         key: item.id,
-        transactionType: item.transaction_type === "PURCHASE" ? "New" : (item.transaction_type.charAt(0).toUpperCase() + item.transaction_type.slice(1).toLowerCase()),
+        transactionType:
+          item.transaction_type === "PURCHASE"
+            ? "New"
+            : item.transaction_type.charAt(0).toUpperCase() +
+              item.transaction_type.slice(1).toLowerCase(),
         planScheme: item.asset_name,
         policyNumber: item.policy_number,
         insuranceCompany: item.insurance_company_name,
@@ -79,21 +88,31 @@ export default function Ulip() {
     fetchData();
   }, []);
 
-  const filteredData = data.filter((row) =>
-    [
-      "transactionType",
-      "planScheme",
-      "assetSelected",
-      "policyNumber",
-      "insuranceCompany",
-      "insuredName",
-      "nominee",
-      "narration",
-    ].some((f) =>
-      (row[f] || "").toString().toLowerCase().includes(searchText.trim().toLowerCase())
-    )
-  );
+  const formatValue = (value) => {
+    if (!value) return "";
 
+    // handle dayjs objects
+    if (dayjs.isDayjs(value)) {
+      return value.format("YYYY-MM-DD");
+    }
+
+    // handle date strings
+    if (typeof value === "string" && dayjs(value).isValid()) {
+      return dayjs(value).format("YYYY-MM-DD");
+    }
+
+    return value.toString();
+  };
+
+  const filteredData = data.filter((row) =>
+    Object.entries(row).some(([key, value]) => {
+      if (key === "key") return false;
+
+      return formatValue(value)
+        .toLowerCase()
+        .includes(searchText.trim().toLowerCase());
+    }),
+  );
   const columns = [
     {
       title: <span className="text-amber-700 font-semibold">Txn Type</span>,
@@ -102,7 +121,9 @@ export default function Ulip() {
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Plan / Scheme</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Plan / Scheme</span>
+      ),
       dataIndex: "planScheme",
       width: 180,
       render: (t) => <span className="text-amber-800">{t}</span>,
@@ -120,7 +141,9 @@ export default function Ulip() {
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">First Premium (₹)</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">First Premium (₹)</span>
+      ),
       dataIndex: "firstPremium",
       width: 140,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
@@ -132,13 +155,17 @@ export default function Ulip() {
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Sum Assured (₹)</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Sum Assured (₹)</span>
+      ),
       dataIndex: "sumAssured",
       width: 150,
       render: (v) => <span className="text-amber-800">{v ?? "-"}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Maturity Date</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Maturity Date</span>
+      ),
       dataIndex: "maturityDate",
       width: 140,
       render: (d) => <span className="text-amber-800">{d || "-"}</span>,
@@ -155,7 +182,11 @@ export default function Ulip() {
               try {
                 const data = await getWealthEntryById(record.key);
                 const mappedData = {
-                  transactionType: data.transaction_type === "PURCHASE" ? "New" : (data.transaction_type.charAt(0).toUpperCase() + data.transaction_type.slice(1).toLowerCase()),
+                  transactionType:
+                    data.transaction_type === "PURCHASE"
+                      ? "New"
+                      : data.transaction_type.charAt(0).toUpperCase() +
+                        data.transaction_type.slice(1).toLowerCase(),
                   planScheme: data.asset_name,
                   policyNumber: data.policy_number,
                   insuranceCompany: data.insurance_company_name,
@@ -163,13 +194,19 @@ export default function Ulip() {
                   brokerName: data.broker_name,
                   brokerAddress: data.broker_address,
                   firstPremium: data.first_premium,
-                  date: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                  date: data.transaction_date
+                    ? dayjs(data.transaction_date)
+                    : undefined,
                   policyDetails: data.policy_details,
                   premiumMode: data.premium_mode,
-                  nextPremiumDueDate: data.next_premium_due_date ? dayjs(data.next_premium_due_date) : undefined,
+                  nextPremiumDueDate: data.next_premium_due_date
+                    ? dayjs(data.next_premium_due_date)
+                    : undefined,
                   nextPremiumAmount: data.next_premium_amount,
                   term: data.term_years,
-                  maturityDate: data.maturity_date ? dayjs(data.maturity_date) : undefined,
+                  maturityDate: data.maturity_date
+                    ? dayjs(data.maturity_date)
+                    : undefined,
                   premiumTerms: data.premium_terms,
                   lockInPeriod: data.lock_in_period,
                   insuredName: data.insured_name,
@@ -192,7 +229,11 @@ export default function Ulip() {
               try {
                 const data = await getWealthEntryById(record.key);
                 const mappedData = {
-                  transactionType: data.transaction_type === "PURCHASE" ? "New" : (data.transaction_type.charAt(0).toUpperCase() + data.transaction_type.slice(1).toLowerCase()),
+                  transactionType:
+                    data.transaction_type === "PURCHASE"
+                      ? "New"
+                      : data.transaction_type.charAt(0).toUpperCase() +
+                        data.transaction_type.slice(1).toLowerCase(),
                   planScheme: data.asset_name,
                   policyNumber: data.policy_number,
                   insuranceCompany: data.insurance_company_name,
@@ -200,13 +241,19 @@ export default function Ulip() {
                   brokerName: data.broker_name,
                   brokerAddress: data.broker_address,
                   firstPremium: data.first_premium,
-                  date: data.transaction_date ? dayjs(data.transaction_date) : undefined,
+                  date: data.transaction_date
+                    ? dayjs(data.transaction_date)
+                    : undefined,
                   policyDetails: data.policy_details,
                   premiumMode: data.premium_mode,
-                  nextPremiumDueDate: data.next_premium_due_date ? dayjs(data.next_premium_due_date) : undefined,
+                  nextPremiumDueDate: data.next_premium_due_date
+                    ? dayjs(data.next_premium_due_date)
+                    : undefined,
                   nextPremiumAmount: data.next_premium_amount,
                   term: data.term_years,
-                  maturityDate: data.maturity_date ? dayjs(data.maturity_date) : undefined,
+                  maturityDate: data.maturity_date
+                    ? dayjs(data.maturity_date)
+                    : undefined,
                   premiumTerms: data.premium_terms,
                   lockInPeriod: data.lock_in_period,
                   insuredName: data.insured_name,
@@ -271,7 +318,11 @@ export default function Ulip() {
       (r.narration || "").replace(/[\n\r]/g, " "),
     ]);
     const csvContent = [headers, ...rows]
-      .map((row) => row.map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`).join(","))
+      .map((row) =>
+        row
+          .map((c) => `"${(c ?? "").toString().replace(/"/g, '""')}"`)
+          .join(","),
+      )
       .join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -305,7 +356,9 @@ export default function Ulip() {
 
         <Col span={10}>
           <Form.Item
-            label={<span className="text-amber-700">Plan / Scheme / New Asset</span>}
+            label={
+              <span className="text-amber-700">Plan / Scheme / New Asset</span>
+            }
             name="planScheme"
             rules={[{ required: true, message: "Enter Plan / Scheme" }]}
           >
@@ -328,7 +381,10 @@ export default function Ulip() {
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Policy Number</span>} name="policyNumber">
+          <Form.Item
+            label={<span className="text-amber-700">Policy Number</span>}
+            name="policyNumber"
+          >
             <Input placeholder="Policy / Policy No" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -336,19 +392,32 @@ export default function Ulip() {
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Insurance Company Name</span>} name="insuranceCompany">
+          <Form.Item
+            label={
+              <span className="text-amber-700">Insurance Company Name</span>
+            }
+            name="insuranceCompany"
+          >
             <Input placeholder="Insurance company" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Insurance Company Address</span>} name="insuranceAddress">
+          <Form.Item
+            label={
+              <span className="text-amber-700">Insurance Company Address</span>
+            }
+            name="insuranceAddress"
+          >
             <Input placeholder="Company address" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Broker Name</span>} name="brokerName">
+          <Form.Item
+            label={<span className="text-amber-700">Broker Name</span>}
+            name="brokerName"
+          >
             <Input placeholder="Broker name" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -356,19 +425,28 @@ export default function Ulip() {
 
       <Row gutter={16}>
         <Col span={12}>
-          <Form.Item label={<span className="text-amber-700">Broker Address</span>} name="brokerAddress">
+          <Form.Item
+            label={<span className="text-amber-700">Broker Address</span>}
+            name="brokerAddress"
+          >
             <Input placeholder="Broker address" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">First Premium (₹)</span>} name="firstPremium">
+          <Form.Item
+            label={<span className="text-amber-700">First Premium (₹)</span>}
+            name="firstPremium"
+          >
             <InputNumber className="w-full" min={0} disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Date</span>} name="date">
+          <Form.Item
+            label={<span className="text-amber-700">Date</span>}
+            name="date"
+          >
             <DatePicker className="w-full" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -376,13 +454,20 @@ export default function Ulip() {
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Policy Details</span>} name="policyDetails">
+          <Form.Item
+            label={<span className="text-amber-700">Policy Details</span>}
+            name="policyDetails"
+          >
             <Input placeholder="Policy notes" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Premium Mode</span>} name="premiumMode" initialValue={PREMIUM_MODES[0]}>
+          <Form.Item
+            label={<span className="text-amber-700">Premium Mode</span>}
+            name="premiumMode"
+            initialValue={PREMIUM_MODES[0]}
+          >
             <Select disabled={disabled}>
               {PREMIUM_MODES.map((m) => (
                 <Option key={m} value={m}>
@@ -394,7 +479,12 @@ export default function Ulip() {
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Next Premium Due Date</span>} name="nextPremiumDueDate">
+          <Form.Item
+            label={
+              <span className="text-amber-700">Next Premium Due Date</span>
+            }
+            name="nextPremiumDueDate"
+          >
             <DatePicker className="w-full" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -402,25 +492,39 @@ export default function Ulip() {
 
       <Row gutter={16}>
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Next Premium Amount (₹)</span>} name="nextPremiumAmount">
+          <Form.Item
+            label={
+              <span className="text-amber-700">Next Premium Amount (₹)</span>
+            }
+            name="nextPremiumAmount"
+          >
             <InputNumber className="w-full" min={0} disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Term (yrs)</span>} name="term">
+          <Form.Item
+            label={<span className="text-amber-700">Term (yrs)</span>}
+            name="term"
+          >
             <InputNumber className="w-full" min={0} disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Maturity Date</span>} name="maturityDate">
+          <Form.Item
+            label={<span className="text-amber-700">Maturity Date</span>}
+            name="maturityDate"
+          >
             <DatePicker className="w-full" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={6}>
-          <Form.Item label={<span className="text-amber-700">Premium Terms</span>} name="premiumTerms">
+          <Form.Item
+            label={<span className="text-amber-700">Premium Terms</span>}
+            name="premiumTerms"
+          >
             <Input placeholder="e.g. Level premium" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -428,19 +532,28 @@ export default function Ulip() {
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Lock-In Period</span>} name="lockInPeriod">
+          <Form.Item
+            label={<span className="text-amber-700">Lock-In Period</span>}
+            name="lockInPeriod"
+          >
             <Input placeholder="e.g. 5 years" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Insured Name</span>} name="insuredName">
+          <Form.Item
+            label={<span className="text-amber-700">Insured Name</span>}
+            name="insuredName"
+          >
             <Input placeholder="Insured person name" disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Nominee</span>} name="nominee">
+          <Form.Item
+            label={<span className="text-amber-700">Nominee</span>}
+            name="nominee"
+          >
             <Input placeholder="Nominee name" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -448,13 +561,19 @@ export default function Ulip() {
 
       <Row gutter={16}>
         <Col span={8}>
-          <Form.Item label={<span className="text-amber-700">Sum Assured (₹)</span>} name="sumAssured">
+          <Form.Item
+            label={<span className="text-amber-700">Sum Assured (₹)</span>}
+            name="sumAssured"
+          >
             <InputNumber className="w-full" min={0} disabled={disabled} />
           </Form.Item>
         </Col>
 
         <Col span={16}>
-          <Form.Item label={<span className="text-amber-700">Narration</span>} name="narration">
+          <Form.Item
+            label={<span className="text-amber-700">Narration</span>}
+            name="narration"
+          >
             <Input placeholder="Optional notes" disabled={disabled} />
           </Form.Item>
         </Col>
@@ -484,13 +603,18 @@ export default function Ulip() {
         </div>
 
         <div className="flex gap-2">
-          <Button icon={<DownloadOutlined />} onClick={exportCSV} className="border-amber-400! text-amber-700! hover:bg-amber-100!">
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={exportCSV}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
             Export
           </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            className="bg-amber-500! hover:bg-amber-600! border-none!" onClick={() => {
+            className="bg-amber-500! hover:bg-amber-600! border-none!"
+            onClick={() => {
               addForm.resetFields();
               setIsAddModalOpen(true);
             }}
@@ -502,14 +626,27 @@ export default function Ulip() {
 
       {/* Table */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
-        <h2 className="text-lg font-semibold text-amber-700 mb-0">ULIP Investments</h2>
-        <p className="text-amber-600 mb-3">Manage insurance-linked investments and fund values</p>
-        <Table columns={columns} dataSource={filteredData} pagination={{ pageSize: 10 }} scroll={{ y: 300 }} />
+        <h2 className="text-lg font-semibold text-amber-700 mb-0">
+          ULIP Investments
+        </h2>
+        <p className="text-amber-600 mb-3">
+          Manage insurance-linked investments and fund values
+        </p>
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          pagination={{ pageSize: 10 }}
+          scroll={{ y: 300 }}
+        />
       </div>
 
       {/* Add Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Add ULIP Investment</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Add ULIP Investment
+          </span>
+        }
         open={isAddModalOpen}
         onCancel={() => {
           setIsAddModalOpen(false);
@@ -525,7 +662,10 @@ export default function Ulip() {
             try {
               const payload = {
                 asset_category: "ULIP",
-                transaction_type: values.transactionType === "New" ? "PURCHASE" : values.transactionType.toUpperCase(),
+                transaction_type:
+                  values.transactionType === "New"
+                    ? "PURCHASE"
+                    : values.transactionType.toUpperCase(),
                 asset_name: values.planScheme,
                 remarks: "ULIP policy",
                 policy_number: values.policyNumber,
@@ -537,15 +677,23 @@ export default function Ulip() {
                 broker_address: values.brokerAddress,
 
                 first_premium: Number(values.firstPremium || 0).toFixed(2),
-                transaction_date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : null,
+                transaction_date: values.date
+                  ? dayjs(values.date).format("YYYY-MM-DD")
+                  : null,
 
                 policy_details: values.policyDetails,
                 premium_mode: values.premiumMode,
-                next_premium_due_date: values.nextPremiumDueDate ? dayjs(values.nextPremiumDueDate).format("YYYY-MM-DD") : null,
-                next_premium_amount: Number(values.nextPremiumAmount || 0).toFixed(2),
+                next_premium_due_date: values.nextPremiumDueDate
+                  ? dayjs(values.nextPremiumDueDate).format("YYYY-MM-DD")
+                  : null,
+                next_premium_amount: Number(
+                  values.nextPremiumAmount || 0,
+                ).toFixed(2),
 
                 term_years: values.term,
-                maturity_date: values.maturityDate ? dayjs(values.maturityDate).format("YYYY-MM-DD") : null,
+                maturity_date: values.maturityDate
+                  ? dayjs(values.maturityDate).format("YYYY-MM-DD")
+                  : null,
                 premium_terms: values.premiumTerms,
 
                 lock_in_period: values.lockInPeriod,
@@ -577,11 +725,14 @@ export default function Ulip() {
                 addForm.resetFields();
               }}
               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-
             >
               Cancel
             </Button>
-            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button
+              type="primary"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit"
+            >
               Add
             </Button>
           </div>
@@ -590,7 +741,11 @@ export default function Ulip() {
 
       {/* Edit Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Edit ULIP Investment</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Edit ULIP Investment
+          </span>
+        }
         open={isEditModalOpen}
         onCancel={() => {
           setIsEditModalOpen(false);
@@ -607,7 +762,10 @@ export default function Ulip() {
             try {
               const payload = {
                 asset_category: "ULIP",
-                transaction_type: values.transactionType === "New" ? "PURCHASE" : values.transactionType.toUpperCase(),
+                transaction_type:
+                  values.transactionType === "New"
+                    ? "PURCHASE"
+                    : values.transactionType.toUpperCase(),
                 asset_name: values.planScheme,
                 remarks: "ULIP policy",
                 policy_number: values.policyNumber,
@@ -619,15 +777,23 @@ export default function Ulip() {
                 broker_address: values.brokerAddress,
 
                 first_premium: Number(values.firstPremium || 0).toFixed(2),
-                transaction_date: values.date ? dayjs(values.date).format("YYYY-MM-DD") : null,
+                transaction_date: values.date
+                  ? dayjs(values.date).format("YYYY-MM-DD")
+                  : null,
 
                 policy_details: values.policyDetails,
                 premium_mode: values.premiumMode,
-                next_premium_due_date: values.nextPremiumDueDate ? dayjs(values.nextPremiumDueDate).format("YYYY-MM-DD") : null,
-                next_premium_amount: Number(values.nextPremiumAmount || 0).toFixed(2),
+                next_premium_due_date: values.nextPremiumDueDate
+                  ? dayjs(values.nextPremiumDueDate).format("YYYY-MM-DD")
+                  : null,
+                next_premium_amount: Number(
+                  values.nextPremiumAmount || 0,
+                ).toFixed(2),
 
                 term_years: values.term,
-                maturity_date: values.maturityDate ? dayjs(values.maturityDate).format("YYYY-MM-DD") : null,
+                maturity_date: values.maturityDate
+                  ? dayjs(values.maturityDate).format("YYYY-MM-DD")
+                  : null,
                 premium_terms: values.premiumTerms,
 
                 lock_in_period: values.lockInPeriod,
@@ -661,11 +827,14 @@ export default function Ulip() {
                 setSelectedRecord(null);
               }}
               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-
             >
               Cancel
             </Button>
-            <Button type="primary" className="bg-amber-500! hover:bg-amber-600! border-none!" htmlType="submit">
+            <Button
+              type="primary"
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              htmlType="submit"
+            >
               Save Changes
             </Button>
           </div>
@@ -674,7 +843,11 @@ export default function Ulip() {
 
       {/* View Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">View ULIP Investment Details</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            View ULIP Investment Details
+          </span>
+        }
         open={isViewModalOpen}
         onCancel={() => {
           setIsViewModalOpen(false);

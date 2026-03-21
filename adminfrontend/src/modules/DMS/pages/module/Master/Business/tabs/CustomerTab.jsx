@@ -18,6 +18,7 @@ import {
   EditOutlined,
   SearchOutlined,
   ReloadOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import { API_BASE_URL } from "@/utils/config";
 import {
@@ -25,13 +26,15 @@ import {
   addAdminCustomer,
   updateAdminCustomer,
   getAdminCustomers,
+  sendCustomerCredential,
 } from "../../../../../../../api/customer";
-
+import { DatePicker } from "antd";
+import dayjs from "dayjs";
 const { Option } = Select;
 
 const inputClass = "border-amber-400 h-8";
 const selectClass = "border-amber-400 h-8 w-full";
-
+const { Password } = Input;
 export default function CustomerTab() {
   const [data, setData] = useState([]);
   const [search, setSearch] = useState("");
@@ -39,9 +42,18 @@ export default function CustomerTab() {
   const [viewMode, setViewMode] = useState(false);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
-
+  const [securityType, setSecurityType] = useState(null);
+  const [sendingId, setSendingId] = useState(null);
   const [form] = Form.useForm();
-
+  const generatePassword = () => {
+    const chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let pass = "";
+    for (let i = 0; i < 8; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return pass;
+  };
   const fileFromUrl = (url) => {
     if (!url) return [];
 
@@ -57,7 +69,15 @@ export default function CustomerTab() {
       },
     ];
   };
-
+  // handler function to auto fill the 6 month
+  const handleBgValidFromChange = (date) => {
+    if (date) {
+      const validUpto = dayjs(date).add(6, "month");
+      form.setFieldsValue({
+        bgValidUpto: validUpto,
+      });
+    }
+  };
   /* ================= FETCH ================= */
   const fetchCustomers = async () => {
     try {
@@ -72,13 +92,20 @@ export default function CustomerTab() {
     }
   };
 
+  // useeffect function to fetch the random password
+  useEffect(() => {
+    if (!selected && open) {
+      form.setFieldsValue({
+        password: generatePassword(),
+      });
+    }
+  }, [open]);
   useEffect(() => {
     fetchCustomers();
   }, []);
 
   /* ================= MAP API → FORM ================= */
   const mapDetailsToForm = (details) => ({
-    customerCode: details.customer_code,
     name: details.customer_name,
     branchName: details.business_name,
     phoneNo: details.phone_number,
@@ -86,42 +113,83 @@ export default function CustomerTab() {
     email: details.email_address,
     type: details.customer_type,
     status: details.status,
-    contactPerson: details.contact_person,
+
     address: details.address,
+    address1: details.address_line1,
     country: details.country,
     state: details.state,
     district: details.district,
     city: details.city,
     pinCode: details.pin_code,
     location: details.location,
-    creditFacility: details.credit_facility,
-    securityForCreditFacility:
-      details.security_for_credit || details.security_for_credit_facility,
-    advCheque: details.advance_cheque_no || details.adv_cheque,
-    amountLimit: details.amount_limit,
-    noDaysLimit: details.days_limit || details.no_days_limit,
-    noInvoiceLimit: details.invoice_limit || details.no_invoice_limit,
-    soudaLimit: details.souda_limit_ton || details.souda_limit,
-    gstNo: details.gst_number || details.gst_no,
-    tinNo: details.tin_number || details.tin_no,
-    panNo: details.pan_number || details.pan_no,
-    aadharNo: details.aadhaar_number || details.aadhar_no,
-    fssaiNo: details.fssai_number || details.fssai_no,
-    licenseNo: details.license_number || details.license_no,
-    tdsApplicable: details.tds_applicable ? "Yes" : "No",
-    billingType: details.billing_type,
 
-    // File mappings
-    gstDoc: fileFromUrl(details.gst_document || details.gst_doc),
-    panDoc: fileFromUrl(details.pan_document || details.pan_doc),
-    aadharDoc: fileFromUrl(details.aadhaar_document || details.aadhar_doc),
+    creditFacility: details.credit_facility,
+    securityForCreditFacility: details.security_for_credit,
+
+    advCheque: details.advance_cheque_no,
+
+    amountLimit: details.amount_limit,
+    noDaysLimit: details.days_limit,
+    noInvoiceLimit: details.invoice_limit,
+    soudaLimit: details.souda_limit_ton,
+
+    gstNo: details.gst_number,
+    tinNo: details.tin_number,
+    panNo: details.pan_number,
+    aadharNo: details.aadhaar_number,
+    fssaiNo: details.fssai_number,
+    licenseNo: details.license_number,
+
+    tdsApplicable: details.tds_applicable ? "Yes" : "No",
+    tdsRate: details.rate_of_tds,
+
+    // ===== BG =====
+    bgBankName: details.bg_bank_name,
+    bgAmount: details.bg_amount,
+    bgNumber: details.bg_number,
+
+    bgDate: details.bg_date ? dayjs(details.bg_date) : null,
+    bgValidFrom: details.bg_valid_from ? dayjs(details.bg_valid_from) : null,
+    bgValidUpto: details.bg_valid_upto ? dayjs(details.bg_valid_upto) : null,
+
+    // ===== PDC =====
+    pdcBank: details.pdc_bank_name,
+    pdcNumber: details.pdc_cheque_number,
+    pdcAmount: details.pdc_amount,
+
+    pdcIssueDate: details.pdc_issue_date ? dayjs(details.pdc_issue_date) : null,
+    pdcDate: details.pdc_cheque_date ? dayjs(details.pdc_cheque_date) : null,
+    pdcValid: details.pdc_valid_upto ? dayjs(details.pdc_valid_upto) : null,
+
+    // ===== FD =====
+    fdBank: details.fd_bank_name,
+    fdCheque: details.fd_cheque_number,
+    fdSecurity: details.fd_security_detail,
+    fdInterest: details.fd_rate_of_interest,
+    fdDate: details.fd_date ? dayjs(details.fd_date) : null,
+
+    // ===== Collateral =====
+    collateralDetails: details.collateral_details,
+    collateralAddress: details.collateral_address,
+    collateralValue: details.collateral_market_value,
+
+    // ===== FILES =====
+    gstDoc: fileFromUrl(details.gst_document),
+    panDoc: fileFromUrl(details.pan_document),
+    aadharDoc: fileFromUrl(details.aadhaar_document),
+    bgDoc: fileFromUrl(details.bg_document),
   });
 
   const openCustomer = async (record, view = false) => {
     try {
       const id = record.customer_id || record.id;
+
       const details = await getAdminCustomerDetails(id);
+
       form.setFieldsValue(mapDetailsToForm(details));
+
+      setSecurityType(details.security_for_credit);
+
       setSelected(details);
       setViewMode(view);
       setOpen(true);
@@ -130,70 +198,146 @@ export default function CustomerTab() {
       message.error("Failed to load customer details");
     }
   };
-
   /* ================= SAVE ================= */
   const handleSubmit = async (values) => {
     try {
       setLoading(true);
-      const payload = {
-        customer_name: values.name,
-        business_name: values.branchName,
-        phone_number: values.phoneNo,
-        mobile_number: values.mobileNo,
-        email_address: values.email,
-        customer_type: values.type,
-        status: values.status,
-        contact_person: values.contactPerson,
-        address: values.address,
-        country: values.country,
-        state: values.state,
-        district: values.district,
-        city: values.city,
-        pin_code: values.pinCode,
-        location: values.location,
-        credit_facility: values.creditFacility,
-        security_for_credit: values.securityForCreditFacility,
-        advance_cheque_no: values.advCheque,
-        amount_limit: Number(values.amountLimit) || 0,
-        days_limit: Number(values.noDaysLimit) || 0,
-        invoice_limit: Number(values.noInvoiceLimit) || 0,
-        souda_limit_ton: Number(values.soudaLimit) || 0,
-        gst_number: values.gstNo,
-        tin_number: values.tinNo,
-        pan_number: values.panNo,
-        aadhaar_number: values.aadharNo,
-        fssai_number: values.fssaiNo,
-        license_number: values.licenseNo,
-        tds_applicable: values.tdsApplicable === "Yes",
-        billing_type: values.billingType,
-      };
 
-      // Extract ID resiliently
-      const id =
-        selected?.customer_id || selected?.id || selected?.customerCode;
+      const formData = new FormData();
 
-      // Add ID to payload if updating (some APIs need it in body)
-      if (selected) {
-        payload.id = id;
-        payload.customer_id = id;
+      // ===== BASIC =====
+      formData.append("customer_name", values.name);
+      formData.append("business_name", values.branchName);
+      formData.append("phone_number", values.phoneNo);
+      formData.append("mobile_number", values.mobileNo);
+      formData.append("email_address", values.email);
+      if (values.password) {
+        formData.append("password", values.password);
+      }
+      formData.append("customer_type", values.type);
+      formData.append("status", values.status);
+
+      // ===== ADDRESS =====
+      formData.append("address", values.address);
+      formData.append("address_line1", values.address1);
+      formData.append("country", values.country);
+      formData.append("state", values.state);
+      formData.append("district", values.district);
+      formData.append("city", values.city);
+      formData.append("pin_code", values.pinCode);
+      formData.append("location", values.location);
+
+      // ===== LEGAL =====
+      formData.append("gst_number", values.gstNo);
+      formData.append("tin_number", values.tinNo);
+      formData.append("pan_number", values.panNo);
+      formData.append("aadhaar_number", values.aadharNo);
+      formData.append("fssai_number", values.fssaiNo);
+      formData.append("license_number", values.licenseNo);
+
+      formData.append("tds_applicable", values.tdsApplicable === "Yes");
+      formData.append("rate_of_tds", values.tdsRate || "1.50");
+
+      // formData.append("billing_type", "REGULAR");
+
+      // ===== CREDIT =====
+      formData.append("credit_facility", values.creditFacility);
+      formData.append("security_for_credit", values.securityForCreditFacility);
+
+      formData.append("amount_limit", values.amountLimit || 0);
+      formData.append("days_limit", values.noDaysLimit || 0);
+      formData.append("invoice_limit", values.noInvoiceLimit || 0);
+      formData.append("souda_limit_ton", values.soudaLimit || 0);
+
+      formData.append("advance_cheque_no", values.advCheque || "");
+
+      // ===== SECURITY TYPES =====
+
+      if (values.securityForCreditFacility === "Bank Guarantee") {
+        formData.append("bg_bank_name", values.bgBankName);
+        formData.append(
+          "bg_date",
+          values.bgDate ? dayjs(values.bgDate).format("YYYY-MM-DD") : "",
+        );
+
+        formData.append("bg_amount", values.bgAmount);
+        formData.append("bg_number", values.bgNumber);
+        formData.append(
+          "bg_valid_from",
+          values.bgValidFrom
+            ? dayjs(values.bgValidFrom).format("YYYY-MM-DD")
+            : "",
+        );
+        formData.append(
+          "bg_valid_upto",
+          values.bgValidUpto
+            ? dayjs(values.bgValidUpto).format("YYYY-MM-DD")
+            : "",
+        );
+
+        if (values.bgDoc?.[0]?.originFileObj) {
+          formData.append("bg_document", values.bgDoc[0].originFileObj);
+        }
       }
 
-      // Handle File Uploads
+      if (values.securityForCreditFacility === "Post Dated Cheque") {
+        formData.append("pdc_bank_name", values.pdcBank);
+        formData.append(
+          "pdc_issue_date",
+          values.pdcIssueDate
+            ? dayjs(values.pdcIssueDate).format("YYYY-MM-DD")
+            : "",
+        );
+        formData.append(
+          "pdc_cheque_date",
+          values.pdcDate ? dayjs(values.pdcDate).format("YYYY-MM-DD") : "",
+        );
+        formData.append("pdc_cheque_number", values.pdcNumber);
+        formData.append("pdc_amount", values.pdcAmount);
+        formData.append(
+          "pdc_valid_upto",
+          values.pdcValid ? dayjs(values.pdcValid).format("YYYY-MM-DD") : "",
+        );
+      }
+
+      if (values.securityForCreditFacility === "Fixed Deposit") {
+        formData.append("fd_bank_name", values.fdBank);
+        formData.append(
+          "fd_date",
+          values.fdDate ? dayjs(values.fdDate).format("YYYY-MM-DD") : "",
+        );
+        formData.append("fd_cheque_number", values.fdCheque);
+        formData.append("fd_security_detail", values.fdSecurity);
+        formData.append("fd_rate_of_interest", values.fdInterest);
+      }
+
+      if (values.securityForCreditFacility === "Collateral") {
+        formData.append("collateral_details", values.collateralDetails);
+        formData.append("collateral_address", values.collateralAddress);
+        formData.append("collateral_market_value", values.collateralValue);
+      }
+
+      // ===== DOCUMENTS =====
+
       if (values.gstDoc?.[0]?.originFileObj) {
-        payload.gst_document = values.gstDoc[0].originFileObj;
-      }
-      if (values.panDoc?.[0]?.originFileObj) {
-        payload.pan_document = values.panDoc[0].originFileObj;
-      }
-      if (values.aadharDoc?.[0]?.originFileObj) {
-        payload.aadhaar_document = values.aadharDoc[0].originFileObj;
+        formData.append("gst_document", values.gstDoc[0].originFileObj);
       }
 
+      if (values.panDoc?.[0]?.originFileObj) {
+        formData.append("pan_document", values.panDoc[0].originFileObj);
+      }
+
+      if (values.aadharDoc?.[0]?.originFileObj) {
+        formData.append("aadhaar_document", values.aadharDoc[0].originFileObj);
+      }
+
+      const id = selected?.customer_id;
+
       if (selected) {
-        await updateAdminCustomer(id, payload);
+        await updateAdminCustomer(id, formData);
         message.success("Customer Updated");
       } else {
-        await addAdminCustomer(payload);
+        await addAdminCustomer(formData);
         message.success("Customer Added");
       }
 
@@ -203,16 +347,42 @@ export default function CustomerTab() {
       fetchCustomers();
     } catch (err) {
       console.error(err);
-      const errorMsg =
-        err.response?.data?.detail ||
-        err.response?.data?.message ||
-        "Save failed";
-      message.error(errorMsg);
+      message.error("Save failed");
     } finally {
       setLoading(false);
     }
   };
+  // mail sending functionality
 
+  const handleSendPassword = async (record) => {
+    try {
+      const partnerId = record.customer_id || record.id;
+
+      setSendingId(partnerId);
+
+      const payload = {
+        partner_type: "customer",
+        partner_id: partnerId,
+      };
+
+      await sendCustomerCredential(payload);
+
+      message.success("Mail successfully sent");
+
+      // update table row immediately
+      setData((prev) =>
+        prev.map((item) =>
+          (item.customer_id || item.id) === partnerId
+            ? { ...item, credentials_sent: true }
+            : item,
+        ),
+      );
+    } catch (error) {
+      message.error("Failed to send mail");
+    } finally {
+      setSendingId(null);
+    }
+  };
   /* ================= TABLE ================= */
   const columns = [
     {
@@ -260,6 +430,29 @@ export default function CustomerTab() {
         </div>
       ),
     },
+    {
+      title: <span className="text-amber-700 font-semibold">Password</span>,
+      render: (_, record) => {
+        const partnerId = record.customer_id || record.id;
+
+        return (
+          <Button
+            size="small"
+            type="primary"
+            disabled={record.credentials_sent}
+            loading={sendingId === partnerId}
+            className={
+              record.credentials_sent
+                ? "bg-green-500! border-none!"
+                : "bg-amber-500! border-none! hover:bg-amber-600!"
+            }
+            onClick={() => handleSendPassword(record)}
+          >
+            {record.credentials_sent ? "Sent" : "Send"}
+          </Button>
+        );
+      },
+    },
   ];
 
   const filteredData = data.filter((c) =>
@@ -301,6 +494,7 @@ export default function CustomerTab() {
           onClick={() => {
             setSelected(null);
             setViewMode(false);
+            setSecurityType(null);
             form.resetFields();
             setOpen(true);
           }}
@@ -356,7 +550,7 @@ export default function CustomerTab() {
               Customer Basic Details
             </h3>
             <Row gutter={24}>
-              <Col span={6}>
+              {/* <Col span={6}>
                 <Form.Item label="Customer Code" name="customerCode">
                   <Input
                     className={inputClass}
@@ -364,7 +558,7 @@ export default function CustomerTab() {
                     placeholder="Auto-generated"
                   />
                 </Form.Item>
-              </Col>
+              </Col> */}
 
               <Col span={6}>
                 <Form.Item
@@ -383,7 +577,13 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={6}>
-                <Form.Item label="Business Name" name="branchName">
+                <Form.Item
+                  label="Business Name"
+                  name="branchName"
+                  rules={[
+                    { required: true, message: "Please enter business name" },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -448,7 +648,24 @@ export default function CustomerTab() {
                   />
                 </Form.Item>
               </Col>
-
+              <Col span={6}>
+                <Form.Item
+                  label="Password"
+                  name="password"
+                  rules={
+                    selected
+                      ? [] // not required when editing
+                      : [{ required: true, message: "Please enter password" }]
+                  }
+                >
+                  <Input.Password
+                    className={inputClass}
+                    disabled={viewMode || selected}
+                    placeholder="Enter password"
+                    type="password"
+                  />
+                </Form.Item>
+              </Col>
               <Col span={4}>
                 <Form.Item
                   label="Customer Type"
@@ -461,7 +678,6 @@ export default function CustomerTab() {
                     placeholder="Select type"
                   >
                     <Option value="Customer">Customer</Option>
-                    <Option value="Supplier">Supplier</Option>
                     <Option value="Both">Both</Option>
                   </Select>
                 </Form.Item>
@@ -489,10 +705,10 @@ export default function CustomerTab() {
           {/* ================= Contact & Address Details ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">
             <h3 className="text-lg font-semibold text-amber-700 mb-3">
-              Contact & Address Details
+              Address Details
             </h3>
             <Row gutter={24}>
-              <Col span={6}>
+              {/* <Col span={6}>
                 <Form.Item label="Contact Person" name="contactPerson">
                   <Input
                     className={inputClass}
@@ -500,10 +716,9 @@ export default function CustomerTab() {
                     placeholder="Enter contact person"
                   />
                 </Form.Item>
-              </Col>
-
+              </Col> */}
               <Col span={6}>
-                <Form.Item label="Address" name="address">
+                <Form.Item label="Address1" name="address1">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -511,29 +726,44 @@ export default function CustomerTab() {
                   />
                 </Form.Item>
               </Col>
-
-              <Col span={4}>
-                <Form.Item label="Country" name="country">
+              <Col span={6}>
+                <Form.Item label="Address2" name="address">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
-                    placeholder="Enter country"
+                    placeholder="Enter address"
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
-                <Form.Item label="State" name="state">
+                <Form.Item
+                  label="City"
+                  name="city"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
-                    placeholder="Enter state"
+                    placeholder="Enter city"
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
-                <Form.Item label="District" name="district">
+                <Form.Item
+                  label="District"
+                  name="district"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -541,13 +771,39 @@ export default function CustomerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
-                <Form.Item label="City" name="city">
+                <Form.Item
+                  label="State"
+                  name="state"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
-                    placeholder="Enter city"
+                    placeholder="Enter state"
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={4}>
+                <Form.Item
+                  label="Country"
+                  name="country"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter country"
                   />
                 </Form.Item>
               </Col>
@@ -574,7 +830,7 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="Location" name="location">
+                <Form.Item label="Google Location" name="location">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -592,7 +848,13 @@ export default function CustomerTab() {
             </h3>
             <Row gutter={24}>
               <Col span={4}>
-                <Form.Item label="Credit Facility" name="creditFacility">
+                <Form.Item
+                  label="Credit Facility type"
+                  name="creditFacility"
+                  rules={[
+                    { required: true, message: "Please select security type" },
+                  ]}
+                >
                   <Select
                     className={selectClass}
                     disabled={viewMode}
@@ -606,15 +868,19 @@ export default function CustomerTab() {
                 </Form.Item>
               </Col>
 
-              <Col span={6}>
+              <Col span={5}>
                 <Form.Item
                   label="Security for Credit"
                   name="securityForCreditFacility"
+                  rules={[
+                    { required: true, message: "Please select security type" },
+                  ]}
                 >
                   <Select
                     className={selectClass}
                     disabled={viewMode}
                     placeholder="Select security"
+                    onChange={(value) => setSecurityType(value)}
                   >
                     <Option value="Bank Guarantee">Bank Guarantee</Option>
                     <Option value="Post Dated Cheque">Post Dated Cheque</Option>
@@ -624,8 +890,351 @@ export default function CustomerTab() {
                   </Select>
                 </Form.Item>
               </Col>
+              {/* ================= Security Fields ================= */}
 
-              <Col span={4}>
+              {securityType === "Bank Guarantee" && (
+                <>
+                  <Col span={5}>
+                    <Form.Item
+                      label="Bank Name"
+                      name="bgBankName"
+                      rules={[{ required: true, message: "Enter Bank Name" }]}
+                    >
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={5}>
+                    <Form.Item
+                      label="Date"
+                      name="bgDate"
+                      rules={[{ required: true, message: "Enter Date" }]}
+                    >
+                      <DatePicker className="w-full" format="YYYY-MM-DD" />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={5}>
+                    <Form.Item
+                      label="Bank Guarantee Amount"
+                      name="bgAmount"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Enter Bank Guarantee amount",
+                        },
+                      ]}
+                    >
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={5}>
+                    <Form.Item
+                      label="Bank Guarantee Number"
+                      name="bgNumber"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Entere Bank Guarantee Number",
+                        },
+                      ]}
+                    >
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={5}>
+                    <Form.Item
+                      label="Valid From"
+                      name="bgValidFrom"
+                      rules={[{ required: true, message: "select Date" }]}
+                    >
+                      <DatePicker
+                        className="w-full"
+                        format="YYYY-MM-DD"
+                        disabled={viewMode}
+                        onChange={handleBgValidFromChange}
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={5}>
+                    <Form.Item
+                      label="Valid Upto"
+                      name="bgValidUpto"
+                      rules={[{ required: true, message: "Select date" }]}
+                    >
+                      <DatePicker
+                        className="w-full"
+                        format="YYYY-MM-DD"
+                        disabled={viewMode}
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={5}>
+                    <Form.Item
+                      label="Upload Document"
+                      name="bgDoc"
+                      valuePropName="fileList"
+                      getValueFromEvent={(e) =>
+                        Array.isArray(e) ? e : e?.fileList
+                      }
+                      rules={[{ required: true, message: "Please upload doc" }]}
+                    >
+                      <div className="w-full">
+                        <Upload
+                          beforeUpload={() => false}
+                          maxCount={1}
+                          listType="picture"
+                          disabled={viewMode}
+                          style={{ width: "100%" }}
+                        >
+                          <Button icon={<UploadOutlined />} block>
+                            Upload Document
+                          </Button>
+                        </Upload>
+                      </div>
+                    </Form.Item>
+                  </Col>
+                </>
+              )}
+              {securityType === "Post Dated Cheque" && (
+                <>
+                  <Col span={5}>
+                    <Form.Item
+                      label="Bank Name"
+                      name="pdcBank"
+                      rules={[
+                        { required: true, message: "Please enter bank name" },
+                      ]}
+                    >
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={5}>
+                    <Form.Item
+                      label="Cheque Issue Date"
+                      name="pdcIssueDate"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please select cheque issue date",
+                        },
+                      ]}
+                    >
+                      <DatePicker
+                        className="w-full"
+                        format="YYYY-MM-DD"
+                        disabled={viewMode}
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={5}>
+                    <Form.Item
+                      label="Cheque Dated"
+                      name="pdcDate"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please select cheque date",
+                        },
+                      ]}
+                    >
+                      <DatePicker
+                        className="w-full"
+                        format="YYYY-MM-DD"
+                        disabled={viewMode}
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={5}>
+                    <Form.Item
+                      label="Cheque Number"
+                      name="pdcNumber"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please enter cheque number",
+                        },
+                      ]}
+                    >
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={5}>
+                    <Form.Item
+                      label="Cheque Amount"
+                      name="pdcAmount"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please enter cheque amount",
+                        },
+                      ]}
+                    >
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={5}>
+                    <Form.Item
+                      label="Valid Upto"
+                      name="pdcValid"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please select valid upto date",
+                        },
+                      ]}
+                    >
+                      <DatePicker
+                        className="w-full"
+                        format="YYYY-MM-DD"
+                        disabled={viewMode}
+                      />
+                    </Form.Item>
+                  </Col>
+                </>
+              )}
+              {securityType === "Fixed Deposit" && (
+                <>
+                  <Col span={5}>
+                    <Form.Item
+                      label="Bank Name"
+                      name="fdBank"
+                      rules={[
+                        { required: true, message: "Please enter bank name" },
+                      ]}
+                    >
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={5}>
+                    <Form.Item
+                      label="Date"
+                      name="fdDate"
+                      rules={[
+                        { required: true, message: "Please select date" },
+                      ]}
+                    >
+                      <DatePicker
+                        className="w-full"
+                        format="YYYY-MM-DD"
+                        disabled={viewMode}
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={5}>
+                    <Form.Item
+                      label="Cheque/RTGS Number"
+                      name="fdCheque"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please enter cheque number",
+                        },
+                      ]}
+                    >
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={5}>
+                    <Form.Item
+                      label="Security Detail/Narration"
+                      name="fdSecurity"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please enter security detail",
+                        },
+                      ]}
+                    >
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={5}>
+                    <Form.Item
+                      label="Rate of Interest"
+                      name="fdInterest"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please enter rate of interest",
+                        },
+                        {
+                          pattern: /^(100|[0-9]{1,2})(\.\d{1,2})?$/,
+                          message: "Enter a valid number between 0 and 100",
+                        },
+                      ]}
+                    >
+                      <Input
+                        className={inputClass}
+                        disabled={viewMode}
+                        placeholder="Enter %"
+                      />
+                    </Form.Item>
+                  </Col>
+                </>
+              )}
+              {securityType === "Collateral" && (
+                <>
+                  <Col span={5}>
+                    <Form.Item
+                      label="Collateral Details"
+                      name="collateralDetails"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please enter collateral details",
+                        },
+                      ]}
+                    >
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={5}>
+                    <Form.Item
+                      label="Address Details"
+                      name="collateralAddress"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please enter address details",
+                        },
+                      ]}
+                    >
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={5}>
+                    <Form.Item
+                      label="Market Value"
+                      name="collateralValue"
+                      rules={[
+                        {
+                          required: true,
+                          message: "Please enter market value",
+                        },
+                      ]}
+                    >
+                      <Input className={inputClass} disabled={viewMode} />
+                    </Form.Item>
+                  </Col>
+                </>
+              )}
+              {/* <Col span={4}>
                 <Form.Item label="Advance Cheque No" name="advCheque">
                   <Input
                     className={inputClass}
@@ -633,20 +1242,38 @@ export default function CustomerTab() {
                     placeholder="Enter cheque number"
                   />
                 </Form.Item>
-              </Col>
+              </Col> */}
 
               <Col span={4}>
-                <Form.Item label="Amount Limit" name="amountLimit">
+                <Form.Item
+                  label="Amount Limit"
+                  name="amountLimit"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Please enter amount limit",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
-                    placeholder="Enter amount limit"
+                    placeholder="100.00"
                   />
                 </Form.Item>
               </Col>
 
-              <Col span={4}>
-                <Form.Item label="Days Limit" name="noDaysLimit">
+              <Col span={5}>
+                <Form.Item
+                  label="Days Limit(No of Days)"
+                  name="noDaysLimit"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Enter Number of Days",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -655,8 +1282,17 @@ export default function CustomerTab() {
                 </Form.Item>
               </Col>
 
-              <Col span={4}>
-                <Form.Item label="Invoice Limit" name="noInvoiceLimit">
+              <Col span={5}>
+                <Form.Item
+                  label="Invoice Limit(No of Invoice)"
+                  name="noInvoiceLimit"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Enter Number of invoice limit",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -666,7 +1302,16 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="Souda Limit (Ton)" name="soudaLimit">
+                <Form.Item
+                  label="Souda Limit (Ton)"
+                  name="soudaLimit"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Enter Souda Limit",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -682,15 +1327,14 @@ export default function CustomerTab() {
             <h3 className="text-lg font-semibold text-amber-700 mb-3">
               Legal & Tax Information
             </h3>
+
             <Row gutter={24}>
               <Col span={4}>
                 <Form.Item
                   label="GST Number"
                   name="gstNo"
                   rules={[
-                    {
-                      message: "Enter a valid GST number",
-                    },
+                    { required: true, message: "Please enter GST number" },
                   ]}
                 >
                   <Input
@@ -709,12 +1353,16 @@ export default function CustomerTab() {
                   getValueFromEvent={(e) =>
                     Array.isArray(e) ? e : e?.fileList
                   }
+                  rules={[
+                    { required: true, message: "Please upload GST document" },
+                  ]}
                 >
                   <Upload
                     beforeUpload={() => false}
                     maxCount={1}
                     disabled={viewMode}
                     listType="picture"
+                    style={{ width: "100%" }}
                     onPreview={(file) => {
                       window.open(
                         file.url || URL.createObjectURL(file.originFileObj),
@@ -722,17 +1370,25 @@ export default function CustomerTab() {
                     }}
                   >
                     <Button
-                      className="w-full text-left bg-white border-amber-400"
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                      className="text-left bg-white border-amber-400"
                       disabled={viewMode}
                     >
-                      Select GST Doc
+                      Upload
                     </Button>
                   </Upload>
                 </Form.Item>
               </Col>
 
               <Col span={4}>
-                <Form.Item label="TIN Number" name="tinNo">
+                <Form.Item
+                  label="TIN Number"
+                  name="tinNo"
+                  rules={[
+                    { required: true, message: "Please enter TIN number" },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -746,9 +1402,7 @@ export default function CustomerTab() {
                   label="PAN Number"
                   name="panNo"
                   rules={[
-                    {
-                      message: "Enter a valid PAN number",
-                    },
+                    { required: true, message: "Please enter PAN number" },
                   ]}
                 >
                   <Input
@@ -767,10 +1421,14 @@ export default function CustomerTab() {
                   getValueFromEvent={(e) =>
                     Array.isArray(e) ? e : e?.fileList
                   }
+                  rules={[
+                    { required: true, message: "Please upload PAN document" },
+                  ]}
                 >
                   <Upload
                     beforeUpload={() => false}
                     maxCount={1}
+                    style={{ width: "100%" }}
                     disabled={viewMode}
                     listType="picture"
                     onPreview={(file) => {
@@ -780,17 +1438,29 @@ export default function CustomerTab() {
                     }}
                   >
                     <Button
-                      className="w-full text-left bg-white border-amber-400"
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                      className=" text-left bg-white border-amber-400"
                       disabled={viewMode}
                     >
-                      Select PAN Doc
+                      Upload
                     </Button>
                   </Upload>
                 </Form.Item>
               </Col>
 
               <Col span={4}>
-                <Form.Item label="Aadhar Number" name="aadharNo">
+                <Form.Item
+                  label="Aadhar Number"
+                  name="aadharNo"
+                  rules={[
+                    { required: true, message: "Please enter Aadhaar number" },
+                    {
+                      pattern: /^[0-9]{12}$/,
+                      message: "Enter a valid 12-digit Aadhaar number",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -807,12 +1477,19 @@ export default function CustomerTab() {
                   getValueFromEvent={(e) =>
                     Array.isArray(e) ? e : e?.fileList
                   }
+                  rules={[
+                    {
+                      required: true,
+                      message: "Please upload Aadhaar document",
+                    },
+                  ]}
                 >
                   <Upload
                     beforeUpload={() => false}
                     maxCount={1}
                     disabled={viewMode}
                     listType="picture"
+                    style={{ width: "100%" }}
                     onPreview={(file) => {
                       window.open(
                         file.url || URL.createObjectURL(file.originFileObj),
@@ -820,17 +1497,25 @@ export default function CustomerTab() {
                     }}
                   >
                     <Button
-                      className="w-full text-left bg-white border-amber-400"
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                      className="text-left bg-white border-amber-400"
                       disabled={viewMode}
                     >
-                      Select Aadhar Doc
+                      Upload
                     </Button>
                   </Upload>
                 </Form.Item>
               </Col>
 
               <Col span={4}>
-                <Form.Item label="FSSAI Number" name="fssaiNo">
+                <Form.Item
+                  label="FSSAI Number"
+                  name="fssaiNo"
+                  rules={[
+                    { required: true, message: "Please enter FSSAI number" },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -839,8 +1524,17 @@ export default function CustomerTab() {
                 </Form.Item>
               </Col>
 
-              <Col span={4}>
-                <Form.Item label="License Number" name="licenseNo">
+              <Col span={5}>
+                <Form.Item
+                  label="Trade License Number"
+                  name="licenseNo"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Please enter trade license number",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -850,7 +1544,13 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="TDS Applicable" name="tdsApplicable">
+                <Form.Item
+                  label="TDS Applicable"
+                  name="tdsApplicable"
+                  rules={[
+                    { required: true, message: "Please select TDS option" },
+                  ]}
+                >
                   <Select
                     className={selectClass}
                     disabled={viewMode}
@@ -863,15 +1563,15 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label="Billing Type" name="billingType">
-                  <Select
-                    className={selectClass}
-                    disabled={viewMode}
-                    placeholder="Select billing type"
-                  >
-                    <Option value="Regular">Regular</Option>
-                    <Option value="Provisional">Provisional</Option>
-                  </Select>
+                <Form.Item
+                  label="Rate of TDS"
+                  name="tdsRate"
+                  rules={[
+                    { required: true, message: "Rate of TDS is required" },
+                  ]}
+                  initialValue="0.10"
+                >
+                  <Input disabled />
                 </Form.Item>
               </Col>
             </Row>

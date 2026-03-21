@@ -7,6 +7,7 @@ import {
   FaUndo,
   FaShoppingCart,
   FaTachometerAlt,
+  FaWallet,
 } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import SaleSouda from "./SaleSouda";
@@ -15,7 +16,9 @@ import SaleReturn from "./SaleReturn";
 import DeliveryStatus from "./DeliveryStatus";
 import SaleDashboard from "./SaleDashboard";
 import SalesDispute from "./SalesDispute";
-import SalesInvoice from "./LoadingDetails";
+import LoadingDetails from "./LoadingDetails";
+import SaleInvoice from "./SaleInvoice";
+import Wallet from "./Wallet";
 
 export const SALES_TAB_DEFINITIONS = [
   {
@@ -39,35 +42,38 @@ export const SALES_TAB_DEFINITIONS = [
     Icon: FaShoppingCart,
     Component: SaleOrders,
   },
-  // {
-  //   id: "status",
-  //   label: "Delivery Status",
-  //   path: "status",
-  //   Icon: FaTruck,
-  //   Component: DeliveryStatus,
-  // },
+ 
   {
-    id: "loadingdetails",
-    label: "Loading Details",
-    path: "loadingdetails",
+    id: "saleinvoice",
+    label: "Sale Invoice",
+    path: "saleinvoice",
     Icon: FaFileInvoice,
-    Component: SalesInvoice,
+    Component: SaleInvoice,
   },
   // {
-  //   id: "return",
-  //   label: "Sale Return",
-  //   path: "return",
-  //   Icon: FaUndo,
-  //   Component: SaleReturn,
+  //   id: "loadingdetails",
+  //   label: "Loading Details",
+  //   path: "loadingdetails",
+  //   Icon: FaTruck,
+  //   Component: LoadingDetails,
   // },
-   {
+ 
+  {
     id: "dispute",
     label: "Sale Dispute",
     path: "dispute",
     Icon: FaUndo,
     Component: SalesDispute,
-    
+
   },
+  {
+    id: "wallet",
+    label: "Wallet",
+    path: "wallet",
+    Icon: FaWallet,
+    Component: Wallet,
+  }
+
 ];
 
 const normalize = (values = []) =>

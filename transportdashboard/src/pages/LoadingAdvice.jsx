@@ -9,7 +9,7 @@ import {
   Row,
   Col,
   Select,
-  Space,
+  message,
 } from "antd";
 import {
   SearchOutlined,
@@ -17,10 +17,11 @@ import {
   EyeOutlined,
   EditOutlined,
   FilterOutlined,
-  PlusOutlined,
-  DeleteOutlined,
+ PrinterOutlined,
+ 
 } from "@ant-design/icons";
-import { getLoadingAdvice ,getLoadingAdviceById,updateLoadingAdvice} from "../api/loadingAdvice";
+import { getLoadingAdvice ,getLoadingAdviceById,updateLoadingAdvice,downloadLoadingAdvicePDF, 
+  printLoadingAdvice } from "../api/loadingAdvice";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 dayjs.extend(customParseFormat);
@@ -67,7 +68,7 @@ console.log(res); // 🔥 IMPORTANT
       plantAddress: item.plant_details?.address,
       plantPhoneNumber: item.plant_details?.phone_number,
 
-      vehicleNo: item.vehicle_no,
+      vehicleNo: item.vehicle_number,
       driverName: item.driver_name,
       driverContact: item.driver_contact,
 
@@ -119,7 +120,7 @@ const mapApiToForm = (item) => {
     plantAddress: item.plant_details?.address,
     plantPhoneNumber: item.plant_details?.phone_number,
 
-    vehicleNo: item.vehicle_no,
+    vehicleNo: item.vehicle_number,
     driverName: item.driver_name,
     driverContact: item.driver_contact,
 
@@ -134,7 +135,15 @@ const mapApiToForm = (item) => {
     tareWeights: item.tare_weight_kg,
     grossWeights: item.gross_weight_kg,
     netWeight: item.net_weight_kg,
-
+     deliveries: item.deliveries?.map((d) => ({
+  id: d.id,
+  sales_order_number: d.sales_order_number,
+  customer_name: d.customer_name,
+  customer_delivery_address: d.customer_delivery_address,
+  delivery_date: d.delivery_date,
+  status: d.status,
+  items: d.items || []
+})) || [],  
     items: item.items?.map((i, idx) => ({
       key: i.id,
       slNo: idx + 1,
@@ -146,6 +155,8 @@ variance: parseFloat(i.variance) || 0, uom: i.uom_details?.unit_name,
     })),
   };
 };
+
+
 const handleEdit = async (record) => {
   try {
    const res = await getLoadingAdviceById(record.key);
@@ -178,28 +189,43 @@ setIsViewModalOpen(true);
   }
 };
 
-  const filteredData = data.filter(
-    (item) =>
-      item.adviceNo?.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.poNo?.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.vendorName?.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.plantName?.toLowerCase().includes(searchText.toLowerCase()) ||
-      item.status?.toLowerCase().includes(searchText.toLowerCase())
+ const filteredData = data.filter((item) => {
+  const val = searchText.toLowerCase();
+  return (
+    item.adviceNo?.toLowerCase().includes(val) ||
+    item.invoice_number?.toLowerCase().includes(val) ||
+    item.vendorName?.toLowerCase().includes(val) ||
+    item.plantName?.toLowerCase().includes(val) ||
+    item.status?.toLowerCase().includes(val) ||
+    item.items?.some((i) => i.itemName?.toLowerCase().includes(val))
   );
+});
 
  const handleFormSubmit = async () => {
   try {
     const values = await editForm.validateFields();
     console.log("FINAL ITEMS BEFORE PATCH", items); // ✅ HERE
     const currentRecord = selectedRecord;
+     // 🚨 CHECK IF STATUS CHANGED
+   const currentStatus = currentRecord.status;
 
+// force change only before In-Transit
+const forceChangeStatuses = ["Approved"];
+
+if (
+  forceChangeStatuses.includes(currentStatus) &&
+  values.status === currentStatus
+) {
+  message.warning("Please update status before submitting");
+  return;
+}
     const payload = {
       // 🔥 map UI → API fields
       advice_date: values.adviceDate?.format("YYYY-MM-DD"),
       way_bill: values.wayBill,
       delivery_address: values.deliveryAddress,
 
-      vehicle_no: values.vehicleNo,
+      vehicle_number: values.vehicleNo,
       driver_name: values.driverName,
       driver_contact: values.driverContact,
 
@@ -222,7 +248,12 @@ setIsViewModalOpen(true);
   id: i.key,
   actual_qty: Number(i.actualQty) || 0,
   required_qty: Number(i.reqQty) || 0,
+  variance: Number(i.variance) || 0,
 })),
+ deliveries: selectedRecord.deliveries.map((d) => ({
+    id: d.id,
+    status: d.status
+  }))
     };
 
     console.log("PATCH PAYLOAD", payload);
@@ -248,8 +279,10 @@ setIsViewModalOpen(true);
       
       case "In-Transit":
         return `${base} bg-blue-100! text-blue-700!`;
-      case "Out for delivery":
+      case "Out for Delivery":
         return `${base} bg-yellow-100! text-yellow-700!`;
+        case "Partially Delivered":
+        return `${base} bg-purple-100! text-purple-700!`;
       case "Delivered":
         return `${base} bg-green-100! text-green-700!`;
       default:
@@ -278,19 +311,40 @@ setIsViewModalOpen(true);
         : null,
     };
   };
+const getSaleOrderAllowedStatus = (currentStatus) => {
+  const flow = {
+    "In-Transit": ["Out for Delivery"],
+    "Out for Delivery": ["Delivered"],
+    "Delivered": ["Delivered"]
+  };
 
+  return flow[currentStatus] || [currentStatus];
+};
  
 const getAllowedStatusOptions = (currentStatus) => {
   const flow = {
-    Approved: ["In-Transit", "Out for delivery", "Delivered"],
-    "In-Transit": ["Out for delivery", "Delivered"],
-    "Out for delivery": ["Delivered"],
+    Approved: ["Dispatched"],
+    Dispatched: ["In-Transit"],
+    "In-Transit": ["Out for Delivery"],
+    "Out for Delivery": ["Delivered"],
+    "Partially Delivered": ["Partially Delivered", "Delivered"],
     Delivered: ["Delivered"],
   };
 
   return flow[currentStatus] || [];
 };
 
+const disableAfterTransitStatuses = [
+  "Dispatched",
+  "In-Transit",
+  "Out for Delivery",
+  "Partially Delivered",
+  "Delivered",
+];
+
+const isAfterTransit = disableAfterTransitStatuses.includes(
+  selectedRecord?.status
+);
  const updateItem = (key, field, value) => {
   setItems((prev) =>
     prev.map((item) => {
@@ -324,7 +378,7 @@ const getAllowedStatusOptions = (currentStatus) => {
       render: (text) => <span className="text-amber-800 font-medium">{text}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Invoice No</span>,
+      title: <span className="text-amber-700 font-semibold">Assign No</span>,
       dataIndex: "invoice_number",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
@@ -368,15 +422,151 @@ const getAllowedStatusOptions = (currentStatus) => {
             className="cursor-pointer! text-red-500! hover:text-red-700! text-lg!"
             onClick={() => handleEdit(record)}
           />
+          
         </div>
       ),
     },
+   {
+  title: <span className="text-amber-700 font-semibold">Documents</span>,
+  width: 120,
+  render: (record) => (
+    <div className="flex gap-3 justify-center">
+      
+      {record.status === "In-Transit" && (
+        <>
+          <DownloadOutlined
+            className="cursor-pointer! text-green-600! text-lg!"
+            title="Download PDF"
+            onClick={() => downloadLoadingAdvicePDF(record.key)}
+          />
+
+          <PrinterOutlined
+            className="cursor-pointer! text-purple-600! text-lg!"
+            title="Print"
+            onClick={() => printLoadingAdvice(record.key)}
+          />
+        </>
+      )}
+
+    </div>
+  ),
+}
   ];
 
+const renderSaleOrderDetails = () => {
+
+  const visibleStatuses = [
+    "In-Transit",
+    "Out for Delivery",
+    "Partially Delivered",
+    "Delivered",
+  ];
+
+  if (!selectedRecord || !visibleStatuses.includes(selectedRecord.status)) {
+    return null;
+  }
+
+  const saleOrders = selectedRecord.deliveries || [];
+
+  if (!saleOrders.length) return null;
+
+  return (
+    <>
+      <h6 className="text-amber-500 pb-2 font-semibold">
+        Customer Order Details
+      </h6>
+
+      {saleOrders.map((order, index) => (
+        <div
+          key={index}
+          className="border border-amber-200 rounded-lg p-3 mb-3"
+        >
+
+          <Row gutter={24}>
+            <Col span={6}>
+              <Form.Item label="Customer Order No">
+                <Input value={order.sales_order_number} disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item label="Customer Name">
+                <Input value={order.customer_name} disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item label="Delivery Address">
+                <Input value={order.customer_delivery_address} disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={6}>
+              <Form.Item label="Delivery Date">
+                <DatePicker
+                  value={dayjs(order.delivery_date)}
+                  className="w-full"
+                  disabled
+                />
+              </Form.Item>
+            </Col>
+                          <Col span={6}>
+ <Form.Item label="Status">
+<Select
+  value={order.status}
+  onChange={(value) => {
+    const updatedDeliveries = selectedRecord.deliveries.map((d, i) =>
+      i === index ? { ...d, status: value } : d
+    );
+
+    setSelectedRecord({
+      ...selectedRecord,
+      deliveries: updatedDeliveries,
+    });
+  }}
+>
+  {getSaleOrderAllowedStatus(order.status).map((st) => (
+    <Select.Option key={st} value={st}>
+      {st}
+    </Select.Option>
+  ))}
+</Select>
+  </Form.Item>
+</Col>
+          </Row>
+
+          {order.items?.map((item, i) => (
+            <Row gutter={24} key={i}>
+
+              <Col span={6}>
+                <Form.Item label="Item">
+                  <Input value={item.item_name} disabled />
+                </Form.Item>
+              </Col>
+
+              <Col span={6}>
+                <Form.Item label="Quantity">
+                  <Input value={item.order_qty} disabled />
+                </Form.Item>
+              </Col>
+
+              <Col span={6}>
+                <Form.Item label="Delivered Qty">
+                  <Input value={item.delivered_qty} disabled />
+                </Form.Item>
+              </Col>
+
+            </Row>
+          ))}
+        </div>
+      ))}
+    </>
+  );
+};
   const renderVendorPlantDetails = (disabled = false) => {
     return (
       <>
-        <div className="text-base font-semibold m-0 text-amber-600 mb-3">
+        <div className="text-base font-semibold m-2 text-amber-600 mt-2!">
           Vendor Details
         </div>
         <Row gutter={24}>
@@ -384,7 +574,7 @@ const getAllowedStatusOptions = (currentStatus) => {
             <Form.Item
               label="Vendor Name"
               name="vendorName"
-              rules={[{ required: true, message: "Required" }]}
+            //  rules={[{ required: true, message: "Required" }]}
             >
               <Input disabled />
             </Form.Item>
@@ -393,7 +583,7 @@ const getAllowedStatusOptions = (currentStatus) => {
             <Form.Item
               label="Address"
               name="vendorAddress"
-              rules={[{ required: true, message: "Required" }]}
+             // rules={[{ required: true, message: "Required" }]}
             >
               <Input disabled />
             </Form.Item>
@@ -403,7 +593,7 @@ const getAllowedStatusOptions = (currentStatus) => {
             <Form.Item
               label="Contact Person"
               name="vendorContactPerson"
-              rules={[{ required: true, message: "Required" }]}
+             // rules={[{ required: true, message: "Required" }]}
             >
               <Input disabled/>
             </Form.Item>
@@ -412,14 +602,14 @@ const getAllowedStatusOptions = (currentStatus) => {
             <Form.Item
               label="Phone Number"
               name="vendorPhoneNumber"
-              rules={[{ required: true, message: "Required" }]}
+             // rules={[{ required: true, message: "Required" }]}
             >
               <Input disabled />
             </Form.Item>
           </Col>
         </Row>
 
-        <div className="text-base font-semibold m-0 text-amber-600 mb-3 mt-4">
+        <div className="text-base font-semibold m-0 text-amber-600 mb-2">
           Plant Details
         </div>
         <Row gutter={24}>
@@ -427,7 +617,7 @@ const getAllowedStatusOptions = (currentStatus) => {
             <Form.Item
               label="Plant Name"
               name="plantName"
-              rules={[{ required: true, message: "Required" }]}
+             // rules={[{ required: true, message: "Required" }]}
             >
               <Input disabled />
             </Form.Item>
@@ -438,7 +628,7 @@ const getAllowedStatusOptions = (currentStatus) => {
             <Form.Item
               label="Address"
               name="plantAddress"
-              rules={[{ required: true, message: "Required" }]}
+             // rules={[{ required: true, message: "Required" }]}
             >
               <Input disabled />
             </Form.Item>
@@ -447,7 +637,7 @@ const getAllowedStatusOptions = (currentStatus) => {
             <Form.Item
               label="Contact Person"
               name="vendorContactPerson"
-              rules={[{ required: true, message: "Required" }]}
+             // rules={[{ required: true, message: "Required" }]}
             >
               <Input disabled />
             </Form.Item>
@@ -456,7 +646,7 @@ const getAllowedStatusOptions = (currentStatus) => {
             <Form.Item
               label="Phone Number"
               name="plantPhoneNumber"
-              rules={[{ required: true, message: "Required" }]}
+             // rules={[{ required: true, message: "Required" }]}
             >
               <Input disabled/>
             </Form.Item>
@@ -468,7 +658,7 @@ const getAllowedStatusOptions = (currentStatus) => {
 
 const renderTransportDetails = (disabled = false) => (
   <>
-    <div className="text-base font-semibold m-0 text-amber-600 mb-3 mt-4">
+    <div className="text-base font-semibold m-0 text-amber-600 mb-2 ">
       Transport Details
     </div>
     <Row gutter={24}>
@@ -519,7 +709,7 @@ const renderTransportDetails = (disabled = false) => (
 );
 const renderLoadingDetails = (disabled = false) => (
   <>
-    <div className="text-base font-semibold m-0 text-amber-600 mb-3 mt-4">
+    <div className="text-base font-semibold m-0 text-amber-600 mb-3">
       Loading Details
     </div>
     <Row gutter={24}>
@@ -625,25 +815,26 @@ const renderLoadingDetails = (disabled = false) => (
     />
   </Form.Item>
 </Col>
-
-        <Col span={4}>
+ <Col span={4}>
               <Form.Item
                 label="Status"
                 name="status"
                 rules={[{ required: true, message: "Required" }]}
               >
                <Select
-                 disabled={disabled} 
+                
   options={getAllowedStatusOptions(editForm.getFieldValue("status")).map(
     (status) => ({
       label: status,
       value: status,
     })
   )}
+    disabled={disabled}
 />
 
               </Form.Item>
             </Col>
+       
     </Row>
   </>
 );
@@ -653,13 +844,13 @@ const renderLoadingDetails = (disabled = false) => (
     {
       title: "SL No.",
       dataIndex: "slNo",
-      width: 50,
+        width:20,
       render: (text) => <span className="font-medium">{text}</span>,
     },
     {
       title: "Item Name",
       dataIndex: "itemName",
-      width: 100,
+         width:20,
       render: (text) => <span>{text}</span>,
     },
    
@@ -667,29 +858,36 @@ const renderLoadingDetails = (disabled = false) => (
     {
       title: "Required Qty",
       dataIndex: "reqQty",
-      width: 50,
+           width:20,
       render: (text) => <span>{text}</span>,
     },
-    {
-      title: "Actual Qty",
-      dataIndex: "actualQty",
-      width: 50,
-    render: (_, record) => (
-  <Input
-    type="number"
-    value={record.actualQty}
-      disabled={disabled} 
-    onChange={(e) =>
-      updateItem(record.key, "actualQty", e.target.value)
-    }
-    placeholder="0"
-  />
-)
-    },
+   {
+  title: "Actual Qty",
+  dataIndex: "actualQty",
+  width: 20,
+  render: (_, record) => (
+    <Input
+      type="number"
+      value={record.actualQty}
+      disabled={disabled}
+      onChange={(e) => {
+        const value = Number(e.target.value);
+
+        if (value > record.reqQty) {
+          message.error("Actual Qty cannot be greater than Required Qty");
+          return;
+        }
+
+        updateItem(record.key, "actualQty", value);
+      }}
+      placeholder="0"
+    />
+  ),
+},
     {
       title: "Variance",
       dataIndex: "variance",
-      width: 50,
+      width:20,
       render: (text) => (
         <span
           className={`font-semibold ${
@@ -703,7 +901,7 @@ const renderLoadingDetails = (disabled = false) => (
     {
       title: "UOM",
       dataIndex: "uom",
-      width: 50,
+           width:20,
       render: (text, record) =>
         disabled ? (
           <span>{text}</span>
@@ -725,7 +923,7 @@ const renderLoadingDetails = (disabled = false) => (
 
   return (
     <>
-      <div className="flex justify-between items-center mb-3 mt-4">
+      <div className="flex justify-between items-center mb-2 ">
         <div className="text-base font-semibold text-amber-600">
           Item Details
         </div>
@@ -759,7 +957,7 @@ const renderLoadingDetails = (disabled = false) => (
    <div className="flex gap-2">
           <Input
             prefix={<SearchOutlined className="text-amber-600!" />}
-            placeholder="Search Advice No, PO, Vendor..."
+            placeholder="Search..."
             className="w-64! border-amber-300! focus:border-amber-500!"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
@@ -830,7 +1028,7 @@ const renderLoadingDetails = (disabled = false) => (
             </Col>
             
             <Col span={4}>
-              <Form.Item label="Invoice No" name="invoice_number">
+              <Form.Item label="Assign No" name="invoice_number">
                 <Input disabled />
               </Form.Item>
             </Col>
@@ -843,20 +1041,18 @@ const renderLoadingDetails = (disabled = false) => (
                 <Input disabled/>
               </Form.Item>
             </Col>
-            <Col span={4}>
-              <Form.Item label="Delivery Address" name="deliveryAddress">
-                <Input disabled />
-              </Form.Item>
-            </Col>
+          
           
           </Row>
+  {renderTransportDetails(false)}
+       {renderLoadingDetails(isAfterTransit)}
 
-         {renderLoadingDetails(false)}
-{renderItemsTable(false)}
-{renderTransportDetails(false)}
+{renderItemsTable(isAfterTransit)}
+
+
 {renderVendorPlantDetails(false)}
 
-
+{renderSaleOrderDetails()}
           <div className="flex justify-end gap-2 mt-4">
             <Button
               onClick={() => {
@@ -903,7 +1099,7 @@ const renderLoadingDetails = (disabled = false) => (
               </Form.Item>
             </Col>
              <Col span={4}>
-              <Form.Item label="Invoice No" name="invoice_number">
+              <Form.Item label="Assign No" name="invoice_number">
                 <Input disabled />
               </Form.Item>
             </Col>
@@ -914,10 +1110,12 @@ const renderLoadingDetails = (disabled = false) => (
             </Col>
             
           </Row>
+          
+{renderTransportDetails(true)}
 {renderLoadingDetails(true)}
 {renderItemsTable(true)}
-{renderTransportDetails(true)}
 {renderVendorPlantDetails(true)}
+{renderSaleOrderDetails()}
 
         </Form>
       </Modal>

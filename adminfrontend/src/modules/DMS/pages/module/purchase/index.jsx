@@ -1,6 +1,6 @@
 import { Route, Routes, Navigate } from "react-router-dom";
 import PurchaseDashboard from "./PurchaseDashboard";
-import DeliveryStatus from "./DeliveryStatus";
+import Invoice from "./Invoice";
 import LoadingAdvice from "./LoadingAdvice";
 import PurchaseIndent from "./PurchaseIndent";
 import PurchaseInvoice from "./PurchaseInvoice";
@@ -15,9 +15,9 @@ const tabComponentMap = {
   dashboard: <PurchaseDashboard />,
   souda: <PurchaseSouda />,
   indent: <PurchaseIndent />,
-  invoice: <PurchaseInvoice />,
+  assign: <PurchaseInvoice />,
   loading: <LoadingAdvice />,
-  status: <DeliveryStatus />,
+  invoice: <Invoice />,
   return: <PurchaseReturn />,
 };
 
@@ -40,15 +40,16 @@ export default function PurchaseRoutes({ allowedTabs }) {
       <Route path="souda" element={guard("souda", tabComponentMap.souda)} />
       <Route path="indent" element={guard("indent", tabComponentMap.indent)} />
       <Route
-        path="invoice"
-        element={guard("invoice", tabComponentMap.invoice)}
+        path="assign"
+        element={guard("assign", tabComponentMap.assign)}
       />
-      <Route path="return" element={guard("return", tabComponentMap.return)} />
-      <Route
+       <Route
         path="loading"
         element={guard("loading", tabComponentMap.loading)}
       />
-      <Route path="status" element={guard("status", tabComponentMap.status)} />
+      <Route path="invoice" element={guard("invoice", tabComponentMap.invoice)} />
+        <Route path="return" element={guard("return", tabComponentMap.return)} />
+   
     </Routes>
   );
 }

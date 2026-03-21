@@ -21,6 +21,7 @@ import {
   SearchOutlined,
   ReloadOutlined,
   MinusCircleOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 
@@ -100,6 +101,7 @@ export default function VendorTab() {
   const mapDetailsToForm = (d) => ({
     name: d.name || d.company_name,
     shortName: d.short_name,
+    companyType: d.company_type,
     mobileNo1: d.mobile_no_1,
     mobileNo2: d.mobile_no_2,
     phoneNumber: d.phone_number,
@@ -108,7 +110,7 @@ export default function VendorTab() {
     email2: d.secondary_email,
     socialLink: d.social_link,
     websiteUrl: d.company_website,
-
+    companyGroupName: d.company_group_name,
     contactPerson:
       d.contact_person_input?.name ||
       d.contact_person_input?.contact_person_name ||
@@ -207,6 +209,7 @@ export default function VendorTab() {
     const payload = {
       name: values.name,
       short_name: values.shortName,
+      company_type: values.companyType,
       mobile_no_1: values.mobileNo1?.toString(),
       mobile_no_2: values.mobileNo2?.toString(),
       phone_number:
@@ -217,7 +220,7 @@ export default function VendorTab() {
       social_link: values.socialLink,
       company_website: values.websiteUrl,
       is_active: values.status === "Active",
-
+      company_group_name: values.companyGroupName,
       contact_person_input: {
         name: values.contactPerson || "",
         gender: values.gender,
@@ -402,16 +405,16 @@ export default function VendorTab() {
             setOpen(true);
           }}
         >
-          Add Vendor
+          Add Supplier
         </Button>
       </div>
 
       {/* ===== TABLE CONTAINER ===== */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
-          Vendor Records
+          Supplier Records
         </h2>
-        <p className="text-amber-600 mb-3">Manage your vendor data</p>
+        <p className="text-amber-600 mb-3">Manage your supplier data</p>
         <Table
           columns={columns}
           dataSource={filteredData}
@@ -434,7 +437,11 @@ export default function VendorTab() {
         }}
         title={
           <span className="text-amber-700 font-semibold text-lg">
-            {viewMode ? "View Vendor" : selected ? "Edit Vendor" : "Add Vendor"}
+            {viewMode
+              ? "View Supplier"
+              : selected
+                ? "Edit Supplier"
+                : "Add Supplier"}
           </span>
         }
         styles={{
@@ -445,20 +452,24 @@ export default function VendorTab() {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          initialValues={{ status: "Active", igstApplicable: "No" }}
+          initialValues={{
+            status: "Active",
+            igstApplicable: "No",
+            companyType: "Supplier",
+          }}
         >
           {/* ================= Vendor / Company Details ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">
             <h3 className="text-lg font-semibold text-amber-700 mb-3">
-              Vendor / Company Details
+              Supplier Details
             </h3>
             <Row gutter={24}>
               <Col span={6}>
                 <Form.Item
-                  label="Company Name"
+                  label="Supplier Name"
                   name="name"
                   rules={[
-                    { required: true, message: "Company name is required" },
+                    { required: true, message: "Supplier name is required" },
                   ]}
                 >
                   <Input
@@ -604,6 +615,24 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
+              <Col span={4}>
+                <Form.Item
+                  label="Supplier Type"
+                  name="companyType"
+                  rules={[
+                    { required: true, message: "Please select supplier type" },
+                  ]}
+                >
+                  <Select
+                    className={selectClass}
+                    disabled={viewMode}
+                    placeholder="Select Type"
+                  >
+                    <Option value="Supplier">Supplier</Option>
+                    <Option value="Both">Both</Option>
+                  </Select>
+                </Form.Item>
+              </Col>
             </Row>
           </Card>
 
@@ -693,7 +722,7 @@ export default function VendorTab() {
                 </Form.Item>
               </Col>
 
-              <Col span={6}>
+              {/* <Col span={6}>
                 <Form.Item label="Aadhar No" name="aadharNo">
                   <Input
                     className={inputClass}
@@ -702,10 +731,10 @@ export default function VendorTab() {
                     maxLength={14}
                   />
                 </Form.Item>
-              </Col>
+              </Col> */}
 
-              <Col span={6}>
-                {/* <Form.Item label="Aadhar Document" name="aadharDoc"> */}
+              {/* <Col span={6}>
+                
                 <Form.Item
                   name="aadharDoc"
                   label="Aadhar Document"
@@ -725,7 +754,7 @@ export default function VendorTab() {
                     <Button disabled={viewMode}>Select File</Button>
                   </Upload>
                 </Form.Item>
-              </Col>
+              </Col> */}
             </Row>
           </Card>
 
@@ -735,86 +764,6 @@ export default function VendorTab() {
               Tax & Registration
             </h3>
             <Row gutter={24}>
-              <Col span={4}>
-                <Form.Item
-                  label="TIN No"
-                  name="tinNo"
-                  rules={[
-                    {
-                      pattern: /^[A-Z0-9]{11,15}$/,
-                      message: "Please enter a valid TIN number",
-                    },
-                  ]}
-                >
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="TIN1234567890"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item label="TIN Date" name="tinDate">
-                  <DatePicker className="w-full h-10" disabled={viewMode} />
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                {/* <Form.Item label="TIN Document" name="tinDoc"> */}
-                <Form.Item
-                  name="tinDoc"
-                  label="TIN Document"
-                  valuePropName="fileList"
-                  getValueFromEvent={(e) => e?.fileList}
-                >
-                  <Upload
-                    beforeUpload={() => false}
-                    maxCount={1}
-                    listType="picture"
-                    onPreview={(file) => {
-                      window.open(
-                        file.url || URL.createObjectURL(file.originFileObj),
-                      );
-                    }}
-                  >
-                    <Button disabled={viewMode}>Select File</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item label="PAN No" name="panNo">
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="PAN1234567890"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item
-                  name="panDoc"
-                  label="PAN Document"
-                  valuePropName="fileList"
-                  getValueFromEvent={(e) => e?.fileList}
-                >
-                  <Upload
-                    beforeUpload={() => false}
-                    maxCount={1}
-                    listType="picture"
-                    onPreview={(file) => {
-                      window.open(
-                        file.url || URL.createObjectURL(file.originFileObj),
-                      );
-                    }}
-                  >
-                    <Button disabled={viewMode}>Select File</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-
               <Col span={4}>
                 <Form.Item label="GSTIN No" name="gstIn">
                   <Input
@@ -836,6 +785,7 @@ export default function VendorTab() {
                   <Upload
                     beforeUpload={() => false}
                     maxCount={1}
+                    style={{ width: "100%" }}
                     listType="picture"
                     onPreview={(file) => {
                       window.open(
@@ -843,12 +793,110 @@ export default function VendorTab() {
                       );
                     }}
                   >
-                    <Button disabled={viewMode}>Select File</Button>
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
+                      Upload
+                    </Button>
                   </Upload>
+                </Form.Item>
+              </Col>
+              <Col span={4}>
+                <Form.Item label="PAN No" name="panNo">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="PAN1234567890"
+                  />
                 </Form.Item>
               </Col>
 
               <Col span={4}>
+                <Form.Item
+                  name="panDoc"
+                  label="PAN Document"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    style={{ width: "100%" }}
+                    listType="picture"
+                    onPreview={(file) => {
+                      window.open(
+                        file.url || URL.createObjectURL(file.originFileObj),
+                      );
+                    }}
+                  >
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
+                      Upload
+                    </Button>
+                  </Upload>
+                </Form.Item>
+              </Col>
+              <Col span={4}>
+                <Form.Item
+                  label="TIN No"
+                  name="tinNo"
+                  rules={[
+                    {
+                      pattern: /^[A-Z0-9]{11,15}$/,
+                      message: "Please enter a valid TIN number",
+                    },
+                  ]}
+                >
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="TIN1234567890"
+                  />
+                </Form.Item>
+              </Col>
+
+              {/* <Col span={4}>
+                <Form.Item label="TIN Date" name="tinDate">
+                  <DatePicker className="w-full h-10" disabled={viewMode} />
+                </Form.Item>
+              </Col> */}
+
+              <Col span={4}>
+                {/* <Form.Item label="TIN Document" name="tinDoc"> */}
+                <Form.Item
+                  name="tinDoc"
+                  label="TIN Document"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    style={{ width: "100%" }}
+                    listType="picture"
+                    onPreview={(file) => {
+                      window.open(
+                        file.url || URL.createObjectURL(file.originFileObj),
+                      );
+                    }}
+                  >
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
+                      Upload
+                    </Button>
+                  </Upload>
+                </Form.Item>
+              </Col>
+
+              {/* <Col span={4}>
                 <Form.Item label="IGST Applicable" name="igstApplicable">
                   <Select
                     className={selectClass}
@@ -859,7 +907,7 @@ export default function VendorTab() {
                     <Option value="No">No</Option>
                   </Select>
                 </Form.Item>
-              </Col>
+              </Col> */}
             </Row>
           </Card>
 
@@ -894,33 +942,35 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item
-                  label="Location"
-                  name="location"
-                  rules={[{ required: true }]}
+                  label="City"
+                  name="city"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
                 >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
-                    placeholder="Enter Location"
+                    placeholder="Enter City"
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
-                <Form.Item label="State" name="state">
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter State"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item label="District" name="district">
+                <Form.Item
+                  label="District"
+                  name="district"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -928,13 +978,34 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
-                <Form.Item label="City" name="city">
+                <Form.Item
+                  label="State"
+                  name="state"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
-                    placeholder="Enter City"
+                    placeholder="Enter State"
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={4}>
+                <Form.Item
+                  label="Google Location"
+                  name="location"
+                  rules={[{ required: true }]}
+                >
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter Location"
                   />
                 </Form.Item>
               </Col>
@@ -973,17 +1044,14 @@ export default function VendorTab() {
               </Col>
 
               <Col span={6}>
-                <Form.Item label="Transaction Type" name="transactionType">
+                <Form.Item label="Type of Transaction" name="transactionType">
                   <Select
                     className={selectClass}
                     disabled={viewMode}
                     placeholder="Select Transaction Type"
                   >
-                    <Option value="Own">Own</Option>
-                    <Option value="Rent">Rent</Option>
                     <Option value="Super Stockist">Super Stockist</Option>
                     <Option value="Distributer">Distributer</Option>
-                    <Option value="Retailer">Retailer</Option>
                   </Select>
                 </Form.Item>
               </Col>
@@ -992,10 +1060,22 @@ export default function VendorTab() {
 
           {/* ================= Plant Details (Dynamic) ================= */}
           <h3 className="text-lg font-semibold text-amber-700 mt-4 mb-2">
-            Plant Details
+            Company Group name
           </h3>
-
-          <div className="max-h-60 overflow-y-auto pr-2 mb-4">
+          <Card className="mb-4 border border-amber-200 rounded-lg">
+            <Row gutter={24}>
+              <Col span={6}>
+                <Form.Item label="Company Group Name" name="companyGroupName">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter Company Group Name"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+          {/* <div className="max-h-60 overflow-y-auto pr-2 mb-4">
             <Form.List name="plants">
               {(fields, { add, remove }) => (
                 <>
@@ -1184,7 +1264,7 @@ export default function VendorTab() {
                 </>
               )}
             </Form.List>
-          </div>
+          </div> */}
 
           {/* ===== FOOTER ACTIONS ===== */}
           {!viewMode && (
@@ -1200,7 +1280,7 @@ export default function VendorTab() {
               <Button
                 htmlType="submit"
                 type="primary"
-                className="bg-amber-500 border-none"
+                className="bg-amber-500! border-none!"
               >
                 {selected ? "Update" : "Save"}
               </Button>

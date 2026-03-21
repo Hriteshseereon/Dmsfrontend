@@ -4,7 +4,10 @@ import { Tabs, Card, message } from "antd";
 import ItemMasterTab from "./itemmaster/ItemMasterTab";
 import UnitConversionTab from "./UnitConversion/UnitConversionTab";
 import PriceManagementTab from "./PriceManagement/PriceManagementTab";
-
+// import ProductGroupMaster from "../ProductGroupMaster";
+import ProductGroupMaster from "./productgroup/ProductGroupMaster";
+import HsnSacManager from "./hsnsac/HsnSacManager";
+import UnitMaster from "./unitmaster/UnitMaster";
 import { getProducts } from "../../../../../../api/product";
 
 export default function ItemUnitPriceManager() {
@@ -64,6 +67,16 @@ export default function ItemUnitPriceManager() {
             },
             {
               key: "2",
+              label: "Product Group",
+              children: <ProductGroupMaster />,
+            },
+            {
+              key: "3",
+              label: "Unit Master",
+              children: <UnitMaster />,
+            },
+            {
+              key: "4",
               label: "Unit Conversions",
               children: (
                 <UnitConversionTab
@@ -75,19 +88,25 @@ export default function ItemUnitPriceManager() {
                 />
               ),
             },
+            // {
+            //   key: "4",
+            //   label: "Price Management",
+            //   children: (
+            //     <PriceManagementTab
+            //       items={items}
+            //       selectedItem={selectedItem}
+            //       setSelectedItem={setSelectedItem}
+            //       unitConversions={unitConversions}
+            //       prices={prices}
+            //       setPrices={setPrices}
+            //     />
+            //   ),
+            // },
+
             {
-              key: "3",
-              label: "Price Management",
-              children: (
-                <PriceManagementTab
-                  items={items}
-                  selectedItem={selectedItem}
-                  setSelectedItem={setSelectedItem}
-                  unitConversions={unitConversions}
-                  prices={prices}
-                  setPrices={setPrices}
-                />
-              ),
+              key: "5",
+              label: "HSN & SAC Manager",
+              children: <HsnSacManager />,
             },
           ]}
         />

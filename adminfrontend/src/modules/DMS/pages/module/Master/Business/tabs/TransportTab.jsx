@@ -10,6 +10,7 @@ import {
   Card,
   message,
   Upload,
+  Select,
 } from "antd";
 import {
   PlusOutlined,
@@ -17,19 +18,21 @@ import {
   EditOutlined,
   SearchOutlined,
   ReloadOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import {
   getAllTransport,
   createTransport,
   updateTransport,
   getTransportById,
+  sendTransportCredential,
 } from "@/api/transport.js";
 // import { getTransporters, addTransporter, updateTransporter, getTransporterDetails } from "../../../../../../../api/transporter";
 import { API_BASE_URL } from "@/utils/config";
 
 const inputClass = "border-amber-400 h-8";
 const passwordClass = "border-amber-400 h-8";
-
+const selectClass = "border-amber-400 h-8 w-full";
 export const phoneValidator = (_, value) => {
   if (!value) return Promise.resolve(); // allow empty if not required
 
@@ -53,9 +56,18 @@ export default function TransportTab() {
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState(false);
   const [selected, setSelected] = useState(null);
-
+  const [sendingId, setSendingId] = useState(null);
+  const { Option } = Select;
   const [form] = Form.useForm();
-
+  const generatePassword = (length = 10) => {
+    const chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$";
+    let password = "";
+    for (let i = 0; i < length; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
   /* ================= FETCH ================= */
   const fetchTransporters = async () => {
     try {
@@ -104,6 +116,7 @@ export default function TransportTab() {
     state: d.state,
     district: d.district,
     pinCode: d.pin,
+    status: d.is_active ? "true" : "false",
     // ✅ FILE PREVIEW DATA
     panDoc: fileFromUrl(d.pan_document),
     gstDoc: fileFromUrl(d.gstin_document),
@@ -120,7 +133,9 @@ export default function TransportTab() {
     fd.append("phone_number", values.mobileNo || "");
     fd.append("alternate_mobile_no", values.altMobileNo || "");
     fd.append("whatsapp_number", values.whatsappNo || "");
+    fd.append("is_active", values.status === "true");
     fd.append("pan", values.panNo || "");
+
     fd.append("gstin", values.gstin || "");
     fd.append("owner_aadhar_number", values.ownerAadharNo || "");
     fd.append("address_1", values.address1 || "");
@@ -160,6 +175,33 @@ export default function TransportTab() {
       fetchTransporters();
     } catch (e) {
       message.error("Save failed");
+    }
+  };
+  // mail sending function
+  const handleSendPassword = async (record) => {
+    try {
+      const partnerId = record.id;
+
+      setSendingId(partnerId);
+
+      const payload = {
+        partner_type: "transport",
+        partner_id: partnerId,
+      };
+
+      await sendTransportCredential(payload);
+
+      message.success("Mail successfully sent");
+
+      setData((prev) =>
+        prev.map((item) =>
+          item.id === partnerId ? { ...item, credentials_sent: true } : item,
+        ),
+      );
+    } catch (error) {
+      message.error("Failed to send mail");
+    } finally {
+      setSendingId(null);
     }
   };
 
@@ -219,6 +261,33 @@ export default function TransportTab() {
         </div>
       ),
     },
+    {
+      title: <span className="text-amber-700 font-semibold">Password</span>,
+      render: (_, record) => {
+        const partnerId = record.id;
+
+        return (
+          <Button
+            size="small"
+            type="primary"
+            disabled={record.credentials_sent}
+            loading={sendingId === partnerId}
+            className={
+              record.credentials_sent
+                ? "bg-green-500! border-none!"
+                : "bg-amber-500! border-none! hover:bg-amber-600!"
+            }
+            onClick={() => handleSendPassword(record)}
+          >
+            {record.credentials_sent
+              ? "Sent"
+              : sendingId === partnerId
+                ? "Sending..."
+                : "Send"}
+          </Button>
+        );
+      },
+    },
   ];
 
   const filteredData = data.filter((t) =>
@@ -258,9 +327,14 @@ export default function TransportTab() {
           icon={<PlusOutlined />}
           className="bg-amber-500! hover:bg-amber-600! border-none!"
           onClick={() => {
+            const randomPassword = generatePassword();
             setSelected(null);
             setViewMode(false);
             form.resetFields();
+            form.setFieldsValue({
+              password: randomPassword,
+              status: "true",
+            });
             setOpen(true);
           }}
         >
@@ -351,15 +425,12 @@ export default function TransportTab() {
                 <Form.Item
                   label="Mobile Number"
                   name="mobileNo"
-                  rules={[
-                    { required: true, message: "mobile number is required" },
-                  ]}
+                  rules={[{ validator: phoneValidator }]}
                 >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
                     placeholder="Enter mobile number"
-                    rules={[{ validator: phoneValidator }]}
                     maxLength={16}
                   />
                 </Form.Item>
@@ -399,7 +470,10 @@ export default function TransportTab() {
                 <Form.Item
                   label="Primary Email"
                   name="email"
-                  rules={[{ required: true, message: "Email id is required" }]}
+                  rules={[
+                    { required: true, message: "Email id is required" },
+                    { type: "email", message: "Please enter valid email" },
+                  ]}
                 >
                   <Input
                     className={inputClass}
@@ -410,7 +484,13 @@ export default function TransportTab() {
               </Col>
 
               <Col span={6}>
-                <Form.Item label="Secondary Email" name="secondaryEmail">
+                <Form.Item
+                  label="Secondary Email"
+                  name="secondaryEmail"
+                  rules={[
+                    { type: "email", message: "Please enter valid email" },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -423,103 +503,25 @@ export default function TransportTab() {
                 <Form.Item label="Password" name="password">
                   <Input.Password
                     className={passwordClass}
-                    disabled={viewMode}
+                    disabled={viewMode || selected}
                     placeholder="Enter password"
                   />
                 </Form.Item>
               </Col>
-            </Row>
-          </Card>
-
-          {/* ================= Business & KYC Details ================= */}
-          <Card className="mb-4 border border-amber-200 rounded-lg">
-            <h3 className="text-lg font-semibold text-amber-700 mb-3">
-              Business & KYC Details
-            </h3>
-            <Row gutter={24}>
               <Col span={4}>
-                <Form.Item label="PAN Number" name="panNo">
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter PAN number"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={6}>
                 <Form.Item
-                  label="PAN Document"
-                  name="panDoc"
-                  valuePropName="fileList"
-                  getValueFromEvent={(e) => e?.fileList}
+                  label="Status"
+                  name="status"
+                  rules={[{ required: true, message: "Status is required" }]}
                 >
-                  <Upload
-                    beforeUpload={() => false}
-                    maxCount={1}
-                    listType="picture"
-                  >
-                    <Button disabled={viewMode}>Upload</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item label="GSTIN Number" name="gstin">
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter GSTIN number"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={6}>
-                <Form.Item
-                  label="GST Document"
-                  name="gstDoc"
-                  valuePropName="fileList"
-                  getValueFromEvent={(e) => e?.fileList}
-                >
-                  <Upload
-                    beforeUpload={() => false}
-                    maxCount={1}
-                    listType="picture"
-                  >
-                    <Button disabled={viewMode}>Upload</Button>
-                  </Upload>
-                </Form.Item>
-              </Col>
-
-              <Col span={4}>
-                <Form.Item label="Owner Aadhar Number" name="ownerAadharNo">
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter owner Aadhar number"
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={6}>
-                <Form.Item
-                  label="Adhar Document"
-                  name="aadharDoc"
-                  valuePropName="fileList"
-                  getValueFromEvent={(e) => e?.fileList}
-                >
-                  <Upload
-                    beforeUpload={() => false}
-                    maxCount={1}
-                    listType="picture"
-                  >
-                    <Button disabled={viewMode}>Upload</Button>
-                  </Upload>
+                  <Select className={selectClass} disabled={viewMode}>
+                    <Option value="true">Active</Option>
+                    <Option value="false">Inactive</Option>
+                  </Select>
                 </Form.Item>
               </Col>
             </Row>
           </Card>
-
           {/* ================= Address & Location ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">
             <h3 className="text-lg font-semibold text-amber-700 mb-3">
@@ -554,7 +556,13 @@ export default function TransportTab() {
                 <Form.Item
                   label="City"
                   name="city"
-                  rules={[{ required: true, message: "City name is required" }]}
+                  rules={[
+                    { required: true, message: "City name is required" },
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
                 >
                   <Input
                     className={inputClass}
@@ -570,6 +578,10 @@ export default function TransportTab() {
                   name="state"
                   rules={[
                     { required: true, message: "state name is required" },
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
                   ]}
                 >
                   <Input
@@ -586,6 +598,10 @@ export default function TransportTab() {
                   name="district"
                   rules={[
                     { required: true, message: "District name is required" },
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
                   ]}
                 >
                   <Input
@@ -600,13 +616,136 @@ export default function TransportTab() {
                 <Form.Item
                   label="Pin Code"
                   name="pinCode"
-                  rules={[{ required: true, message: "pincode is required" }]}
+                  rules={[
+                    {
+                      pattern: /^[0-9]{6}$/,
+                      message: "Only numbers are allowed",
+                    },
+                  ]}
                 >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
                     placeholder="Enter pin code"
                   />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+          {/* ================= Business & KYC Details ================= */}
+          <Card className="mb-4 border border-amber-200 rounded-lg">
+            <h3 className="text-lg font-semibold text-amber-700 mb-3">
+              Legal Details
+            </h3>
+            <Row gutter={24}>
+              <Col span={4}>
+                <Form.Item label="PAN Number" name="panNo">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter PAN number"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item
+                  label="PAN Document"
+                  name="panDoc"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    style={{ width: "100%" }}
+                    listType="picture"
+                  >
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
+                      Upload
+                    </Button>
+                  </Upload>
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item label="GSTIN Number" name="gstin">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter GSTIN number"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item
+                  label="GST Document"
+                  name="gstDoc"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    style={{ width: "100%" }}
+                    listType="picture"
+                  >
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
+                      Upload
+                    </Button>
+                  </Upload>
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item
+                  label="Owner Aadhar Number"
+                  name="ownerAadharNo"
+                  rules={[
+                    {
+                      pattern: /^[0-9]{12}$/,
+                      message: "Enter a valid 12-digit Aadhaar number",
+                    },
+                  ]}
+                >
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter owner Aadhar number"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item
+                  label="Adhar Document"
+                  name="aadharDoc"
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => e?.fileList}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    style={{ width: "100%" }}
+                    listType="picture"
+                  >
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
+                      Upload
+                    </Button>
+                  </Upload>
                 </Form.Item>
               </Col>
             </Row>
@@ -626,7 +765,7 @@ export default function TransportTab() {
               <Button
                 htmlType="submit"
                 type="primary"
-                className="bg-amber-500 border-none"
+                className="bg-amber-500! border-none!"
               >
                 {selected ? "Update" : "Save"}
               </Button>

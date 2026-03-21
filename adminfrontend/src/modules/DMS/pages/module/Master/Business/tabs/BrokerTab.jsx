@@ -19,6 +19,7 @@ import {
   SearchOutlined,
   ReloadOutlined,
   MinusCircleOutlined,
+  UploadOutlined,
 } from "@ant-design/icons";
 import { API_BASE_URL } from "@/utils/config";
 
@@ -30,6 +31,7 @@ import {
   updateBrokerById,
   getAllVendor,
   getproductbyVendor,
+  sendBrokerPassword,
 } from "@/api/broker";
 
 export const phoneValidator = (_, value) => {
@@ -79,6 +81,7 @@ const fileFromUrl = (url) => {
   ];
 };
 
+const { Password } = Input;
 /** Build FormData exactly like VendorTab:
  *  - one `data` key containing a JSON string of all non-file fields
  *  - separate keys for each file
@@ -87,6 +90,9 @@ const buildFormData = (values) => {
   const fd = new FormData();
 
   fd.append("name", values.brokerName || "");
+  fd.append("password", values.password || "");
+  fd.append("username", values.email || values.phoneNo);
+  fd.append("email", values.email);
   fd.append("phone_number", values.phoneNo || "");
   fd.append("alternate_phone", values.altPhoneNo || "");
   fd.append("whatsapp_number", values.whatsappNo || "");
@@ -152,6 +158,15 @@ export default function BrokerTab() {
   const [productsMap, setProductsMap] = useState({});
   const [form] = Form.useForm();
 
+  const generatePassword = (length = 10) => {
+    const chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$!";
+    let password = "";
+    for (let i = 0; i < length; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
   /* ================= FETCH ================= */
   const fetchBrokers = async () => {
     try {
@@ -176,6 +191,15 @@ export default function BrokerTab() {
     fetchVendors();
   }, []);
 
+  // password send button handler
+  const handleSendPassword = async (record) => {
+    try {
+      await sendBrokerPassword(record.id);
+      message.success(`Password sent to ${record.primary_email}`);
+    } catch (err) {
+      message.error("Failed to send password email");
+    }
+  };
   const handleVendorChange = async (vendorId) => {
     try {
       if (productsMap[vendorId]) return; // already loaded
@@ -315,6 +339,19 @@ export default function BrokerTab() {
         </div>
       ),
     },
+    {
+      title: <span className="text-amber-700 font-semibold">Password</span>,
+      render: (_, record) => (
+        <Button
+          size="small"
+          type="primary"
+          className="bg-amber-500! border-none! hover:bg-amber-600!"
+          onClick={() => handleSendPassword(record)}
+        >
+          Send
+        </Button>
+      ),
+    },
   ];
 
   const filteredData = data.filter((b) =>
@@ -355,6 +392,10 @@ export default function BrokerTab() {
             setSelected(null);
             setViewMode(false);
             form.resetFields();
+            const autoPassword = generatePassword();
+            form.setFieldsValue({
+              password: autoPassword,
+            });
             setOpen(true);
           }}
         >
@@ -409,6 +450,16 @@ export default function BrokerTab() {
               Broker Details
             </h3>
             <Row gutter={24}>
+              <Col span={4}>
+                <Form.Item label="Broker Bussiness Name" name="businessName">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter business name"
+                  />
+                </Form.Item>
+              </Col>
+
               <Col span={6}>
                 <Form.Item
                   label="Broker Name"
@@ -479,7 +530,10 @@ export default function BrokerTab() {
                 <Form.Item
                   label="Primary Email"
                   name="email"
-                  rules={[{ required: true }]}
+                  rules={[
+                    { required: true },
+                    { type: "email", message: "Enter a valid email" },
+                  ]}
                 >
                   <Input
                     className={inputClass}
@@ -489,7 +543,21 @@ export default function BrokerTab() {
                 </Form.Item>
               </Col>
               <Col span={6}>
-                <Form.Item label="Secondary Email" name="secondaryEmail">
+                <Form.Item label="Password" name="password">
+                  <Password
+                    className={inputClass}
+                    disabled={viewMode || selected}
+                    placeholder="Auto generated password"
+                    visibilityToggle
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item
+                  label="Secondary Email"
+                  name="secondaryEmail"
+                  rules={[{ type: "email", message: "Enter a valid email" }]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -518,12 +586,9 @@ export default function BrokerTab() {
               Address Details
             </h3>
 
-            <h4 className="text-amber-600 font-medium mb-2">
-              Permanent Address
-            </h4>
             <Row gutter={24}>
-              <Col span={8}>
-                <Form.Item label="Address" name="permanent_address">
+              <Col span={6}>
+                <Form.Item label="Address1" name="permanent_address">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -531,8 +596,26 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
+              <Col span={6}>
+                <Form.Item label="Address2" name="current_address">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter current address"
+                  />
+                </Form.Item>
+              </Col>
               <Col span={4}>
-                <Form.Item label="City" name="permanent_city">
+                <Form.Item
+                  label="City"
+                  name="permanent_city"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -541,7 +624,16 @@ export default function BrokerTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="District" name="permanent_district">
+                <Form.Item
+                  label="District"
+                  name="permanent_district"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -550,7 +642,16 @@ export default function BrokerTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="State" name="permanent_state">
+                <Form.Item
+                  label="State"
+                  name="permanent_state"
+                  rules={[
+                    {
+                      pattern: /^[a-zA-Z\s]+$/,
+                      message: "Only letters and spaces are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -559,7 +660,16 @@ export default function BrokerTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label="Pin Code" name="permanent_pin">
+                <Form.Item
+                  label="Pin Code"
+                  name="permanent_pin"
+                  rules={[
+                    {
+                      pattern: /^[0-9]{6}$/,
+                      message: "Only numbers are allowed",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -569,7 +679,7 @@ export default function BrokerTab() {
               </Col>
             </Row>
 
-            <h4 className="text-amber-600 font-medium mt-4 mb-2">
+            {/* <h4 className="text-amber-600 font-medium mt-4 mb-2">
               Current Address
             </h4>
             <Row gutter={24}>
@@ -618,13 +728,13 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-            </Row>
+            </Row> */}
           </Card>
 
           {/* ================= Documents & KYC ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">
             <h3 className="text-lg font-semibold text-amber-700 mb-3">
-              Documents & KYC
+              Legal Deyails
             </h3>
             <Row gutter={24}>
               {/* PAN */}
@@ -637,7 +747,7 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-              <Col span={6}>
+              <Col span={4}>
                 <Form.Item
                   label="PAN Document"
                   name="panDoc"
@@ -647,6 +757,7 @@ export default function BrokerTab() {
                   <Upload
                     beforeUpload={() => false}
                     maxCount={1}
+                    style={{ width: "100%" }}
                     listType="picture"
                     onPreview={(file) =>
                       window.open(
@@ -654,14 +765,29 @@ export default function BrokerTab() {
                       )
                     }
                   >
-                    <Button disabled={viewMode}>Select File</Button>
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
+                      Upload
+                    </Button>
                   </Upload>
                 </Form.Item>
               </Col>
 
               {/* Aadhar */}
               <Col span={4}>
-                <Form.Item label="Aadhar Number" name="aadharNo">
+                <Form.Item
+                  label="Aadhar Number"
+                  name="aadharNo"
+                  rules={[
+                    {
+                      pattern: /^[0-9]{12}$/,
+                      message: "Enter a valid 12-digit Aadhaar number",
+                    },
+                  ]}
+                >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -669,7 +795,7 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-              <Col span={6}>
+              <Col span={4}>
                 <Form.Item
                   label="Aadhar Document"
                   name="aadharDoc"
@@ -680,19 +806,26 @@ export default function BrokerTab() {
                     beforeUpload={() => false}
                     maxCount={1}
                     listType="picture"
+                    style={{ width: "100%" }}
                     onPreview={(file) =>
                       window.open(
                         file.url || URL.createObjectURL(file.originFileObj),
                       )
                     }
                   >
-                    <Button disabled={viewMode}>Select File</Button>
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
+                      Upload
+                    </Button>
                   </Upload>
                 </Form.Item>
               </Col>
 
               {/* Bank Details */}
-              <Col span={6}>
+              <Col span={4}>
                 <Form.Item label="Bank AC number" name="bankDetails">
                   <Input
                     className={inputClass}
@@ -703,7 +836,7 @@ export default function BrokerTab() {
               </Col>
 
               {/* Passport Photo */}
-              <Col span={6}>
+              <Col span={4}>
                 <Form.Item
                   label="Passport Photo"
                   name="passportPhoto"
@@ -713,6 +846,7 @@ export default function BrokerTab() {
                   <Upload
                     beforeUpload={() => false}
                     maxCount={1}
+                    style={{ width: "100%" }}
                     listType="picture"
                     onPreview={(file) =>
                       window.open(
@@ -720,7 +854,13 @@ export default function BrokerTab() {
                       )
                     }
                   >
-                    <Button disabled={viewMode}>Select File</Button>
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
+                      Upload
+                    </Button>
                   </Upload>
                 </Form.Item>
               </Col>
@@ -735,7 +875,7 @@ export default function BrokerTab() {
                   />
                 </Form.Item>
               </Col>
-              <Col span={6}>
+              <Col span={4}>
                 <Form.Item
                   label="GSTIN Document"
                   name="gstinDoc"
@@ -745,6 +885,7 @@ export default function BrokerTab() {
                   <Upload
                     beforeUpload={() => false}
                     maxCount={1}
+                    style={{ width: "100%" }}
                     listType="picture"
                     onPreview={(file) =>
                       window.open(
@@ -752,7 +893,13 @@ export default function BrokerTab() {
                       )
                     }
                   >
-                    <Button disabled={viewMode}>Select File</Button>
+                    <Button
+                      disabled={viewMode}
+                      icon={<UploadOutlined />}
+                      style={{ width: "100%" }}
+                    >
+                      Upload
+                    </Button>
                   </Upload>
                 </Form.Item>
               </Col>
@@ -790,7 +937,7 @@ export default function BrokerTab() {
                         <Col span={6}>
                           <Form.Item
                             {...restField}
-                            label="Vendor"
+                            label="Supplier"
                             name={[name, "vendor"]}
                             rules={[
                               {
@@ -909,7 +1056,7 @@ export default function BrokerTab() {
                             <Input
                               className={inputClass}
                               disabled={viewMode}
-                              placeholder="Enter amount"
+                              placeholder="100.00"
                             />
                           </Form.Item>
                         </Col>
@@ -947,7 +1094,7 @@ export default function BrokerTab() {
               <Button
                 htmlType="submit"
                 type="primary"
-                className="bg-amber-500 border-none"
+                className="bg-amber-500! border-none!"
               >
                 {selected ? "Update" : "Save"}
               </Button>

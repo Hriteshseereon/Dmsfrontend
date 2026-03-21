@@ -6,13 +6,7 @@ export const getSalescontractGroups = async () => {
   const res = await api.get(`/sales/contracts/`, { params: { organisation: currentOrgId.currentOrgId } });
   return res.data;
 }
-// export const createSalesGroup = async (data) => {
-//   const currentOrgId = useSessionStore.getState();
-//   const res = await api.post(`/sales/contracts/`, data, {   
-//     params: { organization: currentOrgId.organizationId }
-//   });
-//   return res.data;
-// }  
+
 export const getAllSalesContracts = async () => {
   const { currentOrgId } = useSessionStore.getState();
   const res = await api.get(`/sales/contracts/`, {
@@ -132,3 +126,181 @@ export const updateSalesOrder = async (id, payload) => {
   });
   return res.data;
 }
+
+
+//get all loading Advices
+export const getLoadingAdvice = async () => 
+  {const res = await api.get("/transport/loading-advices/"); 
+    return res.data; 
+  }
+//get loading advice by id
+export const getLoadingAdviceById = async (adviceId) => {
+  const res = await api.get(`/transport/loading-advices/${adviceId}/`);
+  return res.data;
+}
+//update loading advice
+export const updateLoadingAdvice = async (adviceId, payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.put(
+    `/transport/loading-advices/${adviceId}/`,
+    payload,
+    {
+      params: {
+        organisation: currentOrgId,
+      },
+    }
+  );
+  return res.data;
+}
+
+// Invoice API
+
+// Get Order dropdown data for invoice creation
+export const getEligibleOrders = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get("/sales/invoice/eligible-orders/", {
+    params: { organisation: currentOrgId },
+  });
+
+  return res.data;
+};
+
+export const getItemByOrderId = async (sales_order_id) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/sales/invoices/order-items-dropdown/`, {
+    params: { organisation: currentOrgId
+      ,sales_order_id: sales_order_id
+     },
+  });
+  return res.data;
+};
+
+export const getInvoiceDropdownData = async (sales_order_id, product_ids) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get(`/sales/invoices/preview/`, {
+    params: {
+      organisation: currentOrgId,
+      sales_order_id: sales_order_id,
+      product_ids: product_ids, // axios will send multiple params
+    },
+    paramsSerializer: (params) => {
+      const query = new URLSearchParams();
+      query.append("organisation", params.organisation);
+      query.append("sales_order_id", params.sales_order_id);
+
+      params.product_ids.forEach((id) => {
+        query.append("product_ids", id);
+      });
+
+      return query.toString();
+    },
+  });
+
+  return res.data;
+};
+
+export const createInvoice = async (payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.post("/sales/invoices/", payload, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+
+export const getInvoices = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("/sales/invoices/", {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+
+export const getInvoiceById = async (invoiceId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/sales/invoices/${invoiceId}/`, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+
+export const updateInvoice = async (invoiceId, payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.put(`/sales/invoices/${invoiceId}/`, payload, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+
+// ---------------- DOWNLOAD INVOICE PDF ----------------
+export const downloadInvoicePDF = async (invoiceId) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get(`/sales/invoices/${invoiceId}/download-pdf/`, {
+    params: { organisation: currentOrgId },
+    responseType: "blob", // Important: tells Axios we want binary data
+  });
+
+  // Trigger browser download
+  const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `invoice_${invoiceId}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+};
+
+export const fetchInvoicePDF = async (invoiceId) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get(`/sales/invoices/${invoiceId}/download-pdf/`, {
+    params: { organisation: currentOrgId },
+    responseType: "blob", // get binary PDF data
+  });
+
+  return res.data; // returns Blob
+};
+
+//Sale Disputes API
+
+export const getSaleDisputes = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("/sales/dispute/invoices/", {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+
+export const getSaleDisputeById = async (invoiceId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/sales/disputes/preview/`, {
+    params: { organisation: currentOrgId  ,sale_invoice_id: invoiceId },
+  });
+  return res.data;
+};
+
+export const createSaleDispute = async (payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.post("/sales/disputes/", payload, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+
+export const updateSaleDispute = async (disputeId, payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.put(`/sales/disputes/${disputeId}/`, payload, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+ 
+export const getDisputeById = async (disputeId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/sales/disputes/${disputeId}/`, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};

@@ -1,12 +1,6 @@
  import React, { useState,useEffect } from "react";  
-import { positiveNumberInputProps } from "../../../helpers/numberInput";
-import {
-  requiredPositiveNumber,
-  optionalPositiveNumber,
-  percentageValidation,
-} from "../../../helpers/formValidation";
 import { exportToExcel } from "../../../../../utils/exportToExcel";
-import { getPurchaseOrder,getPurchaseContract ,getSoudaByContractId,addPurchaseOrder,getPurchaseOrderById,updatePurchaseOrder} from "../../../../../api/purchase";
+import { getPurchaseOrder,getPurchaseContract ,getSoudaByContractId,addPurchaseOrder,getPurchaseOrderById,updatePurchaseOrder,getAllSalesOrder} from "../../../../../api/purchase";
 import {
   Table,
   Input,
@@ -34,43 +28,7 @@ const { Option } = Select;
 
 
 
-const purchaseIndentJSON = {
-  records: [
-    {
-      key: 1,
-      soudaNo: "SOUDA-001",
-      plantName: "Kalinga Oils Pvt. Ltd.",
-      plantCode: "PC1",
-      indentDate: "2024-10-01",
-      deliveryDate: "2024-12-09",
-      deliveryAddress: "Plot 12, Industrial Area, Bhubaneswar",
-      companyName: "Jay Traders",
-      depoName: "Bhubaneswar Depot",
-      items: [
-        {
-          item: "Mustard Oil",
-          itemCode: "ITM-MUST-1",
-          qty: 5000,
-          freeQty: 200,
-          totalQty: 5200,
-          uom: "Litre",
-          rate: 120,
-          discountPercent: 2,
-          discountAmt: 12000,
-          grossWt: 2100,
-          totalGrossWt: 1020,
-          grossAmount: 67080,
-        },
-      ],
-      totalQty: 5200,
-      totalAmt: 588000,
-      status: "Approved",
-    },
-  ],
-  uomOptions: ["Litre", "Kg", "Packet", "Box"],
-  statusOptions: ["Approved", "Pending", "Rejected"],
-  soudaNoOptions: ["SOUDA-001", "SOUDA-002", "SOUDA-003"],
-};
+
 
 export default function PurchaseIndent() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -78,21 +36,20 @@ export default function PurchaseIndent() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
  const [soudaContracts, setSoudaContracts] = useState([]);
+ const [salesOrders, setSalesOrders] = useState([]);
   const [data, setData] = useState([]);
  const [loading, setLoading] = useState(false);
  const [contractItems, setContractItems] = useState([]);
-const [vendor, setVendor] = useState(null);
-const [selectedVendor, setSelectedVendor] = useState(null);
 
   const [searchText, setSearchText] = useState("");
-
+ const statusOptions = ["Pending", "Approved", "Rejected"];
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
   useEffect(() => {
   fetchPurchaseOrder();
   fetchSoudaNoOptions();
-  
+   
 }, []);
 
 const fetchPurchaseOrder = async () => {
@@ -117,7 +74,7 @@ const formattedData = list.map((item, index) => ({
 
 
 
-   setData(formattedData.reverse());
+   setData(formattedData);
    
 
   } catch (error) {
@@ -141,6 +98,17 @@ const fetchSoudaNoOptions = async () => {
     message.error("Failed to load souda numbers");
   }
 };
+
+const fetchSalesOrderOptions = async (vendorId) => {
+  try {
+    const res = await getAllSalesOrder(vendorId);
+    const list = res?.data || res;
+    setSalesOrders(list);
+  } catch (err) {
+    message.error("Failed to load sales orders");
+  }
+};
+
 
 
 
@@ -168,14 +136,14 @@ const handleSoudaSelect = async (contractId, formInstance, existingItems = []) =
     const data = res?.data || res;
 
     setContractItems(data.items || []);
-
+     fetchSalesOrderOptions(data.vendor); 
     // Merge existing items if provided
-    const itemsToSet = existingItems.length
-      ? existingItems.map(it => ({
-          ...it,
-          uom: it.uom_details?.unit_name || it.uom, // ensure uom
-        }))
-      : [];
+   const itemsToSet = existingItems.length
+  ? existingItems.map(it => ({
+      ...it,
+      uom: it.uom_details?.unit_name || it.uom,
+    }))
+  : [{}];   // keep one empty row
 
     formInstance.setFieldsValue({
       vendor: data.vendor,
@@ -205,11 +173,12 @@ const handleSoudaSelect = async (contractId, formInstance, existingItems = []) =
 
   const updatedItems = items.map((item) => {
     const qty = Number(item?.qty || 0);
-    const freeQty = Number(item?.freeQty || 0);
+  //  const freeQty = Number(item?.freeQty || 0);
     const rate = Number(item?.rate || 0);
     const discountPercent = Number(item?.discountPercent || 0);
 
-    const totalQty = qty + freeQty;
+  //  const totalQty = qty + freeQty;
+    const totalQty = qty; 
     const grossAmount = round2(qty * rate);
     const discountAmt = round2((grossAmount * discountPercent) / 100);
     const itemTaxable = round2(grossAmount - discountAmt);
@@ -268,7 +237,7 @@ const handleExport = async () => {
         exportRows.push({
           "Order No": data.order_number,
           "Plant Name": data.plant_name,
-          "Vendor Name": data.vendor_name,
+          "Supplier Name": data.vendor_name,
 
           "Order Date": data.order_date,
           "Expected Receiving Date": data.expected_receiving_date,
@@ -308,6 +277,21 @@ const handleExport = async () => {
 
 const handleFormSubmit = async (values, type) => {
   try {
+    const selectedSalesOrders = salesOrders.filter(so =>
+  values.saleorderNo?.includes(so.id)
+);
+
+const sales_orders = selectedSalesOrders.map(so => so.id);
+
+const sales_order_details = [];
+
+selectedSalesOrders.forEach(so => {
+  so.matching_items?.forEach(item => {
+    sales_order_details.push({
+      sales_order_id: so.id,
+    });
+  });
+});
     const selectedContract = soudaContracts.find(
       (c) => c.id === values.contract
     );
@@ -338,7 +322,8 @@ const handleFormSubmit = async (values, type) => {
       contract: values.contract,
       vendor: selectedContract?.vendor,
       souda_no: selectedContract?.contract_number,
-
+       sales_orders: sales_orders,               // ✅ ADD
+  sales_order_details: sales_order_details, // ✅ ADD
       plant_name: values.plantName || "",
       plant_display_name: values.plantName || "",
       delivery_address: values.deliveryAddress || "",
@@ -367,7 +352,7 @@ const handleFormSubmit = async (values, type) => {
         item_code: it.hsn_code,
         rate: Number(it.rate),
         qty: Number(it.qty),
-        free_qty: Number(it.freeQty),
+       // free_qty: Number(it.freeQty),
         discount_percent: Number(it.discountPercent),
         discount_amount: Number(it.discountAmt),
         gross_amount: Number(it.grossAmount),
@@ -380,7 +365,7 @@ const handleFormSubmit = async (values, type) => {
         },
       })),
     };
-
+console.log("Purchase Order Payload:", payload);
     // 🔥 API CALL
     if (type === "edit") {
       await updatePurchaseOrder(selectedRecord.id, payload);
@@ -419,7 +404,7 @@ const handleFormSubmit = async (values, type) => {
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
    {
-  title: <span className="text-amber-700 font-semibold">Vendor</span>,
+  title: <span className="text-amber-700 font-semibold">Supplier</span>,
   dataIndex: "vendor_name",
   width: 150,
   render: (t) => <span className="text-amber-800">{t}</span>,
@@ -477,10 +462,12 @@ const handleFormSubmit = async (values, type) => {
             className="cursor-pointer! text-blue-500!"
             onClick={() => handleView(record)}
           />
+            {record.status !== "Approved" && (
           <EditOutlined
             className="cursor-pointer! text-red-500!"
             onClick={() => handleEdit(record)}
           />
+            )}
         </div>
       ),
     },
@@ -501,6 +488,7 @@ const handleView = async (record) => {
       plantName: data.plant_name,
       deliveryAddress: data.delivery_address,
       status: data.status,
+       saleorderNo: data.sales_orders || [], 
       order_date: data.order_date ? dayjs(data.order_date) : null,
       expected_receiving_date: data.expected_receiving_date
         ? dayjs(data.expected_receiving_date)
@@ -510,7 +498,7 @@ const handleView = async (record) => {
         hsn_code: it.hsn_code,
         rate: it.rate,
         qty: it.qty,
-        freeQty: it.free_qty,
+       // freeQty: it.free_qty,
         totalQty: Number(it.qty || 0) + Number(it.free_qty || 0),
         discountPercent: it.discount_percent,
         discountAmt: it.discount_amount,
@@ -562,9 +550,11 @@ await handleSoudaSelect(data.contract, editForm, data.items);
   const formattedData = {
   contract: data.contract,
   vendorName: data.vendor_name,
+  vendorId: data.vendor, // ✅ Add vendor ID for API
   plantName: data.plant_name,
   deliveryAddress: data.delivery_address,
   status: data.status,
+   saleorderNo: data.sales_orders || [], 
   order_date: data.order_date ? dayjs(data.order_date) : null,
   expected_receiving_date: data.expected_receiving_date
     ? dayjs(data.expected_receiving_date)
@@ -575,7 +565,7 @@ await handleSoudaSelect(data.contract, editForm, data.items);
     rate: it.rate,
     qty: it.qty,
     maxQty: it.qty,
-    freeQty: it.free_qty,
+    //freeQty: it.free_qty,
     totalQty: Number(it.qty || 0) + Number(it.free_qty || 0),
     discountPercent: it.discount_percent,
     discountAmt: it.discount_amount,
@@ -620,13 +610,13 @@ setTimeout(() => {
       <Row gutter={16}>
         <Col span={6}>
         <Form.Item
-  label="Souda No"
+  label="Contract No"
   name="contract"   // store contract ID
   rules={[{ required: true }]}
   
 >
 <Select
-  placeholder="Select Souda No"
+  placeholder="Select Contract No"
   options={soudaContracts.map(c => ({
     label: c.souda_number,   
     value: c.id
@@ -648,7 +638,7 @@ setTimeout(() => {
 </Form.Item>
 </Col>
 <Col span={6}>
-<Form.Item label="Vendor Name" name="vendorName">
+<Form.Item label="Supplier Name" name="vendorName">
   <Input disabled />
 </Form.Item>
 </Col>
@@ -681,7 +671,7 @@ setTimeout(() => {
          <Col span={6}>
           <Form.Item label="Status" name="status">
             <Select disabled={disabled}>
-              {purchaseIndentJSON.statusOptions.map((opt) => (
+              {statusOptions.map((opt) => (
                 <Option key={opt} value={opt}>
                   {opt}
                 </Option>
@@ -689,15 +679,27 @@ setTimeout(() => {
             </Select>
           </Form.Item>
         </Col>
-        <Col span={8}>
-          <Form.Item
-            label="Delivery Address"
-            name="deliveryAddress"
-            rules={[{ required: true }]}
+       <Col span={6}>
+  <Form.Item
+    label="CRN No"
+    name="saleorderNo"
+     >
+    <Select
+      mode="multiple"
+      placeholder="Select CRN No"
+      allowClear
+      showSearch
+      disabled={disabled}
+      listHeight={150} 
+      options={salesOrders.map(c=>({
+        label: c.order_number,
+        value: c.id
+      }))}
+    
           >
-            <Input.TextArea rows={2} />
-          </Form.Item>
-        </Col>
+          </Select>
+  </Form.Item>
+</Col>
 
 
        
@@ -705,7 +707,7 @@ setTimeout(() => {
 
       <h6 className=" text-amber-500 mt-4">Item & Pricing Details</h6>
 
-      <Form.List name="items" initialValue={[{}]}>
+      <Form.List name="items">
         {(fields, { add, remove }) => (
           <>
             {fields.map((field, index) => (
@@ -717,7 +719,7 @@ setTimeout(() => {
                   <span className="font-semibold text-amber-700">
                     Item {index + 1}
                   </span>
-                  {!disabled && (
+                  {/* {!disabled && (
                     <div>
                       {fields.length > 1 && (
                         <Button
@@ -732,7 +734,7 @@ setTimeout(() => {
                         </Button>
                       )}
                     </div>
-                  )}
+                  )} */}
                 </div>
 
                 <Row gutter={24}>
@@ -767,7 +769,7 @@ setTimeout(() => {
         qty: Number(selected.qty || 0),
         maxQty: Number(selected.qty || 0),   // ✅ ADD THIS
 
-        freeQty: Number(selected.free_qty || 0),
+       // freeQty: Number(selected.free_qty || 0),
         uom: selected.uom_details?.unit_name,
         discountPercent: Number(selected.discount_percent || 0),
       };
@@ -856,7 +858,7 @@ rules={[
                     </Form.Item>
                   </Col>
 
-                  <Col span={4}>
+                  {/* <Col span={4}>
                     <Form.Item
                       {...field}
                       label="Free Qty"
@@ -876,7 +878,7 @@ rules={[
                         onChange={() => recalcAll(formInstance)}
                       />
                     </Form.Item>
-                  </Col>
+                  </Col> */}
 
                   <Col span={4}>
                     <Form.Item
@@ -979,7 +981,7 @@ rules={[
               </div>
             ))}
 
-            {!disabled && (
+            {/* {!disabled && (
               <Button
                 type="dashed"
                 onClick={() => {
@@ -991,7 +993,7 @@ rules={[
               >
                 Add Another Item
               </Button>
-            )}
+            )} */}
           </>
         )}
       </Form.List>
@@ -1003,7 +1005,33 @@ rules={[
             <InputNumber className="w-full! bg-gray-50" disabled />
           </Form.Item>
         </Col>
+ <Col span={4}>
+          <Form.Item label="GST %" name="igstPercent"          rules={[
+    { required: true, message: "IGST % is required" },
+    {
+      validator: (_, value) =>
+        value >= 0
+          ? Promise.resolve()
+          : Promise.reject("Enter valid positive number"),
+    },
+  ]}>
+            <Input
+              className="w-full"
+              disabled={disabled}
+             onChange={(e) => {
+        const igst = Number(e.target.value || 0);
+        const half = igst / 2;
 
+        formInstance.setFieldsValue({
+          sgstPercent: half,
+          cgstPercent: half,
+        });
+
+        recalcAll(formInstance);
+      }}
+            />
+          </Form.Item>
+        </Col>
         <Col span={4}>
           <Form.Item label="SGST %" name="sgstPercent"
                    rules={[
@@ -1017,7 +1045,7 @@ rules={[
   ]}>
             <Input
               className="w-full"
-             disabled={disabled}
+             disabled
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
@@ -1035,29 +1063,13 @@ rules={[
   ]}>
             <Input
               className="w-full"
-             disabled={disabled}
+             disabled
               onChange={() => recalcAll(formInstance)}
             />
           </Form.Item>
         </Col>
 
-        <Col span={4}>
-          <Form.Item label="IGST %" name="igstPercent"          rules={[
-    { required: true, message: "IGST % is required" },
-    {
-      validator: (_, value) =>
-        value >= 0
-          ? Promise.resolve()
-          : Promise.reject("Enter valid positive number"),
-    },
-  ]}>
-            <Input
-              className="w-full"
-              disabled={disabled}
-              onChange={() => recalcAll(formInstance)}
-            />
-          </Form.Item>
-        </Col>
+       
 
         <Col span={4}>
           <Form.Item label="Total GST (₹)" name="totalGST">
@@ -1128,8 +1140,8 @@ rules={[
             className="bg-amber-500! hover:bg-amber-600! border-none!"
             onClick={() => {
               addForm.resetFields();
-              addForm.setFieldsValue({ order_date: dayjs(), items: [] });
-              setIsAddModalOpen(true);
+          // addForm.setFieldsValue({ order_date: dayjs(), items: [] });
+addForm.setFieldsValue({ order_date: dayjs(), items: [{}] });    setIsAddModalOpen(true);
             }}
           >
             Add New
@@ -1140,9 +1152,9 @@ rules={[
       {/* Table */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
-          Purchase Indent Records
+          Purchase Order Records
         </h2>
-        <p className="text-amber-600 mb-3">Manage your purchase souda data</p>
+        <p className="text-amber-600 mb-3">Manage your purchase Order data</p>
 
         <Table
           columns={columns}
@@ -1158,7 +1170,7 @@ rules={[
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            Add New Purchase Indent
+            Add New Purchase Order
           </span>
         }
         open={isAddModalOpen}
@@ -1192,7 +1204,7 @@ rules={[
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            Edit Purchase Indent
+            Edit Purchase Order
           </span>
         }
         open={isEditModalOpen}
@@ -1226,7 +1238,7 @@ rules={[
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            View Purchase Indent
+            View Purchase Order
           </span>
         }
         open={isViewModalOpen}
