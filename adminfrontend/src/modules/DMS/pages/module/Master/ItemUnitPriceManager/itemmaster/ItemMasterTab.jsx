@@ -11,7 +11,7 @@ import {
   Space,
   message,
 } from "antd";
-import { PlusOutlined, EditOutlined, EyeOutlined } from "@ant-design/icons";
+import { PlusOutlined, EditOutlined, EyeOutlined,SearchOutlined } from "@ant-design/icons";
 
 import {
   getProductGroups,
@@ -56,7 +56,7 @@ export default function ItemMasterTab({ items, setItems }) {
     cgstPercent: 0,
     sgstPercent: 0,
   });
-
+const [search, setSearch] = useState("");
   /* ================= LOAD MASTER DATA ================= */
   useEffect(() => {
     Promise.all([
@@ -195,6 +195,27 @@ export default function ItemMasterTab({ items, setItems }) {
     },
   ];
 
+const getFilteredData = () => {
+  if (!search) return items;
+
+  const value = search.toLowerCase();
+
+  return items.filter((item) => {
+    return Object.values(item).some((val) => {
+      if (!val) return false;
+      return JSON.stringify(val).toLowerCase().includes(value);
+    });
+  });
+};
+const filteredData = getFilteredData();
+
+
+
+
+
+
+
+
   return (
     <>
       <style>
@@ -267,32 +288,52 @@ export default function ItemMasterTab({ items, setItems }) {
 `}
       </style>
       <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          marginBottom: 10,
-        }}
-      >
-        <Button
-          className="amber-add-btn"
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => {
-            setFormData({ gstPercent: 0, cgstPercent: 0, sgstPercent: 0 });
-            setEditingId(null);
-            setViewMode(false);
-            setOpen(true);
-          }}
-        >
-          Add Item
-        </Button>
-      </div>
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  }}
+>
+  {/* LEFT: SEARCH */}
+  <div style={{ display: "flex", gap: 8 }}>
+    <Input
+     prefix={<SearchOutlined className="text-amber-500" />}
+          
+      placeholder="Search item..."
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      allowClear
+      style={{ width: 250 }}
+       className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+       
+    />
+
+    <Button onClick={() => setSearch("")}  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+       >Reset</Button>
+  </div>
+
+  {/* RIGHT: ADD BUTTON */}
+  <Button
+    className="amber-add-btn"
+    type="primary"
+    icon={<PlusOutlined />}
+    onClick={() => {
+      setFormData({ gstPercent: 0, cgstPercent: 0, sgstPercent: 0 });
+      setEditingId(null);
+      setViewMode(false);
+      setOpen(true);
+    }}
+  >
+    Add Item
+  </Button>
+</div>
+     
 
       <Table
         className="amber-table"
         rowKey="id"
         columns={columns}
-        dataSource={items}
+        dataSource={filteredData}
         style={{ marginTop: 16 }}
       />
 

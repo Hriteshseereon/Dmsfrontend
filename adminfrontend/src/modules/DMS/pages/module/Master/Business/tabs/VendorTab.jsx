@@ -305,6 +305,24 @@ export default function VendorTab() {
     }
   };
 
+ const getFilteredData = () => {
+  if (!search) return data;
+
+  const value = search.toLowerCase();
+
+  return data.filter((item) => {
+    return Object.values(item).some((val) => {
+      if (!val) return false;
+
+      // convert everything safely to string
+      return JSON.stringify(val).toLowerCase().includes(value);
+    });
+  });
+};
+
+const handleReset = () => {
+  setSearch("");
+};
   /* ================= TABLE ================= */
   const columns = [
     {
@@ -362,10 +380,7 @@ export default function VendorTab() {
     },
   ];
 
-  const filteredData = data.filter((v) =>
-    (v.name || v.company_name)?.toLowerCase().includes(search.toLowerCase()),
-  );
-
+ const filteredData = getFilteredData();
   /* ================= UI ================= */
   return (
     <>
@@ -383,10 +398,7 @@ export default function VendorTab() {
           />
           <Button
             icon={<ReloadOutlined />}
-            onClick={() => {
-              setSearch("");
-              fetchVendors();
-            }}
+             onClick={handleReset}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Reset
