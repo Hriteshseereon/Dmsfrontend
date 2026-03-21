@@ -293,7 +293,24 @@ export default function BrokerTab() {
       message.error("Save failed");
     }
   };
+ const getFilteredData = () => {
+  if (!search) return data;
 
+  const value = search.toLowerCase();
+
+  return data.filter((item) => {
+    return Object.values(item).some((val) => {
+      if (!val) return false;
+
+      // convert everything safely to string
+      return JSON.stringify(val).toLowerCase().includes(value);
+    });
+  });
+};
+
+const handleReset = () => {
+  setSearch("");
+};
   /* ================= TABLE ================= */
   const columns = [
     {
@@ -354,9 +371,7 @@ export default function BrokerTab() {
     },
   ];
 
-  const filteredData = data.filter((b) =>
-    b.name?.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filteredData = getFilteredData();
 
   /* ================= UI ================= */
   return (
@@ -374,10 +389,7 @@ export default function BrokerTab() {
           />
           <Button
             icon={<ReloadOutlined />}
-            onClick={() => {
-              setSearch("");
-              fetchBrokers();
-            }}
+            onClick={handleReset}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Reset
