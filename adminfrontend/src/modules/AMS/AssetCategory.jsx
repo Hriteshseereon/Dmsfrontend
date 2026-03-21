@@ -174,11 +174,7 @@ export default function AssetCategory() {
           i.key === selectedRecord.key ? { ...values, key: i.key } : i,
         ),
       );
-      setFilteredData((prev) =>
-        prev.map((i) =>
-          i.key === selectedRecord.key ? { ...values, key: i.key } : i,
-        ),
-      );
+
       setIsEditModalOpen(false);
       editForm.resetFields();
       message.success("Asset category updated successfully");

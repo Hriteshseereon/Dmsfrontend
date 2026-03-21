@@ -5,6 +5,9 @@ import {
   PlusOutlined,
   EyeOutlined,
   EditOutlined,
+  FilterOutlined,
+
+
 } from "@ant-design/icons";
 
 import {
@@ -106,6 +109,24 @@ export default function UnitMaster() {
     }
   };
 
+   const getFilteredData = () => {
+  if (!search) return data;
+
+  const value = search.toLowerCase();
+
+  return data.filter((item) => {
+    return Object.values(item).some((val) => {
+      if (!val) return false;
+
+      // convert everything safely to string
+      return JSON.stringify(val).toLowerCase().includes(value);
+    });
+  });
+};
+
+const handleReset = () => {
+  setSearch("");
+};
   /* ---------------- TABLE COLUMNS ---------------- */
 
   const columns = [
@@ -151,6 +172,7 @@ export default function UnitMaster() {
     </Form.Item>
   );
 
+
   return (
     <div>
       {/* ---------------- HEADER ---------------- */}
@@ -160,10 +182,17 @@ export default function UnitMaster() {
           <Input
             prefix={<SearchOutlined className="text-amber-500" />}
             placeholder="Search..."
-            className="w-64 border-amber-400 text-amber-700 placeholder:text-amber-400"
+            className="w-64! border-amber-400! focus:border-amber-600! text-amber-700! placeholder:text-amber-400!"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
           />
+          <Button
+            icon={<FilterOutlined />}
+            onClick={() => setSearchText("")}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
+            Reset
+          </Button>
         </div>
 
         <Button

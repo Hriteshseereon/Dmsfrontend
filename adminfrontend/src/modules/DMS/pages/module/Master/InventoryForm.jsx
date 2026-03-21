@@ -17,6 +17,7 @@ import {
   EyeOutlined,
   EditOutlined,
   FilterOutlined,
+  ReloadOutlined,
 } from "@ant-design/icons";
 // import {
 //   getAllVendor,
@@ -33,6 +34,8 @@ import {
   addInventory,
   getInventoryById,
   updateInventory,
+  getAllVendor,
+  
 } from "../../../../../api/masterinventory";
 
 const { Option } = Select;
@@ -49,7 +52,7 @@ export default function InventoryForm() {
   const [selectedRow, setSelectedRow] = useState(null);
   const [vendorList, setVendorList] = useState([]);
   const [productList, setProductList] = useState([]);
-
+  
   useEffect(() => {
     fetchVendors();
     fetchInventory();
@@ -200,10 +203,24 @@ export default function InventoryForm() {
     }
   };
 
-  /* ---------------- TABLE ---------------- */
-  const filteredData = data.filter((item) =>
-    item?.vendorName?.toLowerCase()?.includes(searchText.toLowerCase()),
-  );
+
+const getFilteredData = () => {
+  if (!searchText) return data;
+
+  const value = searchText.toLowerCase();
+
+  return data.filter((item) => {
+    return Object.values(item).some((val) => {
+      if (!val) return false;
+      return JSON.stringify(val).toLowerCase().includes(value);
+    });
+  });
+};
+
+const handleReset = () => {
+  setSearchText("");
+};
+  const filteredData = getFilteredData();
 
   const columns = [
     {
@@ -248,6 +265,9 @@ export default function InventoryForm() {
       ),
     },
   ];
+
+
+  
 
   /* ---------------- COMMON FORM FIELDS ---------------- */
   const InventoryFields = ({
@@ -377,20 +397,21 @@ export default function InventoryForm() {
     <div>
       {/* ---------------- HEADER ---------------- */}
       <div className="flex justify-between items-center mb-2">
-        <div className="flex gap-2">
-          <Input
-            prefix={<SearchOutlined className="text-amber-500!" />}
-            placeholder="Search..."
-            className="w-64! border-amber-400!"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-          />
+        <div className="flex gap-2 items-center">
+         <Input
+  prefix={<SearchOutlined className="text-amber-500" />}
+  placeholder="Search inventory..."
+  value={searchText}
+  onChange={(e) => setSearchText(e.target.value)}
+   className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+      
+/>
           <Button
-            icon={<FilterOutlined className="text-amber-800!" />}
-            className="border-amber-400!"
-            onClick={() => setSearchText("")}
+            icon={<ReloadOutlined />}
+            onClick={handleReset}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
-            <span className="text-amber-800!">Reset</span>
+            Reset
           </Button>
         </div>
 

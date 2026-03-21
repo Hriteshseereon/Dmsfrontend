@@ -419,19 +419,17 @@ export default function UnitConversionTab({ items }) {
                 <Form.Item label="Lower Unit" required>
                   <Select
                     showSearch
-                    placeholder="e.g. kg, litre, box"
+                    placeholder="Select lower unit"
                     optionFilterProp="label"
                     value={formData.reference_unit_id}
                     style={{ width: "100%" }}
                     onChange={(v) =>
                       setFormData({ ...formData, reference_unit_id: v })
                     }
-                    options={referenceUnits
-                      .filter((u) => u.type === "UNIT")
-                      .map((u) => ({
-                        value: u.uom_id,
-                        label: u.label,
-                      }))}
+                    options={units.map((u) => ({
+                      value: u.id,
+                      label: u.name,
+                    }))}
                   />
                 </Form.Item>
               </Col>

@@ -383,6 +383,24 @@ export default function CustomerTab() {
       setSendingId(null);
     }
   };
+
+
+  const getFilteredData = () => {
+  if (!search) return data;
+
+  const value = search.toLowerCase();
+
+  return data.filter((item) =>
+    Object.values(item)
+      .join(" ")
+      .toLowerCase()
+      .includes(value)
+  );
+};
+
+const handleReset = () => {
+  setSearch("");
+};
   /* ================= TABLE ================= */
   const columns = [
     {
@@ -455,9 +473,7 @@ export default function CustomerTab() {
     },
   ];
 
-  const filteredData = data.filter((c) =>
-    c.customer_name?.toLowerCase().includes(search.toLowerCase()),
-  );
+ const filteredData = getFilteredData();
 
   /* ================= UI ================= */
   return (
@@ -476,10 +492,7 @@ export default function CustomerTab() {
           />
           <Button
             icon={<ReloadOutlined />}
-            onClick={() => {
-              setSearch("");
-              fetchCustomers();
-            }}
+            onClick={handleReset}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Reset
