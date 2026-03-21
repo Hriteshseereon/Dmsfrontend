@@ -501,11 +501,6 @@ export default function AssetMaintenance() {
             name="cost"
             rules={[
               {
-                type: "number",
-                min: 0,
-                message: "Cost must be a positive number",
-              },
-              {
                 validator: (_, value) => {
                   if (value === undefined || value === null)
                     return Promise.resolve();
