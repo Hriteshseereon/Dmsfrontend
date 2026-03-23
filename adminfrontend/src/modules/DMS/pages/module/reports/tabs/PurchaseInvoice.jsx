@@ -1,103 +1,80 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState ,useEffect} from "react";
 import { Table, DatePicker, Row, Col, Card, Tag,Button } from "antd";
 import dayjs from "dayjs";
 import { FilterOutlined } from "@ant-design/icons";
 import isBetween from "dayjs/plugin/isBetween";
+import { getCommonReport } from "../../../../../../api/reports";
 dayjs.extend(isBetween);
 const { RangePicker } = DatePicker;
 
-/* ---------------- MOCK PURCHASE INVOICE JSON ---------------- */
-const purchaseInvoiceJSON = [
-  {
-    key: 1,
-    slno: 1,
-    invoiceNo: "PINV-2024-001",
-    invoiceDate: "2024-09-06",
-    totalAmount: 15000,
-    plantName: "Plant A",
-   
-  },
-  {
-    key: 2,
-    slno: 2,
-    invoiceNo: "PINV-2024-014",
-    invoiceDate: "2024-09-19",
-    plantName: "Plant B",
-    totalAmount: 8000,
-  },
-  {
-    key: 3,
-    slno: 3,
-    invoiceNo: "PINV-2024-022",
-    invoiceDate: "2024-10-03",
-    totalAmount: 12000,
-    plantName: "Plant C",
-    
-  },
-  {
-    key: 4,
-    slno: 4,
-    invoiceNo: "PINV-2024-031",
-    invoiceDate: "2024-11-12",
-    totalAmount: 10000,
-    plantName: "Plant D",
-   
-  },
-];
+
 
 /* ---------------- COMPONENT ---------------- */
 const PurchaseInvoice = () => {
- const [dateRange, setDateRange] = useState(null);
-   /* ---------------- MONTH FILTER LOGIC ---------------- */
- const filteredData = useMemo(() => {
-   if (!dateRange) return  purchaseInvoiceJSON;
- 
-   const [start, end] = dateRange;
+ const [data, setData] = useState([]);
+  const [dateRange, setDateRange] = useState(null); 
+  
+  useEffect(() => {
+    fetchData();
+  }, []);
+  
+  const fetchData = async () => {
+    try {
+      const res = await getCommonReport({ type: "purchase_invoice" }); // ✅ IMPORTANT
+  
+      const formatted = res.data.map((item, index) => ({
+        key: index,
+        invoice_number: item.invoice_number || "-", // handle null
+        plant_name: item.plant_name,
+        return_number:item.return_number,
+        invoice_date: item.invoice_date ,
+        return_amount: item.return_amount,
+        return_reason:item.return_reason,
+        status: item.status,
+      }));
+  
+      setData(formatted);
+    } catch (err) {
+      console.error(err);
+    }
+  };/* ---------------- MONTH FILTER LOGIC ---------------- */
+   const filteredData = useMemo(() => {
+  if (!dateRange) return data;
 
-   return purchaseInvoiceJSON.filter((rec) => {
-     const invoiceDate = dayjs(rec.invoiceDate);
-     return invoiceDate.isBetween(start, end, "day", "[]");
-   });
- }, [dateRange]);
+  const [start, end] = dateRange;
+
+  return data.filter((rec) => {
+    if (!rec.invoice_date) return false;
+
+    const invoiceDate = dayjs(rec.invoice_date);
+    return invoiceDate.isBetween(start, end, "day", "[]");
+  });
+}, [dateRange, data]);
 
   /* ---------------- TABLE COLUMNS ---------------- */
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Sl No</span>,
-   
-      dataIndex: "slno",
-      width: 70,
-      
-          render: (t) => <span className="text-amber-800">{t}</span>,
-    },
-    {
        title: <span className="text-amber-700 font-semibold">Invoice No</span>,
     
-      dataIndex: "invoiceNo",
+      dataIndex: "invoice_number",
       width: 160,
       
           render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
        title: <span className="text-amber-700 font-semibold">Invoice Date</span>,
-      dataIndex: "invoiceDate",
+      dataIndex: "invoice_date",
       width: 120, 
        render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
  
     },
     {
         title: <span className="text-amber-700 font-semibold">Plant Name</span>,
-        dataIndex: "plantName",
+        dataIndex: "plant_name",
         width: 180,
         render: (t) => <span className="text-amber-800">{t}</span>,
     },
-    {
-       title: <span className="text-amber-700 font-semibold">Total Amount</span>,
-      dataIndex: "totalAmount",
-      width: 120,
-      
-          render: (t) => <span className="text-amber-800">{t}</span>,
-    },
+  
     
   ];
 

@@ -3,6 +3,8 @@ import { Table, DatePicker, Row, Col, Card, Tag,Button } from "antd";
 import { FilterOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import isBetween from "dayjs/plugin/isBetween";
+import { useEffect } from "react";
+import { getCommonReport } from "../../../../../../api/reports"
 dayjs.extend(isBetween);
 const { RangePicker } = DatePicker;
 
@@ -73,7 +75,7 @@ const SaleContract = () => {
   /* ---------------- TABLE COLUMNS ---------------- */
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Sl No</span>,
+      title: <span className="text-amber-700 font-semibold">Contract No</span>,
    
       dataIndex: "slno",
       width: 70,

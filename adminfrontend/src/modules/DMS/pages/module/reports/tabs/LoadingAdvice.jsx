@@ -3,91 +3,65 @@ import { Table, DatePicker,Button, Row, Col, Card, Tag } from "antd";
 import dayjs from "dayjs";
 import { FilterOutlined } from "@ant-design/icons";
 import isBetween from "dayjs/plugin/isBetween";
+import { useEffect } from "react";
+import { getCommonReport } from "../../../../../../api/reports"
 dayjs.extend(isBetween);
 const { RangePicker } = DatePicker;
 
-/* ---------------- MOCK SALE LoadingAdvice JSON ---------------- */
-const loadingAdviceJSON = [
-  {
-    key: 1,
-    slno: 1,
-   LoadingAdviceNo: "PINV-2024-001",
-    plantName: "Plant A",
-    customerName: "Customer X",
-    transporterName: "Transporter 1",
-    loadingAdviceDate: "2024-09-06",
-    totalAmount: 15000,
 
-  },
-  {
-    key: 2,
-    slno: 2,
-    LoadingAdviceNo: "PINV-2024-014",
-    plantName: "Plant B",
-    customerName: "Customer Y",
-    transporterName: "Transporter 2",
-    loadingAdviceDate: "2024-09-19",
-    totalAmount: 8000,
-  },
-  {
-    key: 3,
-    slno: 3,
-    LoadingAdviceNo: "PINV-2024-022",
-    plantName: "Plant C",
-    customerName: "Customer Z",
-    transporterName: "Transporter 3",
-    loadingAdviceDate: "2024-10-03",
-    totalAmount: 12000,
-    
-  },
-  {
-    key: 4,
-    slno: 4,
-    LoadingAdviceNo: "PINV-2024-031",
-    plantName: "Plant D",
-    customerName: "Customer W",
-    transporterName: "Transporter 4",
-    loadingAdviceDate: "2024-11-12",
-    totalAmount: 10000,
-
-  },
-];
 
 /* ---------------- COMPONENT ---------------- */
 const LoadingAdvice = () => {
-const [dateRange, setDateRange] = useState(null);
-  /* ---------------- MONTH FILTER LOGIC ---------------- */
+ const [data, setData] = useState([]);
+  const [dateRange, setDateRange] = useState(null); 
+  
+  useEffect(() => {
+    fetchData();
+  }, []);
+  
+  const fetchData = async () => {
+    try {
+      const res = await getCommonReport({ type: "loading_advice" }); // ✅ IMPORTANT
+  
+      const formatted = res.data.map((item, index) => ({
+        key: index,
+        loading_advice_number: item.loading_advice_number || "-", // handle null
+        loading_advice_date: item.loading_advice_date,
+        transport_name: item.transport_name,
+        total_amount:item.total_amount,
+      }));
+  
+      setData(formatted);
+    } catch (err) {
+      console.error(err);
+    }
+  };/* ---------------- MONTH FILTER LOGIC ---------------- */
 const filteredData = useMemo(() => {
-  if (!dateRange) return  loadingAdviceJSON;
+  if (!dateRange) return data;
 
   const [start, end] = dateRange;
 
-  return loadingAdviceJSON.filter((rec) => {
-    const loadingAdviceDate = dayjs(rec.loadingAdviceDate);
-    return loadingAdviceDate.isBetween(start, end, "day", "[]");
+  return data.filter((rec) => {
+    if (!rec.loading_advice_date) return false;
+
+    const loadingDate = dayjs(rec.loading_advice_date);
+    return loadingDate.isBetween(start, end, "day", "[]");
   });
-}, [dateRange]);
+}, [dateRange, data]);
 
   /* ---------------- TABLE COLUMNS ---------------- */
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Sl No</span>,
+      title: <span className="text-amber-700 font-semibold">Advice No</span>,
    
-      dataIndex: "slno",
+      dataIndex: "loading_advice_number",
       width: 70,
       
           render: (t) => <span className="text-amber-800">{t}</span>,
     },
-    {
-       title: <span className="text-amber-700 font-semibold">Loading Advice No</span>,
-    
-      dataIndex: "LoadingAdviceNo",
-      width: 160,
-      
-          render: (t) => <span className="text-amber-800">{t}</span>,
-    },
-    {       title: <span className="text-amber-700 font-semibold">Loading Advice Date</span>,
-      dataIndex: "loadingAdviceDate",
+  
+    {       title: <span className="text-amber-700 font-semibold">Advice Date</span>,
+      dataIndex: "loading_advice_date",
       width: 140,
        render: (d) => <span className="text-amber-800">{d}</span>,
     },
@@ -105,13 +79,13 @@ const filteredData = useMemo(() => {
        render: (d) => <span className="text-amber-800">{d}</span>,
     },
     {       title: <span className="text-amber-700 font-semibold">Transporter Name</span>,
-      dataIndex: "transporterName",
+      dataIndex: "transport_name",
       width: 150,
        render: (d) => <span className="text-amber-800">{d}</span>,
     },
     {
        title: <span className="text-amber-700 font-semibold">Total Amount</span>,
-      dataIndex: "totalAmount",
+      dataIndex: "total_amount",
       width: 120,
       
           render: (t) => <span className="text-amber-800">{t}</span>,

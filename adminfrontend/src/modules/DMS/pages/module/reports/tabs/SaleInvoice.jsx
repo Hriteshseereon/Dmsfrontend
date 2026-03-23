@@ -11,6 +11,7 @@ const saleInvoiceJSON = [
   {
     key: 1,
     slno: 1,
+  
     invoiceNo: "PINV-2024-001",
     invoiceDate: "2024-09-06",
     customerName: "Kalinga Oils Pvt Ltd",
@@ -20,6 +21,7 @@ const saleInvoiceJSON = [
   {
     key: 2,
     slno: 2,
+
     invoiceNo: "PINV-2024-014",
     invoiceDate: "2024-09-19",
     customerName: "Odisha Edibles",
@@ -28,6 +30,7 @@ const saleInvoiceJSON = [
   {
     key: 3,
     slno: 3,
+ 
     invoiceNo: "PINV-2024-022",
     invoiceDate: "2024-10-03",
     totalAmount: 12000,
@@ -37,6 +40,7 @@ const saleInvoiceJSON = [
   {
     key: 4,
     slno: 4,
+
     invoiceNo: "PINV-2024-031",
     invoiceDate: "2024-11-12",
     totalAmount: 10000,
@@ -61,14 +65,7 @@ const SaleInvoice = () => {
 
   /* ---------------- TABLE COLUMNS ---------------- */
   const columns = [
-    {
-      title: <span className="text-amber-700 font-semibold">Sl No</span>,
-   
-      dataIndex: "slno",
-      width: 70,
-      
-          render: (t) => <span className="text-amber-800">{t}</span>,
-    },
+    
     {
        title: <span className="text-amber-700 font-semibold">Invoice No</span>,
     

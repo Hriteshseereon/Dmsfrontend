@@ -54,14 +54,7 @@ const SaleExpiredContract = () => {
 
   /* ---------------- TABLE COLUMNS ---------------- */
   const columns = [
-    {
-      title: <span className="text-amber-700 font-semibold">Sl No</span>,
-   
-      dataIndex: "slno",
-      width: 70,
-      
-          render: (t) => <span className="text-amber-800">{t}</span>,
-    },
+    
     {
        title: <span className="text-amber-700 font-semibold">Contract No</span>,
     

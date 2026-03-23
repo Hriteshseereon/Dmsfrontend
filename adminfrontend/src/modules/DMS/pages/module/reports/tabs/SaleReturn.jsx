@@ -11,6 +11,7 @@ const saleReturnJSON = [
   {
     key: 1,
     slno: 1,
+    odno:5,
     customerName: "Reliance Retail",
     plantName: "Kalinga Oils Pvt Ltd",
     returnAmount:50,
@@ -21,6 +22,7 @@ const saleReturnJSON = [
   {
     key: 2,
     slno: 2,
+     odno:5,
     customerName: "Big Bazaar",
     plantName: "Odisha Edibles",
     returnAmount: 25,
@@ -31,6 +33,7 @@ const saleReturnJSON = [
   {
     key: 3,
     slno: 3,
+     odno:5,
     customerName: "Metro Cash & Carry",
     plantName: "Kalinga Oils Pvt Ltd",
     returnAmount: 50,
@@ -41,6 +44,7 @@ const saleReturnJSON = [
   {
     key: 4,
     slno: 4,
+     odno:5,
     customerName: "DMart",
     plantName: "Odisha Edibles",
     returnAmount: 20,
@@ -68,9 +72,17 @@ const SaleReturn = () => {
   /* ---------------- TABLE COLUMNS ---------------- */
   const columns = [
     {
-        title: <span className="text-amber-700 font-semibold">Sl No</span>,
+      title: <span className="text-amber-700 font-semibold">Dispute No</span>,
    
       dataIndex: "slno",
+      width: 70,
+      
+          render: (t) => <span className="text-amber-800">{t}</span>,
+    },
+    {
+        title: <span className="text-amber-700 font-semibold">Order No</span>,
+   
+      dataIndex: "odno",
       width: 70,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },

@@ -72,13 +72,7 @@ const SaleOrder = () => {
 
   /* ---------------- TABLE COLUMNS ---------------- */
   const columns = [
-    {
-      title: <span className="text-amber-700 font-semibold">Sl No</span>,
-   
-      dataIndex: "slno",
-      width: 70,
-      render: (t) => <span className="text-amber-800">{t}</span>,
-    },
+    
     {
         title: <span className="text-amber-700 font-semibold">Order No</span>,
       dataIndex: "orderNo",
@@ -99,20 +93,7 @@ const SaleOrder = () => {
       render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
  
     },
-    {
-        title: <span className="text-amber-700 font-semibold">Order Start Date</span>,
-      dataIndex: "startDate",
-      width: 130,
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
-    }
-   ,
-   {
-
-        title: <span className="text-amber-700 font-semibold">Order End Date</span>,
-      dataIndex: "endDate",
-      width: 130,   
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
-    },
+   
     {
       title: <span className="text-amber-700 font-semibold">Total Amount</span>,
       dataIndex: "totalAmount",
