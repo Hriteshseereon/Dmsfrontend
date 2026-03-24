@@ -20,17 +20,17 @@ useEffect(() => {
     try {
      const res = await getCommonReport({ type: "purchase_contract" });
       const formatted = res.data
-      
-        .map((item, index) => ({
-          key: index,
-          slno: item.contract_number,
-          plantName: item.vendor_name,
-          contractDate: item.contract_date || item.document_date,
-          startDate: item.start_date,
-          endDate: item.end_date,
-          totalAmount: item.total_amount,
-          status: item.status,
-        }));
+     .filter((item) => item.type === "Purchase Contract")
+      .map((item, index) => ({
+    key: index,
+    slno: item.contract_number,
+    plantName: item.vendor_name,
+    contractDate: item.contract_date,
+    startDate: item.start_date,
+    endDate: item.end_date,
+    totalAmount: item.total_amount,
+    status: item.status,
+  }));
 
       setData(formatted);
     } catch (err) {

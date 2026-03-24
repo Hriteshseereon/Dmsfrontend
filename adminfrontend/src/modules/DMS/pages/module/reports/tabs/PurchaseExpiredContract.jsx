@@ -28,14 +28,12 @@ const PurchaseExpiredContract = () => {
         key: index,
         slno: item.contract_number,
         plantName: item.vendor_name,
-        contractDate: item.contract_date || item.document_date,
-        startDate: item.start_date,
-        endDate: item.end_date,
-        totalAmount: item.total_amount,
+        expired_date:item.expired_date,
+        total_amount: item.total_amount,
         status: "expired",
       }))
       .filter((rec) => {
-        const endDate = dayjs(rec.endDate);
+        const endDate = dayjs(rec.expired_date);
         return (
           endDate.isBefore(today, "day") ||
           rec.status?.toLowerCase() === "expired"
@@ -75,38 +73,27 @@ return data.filter((rec) => {
              title: <span className="text-amber-700 font-semibold">Plant Name</span>,
    
       dataIndex: "plantName",
-      width: 200,
+      width: 120,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
-       title: <span className="text-amber-700 font-semibold">Contract Date</span>,
-      dataIndex: "contractDate",
+      title: <span className="text-amber-700 font-semibold">Total Amount</span>,
+      dataIndex: "total_amount",
       width: 120,
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
- 
-    },
-    {
-        title: <span className="text-amber-700 font-semibold">Contract Start Date</span>,
-      dataIndex: "startDate",
-      width: 130,
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
+      render: (amount) => <span className="text-amber-800">{amount}</span>,
     }
    ,
    {
 
-        title: <span className="text-amber-700 font-semibold">Contract End Date</span>,
-      dataIndex: "endDate",
-      width: 130,   
+      title: <span className="text-amber-700 font-semibold">Expired Date</span>,
+      dataIndex: "expired_date",
+      width: 120,   
       render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
     },
-    {
-      title: <span className="text-amber-700 font-semibold">Total Amount</span>,
-      dataIndex: "totalAmount",
-      width: 120,
-      render: (amount) => <span className="text-amber-800">{amount}</span>,
-    },
+   
    {
     title: <span className="text-amber-700 font-semibold">Status</span>,
+    width:120,
    dataIndex: "status",
   render: (status) => (
     <Tag color={status === "expired" ? "red" : "green"}>

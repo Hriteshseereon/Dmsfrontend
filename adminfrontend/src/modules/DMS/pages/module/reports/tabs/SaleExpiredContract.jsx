@@ -1,54 +1,64 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState,useEffect } from "react";
 import { Table, DatePicker, Row, Col, Card, Tag ,Button} from "antd";
 import dayjs from "dayjs";
 import { FilterOutlined } from "@ant-design/icons";
 const { RangePicker } = DatePicker;
+import { getCommonReport } from "../../../../../../api/reports"
 import isBetween from "dayjs/plugin/isBetween";
 dayjs.extend(isBetween);
 
-/* ---------------- MOCK SALE LoadingAdvice JSON ---------------- */
-const SaleExpiredContractJSON = [
-  {
-    key: 1,
-    slno: 1,
-    ContractNo: "SCON-2024-001",
-    customerName: "Customer A",
-    startDate: "2024-06-01",
-    endDate: "2024-09-06", // expiry date
-    totalAmount: 15000,
-     approvalStatus: "EXPIRED",
-  },
-  {
-    key: 2,
-    slno: 2,
-    ContractNo: "PCON-2024-014",
-    customerName: "Customer B",
-    startDate: "2024-07-10",
-    endDate: "2024-09-19",
-    totalAmount: 8000,
-      approvalStatus: "Not EXPIRED",
-  },
-];
 
 
 /* ---------------- COMPONENT ---------------- */
 const SaleExpiredContract = () => {
-  const [dateRange, setDateRange] = useState(null);
-
-
-  /* ---------------- MONTH FILTER LOGIC ---------------- */
- const filteredData = useMemo(() => {
-  return SaleExpiredContractJSON.filter((rec) => {
-    const isExpired = rec.approvalStatus === "EXPIRED";
-
-    if (!dateRange) return isExpired;
-
+  const [data, setData] = useState([]);
+    const [dateRange, setDateRange] = useState(null); 
+    
+    useEffect(() => {
+      fetchData();
+    }, []);
+    
+    const fetchData = async () => {
+    try {
+      const res = await getCommonReport({ type: "sales_contract" });
+  
+      const today = dayjs();
+  
+      const formatted = res.data
+        .map((item, index) => ({
+          key: index,
+          contract_number: item.contract_number,
+          plantName: item.vendor_name,
+          expired_date: item.expired_date,
+          customer_name:item.customer_name,
+          total_amount: item.total_amount,
+          status: "expired",
+        }))
+        .filter((rec) => {
+          const endDate = dayjs(rec.endDate);
+          return (
+            endDate.isBefore(today, "day") ||
+            rec.status?.toLowerCase() === "expired"
+          );
+        });
+  
+      setData(formatted);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+      
+      /* ---------------- MONTH FILTER LOGIC ---------------- */
+  const filteredData = useMemo(() => {
+   if (!dateRange) return data;
+  
     const [start, end] = dateRange;
-    const expiryDate = dayjs(rec.endDate);
-
-    return isExpired && expiryDate.isBetween(start, end, "day", "[]");
+  
+  return data.filter((rec) => {
+    const endDate = dayjs(rec.expired_date);
+    return endDate.isBetween(start, end, "day", "[]");
   });
-}, [dateRange]);
+  }, [dateRange, data]);
 
 
 
@@ -58,7 +68,7 @@ const SaleExpiredContract = () => {
     {
        title: <span className="text-amber-700 font-semibold">Contract No</span>,
     
-      dataIndex: "ContractNo",
+      dataIndex: "contract_number",
       width: 160,
       
           render: (t) => <span className="text-amber-800">{t}</span>,
@@ -66,7 +76,7 @@ const SaleExpiredContract = () => {
     
     {
        title: <span className="text-amber-700 font-semibold">Customer Name</span>,
-      dataIndex: "customerName",
+      dataIndex: "customer_name",
       width: 120, 
        render: (d) => <span className="text-amber-800">{d}</span>,
  
@@ -74,20 +84,20 @@ const SaleExpiredContract = () => {
    
     {
        title: <span className="text-amber-700 font-semibold">Total Amount</span>,
-      dataIndex: "totalAmount",
+      dataIndex: "total_amount",
       width: 120,
       
           render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Expired Date</span>,      
-      dataIndex: "endDate",
+      dataIndex: "expired_date",
       width: 120, 
         render: (d) => <span className="text-amber-800">{ dayjs(d).format("DD-MM-YYYY")}</span>, 
     },
     {
           title: <span className="text-amber-700 font-semibold">Status</span>,
-          dataIndex: "approvalStatus",
+          dataIndex: "status",
           width: 120,
            render: (t) =>  <Tag color="red">{t}</Tag>,
         },

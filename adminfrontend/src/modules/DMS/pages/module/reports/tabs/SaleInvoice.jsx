@@ -3,65 +3,51 @@ import { Table, DatePicker, Row, Col, Card, Button } from "antd";
 import dayjs from "dayjs";
 import { FilterOutlined } from "@ant-design/icons";
 import isBetween from "dayjs/plugin/isBetween";
+import { useEffect } from "react";
+import { getCommonReport } from "../../../../../../api/reports";
 dayjs.extend(isBetween);
 const { RangePicker } = DatePicker;
 
-/* ---------------- MOCK SALE INVOICE JSON ---------------- */
-const saleInvoiceJSON = [
-  {
-    key: 1,
-    slno: 1,
-  
-    invoiceNo: "PINV-2024-001",
-    invoiceDate: "2024-09-06",
-    customerName: "Kalinga Oils Pvt Ltd",
-    totalAmount: 15000,
-    
-  },
-  {
-    key: 2,
-    slno: 2,
 
-    invoiceNo: "PINV-2024-014",
-    invoiceDate: "2024-09-19",
-    customerName: "Odisha Edibles",
-    totalAmount: 8000,
-  },
-  {
-    key: 3,
-    slno: 3,
- 
-    invoiceNo: "PINV-2024-022",
-    invoiceDate: "2024-10-03",
-    totalAmount: 12000,
-    customerName: "Metro Cash & Carry",
-
-  },
-  {
-    key: 4,
-    slno: 4,
-
-    invoiceNo: "PINV-2024-031",
-    invoiceDate: "2024-11-12",
-    totalAmount: 10000,
-    customerName: "DMart",
-  },
-];
 
 /* ---------------- COMPONENT ---------------- */
 const SaleInvoice = () => {
-  const [dateRange, setDateRange] = useState(null);
-    /* ---------------- MONTH FILTER LOGIC ---------------- */
-  const filteredData = useMemo(() => {
-    if (!dateRange) return  saleInvoiceJSON;
-  
-    const [start, end] = dateRange;
-
-    return saleInvoiceJSON.filter((rec) => {
-      const invoiceDate = dayjs(rec.invoiceDate);
-      return invoiceDate.isBetween(start, end, "day", "[]");
-    });
-  }, [dateRange]);
+  const [data, setData] = useState([]);
+     const [dateRange, setDateRange] = useState(null); 
+     
+     useEffect(() => {
+       fetchData();
+     }, []);
+     
+     const fetchData = async () => {
+       try {
+         const res = await getCommonReport({ type: "sales_invoice" }); // ✅ IMPORTANT
+     
+         const formatted = res.data.map((item, index) => ({
+           key: index,
+           invoice_number: item.invoice_number || "-", // handle null
+           customer_name:item.customer_name,
+           invoice_date: item.invoice_date ,
+           total_amount:item.total_amount,
+         }));
+     
+         setData(formatted);
+       } catch (err) {
+         console.error(err);
+       }
+     };/* ---------------- MONTH FILTER LOGIC ---------------- */
+   const filteredData = useMemo(() => {
+     if (!dateRange) return data;
+   
+     const [start, end] = dateRange;
+   
+     return data.filter((rec) => {
+       if (!rec.invoice_date) return false;
+   
+       const invoiceDate = dayjs(rec.invoice_date);
+       return invoiceDate.isBetween(start, end, "day", "[]");
+     });
+   }, [dateRange, data]);
 
   /* ---------------- TABLE COLUMNS ---------------- */
   const columns = [
@@ -69,27 +55,27 @@ const SaleInvoice = () => {
     {
        title: <span className="text-amber-700 font-semibold">Invoice No</span>,
     
-      dataIndex: "invoiceNo",
+      dataIndex: "invoice_number",
       width: 160,
       
           render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
        title: <span className="text-amber-700 font-semibold">Invoice Date</span>,
-      dataIndex: "invoiceDate",
+      dataIndex: "invoice_date",
       width: 120, 
        render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
  
     },
     {
         title: <span className="text-amber-700 font-semibold">Customer Name</span>, 
-      dataIndex: "customerName",
+      dataIndex: "customer_name",
       width: 200, 
           render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
        title: <span className="text-amber-700 font-semibold">Total Amount</span>,
-      dataIndex: "totalAmount",
+      dataIndex: "total_amount",
       width: 120,
       
           render: (t) => <span className="text-amber-800">{t}</span>,
