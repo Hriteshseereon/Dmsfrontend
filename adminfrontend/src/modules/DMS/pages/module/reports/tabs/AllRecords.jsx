@@ -4,107 +4,53 @@ const { RangePicker } = DatePicker;
 import isBetween from "dayjs/plugin/isBetween";
 import dayjs from "dayjs";
 import { FilterOutlined } from "@ant-design/icons";
+import { useEffect } from "react";
+import { getCommonReport } from "../../../../../../api/reports"
+
 dayjs.extend(isBetween);
 const { Option } = Select;
 
-/* ---------------- MOCK JSON DATA ---------------- */
-const allRecordsJSON = [
-  {
-    key: 1,
-    recordType: "Purchase Contract",
-    documentNo: "PC-2024-001",
-    documentDate: "2024-09-10",
-    partyName: "Jay Traders",
-    plantName: "Kalinga Oils Pvt. Ltd.",
-    amount: 1250000,
-    status: "Approved",
-  },
-  {
-    key: 2,
-    recordType: "Purchase Indent",
-    documentNo: "PI-2024-015",
-    documentDate: "2024-10-05",
-    partyName: "Global Suppliers",
-    plantName: "Odisha Edibles",
-    amount: 520000,
-    status: "Pending",
-  },
-  {
-    key: 3,
-    recordType: "Sale Contract",
-    documentNo: "SC-2024-003",
-    documentDate: "2024-08-20",
-    partyName: "Reliance Retail",
-    plantName: "Kalinga Oils Pvt. Ltd.",
-    amount: 2300000,
-    status: "Approved",
-  },
-  {
-    key: 4,
-    recordType: "Sale Invoice",
-    documentNo: "SI-2024-021",
-    documentDate: "2024-10-12",
-    partyName: "Big Bazaar",
-    plantName: "Odisha Edibles",
-    amount: 880000,
-    status: "Completed",
-  },
-  {
-    key: 5,
-    recordType: "Purchase Return",
-    documentNo: "PR-2024-004",
-    documentDate: "2024-07-18",
-    partyName: "Local Traders",
-    plantName: "Kalinga Oils Pvt. Ltd.",
-    amount: 150000,
-    status: "Approved",
-  },
-  {
-    key: 6,
-    recordType: "Sale Return",
-    documentNo: "SR-2024-006",
-    documentDate: "2024-10-01",
-    partyName: "Metro Cash & Carry",
-    plantName: "Odisha Edibles",
-    amount: 95000,
-    status: "Pending",
-  },
-];
-
-/* ---------------- RECORD TYPE OPTIONS ---------------- */
-const recordTypeOptions = [
-  "All",
-  "Purchase Contract",
-  "Purchase Indent",
-  "Purchase Invoice",
-  "Purchase Return",
-  "Sale Contract",
-  "Sale Indent",
-  "Sale Invoice",
-  "Sale Return",
-];
 
 export default function AllRecords() {
-  const [recordType, setRecordType] = useState("All");
-  const [dateRange, setDateRange] = useState(null);
-
-
-  /* ---------------- FILTER LOGIC ---------------- */
-  const filteredData = useMemo(() => {
-  return allRecordsJSON.filter((rec) => {
-    const recDate = dayjs(rec.documentDate);
-
-    if (recordType !== "All" && rec.recordType !== recordType)
-      return false;
-
-    if (dateRange) {
-      const [start, end] = dateRange;
-      if (!recDate.isBetween(start, end, "day", "[]")) return false;
+ 
+const [data, setData] = useState([]);
+  const [dateRange, setDateRange] = useState(null); 
+  
+  useEffect(() => {
+    fetchData();
+  }, []);
+  
+  const fetchData = async () => {
+    try {
+      const res = await getCommonReport({ type: "all_records" }); // ✅ IMPORTANT
+  
+      const formatted = res.data.map((item, index) => ({
+        key: index,
+        loading_advice_number: item.loading_advice_number || "-", // handle null
+        loading_advice_date: item.loading_advice_date,
+        transport_name: item.transport_name,
+        total_amount:item.total_amount,
+        plant_name:item.plant_name,
+        customer_name:item.customer_name,
+      }));
+  
+      setData(formatted);
+    } catch (err) {
+      console.error(err);
     }
+  };/* ---------------- MONTH FILTER LOGIC ---------------- */
+const filteredData = useMemo(() => {
+  if (!dateRange) return data;
 
-    return true;
+  const [start, end] = dateRange;
+
+  return data.filter((rec) => {
+    if (!rec.loading_advice_date) return false;
+
+    const loadingDate = dayjs(rec.loading_advice_date);
+    return loadingDate.isBetween(start, end, "day", "[]");
   });
-}, [recordType, dateRange]);
+}, [dateRange, data]);
 
 
   /* ---------------- TABLE COLUMNS ---------------- */
@@ -187,7 +133,7 @@ export default function AllRecords() {
 
     {/* Right: Filters */}
     <Col>
-      <Row gutter={8} align="middle">
+      {/* <Row gutter={8} align="middle">
 
         <Col>
           <Select
@@ -227,7 +173,7 @@ export default function AllRecords() {
           </Button>
         </Col>
 
-      </Row>
+      </Row> */}
     </Col>
 
   </Row>

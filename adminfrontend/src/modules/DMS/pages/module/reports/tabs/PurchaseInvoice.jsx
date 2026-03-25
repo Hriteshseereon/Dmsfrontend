@@ -30,6 +30,7 @@ const PurchaseInvoice = () => {
         invoice_date: item.invoice_date ,
         return_amount: item.return_amount,
         return_reason:item.return_reason,
+        total_amount:item.total_amount,
         status: item.status,
       }));
   
@@ -75,7 +76,16 @@ const PurchaseInvoice = () => {
         render: (t) => <span className="text-amber-800">{t}</span>,
     },
   
+    {
+        title: <span className="text-amber-700 font-semibold">Total Amount</span>,
+        dataIndex: "total_amount",
+        width: 180,
+        render: (t) => <span className="text-amber-800">{t}</span>,
+    },
+
     
+
+
   ];
 
   return (

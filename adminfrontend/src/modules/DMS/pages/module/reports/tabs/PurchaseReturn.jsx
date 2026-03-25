@@ -29,7 +29,7 @@ const PurchaseReturn = () => {
         plantName: item.vendor_name,
         return_number:item.return_number,
         return_date: item.return_date ,
-        return_amount: item.return_amount,
+        return_qty: item.return_qty,
         return_reason:item.return_reason,
         status: item.status,
       }));
@@ -58,20 +58,20 @@ const filteredData = useMemo(() => {
       title: <span className="text-amber-700 font-semibold">Return No</span>,
    
       dataIndex: "return_number",
-      width: 70,
+      width: 100,
       
           render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Order No</span>,
       dataIndex: "orderNo",
-      width: 150,
+      width: 100,
         render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
        title: <span className="text-amber-700 font-semibold">Return Date</span>,
       dataIndex: "return_date",
-      width: 120, 
+      width: 100, 
        render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
  
     },
@@ -79,23 +79,16 @@ const filteredData = useMemo(() => {
               title: <span className="text-amber-700 font-semibold">Plant Name</span>,
    
       dataIndex: "plantName",
-      width: 200,
+      width: 100,
       
           render: (t) => <span className="text-amber-800">{t}</span>,
     },
-    {
-      title: <span className="text-amber-700 font-semibold">Return Amount</span>,
-   
-      dataIndex: "return_amount",
-      width: 180,
-      
-          render: (t) => <span className="text-amber-800">{t}</span>,
-    },
+    
     {
       title: <span className="text-amber-700 font-semibold">Return Reason</span>,
    
       dataIndex: "return_reason",
-      width: 180,
+      width: 100,
       
           render: (t) => <span className="text-amber-800">{t}</span>,
     },

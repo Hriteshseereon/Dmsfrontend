@@ -20,7 +20,7 @@ const SaleExpiredContract = () => {
     
     const fetchData = async () => {
     try {
-      const res = await getCommonReport({ type: "sales_contract" });
+      const res = await getCommonReport({ type: "sales_expired_contract" });
   
       const today = dayjs();
   

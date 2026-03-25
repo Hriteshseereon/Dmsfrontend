@@ -29,6 +29,8 @@ const LoadingAdvice = () => {
         loading_advice_date: item.loading_advice_date,
         transport_name: item.transport_name,
         total_amount:item.total_amount,
+        plant_name:item.plant_name,
+        customer_name:item.customer_name,
       }));
   
       setData(formatted);
@@ -67,14 +69,14 @@ const filteredData = useMemo(() => {
     },
     {
        title: <span className="text-amber-700 font-semibold">Plant Name</span>,
-      dataIndex: "plantName",
+      dataIndex: "plant_name",
       width: 120, 
        render: (d) => <span className="text-amber-800">{d}</span>,
  
     },
     {
        title: <span className="text-amber-700 font-semibold">Customer Name</span>,
-      dataIndex: "customerName",
+      dataIndex: "customer_name",
       width: 120,
        render: (d) => <span className="text-amber-800">{d}</span>,
     },

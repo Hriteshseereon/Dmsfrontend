@@ -20,16 +20,18 @@ const SaleReturn = () => {
     
     const fetchData = async () => {
       try {
-        const res = await getCommonReport({ type: "sales_dispute" }); // ✅ IMPORTANT
+        const res = await getCommonReport({ type: "sales_return" }); // ✅ IMPORTANT
     
         const formatted = res.data.map((item, index) => ({
           key: index,
-          dispute_number: item.dispute_number || "-", // handle null
+          dispute_number: item.dispute_number,
+          order_number:item.order_number,
           plantName: item.vendor_name,
           customer_name:item.customer_name,
+          plant_name:item.plant_name,
           return_number:item.return_number,
           return_date: item.return_date ,
-          disputed_amount: item.disputed_amount,
+          return_amount: item.return_amount,
           return_reason:item.return_reason,
           status: item.status,
         }));
@@ -65,7 +67,7 @@ const SaleReturn = () => {
     {
         title: <span className="text-amber-700 font-semibold">Order No</span>,
    
-      dataIndex: "odno",
+      dataIndex: "order_number",
       width: 70,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
@@ -79,7 +81,7 @@ const SaleReturn = () => {
     {
              title: <span className="text-amber-700 font-semibold">Plant Name</span>,
    
-      dataIndex: "plantName",
+      dataIndex: "plant_name",
       width: 220,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
@@ -87,20 +89,20 @@ const SaleReturn = () => {
    title: <span className="text-amber-700 font-semibold"> Dispute Date
 </span>,
    
-      dataIndex: "returnDate",
+      dataIndex: "return_date",
       width: 120, 
        render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
  
     },
    {
       title: <span className="text-amber-700 font-semibold">Dispute Amount</span>,
-      dataIndex: "disputed_amount",  
+      dataIndex: "return_amount",  
       width: 130,
       render: (t) => <span className="text-amber-800">{t}</span>, 
    },
    {
     title: <span className="text-amber-700 font-semibold">Return Reason</span>,
-      dataIndex: "returnReason",
+      dataIndex: "return_reason",
       width: 150,
       render: (t) => <span className="text-amber-800">{t}</span>,
 

@@ -19,7 +19,7 @@ const PurchaseExpiredContract = () => {
   
   const fetchData = async () => {
   try {
-    const res = await getCommonReport({ type: "purchase_contract" });
+    const res = await getCommonReport({ type: "purchase_expired_contract" });
 
     const today = dayjs();
 
