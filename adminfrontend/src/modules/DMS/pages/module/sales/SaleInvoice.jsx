@@ -13,6 +13,7 @@ import {
   message,
   Input,
   DatePicker,
+  Checkbox
 } from "antd";
 import {
   PlusOutlined,
@@ -48,6 +49,9 @@ const [editItemOptions, setEditItemOptions] = useState([]);
 const [editSelectedItems, setEditSelectedItems] = useState([]);
 const [searchText, setSearchText] = useState("");
 const [filteredInvoices, setFilteredInvoices] = useState([]);
+const [customerWallet, setCustomerWallet] = useState(null);
+const [debitAdjustedAmount, setDebitAdjustedAmount] = useState(0);
+const [countAsCredit, setCountAsCredit] = useState(false);
   useEffect(() => {
     fetchOrderOptions();
     fetchInvoices();
@@ -202,7 +206,7 @@ const onItemSelect = async (product_ids) => {
     setLoadingOrder(true);
 
    const res = await getInvoiceDropdownData(selectedOrderId, product_ids);
-
+setCustomerWallet(res.customer_wallet);
 // ✅ SET DELIVERY DATE HERE
 setOrderDetails(prev => ({
   ...prev,
@@ -297,7 +301,7 @@ const getTotals = (items) => {
   orderDetails && itemsWithDelivery.length
     ? getTotals(itemsWithDelivery)
     : { totalAmount: 0, creditedQuantityAmount: 0 };
-
+const adjustedDeliveredAmount = totalAmount - (debitAdjustedAmount || 0);
   /* ---------------- SAVE INVOICE ---------------- */
 const handleSubmit = async (values) => {
   try {
@@ -309,7 +313,8 @@ const handleSubmit = async (values) => {
   invoice_date: invoiceDate
     ? invoiceDate.format("YYYY-MM-DD")
     : dayjs().format("YYYY-MM-DD"),
-
+  debit_adjusted_amount: debitAdjustedAmount || 0,   
+  count_as_credit: countAsCredit,                    
  items: itemsWithDelivery.map((row) => ({
   sales_order_item_id: row.itemId,
   product_id: row.productId,
@@ -875,7 +880,6 @@ const handleExport = async () => {
                     </p>
                   </Col>
                            
-                
                 </Row>
               </Card>
 
@@ -898,30 +902,73 @@ const handleExport = async () => {
                 size="small"
                 className="mb-4 border-amber-200 bg-amber-50/30"
               >
-                <Row gutter={24}>
-                  <Col xs={24} sm={12} md={8}>
-                    <span className="text-amber-600 block text-sm">
-                      Delivered Amount
-                    </span>
-                    <span className="text-amber-800 text-xl font-semibold">
-                      {totalAmount.toFixed(2)}
-                    </span>
-                  </Col>
-                  <Col xs={24} sm={12} md={8}>
-                    <span className="text-amber-600 block text-sm">
-                      Credited Amount
-                    </span>
-                    <span
-                      className={
-                        creditedQuantityAmount > 0
-                          ? "text-red-600 text-xl font-semibold"
-                          : "text-amber-800 text-xl font-semibold"
-                      }
-                    >
-                      {creditedQuantityAmount.toFixed(2)}
-                    </span>
-                  </Col>
-                </Row>
+               <Row gutter={24} align="middle" className="mt-2">
+  {/* Delivered */}
+  <Col>
+    <div>
+      <div className="text-amber-600 text-sm">Delivered</div>
+      <div className="text-xl font-semibold text-amber-800">
+        ₹ {totalAmount.toFixed(2)}
+      </div>
+    </div>
+  </Col>
+
+  {/* Credited */}
+  <Col>
+    <div>
+      <div className="text-amber-600 text-sm">Credited</div>
+      <div
+        className={`text-xl font-semibold ${
+          creditedQuantityAmount > 0 ? "text-red-600" : "text-amber-800"
+        }`}
+      >
+        ₹ {creditedQuantityAmount.toFixed(2)}
+      </div>
+    </div>
+  </Col>
+
+  {/* Debit Adjust */}
+  <Col>
+    <div>
+      <div className="text-amber-600 text-sm mb-1">
+        Debit Adjust
+      </div>
+      <InputNumber
+        min={0}
+        value={debitAdjustedAmount}
+        onChange={(val) => setDebitAdjustedAmount(val || 0)}
+        className="w-32"
+      />
+    </div>
+  </Col>
+
+  {/* Final */}
+  <Col>
+    <div>
+      <div className="text-amber-600 text-sm">Final</div>
+      <div
+        className={`text-xl font-bold ${
+          totalAmount - debitAdjustedAmount >= 0
+            ? "text-green-600"
+            : "text-red-600"
+        }`}
+      >
+        ₹ {(totalAmount - debitAdjustedAmount).toFixed(2)}
+      </div>
+    </div>
+  </Col>
+
+  {/* Checkbox */}
+  <Col className="flex items-end">
+    <Checkbox
+      checked={countAsCredit}
+      onChange={(e) => setCountAsCredit(e.target.checked)}
+      className="font-medium"
+    >
+      Count as Credit
+    </Checkbox>
+  </Col>
+</Row>
               </Card>
 
               {/* Actions */}

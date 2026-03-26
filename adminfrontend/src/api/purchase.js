@@ -1,6 +1,20 @@
 import api from "./axios";
 
 import useSessionStore from "../store/sessionStore";
+
+//dashboard
+export const getDashboardData = async () => {
+  const currentOrgId = useSessionStore.getState().currentOrgId;
+
+  const res = await api.get(`/purchase/dashboard/`, {
+    params: {
+      organisation: currentOrgId,
+    },
+  });
+
+  return res.data.data; // directly return "data"
+};
+
 //  PURCHASE CONTRACTS
 //fetch all purchase contracts
 export const getPurchaseContract = async () => {
