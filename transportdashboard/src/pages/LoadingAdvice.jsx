@@ -6,6 +6,7 @@ import {
   Modal,
   Form,
   DatePicker,
+  TimePicker,
   Row,
   Col,
   Select,
@@ -234,8 +235,8 @@ if (
       fitness_valid_upto: values.fitnessValidUpto?.format("YYYY-MM-DD"),
       delivery_date: values.delivery_date?.format("YYYY-MM-DD"),
 
-      vehicle_in_time: values.vehicleInTime,
-      vehicle_out_time: values.vehicleOutTime,
+    vehicle_in_time: values.vehicleInTime?.format("HH:mm"),
+vehicle_out_time: values.vehicleOutTime?.format("HH:mm"),
 
       tare_weight_kg: values.tareWeights,
       gross_weight_kg: values.grossWeights,
@@ -297,6 +298,13 @@ if (
       adviceDate: record.adviceDate
         ? dayjs(record.adviceDate, "YYYY-MM-DD")
         : null,
+         vehicleInTime: record.vehicleInTime
+      ? dayjs(record.vehicleInTime, "HH:mm")
+      : null,
+
+    vehicleOutTime: record.vehicleOutTime
+      ? dayjs(record.vehicleOutTime, "HH:mm")
+      : null,
       insuranceValidUpto: record.insuranceValidUpto
         ? dayjs(record.insuranceValidUpto, "YYYY-MM-DD")
         : null,
@@ -714,35 +722,41 @@ const renderLoadingDetails = (disabled = false) => (
     </div>
     <Row gutter={24}>
      <Col span={4}>
-        <Form.Item
-          label="Vehicle In Time"
-          name="vehicleInTime"
-          rules={[
-            { required: true, message: "Please enter Vehicle In Time" },
-            {
-              pattern: timeRegex,
-              message: "Time must be in HH:MM format (24-hour)",
-            },
-          ]}
-        >
-          <Input disabled={disabled} placeholder="HH:MM" />
-        </Form.Item>
+       <Form.Item
+  label="Vehicle In Time"
+  name="vehicleInTime"
+  rules={[{ required: true, message: "Required" }]}
+>
+  <TimePicker format="HH:mm" className="w-full" />
+</Form.Item>
       </Col>
 
       <Col span={4}>
-        <Form.Item
-          label="Vehicle Out Time"
-          name="vehicleOutTime"
-          rules={[
-            { required: true, message: "Please enter Vehicle Out Time" },
-            {
-              pattern: timeRegex,
-              message: "Time must be in HH:MM format (24-hour)",
-            },
-          ]}
-        >
-          <Input disabled={disabled} placeholder="HH:MM" />
-        </Form.Item>
+       <Form.Item
+  label="Vehicle Out Time"
+  name="vehicleOutTime"
+  dependencies={["vehicleInTime"]}
+  rules={[
+    { required: true, message: "Required" },
+    ({ getFieldValue }) => ({
+      validator(_, value) {
+        const inTime = getFieldValue("vehicleInTime");
+
+        if (!value || !inTime) return Promise.resolve();
+
+        if (value.isAfter(inTime)) {
+          return Promise.resolve();
+        }
+
+        return Promise.reject(
+          new Error("Out Time must be greater than In Time")
+        );
+      },
+    }),
+  ]}
+>
+  <TimePicker format="HH:mm" className="w-full" />
+</Form.Item>
       </Col>
       <Col span={4}>
   <Form.Item

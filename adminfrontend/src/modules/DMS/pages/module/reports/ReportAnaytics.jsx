@@ -73,17 +73,18 @@ const ReportAnaytics = () => {
             { key: "sinv", label: (<span className="flex items-center gap-2"><FaFileInvoice /> Sale Invoice</span>), children: <SaleInvoice />, },
             { key: "la", label: (<span className="flex items-center gap-2"><FaTruck /> Loading Advice</span>), children: <LoadingAdvice />, },
             { key: "ec", label: (<span className="flex items-center gap-2"><FaFileContract /> Purchase Expired Contract</span>), children: <PurchaseExpiredContract />, },
-            { key: "cr", label: (<span className="flex items-center gap-2"><FaFileContract /> Purchase Contract Renewal</span>), children: <PurchaseContractRenewal />, },
             { key: "esc", label: (<span className="flex items-center gap-2"><FaFileContract /> Sale Expired Contract</span>), children: <SaleExpiredContract />, },
-            { key: "scr", label: (<span className="flex items-center gap-2"><FaFileContract /> Sale Contract Renewal</span>), children: <SaleContractRenewal />, },
-            { key: "ao", label: (<span className="flex items-center gap-2"><FaShoppingCart /> Approved Orders</span>), children: <ApprovedOrders />, },
-            { key: "po", label: (<span className="flex items-center gap-2"><FaShoppingCart /> Pending Orders</span>), children: <PendingOrders />, },
-            { key: "do", label: (<span className="flex items-center gap-2"><FaShoppingCart /> Delivered Orders</span>), children: <DeliveredOrder />, },
-            { key: "ppc", label: (<span className="flex items-center gap-2"><FaFileContract /> Pending Purchase Contract</span>), children: <PendingPurchaseContract />, },
-            { key: "psc", label: (<span className="flex items-center gap-2"><FaFileContract /> Pending Sale Contract</span>), children: <PendingSaleContract />, },
             { key: "dn", label: (<span className="flex items-center gap-2"><FaFileInvoice /> Debit Notes</span>), children: <DebitNotes/>, },
             { key: "cn", label: (<span className="flex items-center gap-2"><FaFileInvoice /> Credit Notes</span>), children: <CreditNotes />, },
-        ]}
+      
+            // { key: "cr", label: (<span className="flex items-center gap-2"><FaFileContract /> Purchase Contract Renewal</span>), children: <PurchaseContractRenewal />, },
+            // { key: "scr", label: (<span className="flex items-center gap-2"><FaFileContract /> Sale Contract Renewal</span>), children: <SaleContractRenewal />, },
+            // { key: "ao", label: (<span className="flex items-center gap-2"><FaShoppingCart /> Approved Orders</span>), children: <ApprovedOrders />, },
+            // { key: "po", label: (<span className="flex items-center gap-2"><FaShoppingCart /> Pending Orders</span>), children: <PendingOrders />, },
+            // { key: "do", label: (<span className="flex items-center gap-2"><FaShoppingCart /> Delivered Orders</span>), children: <DeliveredOrder />, },
+            // { key: "ppc", label: (<span className="flex items-center gap-2"><FaFileContract /> Pending Purchase Contract</span>), children: <PendingPurchaseContract />, },
+            // { key: "psc", label: (<span className="flex items-center gap-2"><FaFileContract /> Pending Sale Contract</span>), children: <PendingSaleContract />, },
+             ]}
         />
 
     </div>
