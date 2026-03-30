@@ -305,24 +305,24 @@ export default function VendorTab() {
     }
   };
 
- const getFilteredData = () => {
-  if (!search) return data;
+  const getFilteredData = () => {
+    if (!search) return data;
 
-  const value = search.toLowerCase();
+    const value = search.toLowerCase();
 
-  return data.filter((item) => {
-    return Object.values(item).some((val) => {
-      if (!val) return false;
+    return data.filter((item) => {
+      return Object.values(item).some((val) => {
+        if (!val) return false;
 
-      // convert everything safely to string
-      return JSON.stringify(val).toLowerCase().includes(value);
+        // convert everything safely to string
+        return JSON.stringify(val).toLowerCase().includes(value);
+      });
     });
-  });
-};
+  };
 
-const handleReset = () => {
-  setSearch("");
-};
+  const handleReset = () => {
+    setSearch("");
+  };
   /* ================= TABLE ================= */
   const columns = [
     {
@@ -380,7 +380,7 @@ const handleReset = () => {
     },
   ];
 
- const filteredData = getFilteredData();
+  const filteredData = getFilteredData();
   /* ================= UI ================= */
   return (
     <>
@@ -398,7 +398,7 @@ const handleReset = () => {
           />
           <Button
             icon={<ReloadOutlined />}
-             onClick={handleReset}
+            onClick={handleReset}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Reset
@@ -1012,7 +1012,7 @@ const handleReset = () => {
                 <Form.Item
                   label="Google Location"
                   name="location"
-                  rules={[{ required: true }]}
+                  // rules={[{ required: true }]}
                 >
                   <Input
                     className={inputClass}
@@ -1087,7 +1087,7 @@ const handleReset = () => {
               </Col>
             </Row>
           </Card>
-          {/* <div className="max-h-60 overflow-y-auto pr-2 mb-4">
+          <div className="max-h-60 overflow-y-auto pr-2 mb-4">
             <Form.List name="plants">
               {(fields, { add, remove }) => (
                 <>
@@ -1244,7 +1244,7 @@ const handleReset = () => {
                           </Form.Item>
                         </Col>
 
-                        <Col span={4}>
+                        {/* <Col span={4}>
                           <Form.Item
                             {...restField}
                             name={[name, "faxNo"]}
@@ -1255,7 +1255,7 @@ const handleReset = () => {
                               placeholder="Enter Fax No"
                             />
                           </Form.Item>
-                        </Col>
+                        </Col> */}
                       </Row>
                     </Card>
                   ))}
@@ -1276,7 +1276,7 @@ const handleReset = () => {
                 </>
               )}
             </Form.List>
-          </div> */}
+          </div>
 
           {/* ===== FOOTER ACTIONS ===== */}
           {!viewMode && (
