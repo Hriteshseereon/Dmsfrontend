@@ -1,5 +1,18 @@
 import api from './axios';
 import useSessionStore from '../store/sessionStore';
+
+//dashboard
+export const getDashboardData = async () => {
+  const currentOrgId = useSessionStore.getState().currentOrgId;
+
+  const res = await api.get(`/sales/dashboard/`, {
+    params: {
+      organisation: currentOrgId,
+    },
+  });
+
+  return res.data.data; // directly return "data"
+};
 // section work on sales group
 export const getSalescontractGroups = async () => {
   const currentOrgId = useSessionStore.getState();

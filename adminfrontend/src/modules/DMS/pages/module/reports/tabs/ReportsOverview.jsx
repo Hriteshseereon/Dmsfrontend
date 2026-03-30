@@ -65,23 +65,30 @@ const ReportsOverview = () => {
 
   const soudaFulfillment = [
     {
-      name: "Completed",
+      name: "Deliverd",
       value:
         apiData?.graphs?.sales_order_status_percent?.delivered_percent ?? 0,
+         count:
+      apiData?.graphs?.sales_order_status_percent?.delivered_count ?? 0,
+
     },
     {
       name: "Pending",
       value:
         apiData?.graphs?.sales_order_status_percent?.pending_percent ?? 0,
+        count:
+      apiData?.graphs?.sales_order_status_percent?.pending_count ?? 0,
     },
   ];
 
-  const returnsAnalysis =
-    apiData?.text_data?.top_5_return_reasons?.map((item) => ({
-      name: item.reason,
-      cases: item.count,
-      amount: 0,
-    })) || [];
+const returnsAnalysis =
+  Object.entries(apiData?.text_data?.return_reason_analysis || {}).map(
+    ([reason, count]) => ({
+      name: reason,
+      cases: count,
+      amount: 0, // or calculate if needed
+    })
+  );
 
   const cards = apiData?.cards || {};
 
@@ -99,9 +106,7 @@ const ReportsOverview = () => {
           <p className="text-xl font-bold text-amber-800">
             {cards.purchase_contract_growth_percent ?? 0}%
           </p>
-          <p className="text-sm text-amber-600">
-            <ArrowUpOutlined /> Growth
-          </p>
+         
         </div>
 
         <div className="border-amber-400 border-1 rounded-lg p-3 shadow-sm ">
@@ -114,9 +119,7 @@ const ReportsOverview = () => {
           <p className="text-xl font-bold text-amber-800">
             {cards.purchase_order_growth_percent ?? 0}%
           </p>
-          <p className="text-sm text-amber-600">
-            <ArrowDownOutlined /> Trend
-          </p>
+         
         </div>
 
         <div className=" border-amber-400 border-1 rounded-lg p-3 shadow-sm ">
@@ -129,9 +132,7 @@ const ReportsOverview = () => {
           <p className="text-xl font-bold text-amber-800">
             {cards.sales_contract_growth_percent ?? 0}%
           </p>
-          <p className="text-sm text-amber-600">
-            <ArrowUpOutlined /> Growth
-          </p>
+         
         </div>
 
         <div className=" border-amber-400 border-1 rounded-lg p-3 shadow-sm  ">
@@ -139,14 +140,12 @@ const ReportsOverview = () => {
             <h3 className="text-base font-semibold text-amber-700">
               Sales Order Growth
             </h3>
-            <WarningOutlined className="text-amber-600 text-base" />
+            <WarningOutlined className="text-amber-600! text-base!" />
           </div>
           <p className="text-xl font-bold text-amber-800">
             {cards.sales_order_growth_percent ?? 0}%
           </p>
-          <p className="text-sm text-amber-600">
-            <ArrowDownOutlined /> Trend
-          </p>
+         
         </div>
       </div>
 
@@ -163,13 +162,7 @@ const ReportsOverview = () => {
                 </div>
               </div>
             }
-            extra={
-              <Button
-                className={amberButton}
-                shape="circle"
-                icon={<DownloadOutlined />}
-              />
-            }
+           
             className="rounded-xl"
           >
             <div style={{ width: "100%", height: 300 }}>
@@ -185,53 +178,7 @@ const ReportsOverview = () => {
               </ResponsiveContainer>
             </div>
           </Card>
-
-          {/* Returns Analysis */}
-          <Card
-            title={
-              <div className="font-semibold text-amber-700">
-                Returns Analysis
-                <div className="text-xs text-amber-500">
-                  Reason-wise Return Trends
-                </div>
-              </div>
-            }
-            extra={
-              <Button
-                className={amberButton}
-                shape="circle"
-                icon={<DownloadOutlined />}
-              />
-            }
-            className="rounded-xl"
-          >
-            <div className="space-y-3">
-              {returnsAnalysis.map((r) => (
-                <div
-                  key={r.name}
-                  className="flex items-center justify-between bg-amber-50 rounded-lg p-3 shadow-sm"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="w-3 h-3 rounded-full bg-amber-500 inline-block" />
-                    <div>
-                      <div className="font-medium text-amber-700">{r.name}</div>
-                      <div className="text-xs text-amber-500">
-                        {r.cases} cases
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right text-amber-700 font-semibold">
-                    ₹{r.amount.toLocaleString()}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-
-        {/* Right Column */}
-        <div className="space-y-6">
-          {/* Pie */}
+  {/* Pie */}
           <Card
             title={
               <div className="font-semibold text-amber-700">
@@ -250,21 +197,64 @@ const ReportsOverview = () => {
                     <Cell fill="#fcd34d" />
                     <Cell fill="#d97706" />
                   </Pie>
-                  <Tooltip />
+                 <Tooltip
+  formatter={(value, name, props) => [
+    `${value}% (${props.payload.count})`,
+    name,
+  ]}
+/>
                 </PieChart>
               </ResponsiveContainer>
             </div>
 
-            <div className="flex justify-center gap-6 mt-4">
+            <div className="flex justify-center gap-6">
               <span className="text-amber-700">
-                Completed ({soudaFulfillment[0].value}%)
+                Deliverd ({soudaFulfillment[0].count})
               </span>
               <span className="text-amber-700">
-                Pending ({soudaFulfillment[1].value}%)
+                Pending ({soudaFulfillment[1].count})
               </span>
             </div>
           </Card>
+         
+        </div>
 
+        {/* Right Column */}
+        <div className="space-y-6">
+        
+ {/* Returns Analysis */}
+          <Card
+            title={
+              <div className="font-semibold text-amber-700">
+                Returns Analysis
+                <div className="text-xs text-amber-500">
+                  Reason-wise Return Trends
+                </div>
+              </div>
+            }
+          
+            className="rounded-xl"
+          >
+            <div className="space-y-3">
+              {returnsAnalysis.map((r) => (
+                <div
+                  key={r.name}
+                  className="flex items-center justify-between bg-amber-50 rounded-lg p-3 shadow-sm"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="w-3 h-3 rounded-full bg-amber-500 inline-block" />
+                    <div>
+                      <div className="font-medium text-amber-700">{r.name}</div>
+                     
+                    </div>
+                  </div>
+                  <div className="text-right text-amber-700 font-semibold">
+                    {r.cases} cases
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
           {/* Transit */}
           <Card
             title={
