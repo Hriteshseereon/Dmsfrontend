@@ -161,7 +161,17 @@ export default function CustomerTab() {
       setLoading(false);
     }
   };
+  // useeffect to get the country namw
+  useEffect(() => {
+    if (open && !selected) {
+      const countryIso = getCountryIsoByName("India");
+      setSelCountryIso(countryIso);
 
+      form.setFieldsValue({
+        country: "India",
+      });
+    }
+  }, [open]);
   // useeffect function to fetch the random password
   useEffect(() => {
     if (!selected && open) {
@@ -861,7 +871,6 @@ export default function CustomerTab() {
                     placeholder="Select country"
                     showSearch
                     optionFilterProp="label"
-                    value={selCountryIso}
                     options={getCountryOptions()}
                     onChange={handleCountryChange}
                   />
