@@ -99,7 +99,7 @@ export default function SalesDispute() {
       }
 
       const items = res.items.map((it) => ({
-        id: it.id,                       // dispute item id (used for UPDATE)
+        id: it.id,                                           // dispute item id (used for UPDATE)
         invoice_item_id: it.invoice_item_id,  // used for CREATE
         item: it.item,
         itemCode: it.item_code,

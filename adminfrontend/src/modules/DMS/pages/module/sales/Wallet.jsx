@@ -105,28 +105,37 @@ const fetchLedger = async (record) => {
       dataIndex: "credit",
       render: (text) => <span className="text-amber-800"> {text}</span>,
     },
-    {
-      title: <span className="text-amber-700! font-semibold!">Debit Balance</span>,
-      dataIndex: "debit",
-      render: (text) => <span className="text-amber-800">{text}</span>,
-    },
- {
-  title: "Action",
-  render: (_, record) => (
+     {
+      title: <span className="text-amber-700! font-semibold!"> Deduct Credit Balance</span>,
+        render: (_, record) => (
     <div className="flex gap-2">
       <Button
         type="primary"
         className="bg-amber-500!"
         onClick={() => openModal(record)}
       >
-        Deduct Credit Amount
+        Deduct 
       </Button>
+    </div>
+  ),
+    },
+    {
+      title: <span className="text-amber-700! font-semibold!">Debit Balance</span>,
+      dataIndex: "debit",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+ {
+  title: <span className="text-amber-700! font-semibold!">Action</span>,
+    
+  render: (_, record) => (
+   
+    
 
       <EyeOutlined
-       
+       className="text-blue-500!"
         onClick={() => fetchLedger(record)}
       />
-    </div>
+  
   ),
 }
   ];

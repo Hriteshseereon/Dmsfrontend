@@ -62,7 +62,7 @@ const ReportAnaytics = () => {
   children: <ReportsOverview />
 }
 ,
-            { key: "all", label: (<span className="flex items-center gap-2"><FaListAlt /> All Records</span>), children: <AllRecords />,  },
+        //    { key: "all", label: (<span className="flex items-center gap-2"><FaListAlt /> All Records</span>), children: <AllRecords />,  },
             { key: "pc", label: (<span className="flex items-center gap-2"><FaFileContract /> Purchase Contract</span>), children: <PurchaseContract />,  },
             { key: "pi", label: (<span className="flex items-center gap-2"><FaShoppingCart /> Purchase Order</span>), children: <PurchaseOrder />,  },
             { key: "pr", label: (<span className="flex items-center gap-2"><FaUndoAlt /> Purchase Return</span>), children: <PurchaseReturn />,  },

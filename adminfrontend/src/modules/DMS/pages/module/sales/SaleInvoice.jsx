@@ -129,11 +129,8 @@ const fetchInvoices = async () => {
       orderNumber: inv.order_number,
       customerName: inv.customer_name,
       invoiceDate: inv.invoice_date,
-
-      // ✅ take directly from items
-      deliveredAmount: inv.items?.[0]?.delivered_amount || 0,
-      creditedQuantityAmount: inv.items?.[0]?.credited_amount || 0,
-    }));
+      deliveredAmount: inv.payable_amount,
+          }));
 
     setSavedInvoices(rows);
     setFilteredInvoices(rows);
@@ -349,7 +346,12 @@ const handleSubmit = async (values) => {
 const onEditItemSelect = async (product_ids) => {
   try {
     const res = await getInvoiceDropdownData(editOrderId, product_ids);
-setEditCustomerWallet(res.customer_wallet);
+setEditCustomerWallet(
+  res.customer_wallet || {
+    credit_balance: res.credit_balance || 0,
+    debit_balance: res.debit_balance || 0
+  }
+);
     const items = res?.items || res;
 
     const rows = items.map((item, index) => {
@@ -393,7 +395,10 @@ const handleEdit = async (record) => {
 setInvoiceDate(dayjs(res.invoice_date));
    setEditDebitAdjustedAmount(res.debit_adjusted_amount || 0);
 setEditCountAsCredit(res.count_as_credit || false);
-setEditCustomerWallet(res.customer_wallet || null);
+setEditCustomerWallet({
+  credit_balance: res.credit_balance || 0,
+  debit_balance: res.debit_balance || 0
+});
 
     // ✅ SET ORDER DETAILS (this is missing)
     setOrderDetails({
@@ -660,7 +665,7 @@ const handleExport = async () => {
       ),
     },
     {
-      title: <span className="text-amber-700 font-semibold">Deliverd Amount</span>,
+      title: <span className="text-amber-700 font-semibold">Payable Amount</span>,
       dataIndex: "deliveredAmount",
       render: (n) => (
         <span className="text-amber-800 font-medium">
@@ -668,19 +673,7 @@ const handleExport = async () => {
         </span>
       ),
     },
-    {
-      title: (
-        <span className="text-amber-700 font-semibold">
-          Credited Amount
-        </span>
-      ),
-      dataIndex: "creditedQuantityAmount",
-      render: (n) => (
-        <span className="text-amber-800 font-medium"
-          >{n}
-        </span>
-      ),
-    },
+   
   {
   title: <span className="text-amber-700 font-semibold">Action</span>,
   key: "action",
@@ -928,7 +921,7 @@ const handleExport = async () => {
   {/* Delivered */}
   <Col xs={24} sm={12} md={5}>
     <div>
-      <div className="text-amber-600 text-sm">Delivered</div>
+      <div className="text-amber-600 text-sm">Grand Total</div>
       <div className="text-xl font-semibold text-amber-700">
         ₹ {totalAmount.toFixed(2)}
       </div>
@@ -960,7 +953,7 @@ const handleExport = async () => {
   <Col xs={24} sm={12} md={4}>
     <div>
       <div className="text-amber-600 text-sm mb-1">
-        Debit Adjust
+        Debit Adjusted
       </div>
       <InputNumber
         min={0}
@@ -972,7 +965,7 @@ const handleExport = async () => {
   </Col> {/* Final */}
   <Col xs={24} sm={12} md={5}>
     <div>
-      <div className="text-amber-600 text-sm">Final</div>
+      <div className="text-amber-600 text-sm">Payable Amount</div>
       <div
         className={"text-xl font-bold text-amber-700" }
       >
@@ -1145,7 +1138,7 @@ const handleExport = async () => {
     {/* Delivered */}
     <Col xs={24} sm={12} md={5}>
       <div>
-        <div className="text-amber-600 text-sm">Delivered</div>
+        <div className="text-amber-600 text-sm">Grand Total</div>
         <div className="text-xl font-semibold text-amber-700">
           ₹ {editItems.reduce((sum, r) => sum + r.deliveredAmount, 0).toFixed(2)}
         </div>
@@ -1179,7 +1172,7 @@ const handleExport = async () => {
     <Col xs={24} sm={12} md={4}>
       <div>
         <div className="text-amber-600 text-sm mb-1">
-          Debit Adjust
+          Debit Adjusted
         </div>
         <InputNumber
           min={0}
@@ -1193,7 +1186,7 @@ const handleExport = async () => {
     {/* Final */}
     <Col xs={24} sm={12} md={5}>
       <div>
-        <div className="text-amber-600 text-sm">Final</div>
+        <div className="text-amber-600 text-sm">Payable Amount</div>
         <div className="text-xl font-bold text-amber-700">
           ₹ {(
             editItems.reduce((sum, r) => sum + r.deliveredAmount, 0) -

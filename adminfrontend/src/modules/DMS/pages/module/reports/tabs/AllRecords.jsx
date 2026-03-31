@@ -21,33 +21,32 @@ const [data, setData] = useState([]);
   }, []);
   
   const fetchData = async () => {
-    try {
-      const res = await getCommonReport({ type: "all_records" }); // ✅ IMPORTANT
-  
-      const formatted = res.data.map((item, index) => ({
-        key: index,
-        loading_advice_number: item.loading_advice_number || "-", // handle null
-        loading_advice_date: item.loading_advice_date,
-        transport_name: item.transport_name,
-        total_amount:item.total_amount,
-        plant_name:item.plant_name,
-        customer_name:item.customer_name,
-      }));
-  
-      setData(formatted);
-    } catch (err) {
-      console.error(err);
-    }
-  };/* ---------------- MONTH FILTER LOGIC ---------------- */
+  try {
+    const res = await getCommonReport({ type: "all_records" });
+
+    const formatted = res.data.map((item, index) => ({
+      key: index,
+      recordType: item.record_type,
+      documentDate: item.document_date,
+      partyName: item.party_name,
+      plantName: item.plant_name || "-",
+      status: item.status,
+    }));
+
+    setData(formatted);
+  } catch (err) {
+    console.error(err);
+  }
+};/* ---------------- MONTH FILTER LOGIC ---------------- */
 const filteredData = useMemo(() => {
   if (!dateRange) return data;
 
   const [start, end] = dateRange;
 
   return data.filter((rec) => {
-    if (!rec.loading_advice_date) return false;
+    if (!rec.documentDate) return false;
 
-    const loadingDate = dayjs(rec.loading_advice_date);
+    const loadingDate = dayjs(rec.documentDate);
     return loadingDate.isBetween(start, end, "day", "[]");
   });
 }, [dateRange, data]);
