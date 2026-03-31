@@ -1,5 +1,4 @@
-// PurchaseDashboard.jsx
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Card, Row, Col, Tag, Space } from "antd";
 import {
   FileTextOutlined,
@@ -22,83 +21,114 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useNavigate } from "react-router-dom";
-// JSON Data
-const dashboardJSON = {
-  topCards: [
-    { title: "Total Purchase Contracts", value: 150, icon: "FileTextOutlined",path: "/dms/purchase/souda",  },
-    { title: "Total Purchase Invoice", value: 95, icon: "DollarOutlined",path: "/dms/purchase/invoice",  },
-    { title: "Pending Orders", value: 20, icon: "ShoppingCartOutlined",path: "/dms/purchase/indent", },
-    { title: "Purchase Returns", value: 7, icon: "ReloadOutlined",path: "/dms/purchase/return", },
-  ],
-  contractsData: [
-    { name: "Jan", value: 12 },
-    { name: "Feb", value: 20 },
-    { name: "Mar", value: 25 },
-    { name: "Apr", value: 22 },
-    { name: "May", value: 40 },
-    { name: "Jun", value: 30 },
-    { name: "Jul", value: 24 },
-  ],
-  ordersData: [
-    { name: "Jan", orders: 20 },
-    { name: "Feb", orders: 30 },
-    { name: "Mar", orders: 32 },
-    { name: "Apr", orders: 35 },
-    { name: "May", orders: 45 },
-    { name: "Jun", orders: 38 },
-    { name: "Jul", orders: 42 },
-  ],
-  returnData: [
-    { name: "Damaged", value: 3 },
-    { name: "Expired", value: 2 },
-    { name: "Wrong Item", value: 1 },
-    { name: "Other Reasons", value: 4 },
-  ],
-  quickActions: [
-    { title: "Purchase Order #567", subtitle: "Due Today", tag: "Pending" },
-    {
-      title: "Shipment #789",
-      subtitle: "Expected: 03-Oct-2025",
-      tag: "Nearby",
-    },
-    {
-      title: "Invoice #234",
-      subtitle: "Due in 2 days",
-      tag: "Payment Pending",
-    },
-    {
-      title: "Delivery #321",
-      subtitle: "Location: Nearby Warehouse",
-      tag: "Nearby",
-    },
-  ],
-};
-
-// Mapping icon string to actual components
-const iconMap = {
-  FileTextOutlined: <FileTextOutlined className="text-amber-700 text-2xl" />,
-  DollarOutlined: <DollarOutlined className="text-amber-700 text-2xl" />,
-  ShoppingCartOutlined: (
-    <ShoppingCartOutlined className="text-amber-700 text-2xl" />
-  ),
-  ReloadOutlined: <ReloadOutlined className="text-amber-700 text-2xl" />,
-};
+import { getDashboardData } from "../../../../../api/purchase";
 
 // Amber palette
 const COLORS = ["#d97706", "#f59e0b", "#fbbf24", "#fcd34d"];
 
 export default function PurchaseDashboard() {
   const navigate = useNavigate();
+  const [apiData, setApiData] = useState(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await getDashboardData();
+        setApiData(data);
+      } catch (err) {
+        console.error("Dashboard API error", err);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (!apiData) return <div>Loading...</div>;
+
+  const statusColors = {
+  Pending: "gold",
+  "Pending Approval": "orange",
+  Dispatched: "blue",
+  Rejected: "red",
+  Approved: "green",
+  "Partially Delivered": "cyan",
+  "Out for Delivery": "geekblue",
+  "In-Transit": "purple",
+  Delivered: "success",
+};
+  // ===== TOP CARDS =====
+  const topCards = [
+    {
+      title: "Total Contracts",
+      value: apiData?.cards?.total_contracts ?? 0,
+      icon: <FileTextOutlined className="text-amber-700 text-2xl" />,
+      path: "/dms/purchase/souda",
+    },
+       {
+      title: "Total Orders",
+      value: apiData?.cards?.total_orders ?? 0,
+      icon: <ShoppingCartOutlined className="text-amber-700 text-2xl" />,
+      path: "/dms/purchase/indent",
+    },
+    {
+      title: "Total Invoice",
+      value: apiData?.cards?.total_invoices ?? 0,
+      icon: <DollarOutlined className="text-amber-700 text-2xl" />,
+      path: "/dms/purchase/invoice",
+    },
+ 
+    {
+      title: "Total Returns",
+      value: apiData?.cards?.total_returns ?? 0,
+      icon: <ReloadOutlined className="text-amber-700 text-2xl" />,
+      path: "/dms/purchase/return",
+    },
+  ];
+
+  // ===== CHART DATA =====
+  const contractsData =
+    apiData?.graphs?.contracts?.map((item) => ({
+      name: item.month,
+      value: item.count,
+    })) || [];
+
+  const ordersData =
+    apiData?.graphs?.orders?.map((item) => ({
+      name: item.month,
+      orders: item.count,
+    })) || [];
+
+  // ===== PIE DATA =====
+  const returnData = Object.entries(apiData?.pie_chart || {}).map(
+    ([key, value]) => ({
+      name: key,
+      value: value,
+    })
+  );
+
+  // ===== QUICK ACTIONS =====
+  const quickActions =
+    apiData?.quick_actions?.loading_advice?.map((item) => ({
+      title: item.status,
+      subtitle: `${item.count} items`,
+      tag: item.status,
+    })) || [];
+
   return (
     <div className="p-2">
       {/* Top Cards */}
       <Row gutter={16} className="mb-2 flex flex-wrap">
-        {dashboardJSON.topCards.map((card, index) => (
+        {topCards.map((card, index) => (
           <Col key={index} flex="1" className="mb-4">
-            <Card className="p-1! h-full! border-1! border-amber-500! bg-amber-50! hover:shadow-md! cursor-pointer!" onClick={() => card.path && navigate(card.path)}>
+            <Card
+              className="p-1! h-full! border-1! border-amber-500! bg-amber-50! hover:shadow-md! cursor-pointer!"
+              onClick={() => card.path && navigate(card.path)}
+            >
               <div className="flex items-center text-amber-800 mb-3 gap-3">
-                {iconMap[card.icon]}
-                <p className="text-amber-800 text-md m-0">{card.title}</p>
+                {card.icon}
+                <p className="text-amber-800 text-md m-0">
+                  {card.title}
+                </p>
               </div>
               <h2 className="text-3xl text-amber-700 font-bold m-0">
                 {card.value}
@@ -119,7 +149,7 @@ export default function PurchaseDashboard() {
             }
           >
             <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={dashboardJSON.contractsData}>
+              <LineChart data={contractsData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#fcd34d" />
                 <XAxis dataKey="name" stroke="#92400e" />
                 <YAxis stroke="#92400e" />
@@ -134,16 +164,17 @@ export default function PurchaseDashboard() {
             </ResponsiveContainer>
           </Card>
         </Col>
+
         <Col span={12}>
           <Card
             title={
               <span className="text-amber-700 font-bold">
-                Purchase Invoices Evolution
+                Purchase Orders Evolution
               </span>
             }
           >
             <ResponsiveContainer width="100%" height={250}>
-              <AreaChart data={dashboardJSON.ordersData}>
+              <AreaChart data={ordersData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#fcd34d" />
                 <XAxis dataKey="name" stroke="#92400e" />
                 <YAxis stroke="#92400e" />
@@ -162,8 +193,8 @@ export default function PurchaseDashboard() {
 
       {/* PieChart + Quick Actions */}
       <Row gutter={16} className="mb-6">
-        <Col span={12}>
-          <Card
+        <Col span={12} className="flex">
+          <Card className="h-full flex flex-col"
             title={
               <span className="text-amber-700 font-bold">
                 Purchase Returns Breakdown
@@ -173,14 +204,14 @@ export default function PurchaseDashboard() {
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie
-                  data={dashboardJSON.returnData}
+                  data={returnData}
                   cx="50%"
                   cy="50%"
                   outerRadius={90}
                   dataKey="value"
                   label
                 >
-                  {dashboardJSON.returnData.map((entry, index) => (
+                  {returnData.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
                       fill={COLORS[index % COLORS.length]}
@@ -193,48 +224,59 @@ export default function PurchaseDashboard() {
 
             {/* Legend */}
             <div className="flex space-x-12 mt-2 flex-nowrap overflow-auto">
-              {dashboardJSON.returnData.map((entry, index) => (
+              {returnData.map((entry, index) => (
                 <div key={index} className="flex items-center">
                   <div
                     className="w-3 h-3 rounded-full mr-2"
-                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                    style={{
+                      backgroundColor: COLORS[index % COLORS.length],
+                    }}
                   />
-                  <span className="text-amber-800 text-sm">{entry.name}</span>
+                  <span className="text-amber-800 text-sm">
+                    {entry.name}
+                  </span>
                 </div>
               ))}
             </div>
           </Card>
         </Col>
-        <Col span={12}>
-          <Card
-            title={
-              <span className="text-amber-700 font-bold">Quick Action</span>
-            }
+<Col span={12} className="flex">
+  <Card
+    className="h-full flex flex-col"
+    title={
+      <span className="text-amber-700 font-bold">
+     Order Status Overview
+      </span>
+    }
+  >
+    <div className="flex-1 overflow-y-auto max-h-[260px]">
+      <Space direction="vertical" className="w-full">
+        {quickActions.map((action, index) => (
+          <div
+            key={index}
+            className={`flex justify-between items-center py-2 px-3 ${
+              index !== quickActions.length - 1
+                ? "border-b border-amber-200"
+                : ""
+            }`}
           >
-            <Space direction="vertical" className="w-full">
-              {dashboardJSON.quickActions.map((action, index) => (
-                <div
-                  key={index}
-                  className={`flex justify-between items-center py-2 px-3 ${
-                    index !== dashboardJSON.quickActions.length - 1
-                      ? "border-b border-amber-200"
-                      : ""
-                  }`}
-                >
-                  <div>
-                    <p className="font-medium text-amber-700 text-sm m-0">
-                      {action.title}
-                    </p>
-                    <p className="text-xs text-red-500 m-0">
-                      {action.subtitle}
-                    </p>
-                  </div>
-                  <Tag color="red">{action.tag}</Tag>
-                </div>
-              ))}
-            </Space>
-          </Card>
-        </Col>
+            <div >
+                          <p className="font-medium text-amber-700 text-sm m-0">
+              {action.subtitle}
+                            </p>
+            </div>
+             <p className="font-medium text-amber-700 text-sm m-0">
+               <Tag color={statusColors[action.tag] || "default"}>
+  {action.tag}
+</Tag>
+              </p>
+          
+          </div>
+        ))}
+      </Space>
+    </div>
+  </Card>
+</Col>
       </Row>
     </div>
   );

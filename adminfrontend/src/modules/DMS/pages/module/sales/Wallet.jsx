@@ -1,116 +1,173 @@
 // WalletPage.jsx
-import React, { useState } from "react";
-import {
-  Table,
-  Input,
-  Select,
-  Button,
-} from "antd";
+import React, { useState,useEffect } from "react";
+import { Table, Input, Select, Button, Modal, Form, message } from "antd";
 import {
   SearchOutlined,
   ReloadOutlined,
   EyeOutlined,
 } from "@ant-design/icons";
-
-const amber = {
-  light: "#fef3c7",
-  main: "#f59e0b",
-  dark: "#b45309",
-};
-
-const walletData = [
-  {
-    id: 1,
-    noteNo: "CN-1001",
-    amount: 4500,
-    customerName: "Customer A",
-    disputNo: "DIS-2290",
-    date: "2025-01-15",
-    status: "Paid",
-  },
-  {
-    id: 2,
-    noteNo: "CN-1002",
-    amount: 3000,
-    customerName: "Customer B",
-   disputNo: "DIS-2291",
-    date: "2025-01-20",
-    status: "Partially Paid",
-  },
-  {
-    id: 3,  
-    noteNo: "CN-1003",
-    amount: 1500,
-    customerName: "Customer C",
-    disputNo: "DIS-2292",
-    date: "2025-01-25",
-    status: "Unpaid",
-  },
-];
+import { getWalletData,deductCreditNote ,getCustomerLedger} from "../../../../../api/sales";
 
 const WalletPage = () => {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");
   const [filterRef, setFilterRef] = useState("");
+const [data, setData] = useState([]);
+const [isModalOpen, setIsModalOpen] = useState(false);
+const [selectedCustomer, setSelectedCustomer] = useState(null);
+const [form] = Form.useForm();
+const [ledgerData, setLedgerData] = useState([]);
+const [ledgerModalOpen, setLedgerModalOpen] = useState(false);
+useEffect(() => {
+  fetchWallet();
+}, []);
 
-  const filterData = walletData.filter((row) => {
-    return (
-      row.noteNo.toLowerCase().includes(search.toLowerCase()) &&
-      (filterType ? row.status === filterType : true) &&
-      (filterRef ? row.disputNo === filterRef : true)
-    );
-  });
+const fetchWallet = async () => {
+  try {
+    const res = await getWalletData();
 
+    console.log("API DATA:", res); // 👈 debug
+
+    const formatted = res.map((item, index) => ({
+      key: index,
+      customerId: item.customer_id,
+      customerName: item.customer_name,
+      credit: Number(item.credit_balance),
+      debit: Number(item.debit_balance),
+    }));
+
+    setData(formatted);
+  } catch (error) {
+    console.error("Error fetching wallet:", error);
+  }
+};
+
+const filterData = data.filter((row) =>
+  row.customerName?.toLowerCase().includes(search.toLowerCase())
+);
+const openModal = (record) => {
+  setSelectedCustomer(record);
+  setIsModalOpen(true);
+};
+const handleSubmit = async () => {
+  try {
+    const values = await form.validateFields();
+
+    const payload = {
+  customer_id: selectedCustomer.customerId,
+  amount: values.amount,
+  remarks: values.remarks,
+};
+
+   await deductCreditNote(payload);
+
+    message.success("Credit added successfully");
+
+    setIsModalOpen(false);
+    form.resetFields();
+    fetchWallet(); // refresh table
+  } catch (error) {
+    console.error(error);
+    message.error("Failed to add credit");
+  }
+};
+
+const fetchLedger = async (record) => {
+  try {
+    const res = await getCustomerLedger(record.customerId);
+
+    const formatted = res.map((item, index) => ({
+      key: index,
+      date: new Date(item.created_at).toLocaleString(),
+      type: item.type || item.source_type,
+      amount: Number(item.amount),
+      remarks: item.remarks,
+      credit: Number(item.credit_balance),
+      debit: Number(item.debit_balance),
+    }));
+
+    setLedgerData(formatted);
+    setLedgerModalOpen(true);
+  } catch (error) {
+    console.error("Ledger error:", error);
+  }
+};
   const columns = [
    
    
-    {
-      title: <span className="text-amber-700! font-semibold!">Dispute No</span>,
-      dataIndex: "disputNo",
-      render: (text) => <span className="text-amber-800">{text}</span>,
-    },
     {
       title: <span className="text-amber-700! font-semibold!">Customer Name</span>,
       dataIndex: "customerName",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
-      title: <span className="text-amber-700! font-semibold!">Amount</span>,
-      dataIndex: "amount",
+      title: <span className="text-amber-700! font-semibold!">Credit Balance</span>,
+      dataIndex: "credit",
       render: (text) => <span className="text-amber-800"> {text}</span>,
     },
+     {
+      title: <span className="text-amber-700! font-semibold!"> Deduct Credit Balance</span>,
+        render: (_, record) => (
+    <div className="flex gap-2">
+      <Button
+        type="primary"
+        className="bg-amber-500!"
+        onClick={() => openModal(record)}
+      >
+        Deduct 
+      </Button>
+    </div>
+  ),
+    },
     {
-      title: <span className="text-amber-700! font-semibold!">Date</span>,
-      dataIndex: "date",
+      title: <span className="text-amber-700! font-semibold!">Debit Balance</span>,
+      dataIndex: "debit",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
-    {
-      title: <span className="text-amber-700! font-semibold!">Status</span>,
-      dataIndex: "status",
-      width: 150,
-      render: (status) => {
-        const base = "px-3 py-1 rounded-full text-sm font-semibold";
-        if (status === "Unpaid")
-          return (
-            <span className={`${base} bg-red-100 text-red-700`}>
-              Unpaid
-            </span>
-          );
-        if (status === "Partially Paid")
-          return (
-            <span className={`${base} bg-yellow-100 text-yellow-700`}>
-              Partially Paid
-            </span>
-          );
-        return (
-          <span className={`${base} bg-green-100 text-green-700`}>
-            Paid
-          </span>
-        );
-      },
-    },
-  ];
+ {
+  title: <span className="text-amber-700! font-semibold!">Action</span>,
+    
+  render: (_, record) => (
+   
+    
 
+      <EyeOutlined
+       className="text-blue-500!"
+        onClick={() => fetchLedger(record)}
+      />
+  
+  ),
+}
+  ];
+const ledgerColumns = [
+  {
+    title: "Date",
+    dataIndex: "date",
+  },
+  {
+    title: "Type",
+    dataIndex: "type",
+    render: (type) => {
+      if (type === "CREDIT")
+        return <span className="text-green-600 font-semibold">{type}</span>;
+      if (type === "DEBIT" || type === "DEBIT_USAGE")
+        return <span className="text-red-600 font-semibold">{type}</span>;
+      if (type === "PAYMENT")
+        return <span className="text-blue-600 font-semibold">{type}</span>;
+      return <span>{type}</span>;
+    },
+  },
+  {
+    title: "Amount",
+    dataIndex: "amount",
+  },
+  {
+    title: "Remarks",
+    dataIndex: "remarks",
+  },
+ 
+  
+];
   return (
     <div>
 
@@ -125,45 +182,7 @@ const WalletPage = () => {
             onChange={(e) => setSearch(e.target.value)}
           />
 
-          {/* CREDIT / DEBIT FILTER AS BUTTONS */}
-          <div className="flex gap-2">
-        
- <Button
-              type={filterType === "Paid" ? "primary" : "default"}
-              className={
-                filterType === "Paid"
-                  ? "bg-amber-500! text-white! border-none!"
-                  : "border-amber-400! text-amber-700! hover:bg-amber-100!"
-              }
-              onClick={() => setFilterType("Paid")}
-            >
-              Paid
-            </Button>
-            <Button
-              type={filterType === "Partially Paid" ? "primary" : "default"}
-              className={
-                filterType === "Partially Paid"
-                  ? "bg-amber-500! text-white! border-none!"
-                  : "border-amber-400! text-amber-700! hover:bg-amber-100!"
-              }
-              onClick={() => setFilterType("Partially Paid")}
-            >
-              Partially Paid
-            </Button>
-
-           
-            <Button 
-              type={filterType === "Unpaid" ? "primary" : "default"}
-              className={
-                filterType === "Unpaid"
-                  ? "bg-amber-500! text-white! border-none!"
-                  : "border-amber-400! text-amber-700! hover:bg-amber-100!"
-              }
-              onClick={() => setFilterType("Unpaid")}
-            >
-              Unpaid
-            </Button>
-          </div>
+         
 
           <Button
             icon={<ReloadOutlined />}
@@ -183,10 +202,54 @@ const WalletPage = () => {
       <div className="border border-amber-300 rounded-lg p-4">
         <Table
           dataSource={filterData}
-          columns={columns}
+  columns={columns}
+  rowKey="customerId"
           pagination={10}
           scroll={{ y: 350 }}
         />
+        <Modal
+  title="Deduct Credit Amount"
+  open={isModalOpen}
+  onCancel={() => {
+    setIsModalOpen(false);
+    form.resetFields();
+  }}
+  onOk={handleSubmit}
+  okText="Submit"
+>
+  <Form form={form} layout="vertical">
+    <Form.Item
+      label="Amount"
+      name="amount"
+      rules={[{ required: true, message: "Please enter amount" }]}
+    >
+      <Input type="number" placeholder="Enter amount" />
+    </Form.Item>
+
+    <Form.Item
+      label="Remarks"
+      name="remarks"
+      rules={[{ required: true, message: "Please enter remarks" }]}
+    >
+      <Input placeholder="Enter remarks" />
+    </Form.Item>
+  </Form>
+</Modal>
+
+<Modal
+  title={`Ledger - ${selectedCustomer?.customerName || ""}`}
+  open={ledgerModalOpen}
+  onCancel={() => setLedgerModalOpen(false)}
+  footer={null}
+  width={800}
+>
+  <Table
+    dataSource={ledgerData}
+    columns={ledgerColumns}
+    pagination={false}
+    scroll={{ y: 400 }}
+  />
+</Modal>
       </div>
     </div>
   );

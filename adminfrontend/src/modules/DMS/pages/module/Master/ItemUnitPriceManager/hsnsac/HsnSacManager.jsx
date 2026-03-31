@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Card, Table, Button, Modal, Checkbox, Popconfirm } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 import hsnSacData from "../../hsnSacData.json";
-import { getHSNSACCodes } from "../../../../../../../api/product";
+import { getHSNSACCodes, getSACCodes } from "../../../../../../../api/product";
 
 /* ================= Code Selector (Structured Modal) ================= */
 const CodeSelector = ({ open, title, data, onClose, onAdd }) => {
@@ -10,7 +10,7 @@ const CodeSelector = ({ open, title, data, onClose, onAdd }) => {
   const [showAll, setShowAll] = useState(false);
 
   // Show 6 items (3 rows of 2) by default for a balanced look
-  const visibleList = showAll ? data : data.slice(0, 6);
+  const visibleList = showAll ? data || [] : (data || []).slice(0, 6);
 
   const toggleSelect = (item) => {
     setSelected((prev) =>
@@ -114,27 +114,36 @@ const HsnSacManager = () => {
   // };
   const fetAllHSNSACCodes = async () => {
     try {
-      const data = await getHSNSACCodes();
+      const hsnData = await getHSNSACCodes();
+      const sacData = await getSACCodes();
 
-      console.log("RAW API DATA 👉", data);
+      console.log("HSN API 👉", hsnData);
+      console.log("SAC API 👉", sacData);
 
-      // If API returns only HSN array
-      const normalizedHsn = Array.isArray(data)
-        ? data.map((item) => ({
+      const normalizedHsn = Array.isArray(hsnData)
+        ? hsnData.map((item) => ({
             ...item,
-            code: item.hsn_code, // 👈 normalize here
+            code: item.hsn_code,
+            description: item.description,
+          }))
+        : [];
+
+      const normalizedSac = Array.isArray(sacData)
+        ? sacData.map((item) => ({
+            ...item,
+            code: item.sac_code,
+            description: item.description,
           }))
         : [];
 
       setHsnList(normalizedHsn);
+      setSacList(normalizedSac);
 
-      // TEMP: SAC empty until backend provides it
-      setSacList([]);
-
+      // Update modal data source
       hsnSacData.hsn = normalizedHsn;
-      hsnSacData.sac = [];
+      hsnSacData.sac = normalizedSac;
 
-      return { hsn: normalizedHsn, sac: [] };
+      return { hsn: normalizedHsn, sac: normalizedSac };
     } catch (error) {
       console.error("Error fetching HSN/SAC codes:", error);
       return { hsn: [], sac: [] };
@@ -144,7 +153,7 @@ const HsnSacManager = () => {
   React.useEffect(() => {
     const fetchData = async () => {
       const data = await fetAllHSNSACCodes();
-      hsnSacData.hsn = data;
+      hsnSacData.hsn = data.hsn;
       hsnSacData.sac = data.sac;
     };
     fetchData();

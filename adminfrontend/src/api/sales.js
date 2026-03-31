@@ -1,5 +1,18 @@
 import api from './axios';
 import useSessionStore from '../store/sessionStore';
+
+//dashboard
+export const getDashboardData = async () => {
+  const currentOrgId = useSessionStore.getState().currentOrgId;
+
+  const res = await api.get(`/sales/dashboard/`, {
+    params: {
+      organisation: currentOrgId,
+    },
+  });
+
+  return res.data.data; // directly return "data"
+};
 // section work on sales group
 export const getSalescontractGroups = async () => {
   const currentOrgId = useSessionStore.getState();
@@ -302,5 +315,37 @@ export const getDisputeById = async (disputeId) => {
   const res = await api.get(`/sales/disputes/${disputeId}/`, {
     params: { organisation: currentOrgId },
   });
+  return res.data;
+};
+
+//wallet
+
+export const getWalletData = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get("/customers/admin-credit/summary/", {
+    params: { organisation_id: currentOrgId },
+  });
+
+  return res.data;
+};
+
+export const deductCreditNote = async (payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.post("customers/admin-credit/add/", payload, {
+    params: { organisation_id: currentOrgId },
+  });
+  return res.data;
+};
+export const getCustomerLedger = async (customer_id) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get("/customers/admin-credit/ledger/", {
+    params: {
+      organisation_id: currentOrgId,
+      customer_id,
+    },
+  });
+
   return res.data;
 };

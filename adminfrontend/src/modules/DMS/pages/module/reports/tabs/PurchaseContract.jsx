@@ -3,79 +3,60 @@ import { Table, DatePicker, Row, Col, Card, Tag ,Button} from "antd";
 import dayjs from "dayjs";
 import { FilterOutlined } from "@ant-design/icons";
 import isBetween from "dayjs/plugin/isBetween";
+import { useEffect } from "react";
+import { getCommonReport } from "../../../../../../api/reports"
 dayjs.extend(isBetween);
 const { RangePicker } = DatePicker;
 
-
-/* ---------------- MOCK PURCHASE CONTRACT JSON ---------------- */
-const purchaseContractJSON = [
-  {
-    key: 1,
-    slno: 1,
-    plantName: "Kalinga Oils Pvt Ltd",
-    contractDate: "2024-09-05",
-    startDate: "2024-09-10",
-    endDate: "2025-03-31",
-    totalAmount:600,
-    status: "Approved",
-
-  },
-  {
-    key: 2,
-    slno: 2,
-    plantName: "Odisha Edibles",
-    contractDate: "2024-09-22",
-    startDate: "2024-10-01",
-    endDate: "2025-02-28",
-    totalAmount:300,
-    status: "Pending",
-  },
-  {
-    key: 3,
-    slno: 3,
-    plantName: "Kalinga Oils Pvt Ltd",
-    contractDate: "2024-10-08",
-    startDate: "2024-10-15",
-    endDate: "2025-06-30",
-    totalAmount:700,
-    status: "Approved",
-  },
-  {
-    key: 4,
-    slno: 4,
-    plantName: "Odisha Edibles",
-    contractDate: "2024-11-12",
-    startDate: "2024-11-15",
-    endDate: "2025-05-31",
-    totalAmount:250,
-    status: "Completed",
-  },
-];
-
 /* ---------------- COMPONENT ---------------- */
 const PurchaseContract = () => {
-  const [dateRange, setDateRange] = useState(null);
+ const [data, setData] = useState([]);
+ const [dateRange, setDateRange] = useState(null);
+useEffect(() => {
+  fetchData();
+}, []);
 
+ const fetchData = async () => {
+    try {
+     const res = await getCommonReport({ type: "purchase_contract" });
+      const formatted = res.data
+     .filter((item) => item.type === "Purchase Contract")
+      .map((item, index) => ({
+    key: index,
+    slno: item.contract_number,
+    plantName: item.vendor_name,
+    contractDate: item.contract_date,
+    startDate: item.start_date,
+    endDate: item.end_date,
+    totalAmount: item.total_amount,
+    status: item.status,
+  }));
+
+      setData(formatted);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   /* ---------------- DATE RANGE FILTER LOGIC ---------------- */
 const filteredData = useMemo(() => {
-  if (!dateRange) return purchaseContractJSON;
+ if (!dateRange) return data;
 
   const [start, end] = dateRange;
 
-  return purchaseContractJSON.filter((rec) => {
-    const contractDate = dayjs(rec.contractDate);
-    return contractDate.isBetween(start, end, "day", "[]");
-  });
-}, [dateRange]);
+return data.filter((rec) => {
+  const contractDate = dayjs(rec.contractDate);
+  return contractDate.isBetween(start, end, "day", "[]");
+});
+}, [dateRange, data]);
 
   /* ---------------- TABLE COLUMNS ---------------- */
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Sl No</span>,
+      title: <span className="text-amber-700 font-semibold">Contract No</span>,
    
       dataIndex: "slno",
-      width: 70,
+      width: 120,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {

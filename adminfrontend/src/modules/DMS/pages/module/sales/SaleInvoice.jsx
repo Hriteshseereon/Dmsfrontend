@@ -13,6 +13,7 @@ import {
   message,
   Input,
   DatePicker,
+  Checkbox
 } from "antd";
 import {
   PlusOutlined,
@@ -48,6 +49,12 @@ const [editItemOptions, setEditItemOptions] = useState([]);
 const [editSelectedItems, setEditSelectedItems] = useState([]);
 const [searchText, setSearchText] = useState("");
 const [filteredInvoices, setFilteredInvoices] = useState([]);
+const [customerWallet, setCustomerWallet] = useState(null);
+const [debitAdjustedAmount, setDebitAdjustedAmount] = useState(0);
+const [countAsCredit, setCountAsCredit] = useState(false);
+const [editCustomerWallet, setEditCustomerWallet] = useState(null);
+const [editDebitAdjustedAmount, setEditDebitAdjustedAmount] = useState(0);
+const [editCountAsCredit, setEditCountAsCredit] = useState(false);
   useEffect(() => {
     fetchOrderOptions();
     fetchInvoices();
@@ -122,11 +129,8 @@ const fetchInvoices = async () => {
       orderNumber: inv.order_number,
       customerName: inv.customer_name,
       invoiceDate: inv.invoice_date,
-
-      // ✅ take directly from items
-      deliveredAmount: inv.items?.[0]?.delivered_amount || 0,
-      creditedQuantityAmount: inv.items?.[0]?.credited_amount || 0,
-    }));
+      deliveredAmount: inv.payable_amount,
+          }));
 
     setSavedInvoices(rows);
     setFilteredInvoices(rows);
@@ -202,7 +206,7 @@ const onItemSelect = async (product_ids) => {
     setLoadingOrder(true);
 
    const res = await getInvoiceDropdownData(selectedOrderId, product_ids);
-
+setCustomerWallet(res.customer_wallet);
 // ✅ SET DELIVERY DATE HERE
 setOrderDetails(prev => ({
   ...prev,
@@ -297,7 +301,7 @@ const getTotals = (items) => {
   orderDetails && itemsWithDelivery.length
     ? getTotals(itemsWithDelivery)
     : { totalAmount: 0, creditedQuantityAmount: 0 };
-
+const adjustedDeliveredAmount = totalAmount - (debitAdjustedAmount || 0);
   /* ---------------- SAVE INVOICE ---------------- */
 const handleSubmit = async (values) => {
   try {
@@ -309,7 +313,8 @@ const handleSubmit = async (values) => {
   invoice_date: invoiceDate
     ? invoiceDate.format("YYYY-MM-DD")
     : dayjs().format("YYYY-MM-DD"),
-
+  debit_adjusted_amount: debitAdjustedAmount || 0,   
+  count_as_credit: countAsCredit,                    
  items: itemsWithDelivery.map((row) => ({
   sales_order_item_id: row.itemId,
   product_id: row.productId,
@@ -341,7 +346,12 @@ const handleSubmit = async (values) => {
 const onEditItemSelect = async (product_ids) => {
   try {
     const res = await getInvoiceDropdownData(editOrderId, product_ids);
-
+setEditCustomerWallet(
+  res.customer_wallet || {
+    credit_balance: res.credit_balance || 0,
+    debit_balance: res.debit_balance || 0
+  }
+);
     const items = res?.items || res;
 
     const rows = items.map((item, index) => {
@@ -381,8 +391,14 @@ const handleEdit = async (record) => {
     setEditingInvoiceId(record.id);
 
     setEditOrderId(res.sales_order_id);
+    
 setInvoiceDate(dayjs(res.invoice_date));
-   
+   setEditDebitAdjustedAmount(res.debit_adjusted_amount || 0);
+setEditCountAsCredit(res.count_as_credit || false);
+setEditCustomerWallet({
+  credit_balance: res.credit_balance || 0,
+  debit_balance: res.debit_balance || 0
+});
 
     // ✅ SET ORDER DETAILS (this is missing)
     setOrderDetails({
@@ -390,6 +406,7 @@ setInvoiceDate(dayjs(res.invoice_date));
       order_date: res.order_date,
       delivery_date: res.delivery_date,
       invoice_date: res.invoice_date,
+      
       customer: {
         name: res.customer_name
       }
@@ -459,7 +476,8 @@ const handleUpdateInvoice = async () => {
 
       customer_id: res.customer_id,
       customer_name: res.customer_name,
-
+debit_adjusted_amount: editDebitAdjustedAmount,
+count_as_credit: editCountAsCredit,
       items: editItems.map((row) => ({
         sales_order_item_id: row.itemId,
         product_id: row.productId,
@@ -614,7 +632,7 @@ const handleExport = async () => {
       render: (_, row) => {
         const credited = Number(row.creditedQty ?? 0);
         if (credited <= 0) return <span className="text-amber-600">-</span>;
-        return <span className="text-red-600 font-medium">{credited}</span>;
+        return <span className="text-amber-800 font-medium">{credited}</span>;
       },
     },
   ];
@@ -647,7 +665,7 @@ const handleExport = async () => {
       ),
     },
     {
-      title: <span className="text-amber-700 font-semibold">Deliverd Amount</span>,
+      title: <span className="text-amber-700 font-semibold">Payable Amount</span>,
       dataIndex: "deliveredAmount",
       render: (n) => (
         <span className="text-amber-800 font-medium">
@@ -655,19 +673,7 @@ const handleExport = async () => {
         </span>
       ),
     },
-    {
-      title: (
-        <span className="text-amber-700 font-semibold">
-          Credited Amount
-        </span>
-      ),
-      dataIndex: "creditedQuantityAmount",
-      render: (n) => (
-        <span className="text-amber-800 font-medium"
-          >{n}
-        </span>
-      ),
-    },
+   
   {
   title: <span className="text-amber-700 font-semibold">Action</span>,
   key: "action",
@@ -815,6 +821,18 @@ const handleExport = async () => {
   onChange={onItemSelect}
 />
 </Form.Item></Col>
+{/* Checkbox */}
+
+  <Col  md={8} className="font-medium text-amber-700" >
+  Count as Credit
+    <Checkbox
+      checked={countAsCredit}
+      onChange={(e) => setCountAsCredit(e.target.checked)}
+      className=" pt-9! pl-10!"
+    >
+      
+    </Checkbox>
+  </Col>
           </Row>
 
           {/* Loading */}
@@ -875,7 +893,6 @@ const handleExport = async () => {
                     </p>
                   </Col>
                            
-                
                 </Row>
               </Card>
 
@@ -898,30 +915,65 @@ const handleExport = async () => {
                 size="small"
                 className="mb-4 border-amber-200 bg-amber-50/30"
               >
-                <Row gutter={24}>
-                  <Col xs={24} sm={12} md={8}>
-                    <span className="text-amber-600 block text-sm">
-                      Delivered Amount
-                    </span>
-                    <span className="text-amber-800 text-xl font-semibold">
-                      {totalAmount.toFixed(2)}
-                    </span>
-                  </Col>
-                  <Col xs={24} sm={12} md={8}>
-                    <span className="text-amber-600 block text-sm">
-                      Credited Amount
-                    </span>
-                    <span
-                      className={
-                        creditedQuantityAmount > 0
-                          ? "text-red-600 text-xl font-semibold"
-                          : "text-amber-800 text-xl font-semibold"
-                      }
-                    >
-                      {creditedQuantityAmount.toFixed(2)}
-                    </span>
-                  </Col>
-                </Row>
+      
+ <Row gutter={24} align="middle" className="mt-2">
+                
+  {/* Delivered */}
+  <Col xs={24} sm={12} md={5}>
+    <div>
+      <div className="text-amber-600 text-sm">Grand Total</div>
+      <div className="text-xl font-semibold text-amber-700">
+        ₹ {totalAmount.toFixed(2)}
+      </div>
+    </div>
+  </Col>
+
+{customerWallet && (
+  <>
+    <Col xs={24} sm={12} md={5}>
+      <div>
+        <div className="text-amber-600 text-sm">Credit Balance</div>
+        <div className="text-xl font-semibold text-amber-700">
+          ₹ {Number(customerWallet.credit_balance || 0).toFixed(2)}
+        </div>
+      </div>
+    </Col>
+
+    <Col xs={24} sm={12} md={5}>
+      <div>
+        <div className="text-amber-600 text-sm">Debit Balance</div>
+        <div className="text-xl font-semibold text-amber-700">
+          ₹ {Number(customerWallet.debit_balance || 0).toFixed(2)}
+        </div>
+      </div>
+    </Col>
+  </>
+)}
+  {/* Debit Adjust */}
+  <Col xs={24} sm={12} md={4}>
+    <div>
+      <div className="text-amber-600 text-sm mb-1">
+        Debit Adjusted
+      </div>
+      <InputNumber
+        min={0}
+        value={debitAdjustedAmount}
+        onChange={(val) => setDebitAdjustedAmount(val || 0)}
+        className="w-32"
+      />
+    </div>
+  </Col> {/* Final */}
+  <Col xs={24} sm={12} md={5}>
+    <div>
+      <div className="text-amber-600 text-sm">Payable Amount</div>
+      <div
+        className={"text-xl font-bold text-amber-700" }
+      >
+        ₹ {(totalAmount - debitAdjustedAmount).toFixed(2)}
+      </div>
+    </div>
+  </Col></Row>
+
               </Card>
 
               {/* Actions */}
@@ -959,7 +1011,11 @@ const handleExport = async () => {
   <Form layout="vertical">
     <Row gutter={16}>
   <Col md={8}>
-    <Form.Item label="Sales Order">
+    <Form.Item  label={
+                  <span className="text-amber-700 font-medium">
+                    Sales Order
+                  </span>
+                }>
       <Select
         value={editOrderId}
         options={orderOptions}
@@ -969,7 +1025,8 @@ const handleExport = async () => {
   </Col>
 
   <Col md={8}>
-    <Form.Item label="Item">
+    <Form.Item  label={<span className="text-amber-700 font-medium">Item</span>}
+ >
       <Select
         mode="multiple"
         value={editSelectedItems}
@@ -978,6 +1035,14 @@ const handleExport = async () => {
       />
     </Form.Item>
   </Col>
+  <Col md={8} className="font-medium text-amber-700" >
+  Count as Credit
+  <Checkbox
+    checked={editCountAsCredit}
+    onChange={(e) => setEditCountAsCredit(e.target.checked)}
+     className=" pt-9! pl-10!"
+  />
+</Col>
 </Row>
     {/* Order Details Card */}
     <Card
@@ -1026,18 +1091,27 @@ const handleExport = async () => {
     {/* Items Table */}
     <div className="mb-4">
       <h3 className="text-amber-700 font-semibold mb-2">
-        Items – Required vs Delivered
+        Items Details
       </h3>
       <Table
         columns={[
-          { title: "Item", dataIndex: "productName" },
-          { title: "UOM", dataIndex: "uom" },
-          { title: "HSN Code", dataIndex: "hsnCode" },
-          { title: "Rate", dataIndex: "rate" },
-          { title: "Required Qty", dataIndex: "requiredQty" },
+         {
+      title: <span className="text-amber-700 font-semibold">Item</span>,
+      dataIndex: "productName",
+      render: (t) => <span className="text-amber-800">{t}</span>,
+    },
+        
+         
+    
+          { title: <span className="text-amber-700 font-semibold">Rate</span>,
+      dataIndex: "rate" ,    render: (t) => <span className="text-amber-800">{t}</span>,
+  },
+          {  title: <span className="text-amber-700 font-semibold">Required Qty</span>,
+  dataIndex: "requiredQty" ,    render: (t) => <span className="text-amber-800">{t}</span>,
+  },
           {
-            title: "Delivered Qty",
-            render: (_, record, index) => (
+            title: <span className="text-amber-700 font-semibold">Delivered Qty</span>,
+  render: (_, record, index) => (
               <InputNumber
                 min={0}
                 value={record.deliveredQty}
@@ -1045,10 +1119,9 @@ const handleExport = async () => {
               />
             ),
           },
-          { title: "Credited Qty", dataIndex: "creditedQty" },
-          { title: "Delivered Amount", dataIndex: "deliveredAmount" },
-          { title: "Credited Amount", dataIndex: "creditedAmount" },
-        ]}
+          {  title: <span className="text-amber-700 font-semibold">Credited Qty</span>,
+     dataIndex: "creditedQty" ,render: (t) => <span className="text-amber-800">{t}</span>,},
+             ]}
         dataSource={editItems}
         pagination={false}
         rowKey="key"
@@ -1056,28 +1129,75 @@ const handleExport = async () => {
     </div>
 
     {/* Totals Card */}
-    <Card size="small" className="mb-4 border-amber-200 bg-amber-50/30">
-      <Row gutter={24}>
-        <Col xs={24} sm={12} md={8}>
-          <span className="text-amber-600 block text-sm">Delivered Amount</span>
-          <span className="text-amber-800 text-xl font-semibold">
-            {editItems.reduce((sum, r) => sum + r.deliveredAmount, 0).toFixed(2)}
-          </span>
+    <Card
+  size="small"
+  className="mb-4 border-amber-200 bg-amber-50/30"
+>
+  <Row gutter={24} align="middle" className="mt-2">
+
+    {/* Delivered */}
+    <Col xs={24} sm={12} md={5}>
+      <div>
+        <div className="text-amber-600 text-sm">Grand Total</div>
+        <div className="text-xl font-semibold text-amber-700">
+          ₹ {editItems.reduce((sum, r) => sum + r.deliveredAmount, 0).toFixed(2)}
+        </div>
+      </div>
+    </Col>
+
+    {/* Wallet */}
+    {editCustomerWallet && (
+      <>
+        <Col xs={24} sm={12} md={5}>
+          <div>
+            <div className="text-amber-600 text-sm">Credit Balance</div>
+            <div className="text-xl font-semibold text-amber-700">
+              ₹ {Number(editCustomerWallet.credit_balance || 0).toFixed(2)}
+            </div>
+          </div>
         </Col>
-        <Col xs={24} sm={12} md={8}>
-          <span className="text-amber-600 block text-sm">Credited Amount</span>
-          <span
-            className={
-              editItems.reduce((sum, r) => sum + r.creditedAmount, 0) > 0
-                ? "text-red-600 text-xl font-semibold"
-                : "text-amber-800 text-xl font-semibold"
-            }
-          >
-            {editItems.reduce((sum, r) => sum + r.creditedAmount, 0).toFixed(2)}
-          </span>
+
+        <Col xs={24} sm={12} md={5}>
+          <div>
+            <div className="text-amber-600 text-sm">Debit Balance</div>
+            <div className="text-xl font-semibold text-amber-700">
+              ₹ {Number(editCustomerWallet.debit_balance || 0).toFixed(2)}
+            </div>
+          </div>
         </Col>
-      </Row>
-    </Card>
+      </>
+    )}
+
+    {/* Debit Adjust */}
+    <Col xs={24} sm={12} md={4}>
+      <div>
+        <div className="text-amber-600 text-sm mb-1">
+          Debit Adjusted
+        </div>
+        <InputNumber
+          min={0}
+          value={editDebitAdjustedAmount}
+          onChange={(val) => setEditDebitAdjustedAmount(val || 0)}
+          className="w-32"
+        />
+      </div>
+    </Col>
+
+    {/* Final */}
+    <Col xs={24} sm={12} md={5}>
+      <div>
+        <div className="text-amber-600 text-sm">Payable Amount</div>
+        <div className="text-xl font-bold text-amber-700">
+          ₹ {(
+            editItems.reduce((sum, r) => sum + r.deliveredAmount, 0) -
+            editDebitAdjustedAmount
+          ).toFixed(2)}
+        </div>
+      </div>
+    </Col>
+
+  </Row>
+</Card>
 
     {/* Actions */}
     <div className="flex justify-end gap-2">

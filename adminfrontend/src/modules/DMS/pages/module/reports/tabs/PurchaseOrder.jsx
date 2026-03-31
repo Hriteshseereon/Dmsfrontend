@@ -4,71 +4,49 @@ import dayjs from "dayjs";
 import { FilterOutlined } from "@ant-design/icons";
 const { RangePicker } = DatePicker;
 import isBetween from "dayjs/plugin/isBetween";
+import { useEffect } from "react";
+import { getCommonReport } from "../../../../../../api/reports";
 dayjs.extend(isBetween);
 
-/* ---------------- MOCK PURCHASE ORDER JSON ---------------- */
-const purchaseOrderJSON = [
-  {
-    key: 1,
-    slno: 1,
-    orderNo: "PO-2024-101",
-    plantName: "Kalinga Oils Pvt Ltd",
-    orderDate: "2024-09-05",
-    startDate: "2024-09-10",
-    endDate: "2025-03-31",
-    totalAmount:600,
-    status: "Approved",
-
-  },
-  {
-    key: 2,
-    slno: 2,
-    orderNo: "PO-2024-118",
-    plantName: "Odisha Edibles",
-    orderDate: "2024-09-22",
-    startDate: "2024-10-01",
-    endDate: "2025-02-28",
-    totalAmount:300,
-    status: "Pending",
-  },
-  {
-    key: 3,
-    slno: 3,
-    orderNo: "PO-2024-125",
-    plantName: "Kalinga Oils Pvt Ltd",
-    orderDate: "2024-10-08",
-    startDate: "2024-10-15",
-    endDate: "2025-06-30",
-    totalAmount:700,
-    status: "Approved",
-  },
-  {
-    key: 4,
-    slno: 4,
-    orderNo: "PO-2024-130",
-    plantName: "Odisha Edibles",
-    orderDate: "2024-11-12",
-    startDate: "2024-11-15",
-    endDate: "2025-05-31",
-    totalAmount:250,
-    status: "Completed",
-  },
-];
 
 /* ---------------- COMPONENT ---------------- */
 const PurchaseOrder = () => {
-  const [dateRange, setDateRange] = useState(null);
-    /* ---------------- MONTH FILTER LOGIC ---------------- */
+ const [data, setData] = useState([]);
+const [dateRange, setDateRange] = useState(null); 
+
+useEffect(() => {
+  fetchData();
+}, []);
+
+const fetchData = async () => {
+  try {
+    const res = await getCommonReport({ type: "purchase_order" }); // ✅ IMPORTANT
+
+    const formatted = res.data.map((item, index) => ({
+      key: index,
+      slno: index + 1,
+      orderNo: item.order_number || "-", // handle null
+      plantName: item.vendor_name,
+      orderDate: item.order_date || item.document_date,
+      totalAmount: item.total_amount,
+      status: item.status,
+    }));
+
+    setData(formatted);
+  } catch (err) {
+    console.error(err);
+  }
+};/* ---------------- MONTH FILTER LOGIC ---------------- */
   const filteredData = useMemo(() => {
-    if (!dateRange) return  purchaseOrderJSON;
-  
-    const [start, end] = dateRange;
- 
-    return purchaseOrderJSON.filter((rec) => {
-      const orderDate = dayjs(rec.orderDate);
-      return orderDate.isBetween(start, end, "day", "[]");
-    });
-  }, [dateRange]);
+  if (!dateRange) return data;
+
+  const [start, end] = dateRange;
+
+  return data.filter((rec) => {
+    const orderDate = dayjs(rec.orderDate);
+    return orderDate.isBetween(start, end, "day", "[]");
+  });
+}, [dateRange, data]);
 
   /* ---------------- TABLE COLUMNS ---------------- */
   const columns = [
@@ -99,20 +77,7 @@ const PurchaseOrder = () => {
       render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
  
     },
-    {
-        title: <span className="text-amber-700 font-semibold">Order Start Date</span>,
-      dataIndex: "startDate",
-      width: 130,
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
-    }
-   ,
-   {
-
-        title: <span className="text-amber-700 font-semibold">Order End Date</span>,
-      dataIndex: "endDate",
-      width: 130,   
-      render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
-    },
+    
     {
       title: <span className="text-amber-700 font-semibold">Total Amount</span>,
       dataIndex: "totalAmount",
