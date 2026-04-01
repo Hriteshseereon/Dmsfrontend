@@ -27,6 +27,14 @@ import {
   getTransportById,
   sendTransportCredential,
 } from "@/api/transport.js";
+import {
+  getCountryOptions,
+  getStateOptions,
+  getDistrictOptions,
+  getCityOptions,
+  getCountryIsoByName,
+  getStateIsoByName,
+} from "../../../../../../../utils/locationHelper";
 // import { getTransporters, addTransporter, updateTransporter, getTransporterDetails } from "../../../../../../../api/transporter";
 import { API_BASE_URL } from "@/utils/config";
 
@@ -58,6 +66,9 @@ export default function TransportTab() {
   const [selected, setSelected] = useState(null);
   const [sendingId, setSendingId] = useState(null);
   const { Option } = Select;
+  const [selCountryIso, setSelCountryIso] = useState(null);
+  const [selStateName, setSelStateName] = useState(null);
+  const [selStateIso, setSelStateIso] = useState(null);
   const [form] = Form.useForm();
   const generatePassword = (length = 10) => {
     const chars =
@@ -82,6 +93,34 @@ export default function TransportTab() {
   useEffect(() => {
     fetchTransporters();
   }, []);
+  // handler function to get the dynamic country state dsitrict and cities
+  const handleCountryChange = (isoCode, option) => {
+    setSelCountryIso(isoCode);
+    setSelStateName(null);
+    setSelStateIso(null);
+
+    form.setFieldsValue({
+      country: option.label,
+      state: undefined,
+      district: undefined,
+      city: undefined,
+    });
+  };
+
+  const handleStateChange = (isoCode, option) => {
+    setSelStateName(option.label);
+    setSelStateIso(isoCode);
+
+    form.setFieldsValue({
+      state: option.label,
+      district: undefined,
+      city: undefined,
+    });
+  };
+
+  const handleDistrictChange = () => {
+    form.setFieldsValue({ city: undefined });
+  };
 
   const fileFromUrl = (url) => {
     if (!url) return [];
@@ -112,6 +151,7 @@ export default function TransportTab() {
     ownerAadharNo: d.owner_aadhar_number,
     address1: d.address_1,
     address2: d.address_2,
+    country: d.country || "India",
     city: d.city,
     state: d.state,
     district: d.district,
@@ -140,6 +180,7 @@ export default function TransportTab() {
     fd.append("owner_aadhar_number", values.ownerAadharNo || "");
     fd.append("address_1", values.address1 || "");
     fd.append("address_2", values.address2 || "");
+    fd.append("country", values.country || "");
     fd.append("city", values.city || "");
     fd.append("state", values.state || "");
     fd.append("district", values.district || "");
@@ -205,24 +246,24 @@ export default function TransportTab() {
     }
   };
 
-   const getFilteredData = () => {
-  if (!search) return data;
+  const getFilteredData = () => {
+    if (!search) return data;
 
-  const value = search.toLowerCase();
+    const value = search.toLowerCase();
 
-  return data.filter((item) => {
-    return Object.values(item).some((val) => {
-      if (!val) return false;
+    return data.filter((item) => {
+      return Object.values(item).some((val) => {
+        if (!val) return false;
 
-      // convert everything safely to string
-      return JSON.stringify(val).toLowerCase().includes(value);
+        // convert everything safely to string
+        return JSON.stringify(val).toLowerCase().includes(value);
+      });
     });
-  });
-};
+  };
 
-const handleReset = () => {
-  setSearch("");
-};
+  const handleReset = () => {
+    setSearch("");
+  };
   /* ================= TABLE ================= */
   const columns = [
     {
@@ -260,6 +301,13 @@ const handleReset = () => {
               const details = await getTransportById(record.id);
 
               form.setFieldsValue(mapDetailsToForm(details));
+              const countryName = details.country || "India";
+              const countryIso = getCountryIsoByName(countryName);
+              const stateIso = getStateIsoByName(countryIso, details.state);
+
+              setSelCountryIso(countryIso);
+              setSelStateName(details.state);
+              setSelStateIso(stateIso);
               setSelected(details);
               setViewMode(true);
               setOpen(true);
@@ -271,6 +319,13 @@ const handleReset = () => {
               const details = await getTransportById(record.id);
 
               form.setFieldsValue(mapDetailsToForm(details));
+              const countryName = details.country || "India";
+              const countryIso = getCountryIsoByName(countryName);
+              const stateIso = getStateIsoByName(countryIso, details.state);
+
+              setSelCountryIso(countryIso);
+              setSelStateName(details.state);
+              setSelStateIso(stateIso);
               setSelected(details);
               setViewMode(false);
               setOpen(true);
@@ -344,10 +399,16 @@ const handleReset = () => {
             setSelected(null);
             setViewMode(false);
             form.resetFields();
+
+            const countryIso = getCountryIsoByName("India");
+            setSelCountryIso(countryIso); // IMPORTANT
+
             form.setFieldsValue({
               password: randomPassword,
               status: "true",
+              country: "India",
             });
+
             setOpen(true);
           }}
         >
@@ -567,20 +628,17 @@ const handleReset = () => {
 
               <Col span={4}>
                 <Form.Item
-                  label="City"
-                  name="city"
-                  rules={[
-                    { required: true, message: "City name is required" },
-                    {
-                      pattern: /^[a-zA-Z\s]+$/,
-                      message: "Only letters and spaces are allowed",
-                    },
-                  ]}
+                  label="Country"
+                  name="country"
+                  rules={[{ required: true, message: "Select country" }]}
                 >
-                  <Input
-                    className={inputClass}
+                  <Select
+                    className={selectClass}
                     disabled={viewMode}
-                    placeholder="Enter city"
+                    showSearch
+                    optionFilterProp="label"
+                    options={getCountryOptions()}
+                    onChange={handleCountryChange}
                   />
                 </Form.Item>
               </Col>
@@ -589,18 +647,16 @@ const handleReset = () => {
                 <Form.Item
                   label="State"
                   name="state"
-                  rules={[
-                    { required: true, message: "state name is required" },
-                    {
-                      pattern: /^[a-zA-Z\s]+$/,
-                      message: "Only letters and spaces are allowed",
-                    },
-                  ]}
+                  rules={[{ required: true, message: "Select state" }]}
                 >
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter state"
+                  <Select
+                    className={selectClass}
+                    disabled={viewMode || !selCountryIso}
+                    options={getStateOptions(selCountryIso)}
+                    onChange={handleStateChange}
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select State"
                   />
                 </Form.Item>
               </Col>
@@ -609,18 +665,33 @@ const handleReset = () => {
                 <Form.Item
                   label="District"
                   name="district"
-                  rules={[
-                    { required: true, message: "District name is required" },
-                    {
-                      pattern: /^[a-zA-Z\s]+$/,
-                      message: "Only letters and spaces are allowed",
-                    },
-                  ]}
+                  rules={[{ required: true, message: "Select district" }]}
                 >
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter district"
+                  <Select
+                    className={selectClass}
+                    disabled={viewMode || !selStateName}
+                    options={getDistrictOptions(selStateName)}
+                    onChange={handleDistrictChange}
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select District"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item
+                  label="City"
+                  name="city"
+                  rules={[{ required: true, message: "Select city" }]}
+                >
+                  <Select
+                    className={selectClass}
+                    disabled={viewMode || !selStateIso}
+                    options={getCityOptions(selCountryIso, selStateIso)}
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select City"
                   />
                 </Form.Item>
               </Col>
