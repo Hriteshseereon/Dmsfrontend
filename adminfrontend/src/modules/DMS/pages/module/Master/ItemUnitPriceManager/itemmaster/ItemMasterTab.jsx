@@ -64,6 +64,8 @@ export default function ItemMasterTab({ items, setItems }) {
     gstPercent: 0,
     cgstPercent: 0,
     sgstPercent: 0,
+    net_weight: 0,      
+    gross_weight: 0,  
   });
   const [search, setSearch] = useState("");
   /* ================= LOAD MASTER DATA ================= */
@@ -120,6 +122,8 @@ export default function ItemMasterTab({ items, setItems }) {
         cgstPercent: Number(data.gst_percentage) / 2,
         sgstPercent: Number(data.gst_percentage) / 2,
         currentStock: Number(data.current_stock),
+        net_weight: Number(data.net_weight) || 0,
+        gross_weight: Number(data.gross_weight) || 0,
       });
 
       setViewMode(view);
@@ -146,7 +150,7 @@ export default function ItemMasterTab({ items, setItems }) {
       message.error("Please fill all required fields");
       return;
     }
-
+console.log("Submitting", formData);
     const payload = {
       name: formData.itemName,
       product_group: formData.product_group,
@@ -160,6 +164,8 @@ export default function ItemMasterTab({ items, setItems }) {
       sgst: formData.sgstPercent,
       current_stock: formData.currentStock || 0,
       vendor: formData.company,
+       net_weight: formData.net_weight,     
+       gross_weight: formData.gross_weight,
     };
 
     try {
@@ -195,6 +201,8 @@ export default function ItemMasterTab({ items, setItems }) {
     { title: "Type", dataIndex: "product_type" },
     { title: "Company", dataIndex: "vendor_name" },
     { title: "Base Unit", dataIndex: "base_unit" },
+    { title: "Net Weight", dataIndex: "net_weight" },
+    { title: "Gross Weight", dataIndex: "gross_weight" },
     {
       title: "Action",
       render: (_, r) => (
@@ -327,8 +335,13 @@ export default function ItemMasterTab({ items, setItems }) {
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => {
-            setFormData({ gstPercent: 0, cgstPercent: 0, sgstPercent: 0 });
-            setEditingId(null);
+setFormData({
+  gstPercent: 0,
+  cgstPercent: 0,
+  sgstPercent: 0,
+  net_weight: 0,
+  gross_weight: 0,
+});  setEditingId(null);
             setViewMode(false);
             setOpen(true);
           }}
@@ -574,6 +587,33 @@ export default function ItemMasterTab({ items, setItems }) {
                 />
               </FormField>
             </Col>
+            <Col span={12}>
+  <FormField label="Net Weight">
+    <InputNumber
+      disabled={viewMode}
+      min={0}
+      style={{ width: "100%" }}
+      value={formData.net_weight}
+      onChange={(value) =>
+        setFormData({ ...formData, net_weight: value || 0 })
+      }
+    />
+  </FormField>
+</Col>
+
+<Col span={12}>
+  <FormField label="Gross Weight">
+    <InputNumber
+      disabled={viewMode}
+      min={0}
+      style={{ width: "100%" }}
+      value={formData.gross_weight}
+      onChange={(value) =>
+        setFormData({ ...formData, gross_weight: value || 0 })
+      }
+    />
+  </FormField>
+</Col>
           </Row>
         </div>
       </Modal>

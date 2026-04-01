@@ -187,6 +187,7 @@ export default function VendorTab() {
 
     address1: d.addresses?.[0]?.address_line1 || d.addresses?.address_line_1,
     address2: d.addresses?.[0]?.address_line2 || d.addresses?.address_line_2,
+    country: d.addresses?.[0]?.country || "India",
     state: d.addresses?.[0]?.state || d.addresses?.state,
     district: d.addresses?.[0]?.district || d.addresses?.district,
     city: d.addresses?.[0]?.city || d.addresses?.city,
@@ -219,6 +220,7 @@ export default function VendorTab() {
       address: p.address,
       phoneNo: p.phone_number || p.phone_no,
       email: p.email_address || p.email,
+      country: p.country || "India",
       state: p.state,
       district: p.district,
       city: p.city,
@@ -271,6 +273,7 @@ export default function VendorTab() {
         {
           address_line1: values.address1,
           address_line2: values.address2,
+          country: values.country,
           state: values.state,
           district: values.district,
           city: values.city,
@@ -284,6 +287,7 @@ export default function VendorTab() {
         name: p.plantName,
         address: p.address,
         fax_no: p.faxNo,
+        country: p.country,
         state: p.state,
         city: p.city,
         district: p.district,
@@ -1001,9 +1005,34 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-              <Form.Item name="country" initialValue="India" hidden>
-                <Input />
-              </Form.Item>
+              <Col span={4}>
+                <Form.Item
+                  label="Country"
+                  name="country"
+                  rules={[{ required: true, message: "Please select country" }]}
+                  initialValue="India"
+                >
+                  <Select
+                    className={selectClass}
+                    disabled={viewMode}
+                    showSearch
+                    optionFilterProp="label"
+                    options={getCountryOptions()}
+                    onChange={(isoCode, option) => {
+                      setSelCountryIso(isoCode);
+                      setSelStateName(null);
+                      setSelStateIso(null);
+
+                      form.setFieldsValue({
+                        country: option.label,
+                        state: undefined,
+                        district: undefined,
+                        city: undefined,
+                      });
+                    }}
+                  />
+                </Form.Item>
+              </Col>
               <Col span={4}>
                 <Form.Item
                   label="State"
@@ -1229,7 +1258,37 @@ export default function VendorTab() {
                             />
                           </Form.Item>
                         </Col>
-
+                        <Col span={4}>
+                          <Form.Item
+                            {...restField}
+                            name={[name, "country"]}
+                            label="Country"
+                            initialValue="India"
+                            rules={[
+                              { required: true, message: "Select Country" },
+                            ]}
+                          >
+                            <Select
+                              showSearch
+                              optionFilterProp="label"
+                              options={getCountryOptions()}
+                              onChange={(isoCode, option) => {
+                                const plants =
+                                  form.getFieldValue("plants") || [];
+                                plants[name] = {
+                                  ...plants[name],
+                                  country: option.label,
+                                  state: undefined,
+                                  district: undefined,
+                                  city: undefined,
+                                  stateIso: null,
+                                };
+                                form.setFieldsValue({ plants });
+                              }}
+                              disabled={viewMode}
+                            />
+                          </Form.Item>
+                        </Col>
                         <Col span={4}>
                           <Form.Item
                             {...restField}

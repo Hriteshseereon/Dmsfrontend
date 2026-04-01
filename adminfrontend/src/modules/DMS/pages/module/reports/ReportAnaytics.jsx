@@ -74,9 +74,8 @@ const ReportAnaytics = () => {
             { key: "la", label: (<span className="flex items-center gap-2"><FaTruck /> Loading Advice</span>), children: <LoadingAdvice />, },
             { key: "ec", label: (<span className="flex items-center gap-2"><FaFileContract /> Purchase Expired Contract</span>), children: <PurchaseExpiredContract />, },
             { key: "esc", label: (<span className="flex items-center gap-2"><FaFileContract /> Sale Expired Contract</span>), children: <SaleExpiredContract />, },
-            { key: "dn", label: (<span className="flex items-center gap-2"><FaFileInvoice /> Debit Notes</span>), children: <DebitNotes/>, },
-            { key: "cn", label: (<span className="flex items-center gap-2"><FaFileInvoice /> Credit Notes</span>), children: <CreditNotes />, },
-      
+            // { key: "dn", label: (<span className="flex items-center gap-2"><FaFileInvoice /> Debit Notes</span>), children: <DebitNotes/>, },
+            // { key: "cn", label: (<span className="flex items-center gap-2"><FaFileInvoice /> Credit Notes</span>), children: <CreditNotes />, },
             // { key: "cr", label: (<span className="flex items-center gap-2"><FaFileContract /> Purchase Contract Renewal</span>), children: <PurchaseContractRenewal />, },
             // { key: "scr", label: (<span className="flex items-center gap-2"><FaFileContract /> Sale Contract Renewal</span>), children: <SaleContractRenewal />, },
             // { key: "ao", label: (<span className="flex items-center gap-2"><FaShoppingCart /> Approved Orders</span>), children: <ApprovedOrders />, },
