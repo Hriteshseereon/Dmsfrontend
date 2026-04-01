@@ -199,6 +199,7 @@ export default function CustomerTab() {
     address1: details.address_line1,
     country: details.country,
     state: details.state,
+    region: details.region,
     district: details.district,
     city: details.city,
     pinCode: details.pin_code,
@@ -239,7 +240,7 @@ export default function CustomerTab() {
     pdcAmount: details.pdc_amount,
 
     pdcIssueDate: details.pdc_issue_date ? dayjs(details.pdc_issue_date) : null,
-    pdcDate: details.pdc_cheque_date ? dayjs(details.pdc_cheque_date) : null,
+    pdcDate: details.pdc_cheque_date,
     pdcValid: details.pdc_valid_upto ? dayjs(details.pdc_valid_upto) : null,
 
     // ===== FD =====
@@ -318,6 +319,7 @@ export default function CustomerTab() {
       formData.append("address_line1", values.address1 || "");
       formData.append("country", values.country || "");
       formData.append("state", values.state || "");
+      formData.append("region", values.region || "");
       formData.append("district", values.district || "");
       formData.append("city", values.city || "");
       formData.append("pin_code", values.pinCode);
@@ -384,10 +386,7 @@ export default function CustomerTab() {
             ? dayjs(values.pdcIssueDate).format("YYYY-MM-DD")
             : "",
         );
-        formData.append(
-          "pdc_cheque_date",
-          values.pdcDate ? dayjs(values.pdcDate).format("YYYY-MM-DD") : "",
-        );
+        formData.append("pdc_cheque_date", values.pdcDate);
         formData.append("pdc_cheque_number", values.pdcNumber);
         formData.append("pdc_amount", values.pdcAmount);
         formData.append(
@@ -987,6 +986,15 @@ export default function CustomerTab() {
                   />
                 </Form.Item>
               </Col>
+              <Col span={4}>
+                <Form.Item label="Region" name="region">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter Region"
+                  />
+                </Form.Item>
+              </Col>
             </Row>
           </Card>
 
@@ -1194,7 +1202,7 @@ export default function CustomerTab() {
                         },
                       ]}
                     >
-                      <Input placeholder="YYYY-MM-DD" disabled={viewMode} />
+                      <Input placeholder="DD-MM-YYYY" disabled={viewMode} />
                     </Form.Item>
                   </Col>
 
