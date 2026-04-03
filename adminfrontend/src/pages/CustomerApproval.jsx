@@ -70,36 +70,36 @@ function CustomerApproval() {
   };
 
   /* ===== VIEW CUSTOMER COMPANIES ===== */
-  const handleViewDetails = async (customer) => {
-    try {
-      const details = await getAdminCustomerDetails(customer.id);
+  // const handleViewDetails = async (customer) => {
+  //   try {
+  //     const details = await getAdminCustomerDetails(customer.id);
 
-      const mappedCompanies = (details.companies || []).map(comp => ({
-        "name": comp.company_name,
-        "phone": comp.phone,
-        "email": comp.email,
-        "country": comp.country,
-        "state": comp.state,
-        "city": comp.city,
-        "pin": comp.pin,
-        "tdc": comp.tds_applicable ? "Yes" : "No",
-        "gstin": comp.gstin,
-        "tin": comp.tin,
-        "license": comp.license_no,
-        "fssai": comp.fssai_no,
-        "billingType": comp.billing_type,
-        "aadhaar": comp.aadhaar_no,
-        "pan": comp.pan,
-        "address": comp.address
-      }));
+  //     const mappedCompanies = (details.companies || []).map(comp => ({
+  //       "name": comp.company_name,
+  //       "phone": comp.phone,
+  //       "email": comp.email,
+  //       "country": comp.country,
+  //       "state": comp.state,
+  //       "city": comp.city,
+  //       "pin": comp.pin,
+  //       "tdc": comp.tds_applicable ? "Yes" : "No",
+  //       "gstin": comp.gstin,
+  //       "tin": comp.tin,
+  //       "license": comp.license_no,
+  //       "fssai": comp.fssai_no,
+  //       "billingType": comp.billing_type,
+  //       "aadhaar": comp.aadhaar_no,
+  //       "pan": comp.pan,
+  //       "address": comp.address
+  //     }));
 
-      setModalData(mappedCompanies);
-      setModalVisible(true);
-    } catch (error) {
-      console.error("Failed to fetch customer details:", error);
-      message.error("Failed to fetch customer details");
-    }
-  };
+  //     setModalData(mappedCompanies);
+  //     setModalVisible(true);
+  //   } catch (error) {
+  //     console.error("Failed to fetch customer details:", error);
+  //     message.error("Failed to fetch customer details");
+  //   }
+  // };
 
   const handleApprove = async (id) => {
     const customer = customers.find(c => c.id === id);
@@ -174,17 +174,7 @@ function CustomerApproval() {
         <span className="text-amber-700 font-medium">{text}</span>
       ),
     },
-    {
-      title: <span className="text-amber-600 font-bold">Company</span>,
-      render: (_, record) => (
-        <Button
-          className="bg-amber-500! text-white! hover:bg-amber-600!"
-          onClick={() => handleViewDetails(record)}
-        >
-          Company Details
-        </Button>
-      ),
-    },
+   
     {
       title: <span className="text-amber-600 font-bold">Link Organization</span>,
       render: (_, record) => (
@@ -249,7 +239,7 @@ function CustomerApproval() {
       />
 
       {/* ===== MODAL ===== */}
-      <Modal
+      {/* <Modal
         open={modalVisible}
         footer={null}
         onCancel={() => setModalVisible(false)}
@@ -291,7 +281,7 @@ function CustomerApproval() {
             </div>
           )}
         </div>
-      </Modal>
+      </Modal> */}
     </div>
   );
 }

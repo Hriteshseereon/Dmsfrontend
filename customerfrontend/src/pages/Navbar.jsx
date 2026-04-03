@@ -1,11 +1,30 @@
 // Navbar.js
-import { BellOutlined, LogoutOutlined, UserOutlined, DownOutlined, CustomerServiceOutlined } from "@ant-design/icons";
-import { Avatar, Dropdown, Menu, Badge } from "antd";
+import { LogoutOutlined, UserOutlined, DownOutlined } from "@ant-design/icons";
+import { Avatar, Dropdown, Menu } from "antd";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+
 const Navbar = () => {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
+
+  const formatDisplayName = (value) => {
+    if (!value || typeof value !== "string") return "";
+
+    return value
+      .split(/[._\s-]+/)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  };
+
+  const customerName =
+    currentUser?.customer_name ||
+    currentUser?.name ||
+    currentUser?.full_name ||
+    currentUser?.customer?.name ||
+    formatDisplayName(currentUser?.email?.split("@")[0]) ||
+    "Customer";
 
   const goToProfile = () => {
     navigate("/profile-settings");
@@ -46,18 +65,14 @@ const Navbar = () => {
           <h2 className="text-2xl font-semibold text-amber-500">Customer Portal</h2></div>
 
 
-        {/* Right: Notifications + User */}
+        {/* Right: Customer + User */}
         <div className="flex items-center ">
-          {/* Notification */}
-          <Badge count={3} className="mr-2!">
-            <BellOutlined className="text-xl! text-amber-600! cursor-pointer!" />
-          </Badge>
-
+         
           {/* Profile dropdown */}
           <Dropdown overlay={menu} placement="bottomRight" className="text-amber-600!">
             <div className="flex items-center space-x-2 cursor-pointer pl-2!">
               <Avatar size="small" icon={<UserOutlined />} className="bg-amber-100!  text-amber-600! " />
-              <span className="text-sm text-amber-600 pl-3 ">{currentUser?.name}</span>
+              <span className="text-sm text-amber-600 pl-3 ">{customerName}</span>
               <DownOutlined className="text-amber-600 text-sm pl-2" />
             </div>
           </Dropdown>

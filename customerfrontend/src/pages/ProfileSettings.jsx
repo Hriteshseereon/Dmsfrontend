@@ -1,63 +1,64 @@
-import React, { useState ,useEffect} from "react";
-import { Form, Input, Button, Upload, Col, Row, message } from "antd";
+import React, { useEffect } from "react";
+import { Form, Input, Button, Col, Row, message } from "antd";
 import { UserOutlined, UploadOutlined } from "@ant-design/icons";
-import { getProfileData,updateProfileData } from "../api/dashboard";
+import { getProfileData, updateProfileData } from "../api/dashboard";
 
-/* ===================== COMPONENT ===================== */
 export default function ProfileSettings() {
   const [formPersonal] = Form.useForm();
-  const [formCompany] = Form.useForm();
+  const mapProfileToForm = (response) => {
+    const customer = response?.customer ?? {};
+    const profile = response?.profile ?? {};
+    const fullName = customer.customer_name?.trim() || "";
+    const nameParts = fullName.split(/\s+/).filter(Boolean);
 
-useEffect(() => {
-  fetchProfile();
-}, []);
-
-const fetchProfile = async () => {
-  try {
-    const res = await getProfileData();
-
-    const customer = res.customer;
-
-   formPersonal.setFieldsValue({
-      firstName: customer.customer_name?.split(" ")[0],
-      lastName: customer.customer_name?.split(" ")[1],
-      email: customer.email_address,
-      phone: customer.mobile_number,
-      address: customer.address,
-      broker_associate: customer.broker_associated,
-    });
-  } catch (err) {
-    message.error("Failed to load profile");
-  }
-};
-const onFinish = async (values) => {
-  try {
-    const payload = {
-      customer_name: `${values.firstName} ${values.lastName}`,
-      email_address: values.email,
-      mobile_number: values.phone,
-      address: values.address,
-      broker_associated: values.broker_associate,
+    return {
+      firstName: nameParts[0] || "",
+      lastName: nameParts.slice(1).join(" "),
+      email:
+        customer.email_address || response?.user?.username || response?.user?.email || "",
+      phone: customer.mobile_number || customer.phone_number || customer.whatsapp_number || "",
+      address: customer.address || "",
+      broker_associate: profile.broker_associated || "",
     };
+  };
 
-    await updateProfileData(payload);
+  const fetchProfile = async () => {
+    try {
+      const res = await getProfileData();
+      formPersonal.setFieldsValue(mapProfileToForm(res));
+    } catch (err) {
+      message.error("Failed to load profile");
+    }
+  };
 
-    message.success("Profile updated successfully");
-  } catch (err) {
-    message.error("Update failed");
-  }
-};
-  
-  // const onCompanySubmit = (values) => {
-  //   setProfile((prev) => ({
-  //     ...prev,
-  //     company: { ...prev.company, ...values },
-  //   }));
-  //   message.success("Company information updated");
-  // };
-const firstName = Form.useWatch("firstName", formPersonal);
-const lastName = Form.useWatch("lastName", formPersonal);
-const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const onFinish = async (values) => {
+    try {
+      const payload = {
+        customer_name: `${values.firstName} ${values.lastName}`.trim(),
+        email_address: values.email,
+        mobile_number: values.phone,
+        phone_number: values.phone,
+        whatsapp_number: values.phone,
+        address: values.address,
+        broker_associated: values.broker_associate || null,
+      };
+
+      const updatedResponse = await updateProfileData(payload);
+      formPersonal.setFieldsValue(mapProfileToForm(updatedResponse));
+      message.success("Profile updated successfully");
+    } catch (err) {
+      message.error("Update failed");
+    }
+  };
+
+  const firstName = Form.useWatch("firstName", formPersonal);
+  const lastName = Form.useWatch("lastName", formPersonal);
+  const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
+
   return (
     <div>
       <h1 className="text-3xl font-bold text-amber-700 mb-2">
@@ -78,19 +79,15 @@ const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
             <Row gutter={16} align="middle" className="mb-4">
               <Col>
                 <div className="w-16 h-16 flex items-center justify-center rounded-full bg-amber-200 text-lg font-semibold text-amber-800">
-       <div className="w-16 h-16 flex items-center justify-center rounded-full bg-amber-200 text-lg font-semibold text-amber-800">
-  {initials || "U"}
-</div>
-             </div>
+                  {initials || "U"}
+                </div>
               </Col>
-             
             </Row>
 
             <Form
               layout="vertical"
-             
               form={formPersonal}
-             onFinish={onFinish}
+              onFinish={onFinish}
             >
               <Row gutter={16}>
                 <Col span={6}>
@@ -146,7 +143,7 @@ const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
          
   </Row>
               <Row gutter={16} align="bottom">
-                <Col span={6} >
+                <Col span={6}>
                   <Form.Item
                     label="Address"
                     name="address"
@@ -160,7 +157,6 @@ const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
                   <Form.Item
                     label="Broker Associate"
                     name="broker_associate"
-                  
                   >
                     <Input />
                   </Form.Item>
@@ -171,7 +167,6 @@ const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
                     <Button
                       type="primary"
                       htmlType="submit"
-                      
                       icon={<UploadOutlined />}
                       style={{ backgroundColor: "#d97706", width: "100%" }}
                     >
