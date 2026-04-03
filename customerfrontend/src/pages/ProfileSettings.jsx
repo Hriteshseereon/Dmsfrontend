@@ -2,9 +2,12 @@ import React, { useEffect } from "react";
 import { Form, Input, Button, Col, Row, message } from "antd";
 import { UserOutlined, UploadOutlined } from "@ant-design/icons";
 import { getProfileData, updateProfileData } from "../api/dashboard";
+import useSessionStore from "../store/sessionStore";
 
 export default function ProfileSettings() {
   const [formPersonal] = Form.useForm();
+  const user = useSessionStore((state) => state.user);
+  const setUser = useSessionStore((state) => state.setUser);
   const mapProfileToForm = (response) => {
     const customer = response?.customer ?? {};
     const profile = response?.profile ?? {};
@@ -25,6 +28,12 @@ export default function ProfileSettings() {
   const fetchProfile = async () => {
     try {
       const res = await getProfileData();
+      setUser({
+        ...user,
+        customer_name: res?.customer?.customer_name || user?.customer_name,
+        name: res?.customer?.customer_name || user?.name,
+        email: res?.customer?.email_address || res?.user?.username || user?.email,
+      });
       formPersonal.setFieldsValue(mapProfileToForm(res));
     } catch (err) {
       message.error("Failed to load profile");
@@ -48,6 +57,16 @@ export default function ProfileSettings() {
       };
 
       const updatedResponse = await updateProfileData(payload);
+      setUser({
+        ...user,
+        customer_name:
+          updatedResponse?.customer?.customer_name || payload.customer_name,
+        name: updatedResponse?.customer?.customer_name || payload.customer_name,
+        email:
+          updatedResponse?.customer?.email_address ||
+          updatedResponse?.user?.username ||
+          payload.email_address,
+      });
       formPersonal.setFieldsValue(mapProfileToForm(updatedResponse));
       message.success("Profile updated successfully");
     } catch (err) {

@@ -4,7 +4,7 @@ import useSessionStore from "../store/sessionStrore";
 //Profile Settings
 export const getProfileData = async () => {
   const currentOrgId = useSessionStore.getState().currentOrgId;
-    const res = await api.get(`/customers/profile/`, {
+    const res = await api.get(`/transport/profile/update/`, {
     params: {
         organisation: currentOrgId,
     },
@@ -14,7 +14,7 @@ export const getProfileData = async () => {
 //update profile settings
 export const updateProfileData = async (profileData) => {
   const currentOrgId = useSessionStore.getState().currentOrgId;
-    const res = await api.put(`/customers/profile/`, profileData, {
+    const res = await api.put(`/transport/profile/update/`, profileData, {
     params: {
         organisation: currentOrgId,
     },

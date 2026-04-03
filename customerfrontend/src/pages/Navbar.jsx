@@ -67,13 +67,14 @@ const Navbar = () => {
 
         {/* Right: Customer + User */}
         <div className="flex items-center ">
-         
+          <div className="rounded-full border border-amber-200 bg-amber-100 px-4 py-1 text-sm font-medium text-amber-600">
+            {customerName}
+          </div>
           {/* Profile dropdown */}
           <Dropdown overlay={menu} placement="bottomRight" className="text-amber-600!">
             <div className="flex items-center space-x-2 cursor-pointer pl-2!">
-              <Avatar size="small" icon={<UserOutlined />} className="bg-amber-100!  text-amber-600! " />
-              <span className="text-sm text-amber-600 pl-3 ">{customerName}</span>
-              <DownOutlined className="text-amber-600 text-sm pl-2" />
+              <Avatar size="medium" icon={<UserOutlined />} className="bg-amber-100!  text-amber-600! " />
+                <DownOutlined className="text-amber-600 text-sm pl-2" />
             </div>
           </Dropdown>
         </div>
