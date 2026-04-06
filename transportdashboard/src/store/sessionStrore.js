@@ -24,6 +24,7 @@ const useSessionStore = create(
         }),
 
       setCurrentOrgId: (id) => set({ currentOrgId: id }),
+      setRegisteredName: (registeredName) => set({ registeredName }),
 
       clearSession: () =>
         set({

@@ -151,7 +151,7 @@ export default function Signup() {
             </Col>
           </Row>
 
-          <Button
+          {/* <Button
             type="dashed"
             block
             icon={<PlusOutlined />}
@@ -177,7 +177,7 @@ export default function Signup() {
                 ))}
               </Space>
             </div>
-          )}
+          )} */}
 
           <Button
             block
@@ -199,11 +199,11 @@ export default function Signup() {
       </div>
 
       {/* Modal */}
-      <CompanyInfoModal
+      {/* <CompanyInfoModal
         open={companyModal}
         onClose={() => setCompanyModal(false)}
         onSave={(companyArray) => setCompanies(prev => [...prev, ...companyArray])}
-      />
+      /> */}
     </div>
   );
 }

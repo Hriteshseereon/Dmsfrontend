@@ -1,12 +1,11 @@
 // Navbar.js
 import {
-  BellOutlined,
   LogoutOutlined,
   UserOutlined,
   DownOutlined,
   TruckOutlined,
 } from "@ant-design/icons";
-import { Avatar, Dropdown, Menu, Badge } from "antd";
+import { Avatar, Dropdown, Menu } from "antd";
 import { useNavigate } from "react-router-dom";
 import useSessionStore from "../store/sessionStrore";
 const Navbar = () => {
@@ -14,6 +13,7 @@ const Navbar = () => {
 
   const registeredName = useSessionStore((state) => state.registeredName);
   const clearSession = useSessionStore((state) => state.clearSession);
+  const displayName = registeredName || "Transporter";
 
   const goToProfile = () => {
     navigate("/profile-settings");
@@ -61,23 +61,21 @@ const Navbar = () => {
           </h2>
         </div>
 
-        {/* Right: Notifications + User */}
-        <div className="flex items-center space-x-6">
-          {/* Notification */}
-          <Badge count={3}>
-            <BellOutlined className="text-xl! text-amber-800! cursor-pointer!" />
-          </Badge>
+        {/* Right: Transporter + User */}
+        <div className="flex items-center space-x-2">
+          <div className="rounded-full border border-amber-200 bg-amber-100 px-4 py-1 text-sm font-medium text-amber-600">
+            {displayName}
+          </div>
 
           {/* Profile dropdown */}
           <Dropdown overlay={menu} placement="bottomRight">
             <div className="flex items-center space-x-2 cursor-pointer">
               <Avatar
-                size="small"
+                size="medium"
                 icon={<UserOutlined />}
-                className="bg-amber-100 text-amber-800"
+                className="bg-amber-100! text-amber-600!"
               />
-              <span className="text-sm text-amber-800">{registeredName}</span>
-              <DownOutlined className="text-amber-800 text-sm" />
+                <DownOutlined className="text-amber-600! text-sm!" />
             </div>
           </Dropdown>
         </div>
