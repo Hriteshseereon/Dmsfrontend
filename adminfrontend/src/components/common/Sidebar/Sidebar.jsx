@@ -1,8 +1,9 @@
 // Sidebar.js
-import { Menu } from "antd";
+import { Menu, Tooltip } from "antd";
 import { NavLink, useLocation } from "react-router-dom";
 import { useMemo } from "react";
-import './sidebar.css';
+import "./sidebar.css";
+import { useNavigate } from "react-router-dom";
 import {
   DashboardOutlined,
   ShoppingCartOutlined,
@@ -11,11 +12,13 @@ import {
   FileTextOutlined,
   ApartmentOutlined,
   WalletOutlined,
- GoldOutlined,
- LineChartOutlined,
+  GoldOutlined,
+  LineChartOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  LeftOutlined, RightOutlined
+  LeftOutlined,
+  RightOutlined,
+  ArrowLeftOutlined,
 } from "@ant-design/icons";
 import { useAuth } from "../../../context/AuthContext";
 const SIDEBAR_EXPANDED = 240; // 18rem
@@ -45,30 +48,34 @@ const pickPreferredModule = (orgModules = []) => {
 
 // ===== Header =====
 const SidebarHeader = ({ collapsed, onToggle }) => {
+  const navigate = useNavigate();
   const location = useLocation();
   const { orgModules } = useAuth();
 
   // determine preferred module once
-  const preferredModule = useMemo(() => pickPreferredModule(orgModules), [orgModules]);
+  const preferredModule = useMemo(
+    () => pickPreferredModule(orgModules),
+    [orgModules],
+  );
 
   // map preferred module to routes for dashboard & organisation
   const dashboardRoute =
     preferredModule === "dms"
       ? "/dms"
       : preferredModule === "ams"
-      ? "/ams/dashboard"
-      : preferredModule === "wms"
-      ? "/wms/dashboard"
-      : "/dashboard"; // fallback
+        ? "/ams/dashboard"
+        : preferredModule === "wms"
+          ? "/wms/dashboard"
+          : "/dashboard"; // fallback
 
   const organisationRoute =
     preferredModule === "dms"
       ? "/dms/organisation"
       : preferredModule === "ams"
-      ? "/dms/organisation"
-      : preferredModule === "wms"
-      ? "/dms/organisation"
-      : "/organisation";
+        ? "/dms/organisation"
+        : preferredModule === "wms"
+          ? "/dms/organisation"
+          : "/organisation";
 
   const linkClasses = (path) =>
     `font-semibold no-underline flex items-center px-1 py-1 rounded-md ${
@@ -80,24 +87,24 @@ const SidebarHeader = ({ collapsed, onToggle }) => {
   return (
     <div className="sidebar-header">
       <div className="flex flex-col items-start p-4 border-b border-gray-200">
-       <div className="flex items-center justify-between w-full">
- <div className="sidebar-logo-wrapper">
-  <img
-    src="https://res.cloudinary.com/dfm1xhhwx/image/upload/v1763008447/Aumlogo_gvleis.jpg"
-    alt="Logo"
-    className={`sidebar-logo ${collapsed ? "collapsed" : ""}`}
-  />
-</div>
+        <div className="flex items-center gap-2 w-full">
+          <Tooltip title="Back to Organisations" placement="right">
+            <button
+              onClick={() => navigate("/organizations")}
+              className="p-2 rounded-md hover:bg-amber-100 text-amber-800"
+            >
+              <ArrowLeftOutlined />
+            </button>
+          </Tooltip>
 
-
-          {/* <button
-            onClick={onToggle}
-            className="p-2 rounded-md hover:bg-amber-100 text-amber-800"
-          >
-            {collapsed ? <RightOutlined /> : <LeftOutlined />}
-          </button> */}
+          <div className="sidebar-logo-wrapper">
+            <img
+              src="https://res.cloudinary.com/dfm1xhhwx/image/upload/v1763008447/Aumlogo_gvleis.jpg"
+              alt="Logo"
+              className={`sidebar-logo ${collapsed ? "collapsed" : ""}`}
+            />
+          </div>
         </div>
-
 
         <div className="flex gap-2 mt-4 sidebar-header-tab">
           <NavLink
@@ -222,10 +229,17 @@ const SidebarMenu = ({ collapsed }) => {
     if (item.module) {
       // safe-check: normalize orgModules to uppercase if it's an array of strings/objects
       const modulesNormalized = Array.isArray(orgModules)
-        ? orgModules.map((m) => (typeof m === "string" ? m.toUpperCase() : (m.key || m.module || m.name || "").toUpperCase()))
+        ? orgModules.map((m) =>
+            typeof m === "string"
+              ? m.toUpperCase()
+              : (m.key || m.module || m.name || "").toUpperCase(),
+          )
         : [];
 
-      if (modulesNormalized.length > 0 && !modulesNormalized.includes(item.module.toUpperCase())) {
+      if (
+        modulesNormalized.length > 0 &&
+        !modulesNormalized.includes(item.module.toUpperCase())
+      ) {
         return false;
       }
     }
@@ -238,7 +252,9 @@ const SidebarMenu = ({ collapsed }) => {
     // check if user has permission to this module
     if (item.required) {
       const modulePermission = Array.isArray(user?.permissions)
-        ? user.permissions.find((p) => (p.module || "").toLowerCase() === item.module)
+        ? user.permissions.find(
+            (p) => (p.module || "").toLowerCase() === item.module,
+          )
         : user?.permissions?.[item.module?.toUpperCase?.()] || null;
 
       if (!modulePermission) {
@@ -246,7 +262,8 @@ const SidebarMenu = ({ collapsed }) => {
       }
 
       // support both object submodules or map of flags
-      const subs = modulePermission?.submodules || modulePermission?.submodule || {};
+      const subs =
+        modulePermission?.submodules || modulePermission?.submodule || {};
       if (Array.isArray(subs)) {
         return subs.includes(item.required);
       }
@@ -276,28 +293,26 @@ const SidebarMenu = ({ collapsed }) => {
       "
     >
       {menuItems.map((item) =>
-          item.isSection ? (
-      !collapsed && (
-        <div
-          key={item.label}
-          className="px-4 py-2 text-amber-800 font-semibold text-sm"
-        >
-          {item.label}
-        </div>
-      )
-    ) : (
-         <Menu.Item key={item.key} icon={item.icon}>
-          <NavLink
-            to={item.path}
-            className="sidebar-menu-link"
-          >
-            <span className={`sidebar-menu-label ${collapsed ? "hidden" : ""}`}>
+        item.isSection ? (
+          !collapsed && (
+            <div
+              key={item.label}
+              className="px-4 py-2 text-amber-800 font-semibold text-sm"
+            >
               {item.label}
-            </span>
-          </NavLink>
-        </Menu.Item>
-
-        )
+            </div>
+          )
+        ) : (
+          <Menu.Item key={item.key} icon={item.icon}>
+            <NavLink to={item.path} className="sidebar-menu-link">
+              <span
+                className={`sidebar-menu-label ${collapsed ? "hidden" : ""}`}
+              >
+                {item.label}
+              </span>
+            </NavLink>
+          </Menu.Item>
+        ),
       )}
     </Menu>
   );
@@ -320,16 +335,11 @@ const Sidebar = ({ collapsed, onToggle }) => {
       </div>
 
       {/* Toggle Button (CENTERED) */}
-      <button
-        onClick={onToggle}
-        className="sidebar-toggle-center"
-      >
+      <button onClick={onToggle} className="sidebar-toggle-center">
         {collapsed ? <RightOutlined /> : <LeftOutlined />}
       </button>
     </aside>
   );
 };
-
-
 
 export default Sidebar;
