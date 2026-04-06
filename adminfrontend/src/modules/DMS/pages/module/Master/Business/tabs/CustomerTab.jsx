@@ -58,7 +58,7 @@ import {
   deleteDraft,
   deserialiseDraftValues,
   getAllCustomerDrafts,
-} from "../../../../../../../utils/Customerdraftutils";
+} from "../../../../../../../utils/customerDraftUtils";
 import DraftTable from "./DraftTable";
 
 const { Option } = Select;
