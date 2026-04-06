@@ -18,7 +18,7 @@ import {
 import {
   getAllCustomerDrafts,
   deleteDraft,
-} from "../../../../../../../utils/Customerdraftutils";
+} from "../../../../../../../utils/customerDraftUtils";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 
