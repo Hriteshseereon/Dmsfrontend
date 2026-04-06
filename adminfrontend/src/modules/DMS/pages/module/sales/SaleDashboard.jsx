@@ -1,5 +1,4 @@
-// SaleDashboard.jsx
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Card, Row, Col, Tag, Space } from "antd";
 import {
   FileTextOutlined,
@@ -21,99 +20,99 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-
 import { useNavigate } from "react-router-dom";
-// 🔹 JSON Data
-const saleDashboardJSON = {
-  topCards: [
+import { getDashboardData } from "../../../../../api/sales";
+
+// Amber palette
+const COLORS = ["#d97706", "#f59e0b", "#fbbf24", "#fcd34d"];
+
+export default function SalesDashboard() {
+  const navigate = useNavigate();
+  const [apiData, setApiData] = useState(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await getDashboardData();
+        setApiData(data);
+      } catch (err) {
+        console.error("Dashboard API error", err);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (!apiData) return <div>Loading...</div>;
+
+  const statusColors = {
+  Pending: "gold",
+  "Pending Approval": "orange",
+  Dispatched: "blue",
+  Rejected: "red",
+  Approved: "green",
+  "Partially Delivered": "cyan",
+  "Out for Delivery": "geekblue",
+  "In-Transit": "purple",
+  Delivered: "success",
+};
+  // ===== TOP CARDS =====
+  const topCards = [
     {
-      title: "Total Sale Contracts",
-      value: 150,
+      title: "Total Contracts",
+      value: apiData?.cards?.total_contracts ?? 0,
       icon: <FileTextOutlined className="text-amber-700 text-2xl" />,
       path: "/dms/sales/souda",
     },
-    {
-      title: "Total Sale Invoice",
-      value: 95,
-      icon: <DollarOutlined className="text-amber-700 text-2xl" />,
-      path: "/dms/sales/orders",
-    },
-    {
-      title: "Pending Orders",
-      value: 20,
+       {
+      title: "Total Orders",
+      value: apiData?.cards?.total_orders ?? 0,
       icon: <ShoppingCartOutlined className="text-amber-700 text-2xl" />,
       path: "/dms/sales/orders",
     },
     {
-      title: "Sale Returns",
-      value: 7,
+      title: "Total Invoice",
+      value: apiData?.cards?.total_invoices ?? 0,
+      icon: <DollarOutlined className="text-amber-700 text-2xl" />,
+      path: "/dms/sales/saleinvoice",
+    },
+ 
+    {
+      title: "Total Dispute",
+      value: apiData?.cards?.total_returns ?? 0,
       icon: <ReloadOutlined className="text-amber-700 text-2xl" />,
       path: "/dms/sales/dispute",
     },
-  ],
-  contractsData: [
-    { name: "Jan", value: 12 },
-    { name: "Feb", value: 20 },
-    { name: "Mar", value: 25 },
-    { name: "Apr", value: 22 },
-    { name: "May", value: 40 },
-    { name: "Jun", value: 30 },
-    { name: "Jul", value: 24 },
-  ],
-  ordersData: [
-    { name: "Jan", orders: 20 },
-    { name: "Feb", orders: 30 },
-    { name: "Mar", orders: 32 },
-    { name: "Apr", orders: 35 },
-    { name: "May", orders: 45 },
-    { name: "Jun", orders: 38 },
-    { name: "Jul", orders: 42 },
-  ],
-  returnData: [
-    { name: "Damaged", value: 3 },
-    { name: "Expired", value: 2 },
-    { name: "Wrong Item", value: 1 },
-    { name: "Other Reasons", value: 4 },
-  ],
-  COLORS: ["#d97706", "#f59e0b", "#fbbf24", "#fcd34d"],
-  quickActions: [
-    {
-      title: "Sale Order #567",
-      subtitle: "Due Today",
-      tag: "Pending",
-      tagColor: "red",
-    },
-    {
-      title: "Shipment #789",
-      subtitle: "Expected: 03-Oct-2025",
-      tag: "Nearby",
-      tagColor: "red",
-    },
-    {
-      title: "Invoice #234",
-      subtitle: "Due in 2 days",
-      tag: "Payment Pending",
-      tagColor: "red",
-    },
-    {
-      title: "Delivery #321",
-      subtitle: "Location: Nearby Warehouse",
-      tag: "Nearby",
-      tagColor: "red",
-    },
-  ],
-};
+  ];
 
-export default function SaleDashboard() {
-  const navigate = useNavigate();
-  const {
-    topCards,
-    contractsData,
-    ordersData,
-    returnData,
-    COLORS,
-    quickActions,
-  } = saleDashboardJSON;
+  // ===== CHART DATA =====
+  const contractsData =
+    apiData?.graphs?.contracts?.map((item) => ({
+      name: item.month,
+      value: item.count,
+    })) || [];
+
+  const ordersData =
+    apiData?.graphs?.orders?.map((item) => ({
+      name: item.month,
+      orders: item.count,
+    })) || [];
+
+  // ===== PIE DATA =====
+  const returnData = Object.entries(apiData?.pie_chart || {}).map(
+    ([key, value]) => ({
+      name: key,
+      value: value,
+    })
+  );
+
+  // ===== QUICK ACTIONS =====
+  const quickActions =
+    apiData?.quick_actions?.loading_advice?.map((item) => ({
+      title: item.status,
+      subtitle: `${item.count} items`,
+      tag: item.status,
+    })) || [];
 
   return (
     <div className="p-2">
@@ -121,10 +120,15 @@ export default function SaleDashboard() {
       <Row gutter={16} className="mb-2 flex flex-wrap">
         {topCards.map((card, index) => (
           <Col key={index} flex="1" className="mb-4">
-            <Card className="p-1! h-full! border-1! border-amber-500! bg-amber-50! hover:shadow-lg! cursor-pointer!" onClick={() => navigate(card.path)}>
+            <Card
+              className="p-1! h-full! border-1! border-amber-500! bg-amber-50! hover:shadow-md! cursor-pointer!"
+              onClick={() => card.path && navigate(card.path)}
+            >
               <div className="flex items-center text-amber-800 mb-3 gap-3">
                 {card.icon}
-                <p className="text-amber-800 text-md m-0">{card.title}</p>
+                <p className="text-amber-800 text-md m-0">
+                  {card.title}
+                </p>
               </div>
               <h2 className="text-3xl text-amber-700 font-bold m-0">
                 {card.value}
@@ -140,7 +144,7 @@ export default function SaleDashboard() {
           <Card
             title={
               <span className="text-amber-700 font-bold">
-                Sale Contracts Evolution
+                Sales Contracts Evolution
               </span>
             }
           >
@@ -160,11 +164,12 @@ export default function SaleDashboard() {
             </ResponsiveContainer>
           </Card>
         </Col>
+
         <Col span={12}>
           <Card
             title={
               <span className="text-amber-700 font-bold">
-                Sale Invoices Evolution
+                Sales Orders Evolution
               </span>
             }
           >
@@ -188,11 +193,11 @@ export default function SaleDashboard() {
 
       {/* PieChart + Quick Actions */}
       <Row gutter={16} className="mb-6">
-        <Col span={12}>
-          <Card
+        <Col span={12} className="flex">
+          <Card className="h-full flex flex-col"
             title={
               <span className="text-amber-700 font-bold">
-                Sale Returns Breakdown
+                Sales Returns Breakdown
               </span>
             }
           >
@@ -223,43 +228,55 @@ export default function SaleDashboard() {
                 <div key={index} className="flex items-center">
                   <div
                     className="w-3 h-3 rounded-full mr-2"
-                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                    style={{
+                      backgroundColor: COLORS[index % COLORS.length],
+                    }}
                   />
-                  <span className="text-amber-800 text-sm">{entry.name}</span>
+                  <span className="text-amber-800 text-sm">
+                    {entry.name}
+                  </span>
                 </div>
               ))}
             </div>
           </Card>
         </Col>
-
-        <Col span={12}>
-          <Card
-            title={
-              <span className="text-amber-700 font-bold">Quick Action</span>
-            }
+<Col span={12} className="flex">
+  <Card
+    className="h-full flex flex-col"
+    title={
+      <span className="text-amber-700 font-bold">
+     Order Status Overview
+      </span>
+    }
+  >
+    <div className="flex-1 overflow-y-auto max-h-[260px]">
+      <Space direction="vertical" className="w-full">
+        {quickActions.map((action, index) => (
+          <div
+            key={index}
+            className={`flex justify-between items-center py-2 px-3 ${
+              index !== quickActions.length - 1
+                ? "border-b border-amber-200"
+                : ""
+            }`}
           >
-            <Space direction="vertical" className="w-full">
-              {quickActions.map((action, idx) => (
-                <div
-                  key={idx}
-                  className={`flex justify-between items-center py-2 px-3 ${
-                    idx !== quickActions.length - 1
-                      ? "border-b border-amber-200"
-                      : ""
-                  }`}
-                >
-                  <div>
-                    <p className="font-medium text-sm m-0">{action.title}</p>
-                    <p className="text-xs text-red-500 m-0">
-                      {action.subtitle}
-                    </p>
-                  </div>
-                  <Tag color={action.tagColor}>{action.tag}</Tag>
-                </div>
-              ))}
-            </Space>
-          </Card>
-        </Col>
+            <div >
+                          <p className="font-medium text-amber-700 text-sm m-0">
+              {action.subtitle}
+                            </p>
+            </div>
+             <p className="font-medium text-amber-700 text-sm m-0">
+               <Tag color={statusColors[action.tag] || "default"}>
+  {action.tag}
+</Tag>
+              </p>
+          
+          </div>
+        ))}
+      </Space>
+    </div>
+  </Card>
+</Col>
       </Row>
     </div>
   );

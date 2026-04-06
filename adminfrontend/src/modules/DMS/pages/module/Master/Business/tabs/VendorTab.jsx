@@ -32,6 +32,14 @@ import {
   updateVendor,
   getVendorDetailsByid,
 } from "../../../../../../../api/bussinesspatnr";
+import {
+  getCountryOptions,
+  getStateOptions,
+  getDistrictOptions,
+  getCityOptions,
+  getCountryIsoByName,
+  getStateIsoByName,
+} from "../../../../../../../utils/locationHelper";
 
 const { Option } = Select;
 import { API_BASE_URL } from "@/utils/config";
@@ -62,7 +70,9 @@ export default function VendorTab() {
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState(false);
   const [selected, setSelected] = useState(null);
-
+  const [selCountryIso, setSelCountryIso] = useState("IN");
+  const [selStateName, setSelStateName] = useState(null);
+  const [selStateIso, setSelStateIso] = useState(null);
   const [form] = Form.useForm();
 
   /* ================= FETCH ================= */
@@ -96,6 +106,32 @@ export default function VendorTab() {
       },
     ];
   };
+  // handler for rendering the city state and district
+  const handleCountryChange = (isoCode, option) => {
+    setSelCountryIso(isoCode);
+    setSelStateName(null);
+    setSelStateIso(null);
+    form.setFieldsValue({
+      country: option.label,
+      state: undefined,
+      district: undefined,
+      city: undefined,
+    });
+  };
+
+  const handleStateChange = (isoCode, option) => {
+    setSelStateName(option.label);
+    setSelStateIso(isoCode);
+    form.setFieldsValue({
+      state: option.label,
+      district: undefined,
+      city: undefined,
+    });
+  };
+
+  const handleDistrictChange = () => {
+    form.setFieldsValue({ city: undefined });
+  };
 
   /* ================= MAP API → FORM ================= */
   const mapDetailsToForm = (d) => ({
@@ -115,7 +151,7 @@ export default function VendorTab() {
       d.contact_person_input?.name ||
       d.contact_person_input?.contact_person_name ||
       d.contact_person,
-    gender: d.contact_person_input?.gender || d.gender,
+    gender: d.contact_person_details?.gender || d.gender,
     contactMobile:
       d.contact_person_input?.contact_person_no ||
       d.contact_person_input?.mobile_no ||
@@ -145,11 +181,13 @@ export default function VendorTab() {
       ? dayjs(d.business_details.tin_date)
       : null,
     panNo: d.business_details?.pan || d.business_details?.pan_no,
+    fssaiNo: d.business_details?.fssai_no,
     gstIn: d.business_details?.gstin || d.business_details?.gstin_no,
     igstApplicable: d.business_details?.igst_applicable ? "Yes" : "No",
 
     address1: d.addresses?.[0]?.address_line1 || d.addresses?.address_line_1,
     address2: d.addresses?.[0]?.address_line2 || d.addresses?.address_line_2,
+    country: d.addresses?.[0]?.country || "India",
     state: d.addresses?.[0]?.state || d.addresses?.state,
     district: d.addresses?.[0]?.district || d.addresses?.district,
     city: d.addresses?.[0]?.city || d.addresses?.city,
@@ -182,6 +220,7 @@ export default function VendorTab() {
       address: p.address,
       phoneNo: p.phone_number || p.phone_no,
       email: p.email_address || p.email,
+      country: p.country || "India",
       state: p.state,
       district: p.district,
       city: p.city,
@@ -234,6 +273,7 @@ export default function VendorTab() {
         {
           address_line1: values.address1,
           address_line2: values.address2,
+          country: values.country,
           state: values.state,
           district: values.district,
           city: values.city,
@@ -247,6 +287,7 @@ export default function VendorTab() {
         name: p.plantName,
         address: p.address,
         fax_no: p.faxNo,
+        country: p.country,
         state: p.state,
         city: p.city,
         district: p.district,
@@ -263,6 +304,7 @@ export default function VendorTab() {
           ? dayjs(values.tinDate).format("YYYY-MM-DD")
           : null,
         igst_applicable: values.igstApplicable === "Yes",
+        fssai_no: values.fssaiNo,
       },
     };
 
@@ -305,6 +347,24 @@ export default function VendorTab() {
     }
   };
 
+  const getFilteredData = () => {
+    if (!search) return data;
+
+    const value = search.toLowerCase();
+
+    return data.filter((item) => {
+      return Object.values(item).some((val) => {
+        if (!val) return false;
+
+        // convert everything safely to string
+        return JSON.stringify(val).toLowerCase().includes(value);
+      });
+    });
+  };
+
+  const handleReset = () => {
+    setSearch("");
+  };
   /* ================= TABLE ================= */
   const columns = [
     {
@@ -362,10 +422,7 @@ export default function VendorTab() {
     },
   ];
 
-  const filteredData = data.filter((v) =>
-    (v.name || v.company_name)?.toLowerCase().includes(search.toLowerCase()),
-  );
-
+  const filteredData = getFilteredData();
   /* ================= UI ================= */
   return (
     <>
@@ -383,10 +440,7 @@ export default function VendorTab() {
           />
           <Button
             icon={<ReloadOutlined />}
-            onClick={() => {
-              setSearch("");
-              fetchVendors();
-            }}
+            onClick={handleReset}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Reset
@@ -896,6 +950,15 @@ export default function VendorTab() {
                 </Form.Item>
               </Col>
 
+              <Col span={4}>
+                <Form.Item label="FSSAI No" name="fssaiNo">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter FSSAI Number"
+                  />
+                </Form.Item>
+              </Col>
               {/* <Col span={4}>
                 <Form.Item label="IGST Applicable" name="igstApplicable">
                   <Select
@@ -944,37 +1007,29 @@ export default function VendorTab() {
               </Col>
               <Col span={4}>
                 <Form.Item
-                  label="City"
-                  name="city"
-                  rules={[
-                    {
-                      pattern: /^[a-zA-Z\s]+$/,
-                      message: "Only letters and spaces are allowed",
-                    },
-                  ]}
+                  label="Country"
+                  name="country"
+                  rules={[{ required: true, message: "Please select country" }]}
+                  initialValue="India"
                 >
-                  <Input
-                    className={inputClass}
+                  <Select
+                    className={selectClass}
                     disabled={viewMode}
-                    placeholder="Enter City"
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={4}>
-                <Form.Item
-                  label="District"
-                  name="district"
-                  rules={[
-                    {
-                      pattern: /^[a-zA-Z\s]+$/,
-                      message: "Only letters and spaces are allowed",
-                    },
-                  ]}
-                >
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter District"
+                    showSearch
+                    optionFilterProp="label"
+                    options={getCountryOptions()}
+                    onChange={(isoCode, option) => {
+                      setSelCountryIso(isoCode);
+                      setSelStateName(null);
+                      setSelStateIso(null);
+
+                      form.setFieldsValue({
+                        country: option.label,
+                        state: undefined,
+                        district: undefined,
+                        city: undefined,
+                      });
+                    }}
                   />
                 </Form.Item>
               </Col>
@@ -982,25 +1037,60 @@ export default function VendorTab() {
                 <Form.Item
                   label="State"
                   name="state"
-                  rules={[
-                    {
-                      pattern: /^[a-zA-Z\s]+$/,
-                      message: "Only letters and spaces are allowed",
-                    },
-                  ]}
+                  rules={[{ required: true }]}
                 >
-                  <Input
-                    className={inputClass}
+                  <Select
+                    className={selectClass}
                     disabled={viewMode}
-                    placeholder="Enter State"
+                    placeholder="Select state"
+                    showSearch
+                    optionFilterProp="label"
+                    value={selStateIso}
+                    options={getStateOptions("IN")}
+                    onChange={handleStateChange}
                   />
                 </Form.Item>
               </Col>
               <Col span={4}>
                 <Form.Item
+                  label="District"
+                  name="district"
+                  rules={[{ required: true }]}
+                >
+                  <Select
+                    className={selectClass}
+                    disabled={viewMode || !selStateName}
+                    placeholder="Select district"
+                    showSearch
+                    optionFilterProp="label"
+                    options={getDistrictOptions(selStateName)}
+                    onChange={handleDistrictChange}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item
+                  label="City"
+                  name="city"
+                  rules={[{ required: true }]}
+                >
+                  <Select
+                    className={selectClass}
+                    disabled={viewMode || !selStateIso}
+                    placeholder="Select city"
+                    showSearch
+                    optionFilterProp="label"
+                    options={getCityOptions("IN", selStateIso)}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item
                   label="Google Location"
                   name="location"
-                  rules={[{ required: true }]}
+                  // rules={[{ required: true }]}
                 >
                   <Input
                     className={inputClass}
@@ -1075,7 +1165,7 @@ export default function VendorTab() {
               </Col>
             </Row>
           </Card>
-          {/* <div className="max-h-60 overflow-y-auto pr-2 mb-4">
+          <div className="max-h-60 overflow-y-auto pr-2 mb-4">
             <Form.List name="plants">
               {(fields, { add, remove }) => (
                 <>
@@ -1168,16 +1258,64 @@ export default function VendorTab() {
                             />
                           </Form.Item>
                         </Col>
-
+                        <Col span={4}>
+                          <Form.Item
+                            {...restField}
+                            name={[name, "country"]}
+                            label="Country"
+                            initialValue="India"
+                            rules={[
+                              { required: true, message: "Select Country" },
+                            ]}
+                          >
+                            <Select
+                              showSearch
+                              optionFilterProp="label"
+                              options={getCountryOptions()}
+                              onChange={(isoCode, option) => {
+                                const plants =
+                                  form.getFieldValue("plants") || [];
+                                plants[name] = {
+                                  ...plants[name],
+                                  country: option.label,
+                                  state: undefined,
+                                  district: undefined,
+                                  city: undefined,
+                                  stateIso: null,
+                                };
+                                form.setFieldsValue({ plants });
+                              }}
+                              disabled={viewMode}
+                            />
+                          </Form.Item>
+                        </Col>
                         <Col span={4}>
                           <Form.Item
                             {...restField}
                             name={[name, "state"]}
                             label="State"
+                            rules={[
+                              { required: true, message: "Select State" },
+                            ]}
                           >
-                            <Input
+                            <Select
+                              showSearch
+                              placeholder="Select State"
+                              optionFilterProp="label"
+                              options={getStateOptions("IN")}
+                              onChange={(isoCode, option) => {
+                                const plants =
+                                  form.getFieldValue("plants") || [];
+                                plants[name] = {
+                                  ...plants[name],
+                                  state: option.label,
+                                  district: undefined,
+                                  city: undefined,
+                                  stateIso: isoCode,
+                                };
+                                form.setFieldsValue({ plants });
+                              }}
                               disabled={viewMode}
-                              placeholder="Enter State"
                             />
                           </Form.Item>
                         </Col>
@@ -1188,12 +1326,29 @@ export default function VendorTab() {
                             name={[name, "district"]}
                             label="District"
                             rules={[
-                              { required: true, message: "Missing district" },
+                              { required: true, message: "Select District" },
                             ]}
                           >
-                            <Input
-                              disabled={viewMode}
-                              placeholder="Enter District"
+                            <Select
+                              showSearch
+                              placeholder="Select District"
+                              optionFilterProp="label"
+                              disabled={
+                                viewMode ||
+                                !form.getFieldValue(["plants", name, "state"])
+                              }
+                              options={getDistrictOptions(
+                                form.getFieldValue(["plants", name, "state"]),
+                              )}
+                              onChange={() => {
+                                const plants =
+                                  form.getFieldValue("plants") || [];
+                                plants[name] = {
+                                  ...plants[name],
+                                  city: undefined,
+                                };
+                                form.setFieldsValue({ plants });
+                              }}
                             />
                           </Form.Item>
                         </Col>
@@ -1203,10 +1358,28 @@ export default function VendorTab() {
                             {...restField}
                             name={[name, "city"]}
                             label="City"
+                            rules={[{ required: true, message: "Select City" }]}
                           >
-                            <Input
-                              disabled={viewMode}
-                              placeholder="Enter City"
+                            <Select
+                              showSearch
+                              placeholder="Select City"
+                              optionFilterProp="label"
+                              disabled={
+                                viewMode ||
+                                !form.getFieldValue([
+                                  "plants",
+                                  name,
+                                  "stateIso",
+                                ])
+                              }
+                              options={getCityOptions(
+                                "IN",
+                                form.getFieldValue([
+                                  "plants",
+                                  name,
+                                  "stateIso",
+                                ]),
+                              )}
                             />
                           </Form.Item>
                         </Col>
@@ -1232,7 +1405,7 @@ export default function VendorTab() {
                           </Form.Item>
                         </Col>
 
-                        <Col span={4}>
+                        {/* <Col span={4}>
                           <Form.Item
                             {...restField}
                             name={[name, "faxNo"]}
@@ -1243,7 +1416,7 @@ export default function VendorTab() {
                               placeholder="Enter Fax No"
                             />
                           </Form.Item>
-                        </Col>
+                        </Col> */}
                       </Row>
                     </Card>
                   ))}
@@ -1264,7 +1437,7 @@ export default function VendorTab() {
                 </>
               )}
             </Form.List>
-          </div> */}
+          </div>
 
           {/* ===== FOOTER ACTIONS ===== */}
           {!viewMode && (

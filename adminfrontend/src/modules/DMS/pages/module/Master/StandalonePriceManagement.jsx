@@ -49,17 +49,13 @@ export default function StandalonePriceManagement() {
         `}
       </style>
 
-      <Card
-        className="bg-amber-50"
-        title="Price Management"
-        loading={loading}
-      >
+     
         <PriceManagementTab
           items={items}
           selectedItem={selectedItem}
           setSelectedItem={setSelectedItem}
         />
-      </Card>
+    
     </div>
   );
 }

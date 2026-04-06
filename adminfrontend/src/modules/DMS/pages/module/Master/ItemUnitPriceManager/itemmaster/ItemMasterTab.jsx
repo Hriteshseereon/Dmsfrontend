@@ -11,11 +11,17 @@ import {
   Space,
   message,
 } from "antd";
-import { PlusOutlined, EditOutlined, EyeOutlined } from "@ant-design/icons";
+import {
+  PlusOutlined,
+  EditOutlined,
+  EyeOutlined,
+  SearchOutlined,
+} from "@ant-design/icons";
 
 import {
   getProductGroups,
   getHSNSACCodes,
+  getSACCodes,
   getVendors,
   addproduct,
   getProducts, // ✅ FIX 1
@@ -49,26 +55,35 @@ export default function ItemMasterTab({ items, setItems }) {
   const [units, setUnits] = useState([]);
   const [groups, setGroups] = useState([]);
   const [vendors, setVendors] = useState([]);
-  const [hsnSacCodes, setHsnSacCodes] = useState([]);
+  const [hsnSacCodes, setHsnSacCodes] = useState({
+    hsn: [],
+    sac: [],
+  });
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     gstPercent: 0,
     cgstPercent: 0,
     sgstPercent: 0,
+    net_weight: 0,      
+    gross_weight: 0,  
   });
-
+  const [search, setSearch] = useState("");
   /* ================= LOAD MASTER DATA ================= */
   useEffect(() => {
     Promise.all([
       getProductGroups(),
       getVendors(),
       getHSNSACCodes(),
+      getSACCodes(),
       getUnits(),
     ])
-      .then(([g, v, h, u]) => {
+      .then(([g, v, hsn, sac, u]) => {
         setGroups(g);
         setVendors(v);
-        setHsnSacCodes(h);
+        setHsnSacCodes({
+          hsn: hsn,
+          sac: sac,
+        });
         setUnits(u);
       })
       .catch(() => message.error("Failed to load master data"));
@@ -107,6 +122,8 @@ export default function ItemMasterTab({ items, setItems }) {
         cgstPercent: Number(data.gst_percentage) / 2,
         sgstPercent: Number(data.gst_percentage) / 2,
         currentStock: Number(data.current_stock),
+        net_weight: Number(data.net_weight) || 0,
+        gross_weight: Number(data.gross_weight) || 0,
       });
 
       setViewMode(view);
@@ -123,20 +140,21 @@ export default function ItemMasterTab({ items, setItems }) {
     if (
       !formData.itemName ||
       !formData.product_group ||
-      !formData.hsn_code ||
       !formData.base_unit_group ||
       !formData.itemType ||
+      !formData.company ||
       !formData.itemCategory ||
-      !formData.company
+      (formData.itemCategory === "GOODS" && !formData.hsn_code) ||
+      (formData.itemCategory === "SERVICE" && !formData.sac_code)
     ) {
       message.error("Please fill all required fields");
       return;
     }
-
+console.log("Submitting", formData);
     const payload = {
       name: formData.itemName,
       product_group: formData.product_group,
-      hsn_code: formData.hsn_code,
+      hsn_code: formData.itemCategory === "GOODS" ? formData.hsn_code : null,
       sac_code: formData.itemCategory === "SERVICE" ? formData.sac_code : null,
       base_unit_group: formData.base_unit_group,
       product_type: formData.itemType,
@@ -146,6 +164,8 @@ export default function ItemMasterTab({ items, setItems }) {
       sgst: formData.sgstPercent,
       current_stock: formData.currentStock || 0,
       vendor: formData.company,
+       net_weight: formData.net_weight,     
+       gross_weight: formData.gross_weight,
     };
 
     try {
@@ -181,6 +201,8 @@ export default function ItemMasterTab({ items, setItems }) {
     { title: "Type", dataIndex: "product_type" },
     { title: "Company", dataIndex: "vendor_name" },
     { title: "Base Unit", dataIndex: "base_unit" },
+    { title: "Net Weight", dataIndex: "net_weight" },
+    { title: "Gross Weight", dataIndex: "gross_weight" },
     {
       title: "Action",
       render: (_, r) => (
@@ -194,6 +216,20 @@ export default function ItemMasterTab({ items, setItems }) {
       ),
     },
   ];
+
+  const getFilteredData = () => {
+    if (!search) return items;
+
+    const value = search.toLowerCase();
+
+    return items.filter((item) => {
+      return Object.values(item).some((val) => {
+        if (!val) return false;
+        return JSON.stringify(val).toLowerCase().includes(value);
+      });
+    });
+  };
+  const filteredData = getFilteredData();
 
   return (
     <>
@@ -269,17 +305,43 @@ export default function ItemMasterTab({ items, setItems }) {
       <div
         style={{
           display: "flex",
-          justifyContent: "flex-end",
+          justifyContent: "space-between",
           marginBottom: 10,
         }}
       >
+        {/* LEFT: SEARCH */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <Input
+            prefix={<SearchOutlined className="text-amber-500" />}
+            placeholder="Search item..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            allowClear
+            style={{ width: 250 }}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          />
+
+          <Button
+            onClick={() => setSearch("")}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
+            Reset
+          </Button>
+        </div>
+
+        {/* RIGHT: ADD BUTTON */}
         <Button
           className="amber-add-btn"
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => {
-            setFormData({ gstPercent: 0, cgstPercent: 0, sgstPercent: 0 });
-            setEditingId(null);
+setFormData({
+  gstPercent: 0,
+  cgstPercent: 0,
+  sgstPercent: 0,
+  net_weight: 0,
+  gross_weight: 0,
+});  setEditingId(null);
             setViewMode(false);
             setOpen(true);
           }}
@@ -292,7 +354,7 @@ export default function ItemMasterTab({ items, setItems }) {
         className="amber-table"
         rowKey="id"
         columns={columns}
-        dataSource={items}
+        dataSource={filteredData}
         style={{ marginTop: 16 }}
       />
 
@@ -397,8 +459,8 @@ export default function ItemMasterTab({ items, setItems }) {
                     setFormData({
                       ...formData,
                       itemCategory: value,
-                      hsnCode: "",
-                      sacCode: "",
+                      hsnCode: null,
+                      sacCode: null,
                     })
                   }
                 >
@@ -412,41 +474,40 @@ export default function ItemMasterTab({ items, setItems }) {
             </Col>
 
             <Col span={12}>
-              <FormField label="HSN Code" required>
-                <Select
-                  showSearch
-                  placeholder="Select HSN code"
-                  value={formData.hsn_code || undefined}
-                  style={{ width: "100%" }}
-                  loading={!hsnSacCodes.length}
-                  optionFilterProp="label"
-                  onChange={(value) =>
-                    setFormData({ ...formData, hsn_code: value })
-                  }
-                  options={hsnSacCodes.map((h) => ({
-                    value: h.id, // UUID sent to backend
-                    label: `${h.hsn_code} - ${h.description}`,
-                  }))}
-                />
-              </FormField>
+              {/* GOODS → HSN */}
+              {formData.itemCategory === "GOODS" && (
+                <FormField label="HSN Code" required>
+                  <Select
+                    showSearch
+                    placeholder="Select HSN code"
+                    value={formData.hsn_code || undefined}
+                    style={{ width: "100%" }}
+                    onChange={(value) =>
+                      setFormData({ ...formData, hsn_code: value })
+                    }
+                    options={hsnSacCodes.hsn.map((h) => ({
+                      value: h.id,
+                      label: `${h.hsn_code} - ${h.description}`,
+                    }))}
+                  />
+                </FormField>
+              )}
 
-              {formData.itemCategory === "services" && (
+              {/* SERVICE → SAC */}
+              {formData.itemCategory === "SERVICE" && (
                 <FormField label="SAC Code" required>
                   <Select
                     showSearch
                     placeholder="Select SAC code"
-                    value={formData.sac_code}
+                    value={formData.sac_code || undefined}
                     style={{ width: "100%" }}
                     onChange={(value) =>
                       setFormData({ ...formData, sac_code: value })
                     }
-                    optionFilterProp="label"
-                    options={hsnSacCodes
-                      .filter((i) => i.type === "SAC")
-                      .map((i) => ({
-                        value: i.id,
-                        label: `${i.code} - ${i.description}`,
-                      }))}
+                    options={hsnSacCodes.sac.map((s) => ({
+                      value: s.id,
+                      label: `${s.sac_code} - ${s.description}`,
+                    }))}
                   />
                 </FormField>
               )}
@@ -526,6 +587,33 @@ export default function ItemMasterTab({ items, setItems }) {
                 />
               </FormField>
             </Col>
+            <Col span={12}>
+  <FormField label="Net Weight">
+    <InputNumber
+      disabled={viewMode}
+      min={0}
+      style={{ width: "100%" }}
+      value={formData.net_weight}
+      onChange={(value) =>
+        setFormData({ ...formData, net_weight: value || 0 })
+      }
+    />
+  </FormField>
+</Col>
+
+<Col span={12}>
+  <FormField label="Gross Weight">
+    <InputNumber
+      disabled={viewMode}
+      min={0}
+      style={{ width: "100%" }}
+      value={formData.gross_weight}
+      onChange={(value) =>
+        setFormData({ ...formData, gross_weight: value || 0 })
+      }
+    />
+  </FormField>
+</Col>
           </Row>
         </div>
       </Modal>

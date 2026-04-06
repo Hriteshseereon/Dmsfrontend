@@ -3,109 +3,106 @@ import { Table, DatePicker, Row, Col, Card, Button } from "antd";
 import dayjs from "dayjs";
 import { FilterOutlined } from "@ant-design/icons";
 import isBetween from "dayjs/plugin/isBetween";
+import { useEffect } from "react";
+import { getCommonReport } from "../../../../../../api/reports";
 dayjs.extend(isBetween);
 const { RangePicker } = DatePicker;
 
-/* ---------------- MOCK SALE RETURN JSON ---------------- */
-const saleReturnJSON = [
-  {
-    key: 1,
-    slno: 1,
-    customerName: "Reliance Retail",
-    plantName: "Kalinga Oils Pvt Ltd",
-    returnAmount:50,
-    returnReason: "Damaged Goods",
-    returnDate: "2024-09-12",
-    status: "Approved",
-  },
-  {
-    key: 2,
-    slno: 2,
-    customerName: "Big Bazaar",
-    plantName: "Odisha Edibles",
-    returnAmount: 25,
-    returnReason: "Damaged Goods",
-    returnDate: "2024-09-26",
-    status: "Pending",
-  },
-  {
-    key: 3,
-    slno: 3,
-    customerName: "Metro Cash & Carry",
-    plantName: "Kalinga Oils Pvt Ltd",
-    returnAmount: 50,
-    returnReason: "Damaged Goods",
-    returnDate: "2024-10-08",
-    status: "Approved",
-  },
-  {
-    key: 4,
-    slno: 4,
-    customerName: "DMart",
-    plantName: "Odisha Edibles",
-    returnAmount: 20,
-    returnReason: "Damaged Goods",
-    returnDate: "2024-11-15",
-    status: "Rejected",
-  },
-];
 
 /* ---------------- COMPONENT ---------------- */
 const SaleReturn = () => {
-   const [dateRange, setDateRange] = useState(null);
-       /* ---------------- MONTH FILTER LOGIC ---------------- */
-     const filteredData = useMemo(() => {
-       if (!dateRange) return  saleReturnJSON;
-     
-       const [start, end] = dateRange;
-   
-       return saleReturnJSON.filter((rec) => {
-         const returnDate = dayjs(rec.returnDate);
-         return returnDate.isBetween(start, end, "day", "[]");
-       });
-     }, [dateRange]);
+   const [data, setData] = useState([]);
+    const [dateRange, setDateRange] = useState(null); 
+    
+    useEffect(() => {
+      fetchData();
+    }, []);
+    
+    const fetchData = async () => {
+      try {
+        const res = await getCommonReport({ type: "sales_return" }); // ✅ IMPORTANT
+    
+        const formatted = res.data.map((item, index) => ({
+          key: index,
+          dispute_number: item.dispute_number,
+          order_number:item.order_number,
+          plantName: item.vendor_name,
+          customer_name:item.customer_name,
+          plant_name:item.plant_name,
+          return_number:item.return_number,
+          return_date: item.return_date ,
+          return_amount: item.return_amount,
+          return_reason:item.return_reason,
+          status: item.status,
+        }));
+    
+        setData(formatted);
+      } catch (err) {
+        console.error(err);
+      }
+    };/* ---------------- MONTH FILTER LOGIC ---------------- */
+  const filteredData = useMemo(() => {
+    if (!dateRange) return data;
+  
+    const [start, end] = dateRange;
+  
+    return data.filter((rec) => {
+      if (!rec.return_date) return false;
+  
+      const returnDate = dayjs(rec.return_date);
+      return returnDate.isBetween(start, end, "day", "[]");
+    });
+  }, [dateRange, data]);
 
   /* ---------------- TABLE COLUMNS ---------------- */
   const columns = [
     {
-        title: <span className="text-amber-700 font-semibold">Sl No</span>,
+      title: <span className="text-amber-700 font-semibold">Dispute No</span>,
    
-      dataIndex: "slno",
+      dataIndex: "dispute_number",
+      width: 70,
+      
+          render: (t) => <span className="text-amber-800">{t}</span>,
+    },
+    {
+        title: <span className="text-amber-700 font-semibold">Order No</span>,
+   
+      dataIndex: "order_number",
       width: 70,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
        title: <span className="text-amber-700 font-semibold">Customer Name</span>,
    
-      dataIndex: "customerName",
+      dataIndex: "customer_name",
       width: 220,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
              title: <span className="text-amber-700 font-semibold">Plant Name</span>,
    
-      dataIndex: "plantName",
+      dataIndex: "plant_name",
       width: 220,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
       {
-   title: <span className="text-amber-700 font-semibold"> Return Date
+   title: <span className="text-amber-700 font-semibold"> Dispute Date
 </span>,
    
-      dataIndex: "returnDate",
+      dataIndex: "return_date",
       width: 120, 
        render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
  
     },
    {
-      title: <span className="text-amber-700 font-semibold">Return Amount</span>,
-      dataIndex: "returnAmount",  
+      title: <span className="text-amber-700 font-semibold">Dispute Amount</span>,
+      dataIndex: "return_amount",  
       width: 130,
       render: (t) => <span className="text-amber-800">{t}</span>, 
    },
    {
     title: <span className="text-amber-700 font-semibold">Return Reason</span>,
-      dataIndex: "returnReason",
+      dataIndex: "return_reason",
       width: 150,
       render: (t) => <span className="text-amber-800">{t}</span>,
 

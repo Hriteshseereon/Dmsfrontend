@@ -33,6 +33,14 @@ import {
   getproductbyVendor,
   sendBrokerPassword,
 } from "@/api/broker";
+import {
+  getCountryOptions,
+  getStateOptions,
+  getDistrictOptions,
+  getCityOptions,
+  getCountryIsoByName,
+  getStateIsoByName,
+} from "../../../../../../../utils/locationHelper";
 
 export const phoneValidator = (_, value) => {
   if (!value) return Promise.resolve(); // allow empty if not required
@@ -90,6 +98,7 @@ const buildFormData = (values) => {
   const fd = new FormData();
 
   fd.append("name", values.brokerName || "");
+  fd.append("temporary_city", values.businessName || "");
   fd.append("password", values.password || "");
   fd.append("username", values.email || values.phoneNo);
   fd.append("email", values.email);
@@ -105,13 +114,14 @@ const buildFormData = (values) => {
   fd.append("aadhar_number", values.aadharNo || "");
 
   fd.append("permanent_address_line1", values.permanent_address || "");
+  fd.append("country", values.country || ""); // ADD
   fd.append("permanent_city", values.permanent_city || "");
   fd.append("permanent_district", values.permanent_district || "");
   fd.append("permanent_state", values.permanent_state || "");
   fd.append("permanent_pin", values.permanent_pin || "");
 
   fd.append("temporary_address_line1", values.current_address || "");
-  fd.append("temporary_city", values.current_city || "");
+  // fd.append("temporary_city", values.current_city || "");
   fd.append("temporary_district", values.current_district || "");
   fd.append("temporary_state", values.current_state || "");
   fd.append("temporary_pin", values.current_pin || "");
@@ -156,6 +166,9 @@ export default function BrokerTab() {
   const [selected, setSelected] = useState(null);
   const [vendors, setVendors] = useState([]);
   const [productsMap, setProductsMap] = useState({});
+  const [selCountryIso, setSelCountryIso] = useState(null);
+  const [selStateName, setSelStateName] = useState(null);
+  const [selStateIso, setSelStateIso] = useState(null);
   const [form] = Form.useForm();
 
   const generatePassword = (length = 10) => {
@@ -190,7 +203,34 @@ export default function BrokerTab() {
     fetchBrokers();
     fetchVendors();
   }, []);
+  // handl country state district and cities
+  const handleCountryChange = (isoCode, option) => {
+    setSelCountryIso(isoCode);
+    setSelStateName(null);
+    setSelStateIso(null);
 
+    form.setFieldsValue({
+      country: option.label,
+      permanent_state: undefined,
+      permanent_district: undefined,
+      permanent_city: undefined,
+    });
+  };
+
+  const handleStateChange = (isoCode, option) => {
+    setSelStateName(option.label);
+    setSelStateIso(isoCode);
+
+    form.setFieldsValue({
+      permanent_state: option.label,
+      permanent_district: undefined,
+      permanent_city: undefined,
+    });
+  };
+
+  const handleDistrictChange = () => {
+    form.setFieldsValue({ permanent_city: undefined });
+  };
   // password send button handler
   const handleSendPassword = async (record) => {
     try {
@@ -224,7 +264,7 @@ export default function BrokerTab() {
     email: d.primary_email,
     secondaryEmail: d.secondary_email,
     status: d.is_active ? "Active" : "Inactive",
-
+    country: d.country || "India",
     permanent_address: d.permanent_address_line1,
     permanent_city: d.permanent_city,
     permanent_district: d.permanent_district,
@@ -241,7 +281,7 @@ export default function BrokerTab() {
     aadharNo: d.aadhar_number,
     bankDetails: d.bank_details,
     gstin: d.gstin,
-
+    businessName: d.temporary_city,
     panDoc: fileFromUrl(d.pan_document),
     aadharDoc: fileFromUrl(d.aadhar_document),
     gstinDoc: fileFromUrl(d.gstin_document),
@@ -264,6 +304,13 @@ export default function BrokerTab() {
         await handleVendorChange(c.vendor);
       }
       form.setFieldsValue(mapDetailsToForm(details));
+      const countryName = details.country || "India";
+      const countryIso = getCountryIsoByName(countryName);
+      const stateIso = getStateIsoByName(countryIso, details.permanent_state);
+
+      setSelCountryIso(countryIso);
+      setSelStateName(details.permanent_state);
+      setSelStateIso(stateIso);
       setSelected(details);
       setViewMode(view);
       setOpen(true);
@@ -293,7 +340,24 @@ export default function BrokerTab() {
       message.error("Save failed");
     }
   };
+  const getFilteredData = () => {
+    if (!search) return data;
 
+    const value = search.toLowerCase();
+
+    return data.filter((item) => {
+      return Object.values(item).some((val) => {
+        if (!val) return false;
+
+        // convert everything safely to string
+        return JSON.stringify(val).toLowerCase().includes(value);
+      });
+    });
+  };
+
+  const handleReset = () => {
+    setSearch("");
+  };
   /* ================= TABLE ================= */
   const columns = [
     {
@@ -354,9 +418,7 @@ export default function BrokerTab() {
     },
   ];
 
-  const filteredData = data.filter((b) =>
-    b.name?.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filteredData = getFilteredData();
 
   /* ================= UI ================= */
   return (
@@ -374,10 +436,7 @@ export default function BrokerTab() {
           />
           <Button
             icon={<ReloadOutlined />}
-            onClick={() => {
-              setSearch("");
-              fetchBrokers();
-            }}
+            onClick={handleReset}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Reset
@@ -393,8 +452,12 @@ export default function BrokerTab() {
             setViewMode(false);
             form.resetFields();
             const autoPassword = generatePassword();
+            const countryIso = getCountryIsoByName("India");
+
+            setSelCountryIso(countryIso);
             form.setFieldsValue({
               password: autoPassword,
+              country: "India",
             });
             setOpen(true);
           }}
@@ -607,55 +670,71 @@ export default function BrokerTab() {
               </Col>
               <Col span={4}>
                 <Form.Item
-                  label="City"
-                  name="permanent_city"
-                  rules={[
-                    {
-                      pattern: /^[a-zA-Z\s]+$/,
-                      message: "Only letters and spaces are allowed",
-                    },
-                  ]}
+                  label="Country"
+                  name="country"
+                  rules={[{ required: true, message: "Select country" }]}
                 >
-                  <Input
-                    className={inputClass}
+                  <Select
+                    className={selectClass}
                     disabled={viewMode}
-                    placeholder="Enter city"
+                    options={getCountryOptions()}
+                    onChange={handleCountryChange}
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select Country"
                   />
                 </Form.Item>
               </Col>
-              <Col span={4}>
-                <Form.Item
-                  label="District"
-                  name="permanent_district"
-                  rules={[
-                    {
-                      pattern: /^[a-zA-Z\s]+$/,
-                      message: "Only letters and spaces are allowed",
-                    },
-                  ]}
-                >
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter district"
-                  />
-                </Form.Item>
-              </Col>
+
               <Col span={4}>
                 <Form.Item
                   label="State"
                   name="permanent_state"
-                  rules={[
-                    {
-                      pattern: /^[a-zA-Z\s]+$/,
-                      message: "Only letters and spaces are allowed",
-                    },
-                  ]}
+                  rules={[{ required: true, message: "Select state" }]}
                 >
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter state"
+                  <Select
+                    className={selectClass}
+                    disabled={viewMode || !selCountryIso}
+                    options={getStateOptions(selCountryIso)}
+                    onChange={handleStateChange}
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select State"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item
+                  label="District"
+                  name="permanent_district"
+                  rules={[{ required: true, message: "Select district" }]}
+                >
+                  <Select
+                    className={selectClass}
+                    disabled={viewMode || !selStateName}
+                    options={getDistrictOptions(selStateName)}
+                    onChange={handleDistrictChange}
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select District"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item
+                  label="City"
+                  name="permanent_city"
+                  rules={[{ required: true, message: "Select city" }]}
+                >
+                  <Select
+                    className={selectClass}
+                    disabled={viewMode || !selStateIso}
+                    options={getCityOptions(selCountryIso, selStateIso)}
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select City"
                   />
                 </Form.Item>
               </Col>

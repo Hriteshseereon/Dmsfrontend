@@ -99,7 +99,7 @@ export default function SalesDispute() {
       }
 
       const items = res.items.map((it) => ({
-        id: it.id,                       // dispute item id (used for UPDATE)
+        id: it.id,                                           // dispute item id (used for UPDATE)
         invoice_item_id: it.invoice_item_id,  // used for CREATE
         item: it.item,
         itemCode: it.item_code,
@@ -328,6 +328,14 @@ export default function SalesDispute() {
   };
 
   const columns = [
+     {
+      title: <span className="text-amber-700!">Dispute No</span>,
+      dataIndex: "disputeNo",
+      render: (text, record) =>
+        record.status !== "Delivered" ? (
+          <span className="text-amber-700!">{text || "-"}</span>
+        ) : null,
+    },
     {
       title: <span className="text-amber-700!">Invoice No</span>,
       dataIndex: "invoiceNo",
@@ -338,14 +346,7 @@ export default function SalesDispute() {
       dataIndex: "orderNo",
       render: (text) => <span className="text-amber-700!">{text}</span>,
     },
-    {
-      title: <span className="text-amber-700!">Dispute No</span>,
-      dataIndex: "disputeNo",
-      render: (text, record) =>
-        record.status !== "Delivered" ? (
-          <span className="text-amber-700!">{text || "-"}</span>
-        ) : null,
-    },
+   
     {
       title: <span className="text-amber-700!">Return Date</span>,
       dataIndex: "returnDate",

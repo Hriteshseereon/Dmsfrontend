@@ -30,6 +30,19 @@ import {
 } from "../../../../../../../api/customer";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
+
+// import { locationData } from "../../../../../../../utils/locationData";
+import {
+  getCountryOptions,
+  getStateOptions,
+  getDistrictOptions,
+  getCityOptions,
+  getCountryIsoByName,
+  getStateIsoByName,
+} from "../../../../../../../utils/locationHelper";
+
+// location helper function
+
 const { Option } = Select;
 
 const inputClass = "border-amber-400 h-8";
@@ -44,6 +57,10 @@ export default function CustomerTab() {
   const [loading, setLoading] = useState(false);
   const [securityType, setSecurityType] = useState(null);
   const [sendingId, setSendingId] = useState(null);
+  // ── location cascade state ──────────────────────────────────────────────────
+  const [selCountryIso, setSelCountryIso] = useState(null);
+  const [selStateName, setSelStateName] = useState(null);
+  const [selStateIso, setSelStateIso] = useState(null);
   const [form] = Form.useForm();
   const generatePassword = () => {
     const chars =
@@ -78,6 +95,59 @@ export default function CustomerTab() {
       });
     }
   };
+  const handlePdcIssueDateChange = (date) => {
+    if (date) {
+      const validUpto = dayjs(date).add(6, "month");
+      form.setFieldsValue({
+        pdcValid: validUpto,
+      });
+    }
+  };
+
+  /* ── location cascade handlers ───────────────────────────────────────────── */
+
+  /**
+   * Called when Country dropdown changes.
+   * - isoCode  → saved to selCountryIso (needed to fetch states + cities)
+   * - option.label (plain name e.g. "India") → stored in form field
+   *   so FormData always receives plain names, not codes
+   */
+  const handleCountryChange = (isoCode, option) => {
+    setSelCountryIso(isoCode);
+    setSelStateName(null);
+    setSelStateIso(null);
+    form.setFieldsValue({
+      country: option.label,
+      state: undefined,
+      district: undefined,
+      city: undefined,
+    });
+  };
+
+  /**
+   * Called when State dropdown changes.
+   * - option.label (plain name e.g. "Odisha") → needed for getDistrictOptions()
+   * - isoCode (e.g. "OR") → needed for getCityOptions()
+   */
+  const handleStateChange = (isoCode, option) => {
+    setSelStateName(option.label);
+    setSelStateIso(isoCode);
+    form.setFieldsValue({
+      state: option.label,
+      district: undefined,
+      city: undefined,
+    });
+  };
+
+  /**
+   * Called when District dropdown changes.
+   * District value is already a plain name — just clear city.
+   */
+  const handleDistrictChange = () => {
+    form.setFieldsValue({ city: undefined });
+  };
+
+  /* ─────────────────────────────────────────────────────────────────────────── */
   /* ================= FETCH ================= */
   const fetchCustomers = async () => {
     try {
@@ -91,7 +161,17 @@ export default function CustomerTab() {
       setLoading(false);
     }
   };
+  // useeffect to get the country namw
+  useEffect(() => {
+    if (open && !selected) {
+      const countryIso = getCountryIsoByName("India");
+      setSelCountryIso(countryIso);
 
+      form.setFieldsValue({
+        country: "India",
+      });
+    }
+  }, [open]);
   // useeffect function to fetch the random password
   useEffect(() => {
     if (!selected && open) {
@@ -110,6 +190,7 @@ export default function CustomerTab() {
     branchName: details.business_name,
     phoneNo: details.phone_number,
     mobileNo: details.mobile_number,
+    whatsappNo: details.whatsapp_number,
     email: details.email_address,
     type: details.customer_type,
     status: details.status,
@@ -118,6 +199,7 @@ export default function CustomerTab() {
     address1: details.address_line1,
     country: details.country,
     state: details.state,
+    region: details.region,
     district: details.district,
     city: details.city,
     pinCode: details.pin_code,
@@ -158,7 +240,7 @@ export default function CustomerTab() {
     pdcAmount: details.pdc_amount,
 
     pdcIssueDate: details.pdc_issue_date ? dayjs(details.pdc_issue_date) : null,
-    pdcDate: details.pdc_cheque_date ? dayjs(details.pdc_cheque_date) : null,
+    pdcDate: details.pdc_cheque_date,
     pdcValid: details.pdc_valid_upto ? dayjs(details.pdc_valid_upto) : null,
 
     // ===== FD =====
@@ -189,7 +271,12 @@ export default function CustomerTab() {
       form.setFieldsValue(mapDetailsToForm(details));
 
       setSecurityType(details.security_for_credit);
+      const countryIso = getCountryIsoByName(details.country);
+      const stateIso = getStateIsoByName(countryIso, details.state);
 
+      setSelCountryIso(countryIso);
+      setSelStateName(details.state || null);
+      setSelStateIso(stateIso);
       setSelected(details);
       setViewMode(view);
       setOpen(true);
@@ -197,6 +284,15 @@ export default function CustomerTab() {
       console.error(err);
       message.error("Failed to load customer details");
     }
+  };
+  /* ── close / reset modal ─────────────────────────────────────────────────── */
+  const closeModal = () => {
+    setOpen(false);
+    form.resetFields();
+    setSelCountryIso(null);
+    setSelStateName(null);
+    setSelStateIso(null);
+    setSelected(null);
   };
   /* ================= SAVE ================= */
   const handleSubmit = async (values) => {
@@ -210,6 +306,7 @@ export default function CustomerTab() {
       formData.append("business_name", values.branchName);
       formData.append("phone_number", values.phoneNo);
       formData.append("mobile_number", values.mobileNo);
+      formData.append("whatsapp_number", values.whatsappNo);
       formData.append("email_address", values.email);
       if (values.password) {
         formData.append("password", values.password);
@@ -218,14 +315,15 @@ export default function CustomerTab() {
       formData.append("status", values.status);
 
       // ===== ADDRESS =====
-      formData.append("address", values.address);
-      formData.append("address_line1", values.address1);
-      formData.append("country", values.country);
-      formData.append("state", values.state);
-      formData.append("district", values.district);
-      formData.append("city", values.city);
+      formData.append("address", values.address || "");
+      formData.append("address_line1", values.address1 || "");
+      formData.append("country", values.country || "");
+      formData.append("state", values.state || "");
+      formData.append("region", values.region || "");
+      formData.append("district", values.district || "");
+      formData.append("city", values.city || "");
       formData.append("pin_code", values.pinCode);
-      formData.append("location", values.location);
+      formData.append("location", values.location || "");
 
       // ===== LEGAL =====
       formData.append("gst_number", values.gstNo);
@@ -288,10 +386,7 @@ export default function CustomerTab() {
             ? dayjs(values.pdcIssueDate).format("YYYY-MM-DD")
             : "",
         );
-        formData.append(
-          "pdc_cheque_date",
-          values.pdcDate ? dayjs(values.pdcDate).format("YYYY-MM-DD") : "",
-        );
+        formData.append("pdc_cheque_date", values.pdcDate);
         formData.append("pdc_cheque_number", values.pdcNumber);
         formData.append("pdc_amount", values.pdcAmount);
         formData.append(
@@ -383,6 +478,20 @@ export default function CustomerTab() {
       setSendingId(null);
     }
   };
+
+  const getFilteredData = () => {
+    if (!search) return data;
+
+    const value = search.toLowerCase();
+
+    return data.filter((item) =>
+      Object.values(item).join(" ").toLowerCase().includes(value),
+    );
+  };
+
+  const handleReset = () => {
+    setSearch("");
+  };
   /* ================= TABLE ================= */
   const columns = [
     {
@@ -455,9 +564,7 @@ export default function CustomerTab() {
     },
   ];
 
-  const filteredData = data.filter((c) =>
-    c.customer_name?.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filteredData = getFilteredData();
 
   /* ================= UI ================= */
   return (
@@ -476,10 +583,7 @@ export default function CustomerTab() {
           />
           <Button
             icon={<ReloadOutlined />}
-            onClick={() => {
-              setSearch("");
-              fetchCustomers();
-            }}
+            onClick={handleReset}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Reset
@@ -631,7 +735,26 @@ export default function CustomerTab() {
                   />
                 </Form.Item>
               </Col>
-
+              <Col span={4}>
+                <Form.Item
+                  label="WhatsApp Number"
+                  name="whatsappNo"
+                  rules={[
+                    { required: true, message: "Please enter WhatsApp number" },
+                    {
+                      pattern: /^[6-9]\d{9}$/,
+                      message: "Enter a valid 10-digit WhatsApp number",
+                    },
+                  ]}
+                >
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter WhatsApp number"
+                    maxLength={10}
+                  />
+                </Form.Item>
+              </Col>
               <Col span={6}>
                 <Form.Item
                   label="Email Address"
@@ -703,107 +826,133 @@ export default function CustomerTab() {
           </Card>
 
           {/* ================= Contact & Address Details ================= */}
+
+          {/* ── Address Details ── */}
           <Card className="mb-4 border border-amber-200 rounded-lg">
             <h3 className="text-lg font-semibold text-amber-700 mb-3">
               Address Details
             </h3>
             <Row gutter={24}>
-              {/* <Col span={6}>
-                <Form.Item label="Contact Person" name="contactPerson">
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter contact person"
-                  />
-                </Form.Item>
-              </Col> */}
               <Col span={6}>
-                <Form.Item label="Address1" name="address1">
+                <Form.Item label="Address Line 1" name="address1">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
-                    placeholder="Enter address"
+                    placeholder="Enter address line 1"
                   />
                 </Form.Item>
               </Col>
               <Col span={6}>
-                <Form.Item label="Address2" name="address">
+                <Form.Item label="Address Line 2" name="address">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
-                    placeholder="Enter address"
+                    placeholder="Enter address line 2"
                   />
                 </Form.Item>
               </Col>
+
+              {/*
+                COUNTRY
+                - options:  { value: "IN", label: "India" }  from getCountryOptions()
+                - onChange: stores isoCode in selCountryIso, label (plain name) in form field
+                - form field value: plain name ("India") → sent directly in FormData
+              */}
               <Col span={4}>
                 <Form.Item
-                  label="City"
-                  name="city"
-                  rules={[
-                    {
-                      pattern: /^[a-zA-Z\s]+$/,
-                      message: "Only letters and spaces are allowed",
-                    },
-                  ]}
+                  label="Country"
+                  name="country"
+                  rules={[{ required: true, message: "Please select country" }]}
                 >
-                  <Input
-                    className={inputClass}
+                  <Select
+                    className={selectClass}
                     disabled={viewMode}
-                    placeholder="Enter city"
+                    placeholder="Select country"
+                    showSearch
+                    optionFilterProp="label"
+                    options={getCountryOptions()}
+                    onChange={handleCountryChange}
                   />
                 </Form.Item>
               </Col>
+
+              {/*
+                STATE
+                - options: { value: "OR", label: "Odisha" } from getStateOptions(selCountryIso)
+                - disabled until a country is selected
+                - onChange: stores isoCode in selStateIso, plain name in selStateName + form field
+              */}
+              <Col span={4}>
+                <Form.Item
+                  label="State"
+                  name="state"
+                  rules={[{ required: true, message: "Please select state" }]}
+                >
+                  <Select
+                    className={selectClass}
+                    disabled={viewMode || !selCountryIso}
+                    placeholder={
+                      selCountryIso ? "Select state" : "Select country first"
+                    }
+                    showSearch
+                    optionFilterProp="label"
+                    value={selStateIso}
+                    options={getStateOptions(selCountryIso)}
+                    onChange={handleStateChange}
+                  />
+                </Form.Item>
+              </Col>
+
+              {/*
+                DISTRICT
+                - options: { value: "Khordha", label: "Khordha" } from getDistrictOptions(selStateName)
+                - uses plain stateName (not isoCode) because ind-state-district is resolved by name
+                - disabled until a state is selected
+                - value stored in form is the plain district name
+              */}
               <Col span={4}>
                 <Form.Item
                   label="District"
                   name="district"
                   rules={[
-                    {
-                      pattern: /^[a-zA-Z\s]+$/,
-                      message: "Only letters and spaces are allowed",
-                    },
+                    { required: true, message: "Please select district" },
                   ]}
                 >
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter district"
+                  <Select
+                    className={selectClass}
+                    disabled={viewMode || !selStateName}
+                    placeholder={
+                      selStateName ? "Select district" : "Select state first"
+                    }
+                    showSearch
+                    optionFilterProp="label"
+                    options={getDistrictOptions(selStateName)}
+                    onChange={handleDistrictChange}
                   />
                 </Form.Item>
               </Col>
+
+              {/*
+                CITY
+                - options: { value: "Bhubaneswar", label: "Bhubaneswar" } from getCityOptions()
+                - linked to STATE (not district) — this is a limitation of all free packages
+                - disabled until a state is selected
+              */}
               <Col span={4}>
                 <Form.Item
-                  label="State"
-                  name="state"
-                  rules={[
-                    {
-                      pattern: /^[a-zA-Z\s]+$/,
-                      message: "Only letters and spaces are allowed",
-                    },
-                  ]}
+                  label="City"
+                  name="city"
+                  rules={[{ required: true, message: "Please select city" }]}
                 >
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter state"
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={4}>
-                <Form.Item
-                  label="Country"
-                  name="country"
-                  rules={[
-                    {
-                      pattern: /^[a-zA-Z\s]+$/,
-                      message: "Only letters and spaces are allowed",
-                    },
-                  ]}
-                >
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter country"
+                  <Select
+                    className={selectClass}
+                    disabled={viewMode || !selStateIso}
+                    placeholder={
+                      selStateIso ? "Select city" : "Select state first"
+                    }
+                    showSearch
+                    optionFilterProp="label"
+                    options={getCityOptions(selCountryIso, selStateIso)}
                   />
                 </Form.Item>
               </Col>
@@ -828,13 +977,21 @@ export default function CustomerTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item label="Google Location" name="location">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
                     placeholder="Enter location"
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={4}>
+                <Form.Item label="Region" name="region">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter Region"
                   />
                 </Form.Item>
               </Col>
@@ -1029,6 +1186,7 @@ export default function CustomerTab() {
                         className="w-full"
                         format="YYYY-MM-DD"
                         disabled={viewMode}
+                        onChange={handlePdcIssueDateChange}
                       />
                     </Form.Item>
                   </Col>
@@ -1044,11 +1202,7 @@ export default function CustomerTab() {
                         },
                       ]}
                     >
-                      <DatePicker
-                        className="w-full"
-                        format="YYYY-MM-DD"
-                        disabled={viewMode}
-                      />
+                      <Input placeholder="DD-MM-YYYY" disabled={viewMode} />
                     </Form.Item>
                   </Col>
 
@@ -1385,9 +1539,9 @@ export default function CustomerTab() {
                 <Form.Item
                   label="TIN Number"
                   name="tinNo"
-                  rules={[
-                    { required: true, message: "Please enter TIN number" },
-                  ]}
+                  // rules={[
+                  //   {  message: "Please enter TIN number" },
+                  // ]}
                 >
                   <Input
                     className={inputClass}
@@ -1528,12 +1682,12 @@ export default function CustomerTab() {
                 <Form.Item
                   label="Trade License Number"
                   name="licenseNo"
-                  rules={[
-                    {
-                      required: true,
-                      message: "Please enter trade license number",
-                    },
-                  ]}
+                  // rules={[
+                  //   {
+                  //     required: true,
+                  //     message: "Please enter trade license number",
+                  //   },
+                  // ]}
                 >
                   <Input
                     className={inputClass}

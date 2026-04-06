@@ -2,85 +2,76 @@ import React, { useMemo, useState } from "react";
 import { Table, DatePicker, Row, Col, Card ,Button} from "antd";
 import dayjs from "dayjs";
 import { FilterOutlined } from "@ant-design/icons";
+import { useEffect } from "react";
+import { getCommonReport } from "../../../../../../api/reports";
 import isBetween from "dayjs/plugin/isBetween";
 dayjs.extend(isBetween);
 const { RangePicker } = DatePicker;
 
-/* ---------------- MOCK PURCHASE RETURN JSON ---------------- */
-const purchaseReturnJSON = [
-  {
-    key: 1,
-    slno: 1,
-    orderNo: "PR-2024-101",
-    returnDate: "2024-09-08",
-    plantName: "Jay Traders",
-    returnAmount: 50,
-    returnReason: "Damaged Goods",
-  },
-  {
-    key: 2,
-    slno: 2,
-    orderNo: "PR-2024-118",
-    returnDate: "2024-09-22",
-    plantName: "Global Suppliers",
-    returnAmount: 30,
-    returnReason: "Defective Items",
-  },
-  {
-    key: 3,
-    slno: 3,
-    orderNo: "PR-2024-125",
-    returnDate: "2024-10-10",
-    plantName: "Kalinga Oils Pvt Ltd",
-    returnAmount: 70,
-    returnReason: "Quality Issues",
-  },
-  {
-    key: 4,
-    slno: 4,
-    orderNo: "PR-2024-130",
-    returnDate: "2024-11-03",
-    plantName: "Odisha Edibles",
-    returnAmount: 25,
-    returnReason: "Other",
-  },
-];
+
 
 /* ---------------- COMPONENT ---------------- */
 const PurchaseReturn = () => {
-  const [dateRange, setDateRange] = useState(null);
-    /* ---------------- MONTH FILTER LOGIC ---------------- */
-  const filteredData = useMemo(() => {
-    if (!dateRange) return  purchaseReturnJSON;
+   const [data, setData] = useState([]);
+  const [dateRange, setDateRange] = useState(null); 
   
-    const [start, end] = dateRange;
- 
-    return purchaseReturnJSON.filter((rec) => {
-      const returnDate = dayjs(rec.returnDate);
-      return returnDate.isBetween(start, end, "day", "[]");
-    });
-  }, [dateRange]);
+  useEffect(() => {
+    fetchData();
+  }, []);
+  
+  const fetchData = async () => {
+    try {
+      const res = await getCommonReport({ type: "purchase_return" }); // ✅ IMPORTANT
+  
+      const formatted = res.data.map((item, index) => ({
+        key: index,
+        orderNo: item.order_number || "-", // handle null
+        plantName: item.vendor_name,
+        return_number:item.return_number,
+        return_date: item.return_date ,
+        return_qty: item.return_qty,
+        return_reason:item.return_reason,
+        status: item.status,
+      }));
+  
+      setData(formatted);
+    } catch (err) {
+      console.error(err);
+    }
+  };/* ---------------- MONTH FILTER LOGIC ---------------- */
+const filteredData = useMemo(() => {
+  if (!dateRange) return data;
+
+  const [start, end] = dateRange;
+
+  return data.filter((rec) => {
+    if (!rec.return_date) return false;
+
+    const returnDate = dayjs(rec.return_date);
+    return returnDate.isBetween(start, end, "day", "[]");
+  });
+}, [dateRange, data]);
 
   /* ---------------- TABLE COLUMNS ---------------- */
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Sl No</span>,
+      title: <span className="text-amber-700 font-semibold">Return No</span>,
    
-      dataIndex: "slno",
-      width: 70,
+      dataIndex: "return_number",
+      width: 100,
       
           render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Order No</span>,
       dataIndex: "orderNo",
-      width: 150,
+      width: 100,
         render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
        title: <span className="text-amber-700 font-semibold">Return Date</span>,
-      dataIndex: "returnDate",
-      width: 120, 
+      dataIndex: "return_date",
+      width: 100, 
        render: (d) => <span className="text-amber-800">{d ? dayjs(d).format("YYYY-MM-DD") : ""}</span>,
  
     },
@@ -88,23 +79,16 @@ const PurchaseReturn = () => {
               title: <span className="text-amber-700 font-semibold">Plant Name</span>,
    
       dataIndex: "plantName",
-      width: 200,
+      width: 100,
       
           render: (t) => <span className="text-amber-800">{t}</span>,
     },
-    {
-      title: <span className="text-amber-700 font-semibold">Return Amount</span>,
-   
-      dataIndex: "returnAmount",
-      width: 180,
-      
-          render: (t) => <span className="text-amber-800">{t}</span>,
-    },
+    
     {
       title: <span className="text-amber-700 font-semibold">Return Reason</span>,
    
-      dataIndex: "returnReason",
-      width: 180,
+      dataIndex: "return_reason",
+      width: 100,
       
           render: (t) => <span className="text-amber-800">{t}</span>,
     },

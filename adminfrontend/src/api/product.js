@@ -34,7 +34,10 @@ export const getHSNSACCodes = async () => {
   const res = await api.get("/product/hsn/");
   return res.data;
 };
-
+export const getSACCodes = async () => {
+  const res = await api.get("/product/sac/");
+  return res.data;
+};
 // add more product related api here
 export const addproduct = async (payload) => {
   const { currentOrgId } = useSessionStore.getState();
