@@ -24,23 +24,23 @@
 .sidebar-logo-wrapper {
   width: 100%;
   display: flex;
-  justify-content: center;
+  justify-content:flex-start;
   align-items: center;
   padding: 0.75rem 0;
 }
 
 .sidebar-logo {
-  height: 50px;
+  height: 60px;
   max-width: 100%;
   object-fit: contain;
   transition: all 200ms ease;
 }
-
-/* Collapsed state */
-.sidebar-logo.collapsed {
-  height: 28px;
-  opacity: 0.9;
+.sidebar-header .flex.items-center {
+  align-items: center;
+  gap: 8px;
 }
+/* Collapsed state */
+
 /* menu item  */
 .sidebar-menu-link {
   display: flex;

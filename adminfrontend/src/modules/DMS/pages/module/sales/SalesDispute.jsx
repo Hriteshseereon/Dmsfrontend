@@ -22,7 +22,7 @@ import { exportToExcel } from "../../../../../utils/exportToExcel";
 import { getSaleDisputes, getSaleDisputeById, createSaleDispute, updateSaleDispute, getDisputeById } from "../../../../../api/sales";
 const reasonsList = [
   "Quality Issue",
-  "Damaged Packaging",
+  "Damaged",
   "Expired",
   "Wrong Item",
 ];

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Table,
   Button,
@@ -11,6 +11,8 @@ import {
   Select,
   Upload,
   message,
+  Tag,
+  Tooltip,
 } from "antd";
 import {
   PlusOutlined,
@@ -19,6 +21,7 @@ import {
   SearchOutlined,
   ReloadOutlined,
   UploadOutlined,
+  SaveOutlined,
 } from "@ant-design/icons";
 import { API_BASE_URL } from "@/utils/config";
 import {
@@ -31,7 +34,6 @@ import {
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
 
-// import { locationData } from "../../../../../../../utils/locationData";
 import {
   getCountryOptions,
   getStateOptions,
@@ -41,13 +43,33 @@ import {
   getStateIsoByName,
 } from "../../../../../../../utils/locationHelper";
 
-// location helper function
+// ── Draft utilities ──────────────────────────────────────────────────────────
+// import {
+//   createDraft,
+//   saveDraft,
+//   loadDraft,
+//   deleteDraft,
+//   deserialiseDraftValues,
+// } from ";
+import {
+  createDraft,
+  saveDraft,
+  loadDraft,
+  deleteDraft,
+  deserialiseDraftValues,
+  getAllCustomerDrafts,
+} from "../../../../../../../utils/Customerdraftutils";
+import DraftTable from "./DraftTable";
 
 const { Option } = Select;
-
 const inputClass = "border-amber-400 h-8";
 const selectClass = "border-amber-400 h-8 w-full";
-const { Password } = Input;
+
+// ── Auto-save interval (ms) ──────────────────────────────────────────────────
+const AUTOSAVE_DEBOUNCE_MS = 1500;
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function CustomerTab() {
   const [data, setData] = useState([]);
   const [search, setSearch] = useState("");
@@ -57,11 +79,36 @@ export default function CustomerTab() {
   const [loading, setLoading] = useState(false);
   const [securityType, setSecurityType] = useState(null);
   const [sendingId, setSendingId] = useState(null);
-  // ── location cascade state ──────────────────────────────────────────────────
+  const [hasDraft, setHasDraft] = useState(false);
+  // ── location cascade ──
   const [selCountryIso, setSelCountryIso] = useState(null);
   const [selStateName, setSelStateName] = useState(null);
   const [selStateIso, setSelStateIso] = useState(null);
+
+  // ── draft state ──────────────────────────────────────────────────────────
+  /**
+   * activeDraftId: the localStorage key currently being auto-saved.
+   * null when editing an existing customer (no draft needed) or in view mode.
+   */
+  const [activeDraftId, setActiveDraftId] = useState(null);
+  const [draftSavedAt, setDraftSavedAt] = useState(null);
+  const [draftTableKey, setDraftTableKey] = useState(0); // trigger re-render of DraftTable
+
+  // Debounce timer ref
+  const autosaveTimer = useRef(null);
+
   const [form] = Form.useForm();
+
+  // check draft
+  const checkDraftExists = () => {
+    const drafts = getAllCustomerDrafts();
+    setHasDraft(drafts.length > 0);
+  };
+  useEffect(() => {
+    checkDraftExists();
+  }, [draftTableKey]);
+  // ── helpers ──────────────────────────────────────────────────────────────
+
   const generatePassword = () => {
     const chars =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -71,12 +118,10 @@ export default function CustomerTab() {
     }
     return pass;
   };
+
   const fileFromUrl = (url) => {
     if (!url) return [];
-
-    // if backend already returns full URL → use it
     const finalUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
-
     return [
       {
         uid: finalUrl,
@@ -86,32 +131,21 @@ export default function CustomerTab() {
       },
     ];
   };
-  // handler function to auto fill the 6 month
+
   const handleBgValidFromChange = (date) => {
     if (date) {
-      const validUpto = dayjs(date).add(6, "month");
-      form.setFieldsValue({
-        bgValidUpto: validUpto,
-      });
+      form.setFieldsValue({ bgValidUpto: dayjs(date).add(6, "month") });
     }
   };
+
   const handlePdcIssueDateChange = (date) => {
     if (date) {
-      const validUpto = dayjs(date).add(6, "month");
-      form.setFieldsValue({
-        pdcValid: validUpto,
-      });
+      form.setFieldsValue({ pdcValid: dayjs(date).add(6, "month") });
     }
   };
 
-  /* ── location cascade handlers ───────────────────────────────────────────── */
+  // ── location handlers ─────────────────────────────────────────────────────
 
-  /**
-   * Called when Country dropdown changes.
-   * - isoCode  → saved to selCountryIso (needed to fetch states + cities)
-   * - option.label (plain name e.g. "India") → stored in form field
-   *   so FormData always receives plain names, not codes
-   */
   const handleCountryChange = (isoCode, option) => {
     setSelCountryIso(isoCode);
     setSelStateName(null);
@@ -124,11 +158,6 @@ export default function CustomerTab() {
     });
   };
 
-  /**
-   * Called when State dropdown changes.
-   * - option.label (plain name e.g. "Odisha") → needed for getDistrictOptions()
-   * - isoCode (e.g. "OR") → needed for getCityOptions()
-   */
   const handleStateChange = (isoCode, option) => {
     setSelStateName(option.label);
     setSelStateIso(isoCode);
@@ -139,16 +168,153 @@ export default function CustomerTab() {
     });
   };
 
-  /**
-   * Called when District dropdown changes.
-   * District value is already a plain name — just clear city.
-   */
   const handleDistrictChange = () => {
     form.setFieldsValue({ city: undefined });
   };
 
-  /* ─────────────────────────────────────────────────────────────────────────── */
-  /* ================= FETCH ================= */
+  // ── DRAFT: auto-save on field change ─────────────────────────────────────
+
+  /**
+   * Called by Form's onValuesChange.
+   * Only runs for new-customer forms (not edit/view).
+   */
+  const handleFormValuesChange = useCallback(() => {
+    // No auto-save when editing an existing record or in view mode
+    if (selected || viewMode) return;
+
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+
+    autosaveTimer.current = setTimeout(() => {
+      const values = form.getFieldsValue(true);
+
+      // Build/update draft id
+      setActiveDraftId((prevId) => {
+        const id =
+          prevId ||
+          createDraft(values, {
+            name: values.name,
+            email: values.email,
+            mobileNo: values.mobileNo,
+          });
+
+        if (!prevId) {
+          // first save – id was just created inside createDraft, return it
+          saveDraft(id, values, {
+            name: values.name,
+            email: values.email,
+            mobileNo: values.mobileNo,
+          });
+          setDraftSavedAt(new Date());
+          setDraftTableKey((k) => k + 1);
+          return id;
+        }
+
+        // subsequent saves
+        saveDraft(id, values, {
+          name: values.name,
+          email: values.email,
+          mobileNo: values.mobileNo,
+        });
+        setDraftSavedAt(new Date());
+        setDraftTableKey((k) => k + 1);
+        return id;
+      });
+    }, AUTOSAVE_DEBOUNCE_MS);
+  }, [form, selected, viewMode]);
+
+  // ── DRAFT: manual save ────────────────────────────────────────────────────
+
+  const handleManualSave = () => {
+    if (selected || viewMode) return;
+    const values = form.getFieldsValue(true);
+
+    setActiveDraftId((prevId) => {
+      const id =
+        prevId ||
+        createDraft(values, {
+          name: values.name,
+          email: values.email,
+          mobileNo: values.mobileNo,
+        });
+      saveDraft(id, values, {
+        name: values.name,
+        email: values.email,
+        mobileNo: values.mobileNo,
+      });
+      setDraftSavedAt(new Date());
+      setDraftTableKey((k) => k + 1);
+      message.success("Draft saved");
+      return id;
+    });
+  };
+
+  // ── DRAFT: continue (load into form) ─────────────────────────────────────
+
+  const handleContinueDraft = (draftId) => {
+    const draft = loadDraft(draftId);
+    if (!draft) {
+      message.error("Draft not found");
+      return;
+    }
+
+    // Restore form values
+    const restored = deserialiseDraftValues(draft.values, dayjs);
+    form.resetFields();
+    form.setFieldsValue(restored);
+
+    // Restore location cascade state
+    if (restored.country) {
+      const iso = getCountryIsoByName(restored.country);
+      setSelCountryIso(iso);
+    }
+    if (restored.state) {
+      const countryIso = getCountryIsoByName(restored.country);
+      const stateIso = getStateIsoByName(countryIso, restored.state);
+      setSelStateName(restored.state);
+      setSelStateIso(stateIso);
+    }
+
+    // Restore security type
+    if (restored.securityForCreditFacility) {
+      setSecurityType(restored.securityForCreditFacility);
+    }
+
+    // Set active draft so further edits continue saving to this key
+    setActiveDraftId(draftId);
+    setDraftSavedAt(draft.savedAt ? new Date(draft.savedAt) : null);
+
+    setSelected(null);
+    setViewMode(false);
+    setOpen(true);
+  };
+
+  // ── DRAFT: discard after successful submit ────────────────────────────────
+
+  const discardActiveDraft = () => {
+    if (activeDraftId) {
+      deleteDraft(activeDraftId);
+      setActiveDraftId(null);
+      setDraftSavedAt(null);
+      setDraftTableKey((k) => k + 1);
+    }
+  };
+
+  // ── close / reset modal ───────────────────────────────────────────────────
+
+  const closeModal = () => {
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    setOpen(false);
+    form.resetFields();
+    setSelCountryIso(null);
+    setSelStateName(null);
+    setSelStateIso(null);
+    setSelected(null);
+    setSecurityType(null);
+    // Do NOT clear activeDraftId here – the draft should persist until submitted
+  };
+
+  // ── FETCH ─────────────────────────────────────────────────────────────────
+
   const fetchCustomers = async () => {
     try {
       setLoading(true);
@@ -161,30 +327,33 @@ export default function CustomerTab() {
       setLoading(false);
     }
   };
-  // useeffect to get the country namw
+
+  // ── useEffects ────────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (open && !selected) {
       const countryIso = getCountryIsoByName("India");
       setSelCountryIso(countryIso);
-
-      form.setFieldsValue({
-        country: "India",
-      });
+      form.setFieldsValue({ country: "India" });
     }
   }, [open]);
-  // useeffect function to fetch the random password
+
   useEffect(() => {
     if (!selected && open) {
-      form.setFieldsValue({
-        password: generatePassword(),
-      });
+      // Only pre-fill password if form doesn't already have one (e.g. from draft restore)
+      const existing = form.getFieldValue("password");
+      if (!existing) {
+        form.setFieldsValue({ password: generatePassword() });
+      }
     }
   }, [open]);
+
   useEffect(() => {
     fetchCustomers();
   }, []);
 
-  /* ================= MAP API → FORM ================= */
+  // ── MAP API → FORM ────────────────────────────────────────────────────────
+
   const mapDetailsToForm = (details) => ({
     name: details.customer_name,
     branchName: details.business_name,
@@ -225,37 +394,30 @@ export default function CustomerTab() {
     tdsApplicable: details.tds_applicable ? "Yes" : "No",
     tdsRate: details.rate_of_tds,
 
-    // ===== BG =====
     bgBankName: details.bg_bank_name,
     bgAmount: details.bg_amount,
     bgNumber: details.bg_number,
-
     bgDate: details.bg_date ? dayjs(details.bg_date) : null,
     bgValidFrom: details.bg_valid_from ? dayjs(details.bg_valid_from) : null,
     bgValidUpto: details.bg_valid_upto ? dayjs(details.bg_valid_upto) : null,
 
-    // ===== PDC =====
     pdcBank: details.pdc_bank_name,
     pdcNumber: details.pdc_cheque_number,
     pdcAmount: details.pdc_amount,
-
     pdcIssueDate: details.pdc_issue_date ? dayjs(details.pdc_issue_date) : null,
     pdcDate: details.pdc_cheque_date,
     pdcValid: details.pdc_valid_upto ? dayjs(details.pdc_valid_upto) : null,
 
-    // ===== FD =====
     fdBank: details.fd_bank_name,
     fdCheque: details.fd_cheque_number,
     fdSecurity: details.fd_security_detail,
     fdInterest: details.fd_rate_of_interest,
     fdDate: details.fd_date ? dayjs(details.fd_date) : null,
 
-    // ===== Collateral =====
     collateralDetails: details.collateral_details,
     collateralAddress: details.collateral_address,
     collateralValue: details.collateral_market_value,
 
-    // ===== FILES =====
     gstDoc: fileFromUrl(details.gst_document),
     panDoc: fileFromUrl(details.pan_document),
     aadharDoc: fileFromUrl(details.aadhaar_document),
@@ -265,56 +427,45 @@ export default function CustomerTab() {
   const openCustomer = async (record, view = false) => {
     try {
       const id = record.customer_id || record.id;
-
       const details = await getAdminCustomerDetails(id);
 
       form.setFieldsValue(mapDetailsToForm(details));
-
       setSecurityType(details.security_for_credit);
+
       const countryIso = getCountryIsoByName(details.country);
       const stateIso = getStateIsoByName(countryIso, details.state);
-
       setSelCountryIso(countryIso);
       setSelStateName(details.state || null);
       setSelStateIso(stateIso);
+
       setSelected(details);
       setViewMode(view);
+      setActiveDraftId(null); // editing existing customer — no draft tracking
       setOpen(true);
     } catch (err) {
       console.error(err);
       message.error("Failed to load customer details");
     }
   };
-  /* ── close / reset modal ─────────────────────────────────────────────────── */
-  const closeModal = () => {
-    setOpen(false);
-    form.resetFields();
-    setSelCountryIso(null);
-    setSelStateName(null);
-    setSelStateIso(null);
-    setSelected(null);
-  };
-  /* ================= SAVE ================= */
+
+  // ── SAVE ──────────────────────────────────────────────────────────────────
+
   const handleSubmit = async (values) => {
     try {
       setLoading(true);
 
       const formData = new FormData();
 
-      // ===== BASIC =====
       formData.append("customer_name", values.name);
       formData.append("business_name", values.branchName);
       formData.append("phone_number", values.phoneNo);
       formData.append("mobile_number", values.mobileNo);
       formData.append("whatsapp_number", values.whatsappNo);
       formData.append("email_address", values.email);
-      if (values.password) {
-        formData.append("password", values.password);
-      }
+      if (values.password) formData.append("password", values.password);
       formData.append("customer_type", values.type);
       formData.append("status", values.status);
 
-      // ===== ADDRESS =====
       formData.append("address", values.address || "");
       formData.append("address_line1", values.address1 || "");
       formData.append("country", values.country || "");
@@ -325,31 +476,22 @@ export default function CustomerTab() {
       formData.append("pin_code", values.pinCode);
       formData.append("location", values.location || "");
 
-      // ===== LEGAL =====
       formData.append("gst_number", values.gstNo);
       formData.append("tin_number", values.tinNo);
       formData.append("pan_number", values.panNo);
       formData.append("aadhaar_number", values.aadharNo);
       formData.append("fssai_number", values.fssaiNo);
       formData.append("license_number", values.licenseNo);
-
       formData.append("tds_applicable", values.tdsApplicable === "Yes");
       formData.append("rate_of_tds", values.tdsRate || "1.50");
 
-      // formData.append("billing_type", "REGULAR");
-
-      // ===== CREDIT =====
       formData.append("credit_facility", values.creditFacility);
       formData.append("security_for_credit", values.securityForCreditFacility);
-
       formData.append("amount_limit", values.amountLimit || 0);
       formData.append("days_limit", values.noDaysLimit || 0);
       formData.append("invoice_limit", values.noInvoiceLimit || 0);
       formData.append("souda_limit_ton", values.soudaLimit || 0);
-
       formData.append("advance_cheque_no", values.advCheque || "");
-
-      // ===== SECURITY TYPES =====
 
       if (values.securityForCreditFacility === "Bank Guarantee") {
         formData.append("bg_bank_name", values.bgBankName);
@@ -357,7 +499,6 @@ export default function CustomerTab() {
           "bg_date",
           values.bgDate ? dayjs(values.bgDate).format("YYYY-MM-DD") : "",
         );
-
         formData.append("bg_amount", values.bgAmount);
         formData.append("bg_number", values.bgNumber);
         formData.append(
@@ -372,7 +513,6 @@ export default function CustomerTab() {
             ? dayjs(values.bgValidUpto).format("YYYY-MM-DD")
             : "",
         );
-
         if (values.bgDoc?.[0]?.originFileObj) {
           formData.append("bg_document", values.bgDoc[0].originFileObj);
         }
@@ -412,16 +552,12 @@ export default function CustomerTab() {
         formData.append("collateral_market_value", values.collateralValue);
       }
 
-      // ===== DOCUMENTS =====
-
       if (values.gstDoc?.[0]?.originFileObj) {
         formData.append("gst_document", values.gstDoc[0].originFileObj);
       }
-
       if (values.panDoc?.[0]?.originFileObj) {
         formData.append("pan_document", values.panDoc[0].originFileObj);
       }
-
       if (values.aadharDoc?.[0]?.originFileObj) {
         formData.append("aadhaar_document", values.aadharDoc[0].originFileObj);
       }
@@ -434,6 +570,8 @@ export default function CustomerTab() {
       } else {
         await addAdminCustomer(formData);
         message.success("Customer Added");
+        // ✅ Delete draft on successful submit
+        discardActiveDraft();
       }
 
       setOpen(false);
@@ -447,24 +585,18 @@ export default function CustomerTab() {
       setLoading(false);
     }
   };
-  // mail sending functionality
+
+  // ── send password ─────────────────────────────────────────────────────────
 
   const handleSendPassword = async (record) => {
     try {
       const partnerId = record.customer_id || record.id;
-
       setSendingId(partnerId);
-
-      const payload = {
+      await sendCustomerCredential({
         partner_type: "customer",
         partner_id: partnerId,
-      };
-
-      await sendCustomerCredential(payload);
-
+      });
       message.success("Mail successfully sent");
-
-      // update table row immediately
       setData((prev) =>
         prev.map((item) =>
           (item.customer_id || item.id) === partnerId
@@ -472,27 +604,27 @@ export default function CustomerTab() {
             : item,
         ),
       );
-    } catch (error) {
+    } catch {
       message.error("Failed to send mail");
     } finally {
       setSendingId(null);
     }
   };
 
+  // ── filter ────────────────────────────────────────────────────────────────
+
   const getFilteredData = () => {
     if (!search) return data;
-
     const value = search.toLowerCase();
-
     return data.filter((item) =>
       Object.values(item).join(" ").toLowerCase().includes(value),
     );
   };
 
-  const handleReset = () => {
-    setSearch("");
-  };
-  /* ================= TABLE ================= */
+  const handleReset = () => setSearch("");
+
+  // ── TABLE COLUMNS ─────────────────────────────────────────────────────────
+
   const columns = [
     {
       title: <span className="text-amber-700 font-semibold">Code</span>,
@@ -543,7 +675,6 @@ export default function CustomerTab() {
       title: <span className="text-amber-700 font-semibold">Password</span>,
       render: (_, record) => {
         const partnerId = record.customer_id || record.id;
-
         return (
           <Button
             size="small"
@@ -566,12 +697,14 @@ export default function CustomerTab() {
 
   const filteredData = getFilteredData();
 
-  /* ================= UI ================= */
+  // ── RENDER ────────────────────────────────────────────────────────────────
+
   return (
     <>
+      {/* ===== DRAFT TABLE ===== */}
+
       {/* ===== TOP BAR ===== */}
       <div className="flex justify-between items-center mb-3">
-        {/* Left: Search + Reset */}
         <div className="flex gap-2 items-center">
           <Input
             prefix={<SearchOutlined className="text-amber-500" />}
@@ -590,7 +723,6 @@ export default function CustomerTab() {
           </Button>
         </div>
 
-        {/* Right: Add Customer */}
         <Button
           type="primary"
           icon={<PlusOutlined />}
@@ -599,6 +731,8 @@ export default function CustomerTab() {
             setSelected(null);
             setViewMode(false);
             setSecurityType(null);
+            setActiveDraftId(null);
+            setDraftSavedAt(null);
             form.resetFields();
             setOpen(true);
           }}
@@ -606,8 +740,16 @@ export default function CustomerTab() {
           Add Customer
         </Button>
       </div>
+      {hasDraft && (
+        <DraftTable
+          key={draftTableKey}
+          refreshTrigger={draftTableKey}
+          onContinue={handleContinueDraft}
+          onDelete={() => setDraftTableKey((k) => k + 1)}
+        />
+      )}
 
-      {/* ===== TABLE CONTAINER ===== */}
+      {/* ===== CUSTOMER TABLE ===== */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
           Customer Records
@@ -630,40 +772,78 @@ export default function CustomerTab() {
         open={open}
         footer={null}
         width={1200}
-        onCancel={() => {
-          setOpen(false);
-          form.resetFields();
-        }}
+        onCancel={closeModal}
         title={
-          <span className="text-amber-700 font-semibold text-lg">
-            {viewMode
-              ? "View Customer"
-              : selected
-                ? "Edit Customer"
-                : "Add Customer"}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-amber-700 font-semibold text-lg">
+              {viewMode
+                ? "View Customer"
+                : selected
+                  ? "Edit Customer"
+                  : "Add Customer"}
+            </span>
+
+            {/* Draft indicator — shown only for new-customer forms */}
+            {!selected && !viewMode && (
+              <div className="flex items-center gap-2 ml-2">
+                {activeDraftId ? (
+                  <Tooltip
+                    title={
+                      draftSavedAt
+                        ? `Last auto-saved at ${dayjs(draftSavedAt).format("HH:mm:ss")}`
+                        : "Draft saved"
+                    }
+                  >
+                    <Tag
+                      color="gold"
+                      icon={<SaveOutlined />}
+                      className="cursor-default select-none"
+                    >
+                      Draft saved
+                    </Tag>
+                  </Tooltip>
+                ) : (
+                  <Tag
+                    color="default"
+                    className="cursor-default select-none text-xs"
+                  >
+                    Not saved yet
+                  </Tag>
+                )}
+
+                {/* Manual save button */}
+                <Button
+                  size="small"
+                  icon={<SaveOutlined />}
+                  className="border-amber-400! text-amber-700! hover:bg-amber-100! text-xs!"
+                  onClick={handleManualSave}
+                >
+                  Save Draft
+                </Button>
+              </div>
+            )}
+          </div>
         }
         styles={{
           body: { maxHeight: "75vh", overflowY: "auto", paddingRight: 8 },
         }}
       >
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+        {/*
+         * onValuesChange triggers auto-save debounce every time any field
+         * in the form changes, including uploads and date pickers.
+         */}
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+          onValuesChange={handleFormValuesChange}
+        >
           {/* ================= Customer Basic Details ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">
             <h3 className="text-lg font-semibold text-amber-700 mb-3">
               Customer Basic Details
             </h3>
             <Row gutter={24}>
-              {/* <Col span={6}>
-                <Form.Item label="Customer Code" name="customerCode">
-                  <Input
-                    className={inputClass}
-                    disabled
-                    placeholder="Auto-generated"
-                  />
-                </Form.Item>
-              </Col> */}
-
               <Col span={6}>
                 <Form.Item
                   label="Customer Name"
@@ -735,6 +915,7 @@ export default function CustomerTab() {
                   />
                 </Form.Item>
               </Col>
+
               <Col span={4}>
                 <Form.Item
                   label="WhatsApp Number"
@@ -755,6 +936,7 @@ export default function CustomerTab() {
                   />
                 </Form.Item>
               </Col>
+
               <Col span={6}>
                 <Form.Item
                   label="Email Address"
@@ -771,24 +953,25 @@ export default function CustomerTab() {
                   />
                 </Form.Item>
               </Col>
+
               <Col span={6}>
                 <Form.Item
                   label="Password"
                   name="password"
                   rules={
                     selected
-                      ? [] // not required when editing
+                      ? []
                       : [{ required: true, message: "Please enter password" }]
                   }
                 >
                   <Input.Password
                     className={inputClass}
-                    disabled={viewMode || selected}
+                    disabled={viewMode || !!selected}
                     placeholder="Enter password"
-                    type="password"
                   />
                 </Form.Item>
               </Col>
+
               <Col span={4}>
                 <Form.Item
                   label="Customer Type"
@@ -825,9 +1008,7 @@ export default function CustomerTab() {
             </Row>
           </Card>
 
-          {/* ================= Contact & Address Details ================= */}
-
-          {/* ── Address Details ── */}
+          {/* ================= Address Details ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">
             <h3 className="text-lg font-semibold text-amber-700 mb-3">
               Address Details
@@ -842,6 +1023,7 @@ export default function CustomerTab() {
                   />
                 </Form.Item>
               </Col>
+
               <Col span={6}>
                 <Form.Item label="Address Line 2" name="address">
                   <Input
@@ -852,12 +1034,6 @@ export default function CustomerTab() {
                 </Form.Item>
               </Col>
 
-              {/*
-                COUNTRY
-                - options:  { value: "IN", label: "India" }  from getCountryOptions()
-                - onChange: stores isoCode in selCountryIso, label (plain name) in form field
-                - form field value: plain name ("India") → sent directly in FormData
-              */}
               <Col span={4}>
                 <Form.Item
                   label="Country"
@@ -876,12 +1052,6 @@ export default function CustomerTab() {
                 </Form.Item>
               </Col>
 
-              {/*
-                STATE
-                - options: { value: "OR", label: "Odisha" } from getStateOptions(selCountryIso)
-                - disabled until a country is selected
-                - onChange: stores isoCode in selStateIso, plain name in selStateName + form field
-              */}
               <Col span={4}>
                 <Form.Item
                   label="State"
@@ -903,13 +1073,6 @@ export default function CustomerTab() {
                 </Form.Item>
               </Col>
 
-              {/*
-                DISTRICT
-                - options: { value: "Khordha", label: "Khordha" } from getDistrictOptions(selStateName)
-                - uses plain stateName (not isoCode) because ind-state-district is resolved by name
-                - disabled until a state is selected
-                - value stored in form is the plain district name
-              */}
               <Col span={4}>
                 <Form.Item
                   label="District"
@@ -932,12 +1095,6 @@ export default function CustomerTab() {
                 </Form.Item>
               </Col>
 
-              {/*
-                CITY
-                - options: { value: "Bhubaneswar", label: "Bhubaneswar" } from getCityOptions()
-                - linked to STATE (not district) — this is a limitation of all free packages
-                - disabled until a state is selected
-              */}
               <Col span={4}>
                 <Form.Item
                   label="City"
@@ -977,6 +1134,7 @@ export default function CustomerTab() {
                   />
                 </Form.Item>
               </Col>
+
               <Col span={4}>
                 <Form.Item label="Google Location" name="location">
                   <Input
@@ -986,6 +1144,7 @@ export default function CustomerTab() {
                   />
                 </Form.Item>
               </Col>
+
               <Col span={4}>
                 <Form.Item label="Region" name="region">
                   <Input
@@ -1047,8 +1206,8 @@ export default function CustomerTab() {
                   </Select>
                 </Form.Item>
               </Col>
-              {/* ================= Security Fields ================= */}
 
+              {/* ── Bank Guarantee ── */}
               {securityType === "Bank Guarantee" && (
                 <>
                   <Col span={5}>
@@ -1060,52 +1219,42 @@ export default function CustomerTab() {
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
-
                   <Col span={5}>
                     <Form.Item
                       label="Date"
                       name="bgDate"
                       rules={[{ required: true, message: "Enter Date" }]}
                     >
-                      <DatePicker className="w-full" format="YYYY-MM-DD" />
+                      <DatePicker
+                        className="w-full"
+                        format="YYYY-MM-DD"
+                        disabled={viewMode}
+                      />
                     </Form.Item>
                   </Col>
-
                   <Col span={5}>
                     <Form.Item
                       label="Bank Guarantee Amount"
                       name="bgAmount"
-                      rules={[
-                        {
-                          required: true,
-                          message: "Enter Bank Guarantee amount",
-                        },
-                      ]}
+                      rules={[{ required: true, message: "Enter BG amount" }]}
                     >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
-
                   <Col span={5}>
                     <Form.Item
                       label="Bank Guarantee Number"
                       name="bgNumber"
-                      rules={[
-                        {
-                          required: true,
-                          message: "Entere Bank Guarantee Number",
-                        },
-                      ]}
+                      rules={[{ required: true, message: "Enter BG Number" }]}
                     >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
-
                   <Col span={5}>
                     <Form.Item
                       label="Valid From"
                       name="bgValidFrom"
-                      rules={[{ required: true, message: "select Date" }]}
+                      rules={[{ required: true, message: "Select Date" }]}
                     >
                       <DatePicker
                         className="w-full"
@@ -1115,7 +1264,6 @@ export default function CustomerTab() {
                       />
                     </Form.Item>
                   </Col>
-
                   <Col span={5}>
                     <Form.Item
                       label="Valid Upto"
@@ -1129,7 +1277,6 @@ export default function CustomerTab() {
                       />
                     </Form.Item>
                   </Col>
-
                   <Col span={5}>
                     <Form.Item
                       label="Upload Document"
@@ -1140,23 +1287,22 @@ export default function CustomerTab() {
                       }
                       rules={[{ required: true, message: "Please upload doc" }]}
                     >
-                      <div className="w-full">
-                        <Upload
-                          beforeUpload={() => false}
-                          maxCount={1}
-                          listType="picture"
-                          disabled={viewMode}
-                          style={{ width: "100%" }}
-                        >
-                          <Button icon={<UploadOutlined />} block>
-                            Upload Document
-                          </Button>
-                        </Upload>
-                      </div>
+                      <Upload
+                        beforeUpload={() => false}
+                        maxCount={1}
+                        listType="picture"
+                        disabled={viewMode}
+                      >
+                        <Button icon={<UploadOutlined />} block>
+                          Upload Document
+                        </Button>
+                      </Upload>
                     </Form.Item>
                   </Col>
                 </>
               )}
+
+              {/* ── Post Dated Cheque ── */}
               {securityType === "Post Dated Cheque" && (
                 <>
                   <Col span={5}>
@@ -1170,16 +1316,12 @@ export default function CustomerTab() {
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
-
                   <Col span={5}>
                     <Form.Item
                       label="Cheque Issue Date"
                       name="pdcIssueDate"
                       rules={[
-                        {
-                          required: true,
-                          message: "Please select cheque issue date",
-                        },
+                        { required: true, message: "Select cheque issue date" },
                       ]}
                     >
                       <DatePicker
@@ -1190,61 +1332,45 @@ export default function CustomerTab() {
                       />
                     </Form.Item>
                   </Col>
-
                   <Col span={5}>
                     <Form.Item
                       label="Cheque Dated"
                       name="pdcDate"
                       rules={[
-                        {
-                          required: true,
-                          message: "Please select cheque date",
-                        },
+                        { required: true, message: "Select cheque date" },
                       ]}
                     >
                       <Input placeholder="DD-MM-YYYY" disabled={viewMode} />
                     </Form.Item>
                   </Col>
-
                   <Col span={5}>
                     <Form.Item
                       label="Cheque Number"
                       name="pdcNumber"
                       rules={[
-                        {
-                          required: true,
-                          message: "Please enter cheque number",
-                        },
+                        { required: true, message: "Enter cheque number" },
                       ]}
                     >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
-
                   <Col span={5}>
                     <Form.Item
                       label="Cheque Amount"
                       name="pdcAmount"
                       rules={[
-                        {
-                          required: true,
-                          message: "Please enter cheque amount",
-                        },
+                        { required: true, message: "Enter cheque amount" },
                       ]}
                     >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
-
                   <Col span={5}>
                     <Form.Item
                       label="Valid Upto"
                       name="pdcValid"
                       rules={[
-                        {
-                          required: true,
-                          message: "Please select valid upto date",
-                        },
+                        { required: true, message: "Select valid upto date" },
                       ]}
                     >
                       <DatePicker
@@ -1256,27 +1382,24 @@ export default function CustomerTab() {
                   </Col>
                 </>
               )}
+
+              {/* ── Fixed Deposit ── */}
               {securityType === "Fixed Deposit" && (
                 <>
                   <Col span={5}>
                     <Form.Item
                       label="Bank Name"
                       name="fdBank"
-                      rules={[
-                        { required: true, message: "Please enter bank name" },
-                      ]}
+                      rules={[{ required: true, message: "Enter bank name" }]}
                     >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
-
                   <Col span={5}>
                     <Form.Item
                       label="Date"
                       name="fdDate"
-                      rules={[
-                        { required: true, message: "Please select date" },
-                      ]}
+                      rules={[{ required: true, message: "Select date" }]}
                     >
                       <DatePicker
                         className="w-full"
@@ -1285,46 +1408,34 @@ export default function CustomerTab() {
                       />
                     </Form.Item>
                   </Col>
-
                   <Col span={5}>
                     <Form.Item
                       label="Cheque/RTGS Number"
                       name="fdCheque"
                       rules={[
-                        {
-                          required: true,
-                          message: "Please enter cheque number",
-                        },
+                        { required: true, message: "Enter cheque number" },
                       ]}
                     >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
-
                   <Col span={5}>
                     <Form.Item
                       label="Security Detail/Narration"
                       name="fdSecurity"
                       rules={[
-                        {
-                          required: true,
-                          message: "Please enter security detail",
-                        },
+                        { required: true, message: "Enter security detail" },
                       ]}
                     >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
-
                   <Col span={5}>
                     <Form.Item
                       label="Rate of Interest"
                       name="fdInterest"
                       rules={[
-                        {
-                          required: true,
-                          message: "Please enter rate of interest",
-                        },
+                        { required: true, message: "Enter rate of interest" },
                         {
                           pattern: /^(100|[0-9]{1,2})(\.\d{1,2})?$/,
                           message: "Enter a valid number between 0 and 100",
@@ -1340,6 +1451,8 @@ export default function CustomerTab() {
                   </Col>
                 </>
               )}
+
+              {/* ── Collateral ── */}
               {securityType === "Collateral" && (
                 <>
                   <Col span={5}>
@@ -1347,40 +1460,29 @@ export default function CustomerTab() {
                       label="Collateral Details"
                       name="collateralDetails"
                       rules={[
-                        {
-                          required: true,
-                          message: "Please enter collateral details",
-                        },
+                        { required: true, message: "Enter collateral details" },
                       ]}
                     >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
-
                   <Col span={5}>
                     <Form.Item
                       label="Address Details"
                       name="collateralAddress"
                       rules={[
-                        {
-                          required: true,
-                          message: "Please enter address details",
-                        },
+                        { required: true, message: "Enter address details" },
                       ]}
                     >
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
-
                   <Col span={5}>
                     <Form.Item
                       label="Market Value"
                       name="collateralValue"
                       rules={[
-                        {
-                          required: true,
-                          message: "Please enter market value",
-                        },
+                        { required: true, message: "Enter market value" },
                       ]}
                     >
                       <Input className={inputClass} disabled={viewMode} />
@@ -1388,25 +1490,13 @@ export default function CustomerTab() {
                   </Col>
                 </>
               )}
-              {/* <Col span={4}>
-                <Form.Item label="Advance Cheque No" name="advCheque">
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="Enter cheque number"
-                  />
-                </Form.Item>
-              </Col> */}
 
               <Col span={4}>
                 <Form.Item
                   label="Amount Limit"
                   name="amountLimit"
                   rules={[
-                    {
-                      required: true,
-                      message: "Please enter amount limit",
-                    },
+                    { required: true, message: "Please enter amount limit" },
                   ]}
                 >
                   <Input
@@ -1419,14 +1509,9 @@ export default function CustomerTab() {
 
               <Col span={5}>
                 <Form.Item
-                  label="Days Limit(No of Days)"
+                  label="Days Limit (No of Days)"
                   name="noDaysLimit"
-                  rules={[
-                    {
-                      required: true,
-                      message: "Enter Number of Days",
-                    },
-                  ]}
+                  rules={[{ required: true, message: "Enter Number of Days" }]}
                 >
                   <Input
                     className={inputClass}
@@ -1438,7 +1523,7 @@ export default function CustomerTab() {
 
               <Col span={5}>
                 <Form.Item
-                  label="Invoice Limit(No of Invoice)"
+                  label="Invoice Limit (No of Invoice)"
                   name="noInvoiceLimit"
                   rules={[
                     {
@@ -1459,12 +1544,7 @@ export default function CustomerTab() {
                 <Form.Item
                   label="Souda Limit (Ton)"
                   name="soudaLimit"
-                  rules={[
-                    {
-                      required: true,
-                      message: "Enter Souda Limit",
-                    },
-                  ]}
+                  rules={[{ required: true, message: "Enter Souda Limit" }]}
                 >
                   <Input
                     className={inputClass}
@@ -1481,7 +1561,6 @@ export default function CustomerTab() {
             <h3 className="text-lg font-semibold text-amber-700 mb-3">
               Legal & Tax Information
             </h3>
-
             <Row gutter={24}>
               <Col span={4}>
                 <Form.Item
@@ -1516,12 +1595,11 @@ export default function CustomerTab() {
                     maxCount={1}
                     disabled={viewMode}
                     listType="picture"
-                    style={{ width: "100%" }}
-                    onPreview={(file) => {
+                    onPreview={(file) =>
                       window.open(
                         file.url || URL.createObjectURL(file.originFileObj),
-                      );
-                    }}
+                      )
+                    }
                   >
                     <Button
                       icon={<UploadOutlined />}
@@ -1536,13 +1614,7 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={4}>
-                <Form.Item
-                  label="TIN Number"
-                  name="tinNo"
-                  // rules={[
-                  //   {  message: "Please enter TIN number" },
-                  // ]}
-                >
+                <Form.Item label="TIN Number" name="tinNo">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -1582,19 +1654,18 @@ export default function CustomerTab() {
                   <Upload
                     beforeUpload={() => false}
                     maxCount={1}
-                    style={{ width: "100%" }}
                     disabled={viewMode}
                     listType="picture"
-                    onPreview={(file) => {
+                    onPreview={(file) =>
                       window.open(
                         file.url || URL.createObjectURL(file.originFileObj),
-                      );
-                    }}
+                      )
+                    }
                   >
                     <Button
                       icon={<UploadOutlined />}
                       style={{ width: "100%" }}
-                      className=" text-left bg-white border-amber-400"
+                      className="text-left bg-white border-amber-400"
                       disabled={viewMode}
                     >
                       Upload
@@ -1643,12 +1714,11 @@ export default function CustomerTab() {
                     maxCount={1}
                     disabled={viewMode}
                     listType="picture"
-                    style={{ width: "100%" }}
-                    onPreview={(file) => {
+                    onPreview={(file) =>
                       window.open(
                         file.url || URL.createObjectURL(file.originFileObj),
-                      );
-                    }}
+                      )
+                    }
                   >
                     <Button
                       icon={<UploadOutlined />}
@@ -1679,16 +1749,7 @@ export default function CustomerTab() {
               </Col>
 
               <Col span={5}>
-                <Form.Item
-                  label="Trade License Number"
-                  name="licenseNo"
-                  // rules={[
-                  //   {
-                  //     required: true,
-                  //     message: "Please enter trade license number",
-                  //   },
-                  // ]}
-                >
+                <Form.Item label="Trade License Number" name="licenseNo">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -1735,10 +1796,7 @@ export default function CustomerTab() {
           {!viewMode && (
             <div className="flex justify-end gap-2 pt-2">
               <Button
-                onClick={() => {
-                  setOpen(false);
-                  form.resetFields();
-                }}
+                onClick={closeModal}
                 className="border-amber-500! text-amber-700! hover:bg-amber-100!"
               >
                 Cancel

@@ -1,72 +1,82 @@
-import React, { useState } from "react";
-import {
-  Form,
-  Input,
-  Button,
-  Upload,
-  Col,
-  Row,
-  Select,
-  message,
-} from "antd";
-import {
-  UserOutlined,
-  ApartmentOutlined,
-  UploadOutlined,
-} from "@ant-design/icons";
+import React, { useEffect } from "react";
+import { Form, Input, Button, Col, Row, message } from "antd";
+import { UserOutlined, UploadOutlined } from "@ant-design/icons";
+import { getProfileData, updateProfileData } from "../api/dashboard";
+import useSessionStore from "../store/sessionStore";
 
-/* ===================== INITIAL DATA ===================== */
-const profileData = {
-  personalInfo: {
-    firstName: "Rajesh",
-    lastName: "Kumar",
-    email: "rajesh.kumar@ruchisoya.com",
-    phone: "9876543210",
-    address: "Bhubaneswar, Odisha, India",
-    broker_associate: "N/A",
-    avatarInitials: "RK",
-  },
-  company: {
-    name: "Ruchi Soya Industries Ltd.",
-    companyPhone: "9876543210",
-    companyEmail: "rajesh.kumar@ruchisoya.com",
-    country: "India",
-    state: "Odisha",
-    city: "Bhubaneswar",
-    pin: "751010",
-    address: "Plot No. 15, Industrial Estate",
-    gst_in: "21AAACR1234Q1ZV",
-    tin: "1234567890",
-    license_no: "LIC1234567890",
-    fassai_no: "FSSAI1234567890",
-    pan_no: "AAACR1234Q",
-    adhhar_no: "123456789012",
-    tdc_applicable: "yes",
-  },
-};
-
-/* ===================== COMPONENT ===================== */
 export default function ProfileSettings() {
   const [formPersonal] = Form.useForm();
-  const [formCompany] = Form.useForm();
-  const [profile, setProfile] = useState(profileData);
+  const user = useSessionStore((state) => state.user);
+  const setUser = useSessionStore((state) => state.setUser);
+  const mapProfileToForm = (response) => {
+    const customer = response?.customer ?? {};
+    const profile = response?.profile ?? {};
+    const fullName = customer.customer_name?.trim() || "";
+    const nameParts = fullName.split(/\s+/).filter(Boolean);
 
-  /* ===================== SUBMIT HANDLERS ===================== */
-  const onPersonalSubmit = (values) => {
-    setProfile((prev) => ({
-      ...prev,
-      personalInfo: { ...prev.personalInfo, ...values },
-    }));
-    message.success("Personal information updated");
+    return {
+      firstName: nameParts[0] || "",
+      lastName: nameParts.slice(1).join(" "),
+      email:
+        customer.email_address || response?.user?.username || response?.user?.email || "",
+      phone: customer.mobile_number || customer.phone_number || customer.whatsapp_number || "",
+      address: customer.address || "",
+      broker_associate: profile.broker_associated || "",
+    };
   };
 
-  const onCompanySubmit = (values) => {
-    setProfile((prev) => ({
-      ...prev,
-      company: { ...prev.company, ...values },
-    }));
-    message.success("Company information updated");
+  const fetchProfile = async () => {
+    try {
+      const res = await getProfileData();
+      setUser({
+        ...user,
+        customer_name: res?.customer?.customer_name || user?.customer_name,
+        name: res?.customer?.customer_name || user?.name,
+        email: res?.customer?.email_address || res?.user?.username || user?.email,
+      });
+      formPersonal.setFieldsValue(mapProfileToForm(res));
+    } catch (err) {
+      message.error("Failed to load profile");
+    }
   };
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const onFinish = async (values) => {
+    try {
+      const payload = {
+        customer_name: `${values.firstName} ${values.lastName}`.trim(),
+        email_address: values.email,
+        mobile_number: values.phone,
+        phone_number: values.phone,
+        whatsapp_number: values.phone,
+        address: values.address,
+        broker_associated: values.broker_associate || null,
+      };
+
+      const updatedResponse = await updateProfileData(payload);
+      setUser({
+        ...user,
+        customer_name:
+          updatedResponse?.customer?.customer_name || payload.customer_name,
+        name: updatedResponse?.customer?.customer_name || payload.customer_name,
+        email:
+          updatedResponse?.customer?.email_address ||
+          updatedResponse?.user?.username ||
+          payload.email_address,
+      });
+      formPersonal.setFieldsValue(mapProfileToForm(updatedResponse));
+      message.success("Profile updated successfully");
+    } catch (err) {
+      message.error("Update failed");
+    }
+  };
+
+  const firstName = Form.useWatch("firstName", formPersonal);
+  const lastName = Form.useWatch("lastName", formPersonal);
+  const initials = `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
 
   return (
     <div>
@@ -79,35 +89,27 @@ export default function ProfileSettings() {
 
       <Row gutter={24}>
         {/* ===================== PERSONAL INFO ===================== */}
-        <Col span={10}>
-          <div className="bg-white p-6 rounded-lg shadow border border-amber-300">
-            <h2 className="font-semibold text-lg text-amber-700 mb-4 flex items-center gap-2">
+        <Col span={24}>
+          <div className="bg-white p-4 rounded-lg shadow border border-amber-300">
+            <h2 className="font-semibold text-base text-amber-700 mb-3 flex items-center gap-2">
               <UserOutlined /> Personal Information
             </h2>
 
-            <Row gutter={20} align="middle" className="mb-6">
+            <Row gutter={16} align="middle" className="mb-4">
               <Col>
-                <div className="w-20 h-20 flex items-center justify-center rounded-full bg-amber-200 text-xl font-semibold text-amber-800">
-                  {profile.personalInfo.avatarInitials}
+                <div className="w-16 h-16 flex items-center justify-center rounded-full bg-amber-200 text-lg font-semibold text-amber-800">
+                  {initials || "U"}
                 </div>
-              </Col>
-              <Col>
-                <Upload showUploadList={false}>
-                  <Button className="border-amber-500 text-amber-700">
-                    Change Photo
-                  </Button>
-                </Upload>
               </Col>
             </Row>
 
             <Form
               layout="vertical"
               form={formPersonal}
-              initialValues={profile.personalInfo}
-              onFinish={onPersonalSubmit}
+              onFinish={onFinish}
             >
               <Row gutter={16}>
-                <Col span={12}>
+                <Col span={6}>
                   <Form.Item
                     label="First Name"
                     name="firstName"
@@ -117,7 +119,7 @@ export default function ProfileSettings() {
                   </Form.Item>
                 </Col>
 
-                <Col span={12}>
+                <Col span={6}>
                   <Form.Item
                     label="Last Name"
                     name="lastName"
@@ -126,10 +128,10 @@ export default function ProfileSettings() {
                     <Input />
                   </Form.Item>
                 </Col>
-              </Row>
+            
 
-              <Row gutter={16}>
-                <Col span={12}>
+
+                <Col span={6}>
                   <Form.Item
                     label="Email"
                     name="email"
@@ -142,7 +144,7 @@ export default function ProfileSettings() {
                   </Form.Item>
                 </Col>
 
-                <Col span={12}>
+                <Col span={6}>
                   <Form.Item
                     label="Phone"
                     name="phone"
@@ -157,38 +159,47 @@ export default function ProfileSettings() {
                     <Input />
                   </Form.Item>
                 </Col>
+         
+  </Row>
+              <Row gutter={16} align="bottom">
+                <Col span={6}>
+                  <Form.Item
+                    label="Address"
+                    name="address"
+                    rules={[{ required: true }]}
+                  >
+                    <Input.TextArea rows={2} />
+                  </Form.Item>
+                </Col>
+
+                <Col span={6}>
+                  <Form.Item
+                    label="Broker Associate"
+                    name="broker_associate"
+                  >
+                    <Input />
+                  </Form.Item>
+                </Col>
+
+                <Col span={6}>
+                  <Form.Item label=" ">
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      icon={<UploadOutlined />}
+                      style={{ backgroundColor: "#d97706", width: "100%" }}
+                    >
+                      Save Personal Info
+                    </Button>
+                  </Form.Item>
+                </Col>
               </Row>
-
-              <Form.Item
-                label="Address"
-                name="address"
-                rules={[{ required: true }]}
-              >
-                <Input.TextArea rows={2} />
-              </Form.Item>
-
-              <Form.Item
-                label="Broker Associate"
-                name="broker_associate"
-                rules={[{ required: true }]}
-              >
-                <Input />
-              </Form.Item>
-
-              <Button
-                type="primary"
-                htmlType="submit"
-                icon={<UploadOutlined />}
-                style={{ backgroundColor: "#d97706" }}
-              >
-                Save Personal Info
-              </Button>
             </Form>
           </div>
         </Col>
 
         {/* ===================== COMPANY INFO ===================== */}
-        <Col span={14}>
+        {/* <Col span={14}>
           <div className="bg-white p-6 rounded-lg shadow border border-amber-300">
             <h2 className="font-semibold text-lg text-amber-700 mb-4 flex items-center gap-2">
               <ApartmentOutlined /> Company Information
@@ -366,7 +377,7 @@ export default function ProfileSettings() {
               </Button>
             </Form>
           </div>
-        </Col>
+        </Col> */}
       </Row>
     </div>
   );
