@@ -24,7 +24,10 @@ export const updateProfileData = async (profileData) => {
 //dashboard
 export const getDashboardData = async () => {
     const currentOrgId = useSessionStore.getState().currentOrgId;
-    const res = await api.get(`/transport/dashboard/${currentOrgId}`, {
+    const res = await api.get(`/transport/dashboard/`, {
+       params: {
+        organisation: currentOrgId,
+    },
     });
     return res.data;
 };
