@@ -643,7 +643,7 @@ export default function CustomerTab() {
     },
     {
       title: <span className="text-amber-700 font-semibold">Mobile</span>,
-      dataIndex: "mobile_number",
+      dataIndex: "phone_number",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
