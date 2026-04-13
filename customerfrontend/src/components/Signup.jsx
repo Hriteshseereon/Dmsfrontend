@@ -25,7 +25,7 @@ export default function Signup() {
       name: values.name,
       email: values.email,
       password: values.password,
-      phone: values.phone,
+      phone_number: values.phone,
       address: values.address,
       companies: companies,
     };
