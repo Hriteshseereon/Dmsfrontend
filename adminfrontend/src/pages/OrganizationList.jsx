@@ -13,6 +13,8 @@ import {
   Edit,
   Download,
   Trash2,
+  ChevronDown,
+  CalendarDays,
 } from "lucide-react";
 import { useOrganizations } from "../queries/useOrganizations";
 import useSessionStore from "../store/sessionStore";
@@ -20,6 +22,7 @@ import { getOrganization } from "../api/organizations";
 import { exportOrganisationExcel } from "../utils/exportOrganisationExcel";
 import { getAllDraftOrganizations } from "../utils/savedForms";
 import { Divider } from "antd";
+const FY_OPTIONS = ["2025-26", "2024-25", "2023-24"];
 export default function OrganizationList() {
   const { user, setOrgModules } = useAuth();
   const navigate = useNavigate();
@@ -56,17 +59,16 @@ export default function OrganizationList() {
 
   const handleDraftEdit = (draftFormId) => {
     navigate(`/organisation/add?draft=${draftFormId}`);
-  }
+  };
 
   const handleDraftDelete = (draftFormId) => {
     if (window.confirm("Are you sure you want to delete this draft?")) {
       localStorage.removeItem(`form-${draftFormId}`);
       setCurrentOrgId((prev) => prev); // Trigger re-render
     }
-  }
+  };
 
   const draftOrganizations = getAllDraftOrganizations();
-  
 
   return (
     <div className="min-h-screen mb-0 pb-0 ">
@@ -121,8 +123,10 @@ const OrganizationCard = ({
   onDownload,
   onEdit,
   onOpen,
-  onDelete
+  onDelete,
 }) => {
+  const [selectedFY, setSelectedFY] = useState("2024-25");
+  const [fyOpen, setFyOpen] = useState(false);
   const headerStyles = isDraft
     ? "bg-gradient-to-r from-gray-400 to-gray-600 h-2"
     : "bg-gradient-to-r from-amber-500 to-orange-500 h-2";
@@ -144,19 +148,19 @@ const OrganizationCard = ({
           {isDraft ? (
             <>
               <div className="flex gap-2">
-            <button
-              onClick={() => onEdit(org.id)}
-              className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors cursor-pointer"
-            >
-              <Edit className="text-gray-600" size={24} />
-            </button>
-            <button
-              onClick={() => onDelete(org.id)}
-              className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center hover:bg-red-200 transition-colors cursor-pointer"
-            >
-              <Trash2 className="text-red-600" size={24} />
-            </button>
-            </div>
+                <button
+                  onClick={() => onEdit(org.id)}
+                  className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors cursor-pointer"
+                >
+                  <Edit className="text-gray-600" size={24} />
+                </button>
+                <button
+                  onClick={() => onDelete(org.id)}
+                  className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center hover:bg-red-200 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="text-red-600" size={24} />
+                </button>
+              </div>
             </>
           ) : (
             <>
@@ -207,7 +211,52 @@ const OrganizationCard = ({
                 )}
               </div>
             </div>
+            {/* ✅ NEW: Financial Year Selector */}
+            <div className="mb-4">
+              <p className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                <CalendarDays size={14} className="text-amber-500" />
+                Financial Year
+              </p>
+              <div className="relative">
+                <button
+                  onClick={() => setFyOpen((prev) => !prev)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg text-sm font-semibold text-amber-700 transition-colors cursor-pointer"
+                >
+                  <span>FY {selectedFY}</span>
+                  <ChevronDown
+                    size={15}
+                    className={`text-amber-500 transition-transform duration-200 ${fyOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
 
+                {fyOpen && (
+                  <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                    {FY_OPTIONS.map((fy) => (
+                      <button
+                        key={fy}
+                        onClick={() => {
+                          setSelectedFY(fy);
+                          setFyOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-2.5 text-sm transition-colors cursor-pointer flex items-center justify-between
+                          ${
+                            fy === selectedFY
+                              ? "bg-amber-50 text-amber-700 font-semibold"
+                              : "text-gray-700 hover:bg-gray-50 font-normal"
+                          }`}
+                      >
+                        FY {fy}
+                        {fy === selectedFY && (
+                          <span className="w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center text-white text-[10px]">
+                            ✓
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
             <button
               onClick={() => onOpen(org)}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-lg font-medium transition-all group-hover:shadow-md"
