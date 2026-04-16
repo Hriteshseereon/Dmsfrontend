@@ -112,11 +112,11 @@ export default function Login() {
             </button>
           </div>
 
-          <div className="text-right mb-4">
+          {/* <div className="text-right mb-4">
             <a href="#" className="text-sm text-amber-600 hover:underline">
               Forgot Password?
             </a>
-          </div>
+          </div> */}
 
           <button
             type="submit"

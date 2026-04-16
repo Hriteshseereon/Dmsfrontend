@@ -520,6 +520,25 @@ export default function VendorTab() {
       setSelStateIso(stateIso);
     }
 
+    // Check for uploaded files and show warning
+    const hasFiles = Object.keys(restored).some(key => {
+      const value = restored[key];
+      return Array.isArray(value) && value.length > 0 && value[0]?._fromDraft;
+    });
+
+    // Also check nested plants for files
+    const hasPlantFiles = Array.isArray(restored.plants) && restored.plants.some(plant => {
+      if (!plant) return false;
+      return Object.keys(plant).some(key => {
+        const value = plant[key];
+        return Array.isArray(value) && value.length > 0 && value[0]?._fromDraft;
+      });
+    });
+
+    if (hasFiles || hasPlantFiles) {
+      message.warning("Draft restored! Please re-upload any documents as they are not saved in drafts.", 5);
+    }
+
     setActiveDraftId(draftId);
     setDraftSavedAt(draft.savedAt ? new Date(draft.savedAt) : null);
     setSelected(null);

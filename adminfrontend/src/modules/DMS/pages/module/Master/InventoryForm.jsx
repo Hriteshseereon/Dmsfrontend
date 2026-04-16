@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Table,
   Button,
@@ -10,6 +10,9 @@ import {
   Row,
   Col,
   Card,
+  Tag,
+  Tooltip,
+  message,
 } from "antd";
 import {
   SearchOutlined,
@@ -18,6 +21,10 @@ import {
   EditOutlined,
   FilterOutlined,
   ReloadOutlined,
+  SaveOutlined,
+  FileTextOutlined,
+  ClockCircleOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 // import {
 //   getAllVendor,
@@ -35,8 +42,18 @@ import {
   getInventoryById,
   updateInventory,
   getAllVendor,
-  
 } from "../../../../../api/masterinventory";
+import {
+  createInventoryDraft,
+  saveInventoryDraft,
+  loadInventoryDraft,
+  deleteInventoryDraft,
+  deserialiseInventoryDraft,
+  getAllInventoryDrafts,
+} from "../../../../../utils/inventoryDraftUtils";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+dayjs.extend(relativeTime);
 
 const { Option } = Select;
 
@@ -52,7 +69,13 @@ export default function InventoryForm() {
   const [selectedRow, setSelectedRow] = useState(null);
   const [vendorList, setVendorList] = useState([]);
   const [productList, setProductList] = useState([]);
-  
+
+  // Draft state
+  const [activeDraftId, setActiveDraftId] = useState(null);
+  const [draftSavedAt, setDraftSavedAt] = useState(null);
+  const [draftTableKey, setDraftTableKey] = useState(0);
+  const autosaveTimer = useRef(null);
+
   useEffect(() => {
     fetchVendors();
     fetchInventory();
@@ -131,6 +154,11 @@ export default function InventoryForm() {
       setAddOpen(false);
       addForm.resetFields();
       fetchInventory();
+
+      // Delete draft on successful save
+      if (activeDraftId) {
+        discardActiveDraft();
+      }
     } catch (error) {
       console.log(error);
     }
@@ -203,23 +231,99 @@ export default function InventoryForm() {
     }
   };
 
+  const getFilteredData = () => {
+    if (!searchText) return data;
 
-const getFilteredData = () => {
-  if (!searchText) return data;
+    const value = searchText.toLowerCase();
 
-  const value = searchText.toLowerCase();
-
-  return data.filter((item) => {
-    return Object.values(item).some((val) => {
-      if (!val) return false;
-      return JSON.stringify(val).toLowerCase().includes(value);
+    return data.filter((item) => {
+      return Object.values(item).some((val) => {
+        if (!val) return false;
+        return JSON.stringify(val).toLowerCase().includes(value);
+      });
     });
-  });
-};
+  };
 
-const handleReset = () => {
-  setSearchText("");
-};
+  const handleReset = () => {
+    setSearchText("");
+  };
+
+  // ================= DRAFT FUNCTIONALITY =================
+  const handleFormValuesChange = useCallback(
+    (changedValues, allValues) => {
+      if (addOpen) {
+        if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+
+        autosaveTimer.current = setTimeout(() => {
+          const meta = {
+            vendorName: vendorList.find((v) => v.id === allValues.vendor)?.name,
+            productName: productList.find((p) => p.id === allValues.product)
+              ?.name,
+            productType: allValues.productType,
+          };
+
+          setActiveDraftId((prevId) => {
+            const id = prevId || createInventoryDraft(allValues, meta);
+            saveInventoryDraft(id, allValues, meta);
+            setDraftSavedAt(new Date());
+            setDraftTableKey((k) => k + 1);
+            return id;
+          });
+        }, 1500);
+      }
+    },
+    [addOpen, vendorList, productList],
+  );
+
+  const handleManualSave = () => {
+    if (!addOpen) return;
+
+    const values = addForm.getFieldsValue(true);
+    const meta = {
+      vendorName: vendorList.find((v) => v.id === values.vendor)?.name,
+      productName: productList.find((p) => p.id === values.product)?.name,
+      productType: values.productType,
+    };
+
+    setActiveDraftId((prevId) => {
+      const id = prevId || createInventoryDraft(values, meta);
+      saveInventoryDraft(id, values, meta);
+      setDraftSavedAt(new Date());
+      setDraftTableKey((k) => k + 1);
+      message.success("Draft saved");
+      return id;
+    });
+  };
+
+  const handleContinueDraft = (draftId) => {
+    const draft = loadInventoryDraft(draftId);
+    if (!draft) {
+      message.error("Draft not found");
+      return;
+    }
+
+    const restored = deserialiseInventoryDraft(draft.values);
+    addForm.setFieldsValue(restored);
+    setActiveDraftId(draftId);
+    setDraftSavedAt(new Date(draft.savedAt));
+
+    // Load products for the vendor
+    if (restored.vendor) {
+      handleVendorChange(restored.vendor, addForm);
+    }
+
+    setAddOpen(true);
+  };
+
+  const discardActiveDraft = () => {
+    if (activeDraftId) {
+      deleteInventoryDraft(activeDraftId);
+      setActiveDraftId(null);
+      setDraftSavedAt(null);
+      setDraftTableKey((k) => k + 1);
+    }
+  };
+
   const filteredData = getFilteredData();
 
   const columns = [
@@ -266,8 +370,119 @@ const handleReset = () => {
     },
   ];
 
+  // Draft Table Component
+  function InventoryDraftTable({ refreshKey, onContinue, onDelete }) {
+    const [drafts, setDrafts] = useState([]);
 
-  
+    useEffect(() => {
+      setDrafts(getAllInventoryDrafts());
+    }, [refreshKey]);
+
+    if (!drafts.length) return null;
+
+    const handleDelete = (id) => {
+      deleteInventoryDraft(id);
+      onDelete?.();
+      setDrafts(getAllInventoryDrafts());
+    };
+
+    const columns = [
+      {
+        title: (
+          <span className="text-amber-700 font-semibold text-xs">
+            Vendor Name
+          </span>
+        ),
+        dataIndex: "vendorName",
+        render: (t) => <span className="text-amber-800 font-medium">{t}</span>,
+      },
+      {
+        title: (
+          <span className="text-amber-700 font-semibold text-xs">
+            Product Name
+          </span>
+        ),
+        dataIndex: "productName",
+        render: (t) => <span className="text-amber-700 text-sm">{t}</span>,
+      },
+      {
+        title: (
+          <span className="text-amber-700 font-semibold text-xs">
+            Product Type
+          </span>
+        ),
+        dataIndex: "productType",
+        render: (t) => <span className="text-amber-700 text-sm">{t}</span>,
+      },
+      {
+        title: (
+          <span className="text-amber-700 font-semibold text-xs">
+            Last Saved
+          </span>
+        ),
+        dataIndex: "savedAt",
+        render: (v) => (
+          <Tag
+            icon={<ClockCircleOutlined />}
+            color="gold"
+            className="text-xs font-normal"
+          >
+            {v ? dayjs(v).fromNow() : "Not saved"}
+          </Tag>
+        ),
+      },
+      {
+        title: (
+          <span className="text-amber-700 font-semibold text-xs">Actions</span>
+        ),
+        render: (_, record) => (
+          <div className="flex gap-2">
+            <Button
+              size="small"
+              type="primary"
+              icon={<EditOutlined />}
+              className="bg-amber-500! hover:bg-amber-600! border-none! text-xs!"
+              onClick={() => onContinue(record.id)}
+            >
+              Continue
+            </Button>
+            <Button
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              className="text-xs!"
+              onClick={() => handleDelete(record.id)}
+            >
+              Delete
+            </Button>
+          </div>
+        ),
+      },
+    ];
+
+    return (
+      <div className="border border-amber-200 rounded-lg p-4 bg-white shadow-sm mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <FileTextOutlined className="text-amber-500 text-lg" />
+          <h2 className="text-base font-semibold text-amber-700 m-0">
+            Saved Drafts
+          </h2>
+          <Tag color="gold" className="ml-1">
+            {drafts.length}
+          </Tag>
+        </div>
+        <Table
+          columns={columns}
+          dataSource={drafts}
+          rowKey="id"
+          size="small"
+          bordered
+          pagination={false}
+          rowClassName="hover:bg-amber-50"
+        />
+      </div>
+    );
+  }
 
   /* ---------------- COMMON FORM FIELDS ---------------- */
   const InventoryFields = ({
@@ -398,14 +613,13 @@ const handleReset = () => {
       {/* ---------------- HEADER ---------------- */}
       <div className="flex justify-between items-center mb-2">
         <div className="flex gap-2 items-center">
-         <Input
-  prefix={<SearchOutlined className="text-amber-500" />}
-  placeholder="Search inventory..."
-  value={searchText}
-  onChange={(e) => setSearchText(e.target.value)}
-   className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-      
-/>
+          <Input
+            prefix={<SearchOutlined className="text-amber-500" />}
+            placeholder="Search inventory..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          />
           <Button
             icon={<ReloadOutlined />}
             onClick={handleReset}
@@ -425,6 +639,13 @@ const handleReset = () => {
         </Button>
       </div>
 
+      {/* Draft Table */}
+      <InventoryDraftTable
+        refreshKey={draftTableKey}
+        onContinue={handleContinueDraft}
+        onDelete={() => setDraftTableKey((k) => k + 1)}
+      />
+
       {/* ---------------- TABLE ---------------- */}
       <div className="border border-amber-300 rounded-lg p-4 bg-white shadow-md">
         <Table columns={columns} dataSource={filteredData} rowKey="key" />
@@ -433,16 +654,53 @@ const handleReset = () => {
       {/* ---------------- ADD MODAL ---------------- */}
       <Modal
         title={
-          <span className="text-amber-700 text-xl font-semibold">
-            Add Inventory
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-amber-700 text-xl font-semibold">
+              Add Inventory
+            </span>
+
+            {/* Draft indicator */}
+            <div className="flex items-center gap-2 ml-2">
+              {activeDraftId ? (
+                <Tag
+                  color="gold"
+                  icon={<SaveOutlined />}
+                  className="cursor-default select-none"
+                >
+                  Draft saved
+                </Tag>
+              ) : (
+                <Tag
+                  color="default"
+                  className="cursor-default select-none text-xs"
+                >
+                  Not saved yet
+                </Tag>
+              )}
+
+              {/* Manual save button */}
+              <Button
+                size="small"
+                icon={<SaveOutlined />}
+                className="border-amber-400! text-amber-700! hover:bg-amber-100! text-xs!"
+                onClick={handleManualSave}
+              >
+                Save Draft
+              </Button>
+            </div>
+          </div>
         }
         open={addOpen}
         onCancel={() => setAddOpen(false)}
         footer={null}
         width={1000}
       >
-        <Form form={addForm} layout="vertical" onFinish={handleAdd}>
+        <Form
+          form={addForm}
+          layout="vertical"
+          onFinish={handleAdd}
+          onValuesChange={handleFormValuesChange}
+        >
           <Card bordered className="border-amber-300">
             <h6 className="text-amber-500 mb-3">Inventory Details</h6>
             <InventoryFields form={addForm} />
