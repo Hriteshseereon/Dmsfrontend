@@ -26,6 +26,7 @@ import {
   FileTextOutlined,
   ClockCircleOutlined,
   DeleteOutlined,
+  SaveOutlined,
 } from "@ant-design/icons";
 import { API_BASE_URL } from "@/utils/config";
 
@@ -202,9 +203,9 @@ const buildFormData = (values) => {
   const fd = new FormData();
 
   fd.append("name", values.brokerName || "");
-  fd.append("temporary_city", values.businessName || "");
+  // fd.append("temporary_city", values.businessName || "");
   fd.append("password", values.password || "");
-  fd.append("username", values.email || values.phoneNo);
+  fd.append("username", values.businessName || "");
   fd.append("email", values.email);
   fd.append("phone_number", values.phoneNo || "");
   fd.append("alternate_phone", values.altPhoneNo || "");
@@ -300,6 +301,26 @@ export default function BrokerTab() {
         return id;
       });
     }, AUTOSAVE_MS);
+  };
+
+  // Manual save draft function
+  const handleManualSave = () => {
+    if (selected || viewMode) return;
+    const values = form.getFieldsValue(true);
+    const meta = {
+      brokerName: values.brokerName,
+      email: values.email,
+      phoneNo: values.phoneNo,
+    };
+
+    setActiveDraftId((prevId) => {
+      const id = prevId || createDraft(values, meta);
+      saveDraft(id, values, meta);
+      setDraftSavedAt(new Date());
+      setDraftTableKey((k) => k + 1);
+      message.success("Draft saved");
+      return id;
+    });
   };
   const generatePassword = (length = 10) => {
     const chars =
@@ -411,7 +432,7 @@ export default function BrokerTab() {
     aadharNo: d.aadhar_number,
     bankDetails: d.bank_details,
     gstin: d.gstin,
-    businessName: d.temporary_city,
+    businessName: d.username,
     panDoc: fileFromUrl(d.pan_document),
     aadharDoc: fileFromUrl(d.aadhar_document),
     gstinDoc: fileFromUrl(d.gstin_document),
@@ -561,6 +582,20 @@ export default function BrokerTab() {
 
     const restored = deserialiseDraft(draft.values);
     form.setFieldsValue(restored);
+
+    // Check for uploaded files and show warning
+    const hasFiles = Object.keys(restored).some((key) => {
+      const value = restored[key];
+      return Array.isArray(value) && value.length > 0 && value[0]?._fromDraft;
+    });
+
+    if (hasFiles) {
+      message.warning(
+        "Draft restored! Please re-upload any documents as they are not saved in drafts.",
+        5,
+      );
+    }
+
     setActiveDraftId(id);
     setDraftSavedAt(new Date(draft.savedAt));
     setSelected(null);
@@ -755,9 +790,47 @@ export default function BrokerTab() {
           form.resetFields();
         }}
         title={
-          <span className="text-amber-700 font-semibold text-lg">
-            {viewMode ? "View Broker" : selected ? "Edit Broker" : "Add Broker"}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-amber-700 font-semibold text-lg">
+              {viewMode
+                ? "View Broker"
+                : selected
+                  ? "Edit Broker"
+                  : "Add Broker"}
+            </span>
+
+            {/* Draft indicator — shown only for new-broker forms */}
+            {!selected && !viewMode && (
+              <div className="flex items-center gap-2 ml-2">
+                {activeDraftId ? (
+                  <Tag
+                    color="gold"
+                    icon={<SaveOutlined />}
+                    className="cursor-default select-none"
+                  >
+                    Draft saved
+                  </Tag>
+                ) : (
+                  <Tag
+                    color="default"
+                    className="cursor-default select-none text-xs"
+                  >
+                    Not saved yet
+                  </Tag>
+                )}
+
+                {/* Manual save button */}
+                <Button
+                  size="small"
+                  icon={<SaveOutlined />}
+                  className="border-amber-400! text-amber-700! hover:bg-amber-100! text-xs!"
+                  onClick={handleManualSave}
+                >
+                  Save Draft
+                </Button>
+              </div>
+            )}
+          </div>
         }
         styles={{
           body: { maxHeight: "75vh", overflowY: "auto", paddingRight: 8 },
