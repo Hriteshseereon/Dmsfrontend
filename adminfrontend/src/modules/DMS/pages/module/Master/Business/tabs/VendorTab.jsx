@@ -384,7 +384,8 @@ export default function VendorTab() {
   const [selCountryIso, setSelCountryIso] = useState("IN");
   const [selStateName, setSelStateName] = useState(null);
   const [selStateIso, setSelStateIso] = useState(null);
-
+  const [corpStateName, setCorpStateName] = useState(null);
+  const [corpStateIso, setCorpStateIso] = useState(null);
   // draft state
   const [activeDraftId, setActiveDraftId] = useState(null);
   const [draftSavedAt, setDraftSavedAt] = useState(null);
@@ -521,22 +522,29 @@ export default function VendorTab() {
     }
 
     // Check for uploaded files and show warning
-    const hasFiles = Object.keys(restored).some(key => {
+    const hasFiles = Object.keys(restored).some((key) => {
       const value = restored[key];
       return Array.isArray(value) && value.length > 0 && value[0]?._fromDraft;
     });
 
     // Also check nested plants for files
-    const hasPlantFiles = Array.isArray(restored.plants) && restored.plants.some(plant => {
-      if (!plant) return false;
-      return Object.keys(plant).some(key => {
-        const value = plant[key];
-        return Array.isArray(value) && value.length > 0 && value[0]?._fromDraft;
+    const hasPlantFiles =
+      Array.isArray(restored.plants) &&
+      restored.plants.some((plant) => {
+        if (!plant) return false;
+        return Object.keys(plant).some((key) => {
+          const value = plant[key];
+          return (
+            Array.isArray(value) && value.length > 0 && value[0]?._fromDraft
+          );
+        });
       });
-    });
 
     if (hasFiles || hasPlantFiles) {
-      message.warning("Draft restored! Please re-upload any documents as they are not saved in drafts.", 5);
+      message.warning(
+        "Draft restored! Please re-upload any documents as they are not saved in drafts.",
+        5,
+      );
     }
 
     setActiveDraftId(draftId);
@@ -641,19 +649,19 @@ export default function VendorTab() {
         d.aadhar_document ||
         d.business_details?.aadhaar_documents,
     ),
-corporateAddress: d.corporate_addresses?.[0]
-  ? {
-      name: d.corporate_addresses[0].name,
-      address: d.corporate_addresses[0].address,
-      phoneNo: d.corporate_addresses[0].phone_number,
-      email: d.corporate_addresses[0].email_address,
-      country: d.corporate_addresses[0].country,
-      state: d.corporate_addresses[0].state,
-      district: d.corporate_addresses[0].district,
-      city: d.corporate_addresses[0].city,
-      pin: d.corporate_addresses[0].pin,
-    }
-  : {},
+    corporateAddress: d.corporate_addresses?.[0]
+      ? {
+          name: d.corporate_addresses[0].name,
+          address: d.corporate_addresses[0].address,
+          phoneNo: d.corporate_addresses[0].phone_number,
+          email: d.corporate_addresses[0].email_address,
+          country: d.corporate_addresses[0].country,
+          state: d.corporate_addresses[0].state,
+          district: d.corporate_addresses[0].district,
+          city: d.corporate_addresses[0].city,
+          pin: d.corporate_addresses[0].pin,
+        }
+      : {},
     plants: (d.plants || []).map((p) => ({
       plantName: p.name || p.plant_name,
       address: p.address,
@@ -742,20 +750,20 @@ corporateAddress: d.corporate_addresses?.[0]
         },
       ],
       corporate_addresses: values.corporateAddress
-  ? [
-      {
-        name: values.corporateAddress.name,
-        address: values.corporateAddress.address,
-        phone_number: values.corporateAddress.phoneNo?.toString(),
-        email_address: values.corporateAddress.email,
-        country: values.corporateAddress.country,
-        state: values.corporateAddress.state,
-        district: values.corporateAddress.district,
-        city: values.corporateAddress.city,
-        pin: values.corporateAddress.pin?.toString(),
-      },
-    ]
-  : [],
+        ? [
+            {
+              name: values.corporateAddress.name,
+              address: values.corporateAddress.address,
+              phone_number: values.corporateAddress.phoneNo?.toString(),
+              email_address: values.corporateAddress.email,
+              country: values.corporateAddress.country,
+              state: values.corporateAddress.state,
+              district: values.corporateAddress.district,
+              city: values.corporateAddress.city,
+              pin: values.corporateAddress.pin?.toString(),
+            },
+          ]
+        : [],
       plants: (values.plants || []).map((p) => ({
         name: p.plantName,
         address: p.address,
@@ -1549,96 +1557,139 @@ corporateAddress: d.corporate_addresses?.[0]
               </Col>
             </Row>
           </Card>
-                  {/* ================= Corporate Address (Single) ================= */}
-<Card className="mb-4 border border-amber-200 rounded-lg">
-  <h3 className="text-lg font-semibold text-amber-700 mb-3">
-    Corporate Address
-  </h3>
+          {/* ================= Corporate Address (Single) ================= */}
+          <Card className="mb-4 border border-amber-200 rounded-lg">
+            <h3 className="text-lg font-semibold text-amber-700 mb-3">
+              Corporate Address
+            </h3>
 
-  <Row gutter={24}>
-    <Col span={6}>
-      <Form.Item
-        name={["corporateAddress", "name"]}
-        label="Corporate Name"
-      >
-        <Input placeholder="Enter Name" />
-      </Form.Item>
-    </Col>
+            <Row gutter={24}>
+              <Col span={6}>
+                <Form.Item
+                  name={["corporateAddress", "name"]}
+                  label="Corporate Name"
+                >
+                  <Input placeholder="Enter Name" />
+                </Form.Item>
+              </Col>
 
-    <Col span={6}>
-      <Form.Item
-        name={["corporateAddress", "address"]}
-        label="Address"
-      >
-        <Input placeholder="Enter Address" />
-      </Form.Item>
-    </Col>
+              <Col span={6}>
+                <Form.Item
+                  name={["corporateAddress", "address"]}
+                  label="Address"
+                >
+                  <Input placeholder="Enter Address" />
+                </Form.Item>
+              </Col>
 
-    <Col span={4}>
-      <Form.Item
-        name={["corporateAddress", "phoneNo"]}
-        label="Phone No"
-      >
-        <InputNumber style={{ width: "100%" }} />
-      </Form.Item>
-    </Col>
+              <Col span={4}>
+                <Form.Item
+                  name={["corporateAddress", "phoneNo"]}
+                  label="Phone No"
+                >
+                  <InputNumber style={{ width: "100%" }} />
+                </Form.Item>
+              </Col>
 
-    <Col span={4}>
-      <Form.Item
-        name={["corporateAddress", "email"]}
-        label="Email"
-      >
-        <Input />
-      </Form.Item>
-    </Col>
+              <Col span={4}>
+                <Form.Item name={["corporateAddress", "email"]} label="Email">
+                  <Input />
+                </Form.Item>
+              </Col>
 
-    <Col span={4}>
-      <Form.Item
-        name={["corporateAddress", "country"]}
-        label="Country"
-        initialValue="India"
-      >
-        <Select options={getCountryOptions()} />
-      </Form.Item>
-    </Col>
+              <Col span={4}>
+                <Form.Item
+                  name={["corporateAddress", "country"]}
+                  label="Country"
+                  initialValue="India"
+                >
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    options={getCountryOptions()}
+                    onChange={(iso, option) => {
+                      form.setFieldsValue({
+                        corporateAddress: {
+                          country: option.label,
+                          state: undefined,
+                          district: undefined,
+                          city: undefined,
+                        },
+                      });
 
-    <Col span={4}>
-      <Form.Item
-        name={["corporateAddress", "state"]}
-        label="State"
-      >
-        <Select options={getStateOptions("IN")} />
-      </Form.Item>
-    </Col>
+                      setCorpStateName(null);
+                      setCorpStateIso(null);
+                    }}
+                  />
+                </Form.Item>
+              </Col>
 
-    <Col span={4}>
-      <Form.Item
-        name={["corporateAddress", "district"]}
-        label="District"
-      >
-        <Select options={getDistrictOptions()} />
-      </Form.Item>
-    </Col>
+              <Col span={4}>
+                <Form.Item name={["corporateAddress", "state"]} label="State">
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select State"
+                    options={getStateOptions("IN")}
+                    onChange={(iso, option) => {
+                      setCorpStateName(option.label);
+                      setCorpStateIso(iso);
 
-    <Col span={4}>
-      <Form.Item
-        name={["corporateAddress", "city"]}
-        label="City"
-      >
-        <Select options={getCityOptions("IN")} />
-      </Form.Item>
-    </Col>
+                      form.setFieldsValue({
+                        corporateAddress: {
+                          ...form.getFieldValue("corporateAddress"),
+                          state: option.label,
+                          district: undefined,
+                          city: undefined,
+                        },
+                      });
+                    }}
+                  />
+                </Form.Item>
+              </Col>
 
-    <Col span={4}>
-      <Form.Item
-        name={["corporateAddress", "pin"]}
-        label="Pin"
-      >
-        <InputNumber style={{ width: "100%" }} />
-      </Form.Item>
-    </Col>
-  </Row>
-</Card>
+              <Col span={4}>
+                <Form.Item
+                  name={["corporateAddress", "district"]}
+                  label="District"
+                >
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select District"
+                    options={getDistrictOptions(corpStateName)}
+                    disabled={!corpStateName}
+                    onChange={() => {
+                      form.setFieldsValue({
+                        corporateAddress: {
+                          ...form.getFieldValue("corporateAddress"),
+                          city: undefined,
+                        },
+                      });
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item name={["corporateAddress", "city"]} label="City">
+                  <Select
+                    options={getCityOptions("IN", corpStateIso)}
+                    disabled={!corpStateIso}
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select City"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item name={["corporateAddress", "pin"]} label="Pin">
+                  <InputNumber style={{ width: "100%" }} />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
           {/* ================= Company Group ================= */}
           <h3 className="text-lg font-semibold text-amber-700 mt-4 mb-2">
             Company Group name
