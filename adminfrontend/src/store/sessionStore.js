@@ -9,7 +9,8 @@ const useSessionStore = create(
       user: null,
       currentOrgId: null,
       orgModules: [],
-
+      selectedFY: null,
+      setSelectedFY: (fy) => set({ selectedFY: fy }),
       setSession: ({ accessToken, refreshToken, user, currentOrgId }) =>
         set({ accessToken, refreshToken, user, currentOrgId }),
 
@@ -26,6 +27,7 @@ const useSessionStore = create(
           user: null,
           currentOrgId: null,
           orgModules: [],
+          selectedFY: null,
         }),
     }),
     {

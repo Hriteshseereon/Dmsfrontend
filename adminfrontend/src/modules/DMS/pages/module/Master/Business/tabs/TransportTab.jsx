@@ -25,6 +25,7 @@ import {
   DeleteOutlined,
   FileTextOutlined,
   ClockCircleOutlined,
+  SaveOutlined,
 } from "@ant-design/icons";
 import {
   getAllTransport,
@@ -221,6 +222,26 @@ export default function TransportTab() {
         return id;
       });
     }, AUTOSAVE_MS);
+  };
+
+  // Manual save draft function
+  const handleManualSave = () => {
+    if (selected || viewMode) return;
+    const values = form.getFieldsValue(true);
+    const meta = {
+      agencyName: values.agencyName,
+      email: values.email,
+      mobileNo: values.mobileNo,
+    };
+
+    setActiveDraftId((prevId) => {
+      const id = prevId || createDraft(values, meta);
+      saveDraft(id, values, meta);
+      setDraftSavedAt(new Date());
+      setDraftTableKey((k) => k + 1);
+      message.success("Draft saved");
+      return id;
+    });
   };
   /* ================= FETCH ================= */
   const fetchTransporters = async () => {
@@ -651,6 +672,17 @@ export default function TransportTab() {
 
     const restored = deserialiseDraft(draft.values, dayjs);
     form.setFieldsValue(restored);
+
+    // Check for uploaded files and show warning
+    const hasFiles = Object.keys(restored).some(key => {
+      const value = restored[key];
+      return Array.isArray(value) && value.length > 0 && value[0]?._fromDraft;
+    });
+
+    if (hasFiles) {
+      message.warning("Draft restored! Please re-upload any documents as they are not saved in drafts.", 5);
+    }
+
     setActiveDraftId(id);
     setDraftSavedAt(new Date(draft.savedAt));
     setOpen(true);
@@ -734,13 +766,47 @@ export default function TransportTab() {
           form.resetFields();
         }}
         title={
-          <span className="text-amber-700 font-semibold text-lg">
-            {viewMode
-              ? "View Transporter"
-              : selected
-                ? "Edit Transporter"
-                : "Add Transporter"}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-amber-700 font-semibold text-lg">
+              {viewMode
+                ? "View Transporter"
+                : selected
+                  ? "Edit Transporter"
+                  : "Add Transporter"}
+            </span>
+
+            {/* Draft indicator — shown only for new-transporter forms */}
+            {!selected && !viewMode && (
+              <div className="flex items-center gap-2 ml-2">
+                {activeDraftId ? (
+                  <Tag
+                    color="gold"
+                    icon={<SaveOutlined />}
+                    className="cursor-default select-none"
+                  >
+                    Draft saved
+                  </Tag>
+                ) : (
+                  <Tag
+                    color="default"
+                    className="cursor-default select-none text-xs"
+                  >
+                    Not saved yet
+                  </Tag>
+                )}
+
+                {/* Manual save button */}
+                <Button
+                  size="small"
+                  icon={<SaveOutlined />}
+                  className="border-amber-400! text-amber-700! hover:bg-amber-100! text-xs!"
+                  onClick={handleManualSave}
+                >
+                  Save Draft
+                </Button>
+              </div>
+            )}
+          </div>
         }
         styles={{
           body: { maxHeight: "75vh", overflowY: "auto", paddingRight: 8 },

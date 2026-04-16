@@ -9,21 +9,32 @@ export default function ProfileSettings() {
   const user = useSessionStore((state) => state.user);
   const setUser = useSessionStore((state) => state.setUser);
   const mapProfileToForm = (response) => {
-    const customer = response?.customer ?? {};
-    const profile = response?.profile ?? {};
-    const fullName = customer.customer_name?.trim() || "";
-    const nameParts = fullName.split(/\s+/).filter(Boolean);
+  const customer = response?.customer ?? {};
+  const fullName = customer.customer_name?.trim() || "";
+  const nameParts = fullName.split(/\s+/).filter(Boolean);
 
-    return {
-      firstName: nameParts[0] || "",
-      lastName: nameParts.slice(1).join(" "),
-      email:
-        customer.email_address || response?.user?.username || response?.user?.email || "",
-      phone: customer.mobile_number || customer.phone_number || customer.whatsapp_number || "",
-      address: customer.address || "",
-      broker_associate: profile.broker_associated || "",
-    };
+  return {
+    firstName: nameParts[0] || "",
+    lastName: nameParts.slice(1).join(" "),
+    email:
+      customer.email_address ||
+      response?.user?.username ||
+      response?.user?.email ||
+      "",
+    phone:
+      customer.mobile_number ||
+      customer.phone_number ||
+      customer.whatsapp_number ||
+      "",
+    address: customer.address || "",
+
+    // ✅ HANDLE BOTH CASES
+    broker_associated_name:
+      response?.profile?.broker_associated_name ||
+      response?.broker_associated_name ||
+      "",
   };
+};
 
   const fetchProfile = async () => {
     try {
@@ -33,7 +44,12 @@ export default function ProfileSettings() {
         customer_name: res?.customer?.customer_name || user?.customer_name,
         name: res?.customer?.customer_name || user?.name,
         email: res?.customer?.email_address || res?.user?.username || user?.email,
-      });
+     broker_associated_name:
+  res?.profile?.broker_associated_name ||
+  res?.broker_associated_name ||
+  user?.broker_associated_name ||
+  null,
+    });
       formPersonal.setFieldsValue(mapProfileToForm(res));
     } catch (err) {
       message.error("Failed to load profile");
@@ -44,35 +60,44 @@ export default function ProfileSettings() {
     fetchProfile();
   }, []);
 
-  const onFinish = async (values) => {
-    try {
-      const payload = {
-        customer_name: `${values.firstName} ${values.lastName}`.trim(),
-        email_address: values.email,
-        mobile_number: values.phone,
-        phone_number: values.phone,
-        whatsapp_number: values.phone,
-        address: values.address,
-        broker_associated: values.broker_associate || null,
-      };
+ const onFinish = async (values) => {
+  try {
+  const payload = {
+  customer_name: `${values.firstName} ${values.lastName}`.trim(),
+  email_address: values.email,
+  mobile_number: values.phone,
+  phone_number: values.phone,
+  whatsapp_number: values.phone,
+  address: values.address,
+  broker_associated_name: values.broker_associated_name || null,
+};
 
-      const updatedResponse = await updateProfileData(payload);
-      setUser({
-        ...user,
-        customer_name:
-          updatedResponse?.customer?.customer_name || payload.customer_name,
-        name: updatedResponse?.customer?.customer_name || payload.customer_name,
-        email:
-          updatedResponse?.customer?.email_address ||
-          updatedResponse?.user?.username ||
-          payload.email_address,
-      });
-      formPersonal.setFieldsValue(mapProfileToForm(updatedResponse));
-      message.success("Profile updated successfully");
-    } catch (err) {
-      message.error("Update failed");
-    }
-  };
+    const updatedResponse = await updateProfileData(payload);
+
+    setUser({
+      ...user,
+      customer_name:
+        updatedResponse?.customer?.customer_name || payload.customer_name,
+      name:
+        updatedResponse?.customer?.customer_name || payload.customer_name,
+      email:
+        updatedResponse?.customer?.email_address ||
+        updatedResponse?.user?.username ||
+        payload.email_address,
+      broker_associated_name:
+  updatedResponse?.profile?.broker_associated_name ||
+  updatedResponse?.broker_associated_name ||
+  payload.broker_associated_name ||
+  null,
+    });
+
+    formPersonal.setFieldsValue(mapProfileToForm(updatedResponse));
+    message.success("Profile updated successfully");
+  } catch (err) {
+    console.log(err); // 👈 ADD THIS FOR DEBUG
+    message.error("Update failed");
+  }
+};
 
   const firstName = Form.useWatch("firstName", formPersonal);
   const lastName = Form.useWatch("lastName", formPersonal);
@@ -123,7 +148,7 @@ export default function ProfileSettings() {
                   <Form.Item
                     label="Last Name"
                     name="lastName"
-                    rules={[{ required: true, message: "Last name required" }]}
+                  
                   >
                     <Input />
                   </Form.Item>
@@ -175,7 +200,7 @@ export default function ProfileSettings() {
                 <Col span={6}>
                   <Form.Item
                     label="Broker Associate"
-                    name="broker_associate"
+                    name="broker_associated_name"
                   >
                     <Input />
                   </Form.Item>

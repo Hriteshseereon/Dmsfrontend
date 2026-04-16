@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   Table,
   Button,
@@ -10,12 +10,18 @@ import {
   Col,
   Space,
   message,
+  Tag,
+  Tooltip,
 } from "antd";
 import {
   PlusOutlined,
   EditOutlined,
   EyeOutlined,
   SearchOutlined,
+  SaveOutlined,
+  FileTextOutlined,
+  ClockCircleOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 
 import {
@@ -29,6 +35,17 @@ import {
   updateProductById,
   getUnits,
 } from "../../../../../../../api/product";
+import {
+  createItemMasterDraft,
+  saveItemMasterDraft,
+  loadItemMasterDraft,
+  deleteItemMasterDraft,
+  deserialiseItemMasterDraft,
+  getAllItemMasterDrafts,
+} from "../../../../../../../utils/itemMasterDraftUtils";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+dayjs.extend(relativeTime);
 
 const { Option } = Select;
 
@@ -68,6 +85,13 @@ export default function ItemMasterTab({ items, setItems }) {
     gross_weight: 0,  
   });
   const [search, setSearch] = useState("");
+  
+  // Draft state
+  const [activeDraftId, setActiveDraftId] = useState(null);
+  const [draftSavedAt, setDraftSavedAt] = useState(null);
+  const [draftTableKey, setDraftTableKey] = useState(0);
+  const autosaveTimer = useRef(null);
+  
   /* ================= LOAD MASTER DATA ================= */
   useEffect(() => {
     Promise.all([
@@ -99,6 +123,78 @@ export default function ItemMasterTab({ items, setItems }) {
       sgstPercent: gst / 2,
     }));
   };
+
+  // ================= DRAFT FUNCTIONALITY =================
+  const handleFormValuesChange = useCallback(() => {
+    if (editingId || viewMode) return;
+
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+
+    autosaveTimer.current = setTimeout(() => {
+      const meta = {
+        itemName: formData.itemName,
+        itemType: formData.itemType,
+        company: formData.company,
+      };
+
+      setActiveDraftId((prevId) => {
+        const id = prevId || createItemMasterDraft(formData, meta);
+        saveItemMasterDraft(id, formData, meta);
+        setDraftSavedAt(new Date());
+        setDraftTableKey((k) => k + 1);
+        return id;
+      });
+    }, 1500);
+  }, [formData, editingId, viewMode]);
+
+  const handleManualSave = () => {
+    if (editingId || viewMode) return;
+    
+    const meta = {
+      itemName: formData.itemName,
+      itemType: formData.itemType,
+      company: formData.company,
+    };
+
+    setActiveDraftId((prevId) => {
+      const id = prevId || createItemMasterDraft(formData, meta);
+      saveItemMasterDraft(id, formData, meta);
+      setDraftSavedAt(new Date());
+      setDraftTableKey((k) => k + 1);
+      message.success("Draft saved");
+      return id;
+    });
+  };
+
+  const handleContinueDraft = (draftId) => {
+    const draft = loadItemMasterDraft(draftId);
+    if (!draft) {
+      message.error("Draft not found");
+      return;
+    }
+
+    const restored = deserialiseItemMasterDraft(draft.values);
+    setFormData(restored);
+    setActiveDraftId(draftId);
+    setDraftSavedAt(new Date(draft.savedAt));
+    setEditingId(null);
+    setViewMode(false);
+    setOpen(true);
+  };
+
+  const discardActiveDraft = () => {
+    if (activeDraftId) {
+      deleteItemMasterDraft(activeDraftId);
+      setActiveDraftId(null);
+      setDraftSavedAt(null);
+      setDraftTableKey((k) => k + 1);
+    }
+  };
+
+  // Auto-save when formData changes
+  useEffect(() => {
+    handleFormValuesChange();
+  }, [formData]);
 
   /* ================= SAFE EDIT MAPPING ================= */
   const openEdit = async (record, view = false) => {
@@ -172,13 +268,17 @@ console.log("Submitting", formData);
       setLoading(true);
 
       if (editingId) {
-        // ✅ UPDATE
+        // UPDATE
         await updateProductById(payload, editingId);
         message.success("Product updated successfully");
       } else {
-        // ✅ ADD
+        // ADD
         await addproduct(payload);
         message.success("Product added successfully");
+        // Delete draft on successful save for new items
+        if (activeDraftId) {
+          discardActiveDraft();
+        }
       }
 
       const updated = await getProducts();
@@ -230,6 +330,116 @@ console.log("Submitting", formData);
     });
   };
   const filteredData = getFilteredData();
+
+  // Draft Table Component
+  function ItemMasterDraftTable({ refreshKey, onContinue, onDelete }) {
+    const [drafts, setDrafts] = useState([]);
+
+    useEffect(() => {
+      setDrafts(getAllItemMasterDrafts());
+    }, [refreshKey]);
+
+    if (!drafts.length) return null;
+
+    const handleDelete = (id) => {
+      deleteItemMasterDraft(id);
+      onDelete?.();
+      setDrafts(getAllItemMasterDrafts());
+    };
+
+    const columns = [
+      {
+        title: (
+          <span className="text-amber-700 font-semibold text-xs">
+            Item Name
+          </span>
+        ),
+        dataIndex: "name",
+        render: (t) => <span className="text-amber-800 font-medium">{t}</span>,
+      },
+      {
+        title: (
+          <span className="text-amber-700 font-semibold text-xs">Type</span>
+        ),
+        dataIndex: "type",
+        render: (t) => <span className="text-amber-700 text-sm">{t}</span>,
+      },
+      {
+        title: (
+          <span className="text-amber-700 font-semibold text-xs">Company</span>
+        ),
+        dataIndex: "company",
+        render: (t) => <span className="text-amber-700 text-sm">{t}</span>,
+      },
+      {
+        title: (
+          <span className="text-amber-700 font-semibold text-xs">
+            Last Saved
+          </span>
+        ),
+        dataIndex: "savedAt",
+        render: (v) => (
+          <Tag
+            icon={<ClockCircleOutlined />}
+            color="gold"
+            className="text-xs font-normal"
+          >
+            {v ? dayjs(v).fromNow() : "Not saved"}
+          </Tag>
+        ),
+      },
+      {
+        title: (
+          <span className="text-amber-700 font-semibold text-xs">Actions</span>
+        ),
+        render: (_, record) => (
+          <div className="flex gap-2">
+            <Button
+              size="small"
+              type="primary"
+              icon={<EditOutlined />}
+              className="bg-amber-500! hover:bg-amber-600! border-none! text-xs!"
+              onClick={() => onContinue(record.id)}
+            >
+              Continue
+            </Button>
+            <Button
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              className="text-xs!"
+              onClick={() => handleDelete(record.id)}
+            >
+              Delete
+            </Button>
+          </div>
+        ),
+      },
+    ];
+
+    return (
+      <div className="border border-amber-200 rounded-lg p-4 bg-white shadow-sm mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <FileTextOutlined className="text-amber-500 text-lg" />
+          <h2 className="text-base font-semibold text-amber-700 m-0">
+            Saved Drafts
+          </h2>
+          <Tag color="gold" className="ml-1">
+            {drafts.length}
+          </Tag>
+        </div>
+        <Table
+          columns={columns}
+          dataSource={drafts}
+          rowKey="id"
+          size="small"
+          bordered
+          pagination={false}
+          rowClassName="hover:bg-amber-50"
+        />
+      </div>
+    );
+  }
 
   return (
     <>
@@ -350,6 +560,13 @@ setFormData({
         </Button>
       </div>
 
+      {/* Draft Table */}
+      <ItemMasterDraftTable
+        refreshKey={draftTableKey}
+        onContinue={handleContinueDraft}
+        onDelete={() => setDraftTableKey((k) => k + 1)}
+      />
+
       <Table
         className="amber-table"
         rowKey="id"
@@ -371,7 +588,45 @@ setFormData({
             borderColor: "#f59e0b",
           },
         }}
-        title={viewMode ? "View Item" : "Add / Edit Item"}
+        title={
+          <div className="flex items-center gap-3">
+            <span className="text-amber-700 font-semibold text-lg">
+              {viewMode ? "View Item" : editingId ? "Edit Item" : "Add Item"}
+            </span>
+
+            {/* Draft indicator - shown only for new item forms */}
+            {!editingId && !viewMode && (
+              <div className="flex items-center gap-2 ml-2">
+                {activeDraftId ? (
+                  <Tag
+                    color="gold"
+                    icon={<SaveOutlined />}
+                    className="cursor-default select-none"
+                  >
+                    Draft saved
+                  </Tag>
+                ) : (
+                  <Tag
+                    color="default"
+                    className="cursor-default select-none text-xs"
+                  >
+                    Not saved yet
+                  </Tag>
+                )}
+
+                {/* Manual save button */}
+                <Button
+                  size="small"
+                  icon={<SaveOutlined />}
+                  className="border-amber-400! text-amber-700! hover:bg-amber-100! text-xs!"
+                  onClick={handleManualSave}
+                >
+                  Save Draft
+                </Button>
+              </div>
+            )}
+          </div>
+        }
       >
         <div style={{ paddingTop: 16 }}>
           <Row gutter={16}>

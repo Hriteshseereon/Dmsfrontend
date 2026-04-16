@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -22,7 +22,11 @@ import { getOrganization } from "../api/organizations";
 import { exportOrganisationExcel } from "../utils/exportOrganisationExcel";
 import { getAllDraftOrganizations } from "../utils/savedForms";
 import { Divider } from "antd";
-const FY_OPTIONS = ["2025-26", "2024-25", "2023-24"];
+// const FY_OPTIONS = ["2025-26", "2024-25", "2023-24"];
+import {
+  getFinancialYearOptions,
+  getCurrentFinancialYear,
+} from "../utils/financialYear";
 export default function OrganizationList() {
   const { user, setOrgModules } = useAuth();
   const navigate = useNavigate();
@@ -125,8 +129,11 @@ const OrganizationCard = ({
   onOpen,
   onDelete,
 }) => {
-  const [selectedFY, setSelectedFY] = useState("2024-25");
+  const { selectedFY, setSelectedFY } = useSessionStore();
+  // const [selectedFY, setSelectedFY] = useState("2024-25");
+  const FY_OPTIONS = useMemo(() => getFinancialYearOptions(3), []);
   const [fyOpen, setFyOpen] = useState(false);
+  const currentFY = selectedFY || getCurrentFinancialYear();
   const headerStyles = isDraft
     ? "bg-gradient-to-r from-gray-400 to-gray-600 h-2"
     : "bg-gradient-to-r from-amber-500 to-orange-500 h-2";
@@ -134,7 +141,7 @@ const OrganizationCard = ({
   return (
     <div
       key={org.id}
-      className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden group"
+      className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-visible group"
     >
       <div className={headerStyles}></div>
       <div className="p-6">
@@ -212,47 +219,59 @@ const OrganizationCard = ({
               </div>
             </div>
             {/* ✅ NEW: Financial Year Selector */}
+            {/* ✅ Financial Year Selector */}
             <div className="mb-4">
               <p className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
                 <CalendarDays size={14} className="text-amber-500" />
                 Financial Year
               </p>
+
               <div className="relative">
                 <button
                   onClick={() => setFyOpen((prev) => !prev)}
                   className="w-full flex items-center justify-between px-3 py-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg text-sm font-semibold text-amber-700 transition-colors cursor-pointer"
                 >
-                  <span>FY {selectedFY}</span>
+                  {/* ✅ Always show valid FY */}
+                  <span>FY {selectedFY || getCurrentFinancialYear()}</span>
+
                   <ChevronDown
                     size={15}
-                    className={`text-amber-500 transition-transform duration-200 ${fyOpen ? "rotate-180" : ""}`}
+                    className={`text-amber-500 transition-transform duration-200 ${
+                      fyOpen ? "rotate-180" : ""
+                    }`}
                   />
                 </button>
 
                 {fyOpen && (
                   <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                    {FY_OPTIONS.map((fy) => (
-                      <button
-                        key={fy}
-                        onClick={() => {
-                          setSelectedFY(fy);
-                          setFyOpen(false);
-                        }}
-                        className={`w-full text-left px-4 py-2.5 text-sm transition-colors cursor-pointer flex items-center justify-between
-                          ${
-                            fy === selectedFY
-                              ? "bg-amber-50 text-amber-700 font-semibold"
-                              : "text-gray-700 hover:bg-gray-50 font-normal"
-                          }`}
-                      >
-                        FY {fy}
-                        {fy === selectedFY && (
-                          <span className="w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center text-white text-[10px]">
-                            ✓
-                          </span>
-                        )}
-                      </button>
-                    ))}
+                    {FY_OPTIONS.map((fy) => {
+                      const activeFY = selectedFY || getCurrentFinancialYear();
+
+                      return (
+                        <button
+                          key={fy}
+                          onClick={() => {
+                            setSelectedFY(fy); // ✅ store globally
+                            setFyOpen(false);
+                          }}
+                          className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between
+                ${
+                  fy === activeFY
+                    ? "bg-amber-50 text-amber-700 font-semibold"
+                    : "text-gray-700 hover:bg-gray-50"
+                }`}
+                        >
+                          <span>FY {fy}</span>
+
+                          {/* ✅ Optional tick mark */}
+                          {fy === activeFY && (
+                            <span className="w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center text-white text-[10px]">
+                              ✓
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
