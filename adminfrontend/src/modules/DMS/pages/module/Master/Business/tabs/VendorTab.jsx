@@ -641,7 +641,19 @@ export default function VendorTab() {
         d.aadhar_document ||
         d.business_details?.aadhaar_documents,
     ),
-
+corporateAddress: d.corporate_addresses?.[0]
+  ? {
+      name: d.corporate_addresses[0].name,
+      address: d.corporate_addresses[0].address,
+      phoneNo: d.corporate_addresses[0].phone_number,
+      email: d.corporate_addresses[0].email_address,
+      country: d.corporate_addresses[0].country,
+      state: d.corporate_addresses[0].state,
+      district: d.corporate_addresses[0].district,
+      city: d.corporate_addresses[0].city,
+      pin: d.corporate_addresses[0].pin,
+    }
+  : {},
     plants: (d.plants || []).map((p) => ({
       plantName: p.name || p.plant_name,
       address: p.address,
@@ -729,6 +741,21 @@ export default function VendorTab() {
           transaction_type: values.transactionType,
         },
       ],
+      corporate_addresses: values.corporateAddress
+  ? [
+      {
+        name: values.corporateAddress.name,
+        address: values.corporateAddress.address,
+        phone_number: values.corporateAddress.phoneNo?.toString(),
+        email_address: values.corporateAddress.email,
+        country: values.corporateAddress.country,
+        state: values.corporateAddress.state,
+        district: values.corporateAddress.district,
+        city: values.corporateAddress.city,
+        pin: values.corporateAddress.pin?.toString(),
+      },
+    ]
+  : [],
       plants: (values.plants || []).map((p) => ({
         name: p.plantName,
         address: p.address,
@@ -1522,7 +1549,96 @@ export default function VendorTab() {
               </Col>
             </Row>
           </Card>
+                  {/* ================= Corporate Address (Single) ================= */}
+<Card className="mb-4 border border-amber-200 rounded-lg">
+  <h3 className="text-lg font-semibold text-amber-700 mb-3">
+    Corporate Address
+  </h3>
 
+  <Row gutter={24}>
+    <Col span={6}>
+      <Form.Item
+        name={["corporateAddress", "name"]}
+        label="Corporate Name"
+      >
+        <Input placeholder="Enter Name" />
+      </Form.Item>
+    </Col>
+
+    <Col span={6}>
+      <Form.Item
+        name={["corporateAddress", "address"]}
+        label="Address"
+      >
+        <Input placeholder="Enter Address" />
+      </Form.Item>
+    </Col>
+
+    <Col span={4}>
+      <Form.Item
+        name={["corporateAddress", "phoneNo"]}
+        label="Phone No"
+      >
+        <InputNumber style={{ width: "100%" }} />
+      </Form.Item>
+    </Col>
+
+    <Col span={4}>
+      <Form.Item
+        name={["corporateAddress", "email"]}
+        label="Email"
+      >
+        <Input />
+      </Form.Item>
+    </Col>
+
+    <Col span={4}>
+      <Form.Item
+        name={["corporateAddress", "country"]}
+        label="Country"
+        initialValue="India"
+      >
+        <Select options={getCountryOptions()} />
+      </Form.Item>
+    </Col>
+
+    <Col span={4}>
+      <Form.Item
+        name={["corporateAddress", "state"]}
+        label="State"
+      >
+        <Select options={getStateOptions("IN")} />
+      </Form.Item>
+    </Col>
+
+    <Col span={4}>
+      <Form.Item
+        name={["corporateAddress", "district"]}
+        label="District"
+      >
+        <Select options={getDistrictOptions()} />
+      </Form.Item>
+    </Col>
+
+    <Col span={4}>
+      <Form.Item
+        name={["corporateAddress", "city"]}
+        label="City"
+      >
+        <Select options={getCityOptions("IN")} />
+      </Form.Item>
+    </Col>
+
+    <Col span={4}>
+      <Form.Item
+        name={["corporateAddress", "pin"]}
+        label="Pin"
+      >
+        <InputNumber style={{ width: "100%" }} />
+      </Form.Item>
+    </Col>
+  </Row>
+</Card>
           {/* ================= Company Group ================= */}
           <h3 className="text-lg font-semibold text-amber-700 mt-4 mb-2">
             Company Group name
