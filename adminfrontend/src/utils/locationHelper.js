@@ -16,7 +16,7 @@
 import { Country, State, City } from "country-state-city";
 // import districtJson from "ind-state-district/assets/district.json";
 // import statesJson   from "ind-state-district/assets/states.json";
-import { indiaLocations } from "./indialocation";
+import { indiaLocations } from "./indiaLocation";
 // ─── raw data from ind-state-district ────────────────────────────────────────
 
 
