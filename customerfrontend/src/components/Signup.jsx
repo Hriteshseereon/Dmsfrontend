@@ -27,6 +27,7 @@ export default function Signup() {
       password: values.password,
       phone_number: values.phone,
       address: values.address,
+      broker_associated_name: values.broker_associated_name,
       companies: companies,
     };
 
@@ -145,7 +146,7 @@ export default function Signup() {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item label="Broker Associate (Optional)" name="broker_associate">
+              <Form.Item label="Broker Associate (Optional)" name="broker_associated_name">
                 <Input />
               </Form.Item>
             </Col>
