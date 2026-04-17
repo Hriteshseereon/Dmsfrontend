@@ -1,6 +1,7 @@
 // SalesSouda.jsx
 import React, { useState, useEffect, useMemo } from "react";
 import useSessionStore from "../../../../../store/sessionStore";
+import { createFinancialYearDisabledDate, useSelectedFinancialYear } from "../../../../../utils/financialYearValidation";
 import { exportToExcel } from "../../../../../utils/exportToExcel";
 import {
   Table,
@@ -73,6 +74,7 @@ export default function SalesSouda() {
   const [searchText, setSearchText] = useState("");
   const [data, setData] = useState(salesSoudaJSONModified2.initialData);
   const { currentOrgId } = useSessionStore.getState();
+  const selectedFY = useSelectedFinancialYear();
   // get the all customer data
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -1277,7 +1279,11 @@ igstPercent: Number(contract.igst),          // GST from API
                 rules={[{ required: true }]}
                 initialValue={dayjs()}
               >
-                <DatePicker className="w-full" disabled />
+                <DatePicker 
+                  className="w-full" 
+                  disabled
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
               </Form.Item>
             </Col>
 
@@ -1287,11 +1293,9 @@ igstPercent: Number(contract.igst),          // GST from API
                 name="startDate"
               >
                 <DatePicker
-  className="w-full"
-  disabledDate={(current) =>
-    current && current.isBefore(dayjs(), "day")
-  }
-/>
+                  className="w-full"
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
               </Form.Item>
             </Col>
 
@@ -1301,13 +1305,9 @@ igstPercent: Number(contract.igst),          // GST from API
                 name="endDate"
               >
                <DatePicker
-  className="w-full"
-  disabledDate={(current) =>
-    current &&
-    addForm.getFieldValue("startDate") &&
-    current < addForm.getFieldValue("startDate").startOf("day")
-  }
-/>
+                  className="w-full"
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
               </Form.Item>
             </Col>
 
@@ -1642,7 +1642,11 @@ igstPercent: Number(contract.igst),          // GST from API
                 name="soudaDate"
                 rules={[{ required: true }]}
               >
-                <DatePicker className="w-full" />
+                <DatePicker 
+                  className="w-full" 
+                  disabled
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
               </Form.Item>
             </Col>
 
@@ -1651,7 +1655,11 @@ igstPercent: Number(contract.igst),          // GST from API
                 label={<span className="text-amber-700">Start Date</span>}
                 name="startDate"
               >
-                <DatePicker className="w-full" />
+                <DatePicker 
+                  className="w-full" 
+                  disabled
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
               </Form.Item>
             </Col>
 
@@ -1660,7 +1668,11 @@ igstPercent: Number(contract.igst),          // GST from API
                 label={<span className="text-amber-700">End Date</span>}
                 name="endDate"
               >
-                <DatePicker className="w-full" />
+                <DatePicker 
+                  className="w-full" 
+                  disabled
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
               </Form.Item>
             </Col>
 
@@ -1889,7 +1901,11 @@ igstPercent: Number(contract.igst),          // GST from API
                 label={<span className="text-amber-700">Souda Date</span>}
                 name="soudaDate"
               >
-                <DatePicker className="w-full" disabled />
+                <DatePicker 
+                  className="w-full" 
+                  disabled
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
               </Form.Item>
             </Col>
 
@@ -1898,7 +1914,11 @@ igstPercent: Number(contract.igst),          // GST from API
                 label={<span className="text-amber-700">Start Date</span>}
                 name="startDate"
               >
-                <DatePicker className="w-full" disabled />
+                <DatePicker 
+                  className="w-full" 
+                  disabled
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
               </Form.Item>
             </Col>
 
@@ -1907,7 +1927,11 @@ igstPercent: Number(contract.igst),          // GST from API
                 label={<span className="text-amber-700">End Date</span>}
                 name="endDate"
               >
-                <DatePicker className="w-full" disabled />
+                <DatePicker 
+                  className="w-full" 
+                  disabled
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
               </Form.Item>
             </Col>
 

@@ -1,5 +1,4 @@
-
- import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Table,
   Input,
@@ -54,6 +53,7 @@ export default function SaleOrdersInvoice() {
   const [contractPersonOptions, setContractPersonOptions] = useState([]);
   const [contractOptions, setContractOptions] = useState([]);
   // const [contractItems, setContractItems] = useState([]);
+  const selectedFY = useSelectedFinancialYear();
   const [contractItemsMap, setContractItemsMap] = useState({});
   useEffect(() => {
     fetchContracts();
@@ -1275,7 +1275,11 @@ narration: order.narration,      // NEW
             rules={[{ required: true }]}
             initialValue={dayjs()}
           >
-            <DatePicker className="w-full" disabled />
+            <DatePicker 
+              className="w-full" 
+              disabled
+              disabledDate={createFinancialYearDisabledDate(selectedFY)}
+            />
           </Form.Item>
         </Col>
 
@@ -1286,11 +1290,7 @@ narration: order.narration,      // NEW
           >
            <DatePicker
             className="w-full"
-            disabledDate={(current) =>
-              current &&
-              form.getFieldValue("orderDate") &&
-              current < form.getFieldValue("orderDate").startOf("day")
-            }
+            disabledDate={createFinancialYearDisabledDate(selectedFY)}
             disabled={disabled}
           />   </Form.Item>
         </Col>

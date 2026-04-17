@@ -8,6 +8,7 @@ import {
 import { exportToExcel } from "../../../../../utils/exportToExcel";
 import { requiredPositiveNumber, } from "../../../helpers/formValidation";
 import useSessionStore from "../../../../../store/sessionStore";
+import { createFinancialYearDisabledDate, useSelectedFinancialYear } from "../../../../../utils/financialYearValidation";
 import { getPurchaseContract, getAllVendor, addPurchaseContract, getproductbyVendor, getPlantsByVendor ,getPurchaseContractById,updatePurchaseContract} from "../../../../../api/purchase";
 import {
   Table,
@@ -53,6 +54,7 @@ export default function PurchaseSouda() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const currentOrgId = useSessionStore.getState();
+  const selectedFY = useSelectedFinancialYear();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
@@ -1055,27 +1057,32 @@ const handleExport = async () => {
 
           <Col span={4}>
             <Form.Item label="Contract Date" name="soudaDate" initialValue={dayjs()}>
-              <DatePicker className="w-full" disabled={disabled}  />
+              <DatePicker 
+                className="w-full" 
+                disabled={disabled}
+                disabledDate={createFinancialYearDisabledDate(selectedFY)}
+              />
             </Form.Item>
           </Col>
 
           {/* REMOVED Delivery Date; ADDED Start / End */}
           <Col span={4}>
             <Form.Item label="Start Date" name="from_date">
-              <DatePicker className="w-full"  disabledDate={(current) =>
-     current && current.isBefore(dayjs(), "day")
-    } 
-    disabled={disabled}/>
+              <DatePicker 
+                className="w-full" 
+                disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                disabled={disabled}
+              />
             </Form.Item>
           </Col>
 
           <Col span={4}>
             <Form.Item label="End Date" name="to_date">
-              <DatePicker className="w-full" disabledDate={(current) =>
-      current &&
-      addForm.getFieldValue("from_date") &&
-      current < addForm.getFieldValue("from_date").startOf("day")
-    } disabled={disabled} />
+              <DatePicker 
+                className="w-full" 
+                disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                disabled={disabled}
+              />
             </Form.Item>
           </Col>
         </Row>
