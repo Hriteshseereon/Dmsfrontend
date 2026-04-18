@@ -495,6 +495,7 @@ export default function SaleOrdersInvoice() {
   const buildSalesOrderPayload = (values) => {
     const { orderTaxAndTotals } = values;
     console.log("PAYLOAD bill_mode 👉", values.bill_mode);
+    console.log("DELIVERY DATE DEBUG:", values.deliveryDate, typeof values.deliveryDate);
     return {
       customer_id: values.customer_id,
       status: values.status,
