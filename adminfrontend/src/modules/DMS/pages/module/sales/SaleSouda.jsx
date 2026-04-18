@@ -1,8 +1,17 @@
 // SalesSouda.jsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import useSessionStore from "../../../../../store/sessionStore";
-import { createFinancialYearDisabledDate, useSelectedFinancialYear } from "../../../../../utils/financialYearValidation";
+import {
+  createFinancialYearDisabledDate,
+  useSelectedFinancialYear,
+} from "../../../../../utils/financialYearValidation";
 import { exportToExcel } from "../../../../../utils/exportToExcel";
+import {
+  saveSalesDraft,
+  loadSalesDraft,
+  deleteSalesDraft,
+  getAllSalesDrafts,
+} from "../../../../../utils/salesDraftUtils";
 import {
   Table,
   Input,
@@ -15,7 +24,6 @@ import {
   Row,
   Col,
   Divider,
-  
 } from "antd";
 import {
   SearchOutlined,
@@ -42,7 +50,7 @@ import { getAdminCustomerDetails } from "../../../../../api/customer";
 
 /** trimmed/embedded seed data (same as you provided) */
 const salesSoudaJSONModified2 = {
-  statusOptions: ["Pending","Approved", "Rejected"],
+  statusOptions: ["Pending", "Approved", "Rejected"],
 
   typeOptions: ["Retail", "Wholesale"],
 
@@ -75,6 +83,139 @@ export default function SalesSouda() {
   const [data, setData] = useState(salesSoudaJSONModified2.initialData);
   const { currentOrgId } = useSessionStore.getState();
   const selectedFY = useSelectedFinancialYear();
+
+  // Draft state
+  const [showDrafts, setShowDrafts] = useState(false);
+  const [drafts, setDrafts] = useState([]);
+  const [activeDraftId, setActiveDraftId] = useState(null);
+  const autoSaveTimeoutRef = useRef(null);
+
+  // Draft functions
+  const handleAutoSave = (form, draftId) => {
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      const values = form.getFieldsValue();
+      if (values && Object.keys(values).length > 0) {
+        saveSalesDraft(draftId, values, 'souda');
+        setActiveDraftId(draftId);
+      }
+    }, 1500); // Auto-save after 1.5 seconds of inactivity
+  };
+
+  const handleManualSave = (form) => {
+    const values = form.getFieldsValue();
+    if (values && Object.keys(values).length > 0) {
+      const draftId = `sales-${Date.now()}`;
+      saveSalesDraft(draftId, values, 'souda');
+      setActiveDraftId(draftId);
+      loadDraftsList();
+    }
+  };
+
+  const loadDraftsList = () => {
+    const allDrafts = getAllSalesDrafts('souda');
+    setDrafts(allDrafts);
+  };
+
+  const handleContinueDraft = (draft) => {
+    addForm.setFieldsValue(draft);
+    setActiveDraftId(draft.id);
+    setIsAddModalOpen(true);
+    setShowDrafts(false);
+  };
+
+  const handleDeleteDraft = (draftId) => {
+    deleteSalesDraft(draftId, 'souda');
+    if (activeDraftId === draftId) {
+      setActiveDraftId(null);
+    }
+    loadDraftsList();
+  };
+
+  const handleFormValuesChange = (changedValues, allValues, form) => {
+    // Auto-save on form changes
+    const draftId = activeDraftId || `sales-${Date.now()}`;
+    handleAutoSave(form, draftId);
+  };
+
+  // Load drafts on component mount
+  useEffect(() => {
+    loadDraftsList();
+  }, []);
+
+  // Clean up auto-save timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Draft Table Component
+  const DraftTable = () => (
+    <div className="mb-4">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="text-lg font-semibold text-amber-700">Saved Drafts</h3>
+        <Button
+          type="primary"
+          onClick={() => setShowDrafts(!showDrafts)}
+          className="!bg-amber-500 !hover:bg-amber-600"
+        >
+          {showDrafts ? "Hide Drafts" : "Show Drafts"}
+        </Button>
+      </div>
+
+      {showDrafts && (
+        <div className="border border-amber-300 rounded-lg p-4 bg-white">
+          {drafts.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">No drafts found</p>
+          ) : (
+            <div className="space-y-2">
+              {drafts.map((draft) => (
+                <div
+                  key={draft.id}
+                  className="flex justify-between items-center p-3 border border-gray-200 rounded hover:bg-gray-50"
+                >
+                  <div className="flex-1">
+                    <div className="font-medium">
+                      {draft.customerName || "Sales Draft"}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {draft.savedAt
+                        ? new Date(draft.savedAt).toLocaleString()
+                        : "Unknown time"}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="small"
+                      type="primary"
+                      onClick={() => handleContinueDraft(draft)}
+                      className="bg-amber-500! hover:bg-amber-600!"
+                    >
+                      Continue
+                    </Button>
+                    <Button
+                      size="small"
+                      danger
+                      onClick={() => handleDeleteDraft(draft.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   // get the all customer data
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -129,33 +270,33 @@ export default function SalesSouda() {
     fetchSalesContracts();
   }, []);
   const fetchSalesContracts = async () => {
-      try {
-        const res = await getSalescontractGroups(); // or whatever API fetches all contracts
-        console.log("Fetched sales contracts:", res);
+    try {
+      const res = await getSalescontractGroups(); // or whatever API fetches all contracts
+      console.log("Fetched sales contracts:", res);
 
-        // Map the API response to table format
-        const mappedData = (res || []).map((contract) => ({
-          key: contract.sale_contract_id,
-          saleContractNumber: contract.sale_contract_number,
-          customer: contract.customer_name,
-          customerEmail: contract.customer_email, // Map email
-          customerMobile: contract.customer_mobile, // Map mobile
-          startDate: contract.from_date,
-          endDate: contract.to_date,
-          status: contract.status,
-          items: contract.items,
-          grandTotal: contract.grand_total,
-          sgst: contract.sgst, 
+      // Map the API response to table format
+      const mappedData = (res || []).map((contract) => ({
+        key: contract.sale_contract_id,
+        saleContractNumber: contract.sale_contract_number,
+        customer: contract.customer_name,
+        customerEmail: contract.customer_email, // Map email
+        customerMobile: contract.customer_mobile, // Map mobile
+        startDate: contract.from_date,
+        endDate: contract.to_date,
+        status: contract.status,
+        items: contract.items,
+        grandTotal: contract.grand_total,
+        sgst: contract.sgst,
         cgst: contract.cgst,
         igst: contract.igst,
         tcs_amount: contract.tcs_amount,
-        }));
+      }));
 
-        setData(mappedData);
-      } catch (err) {
-        console.error("Failed to fetch sales contracts", err);
-      }
-    };
+      setData(mappedData);
+    } catch (err) {
+      console.error("Failed to fetch sales contracts", err);
+    }
+  };
   // payload for create sales contract
   const buildCreateContractPayload = (values) => {
     // First, build items to calculate taxable amount
@@ -182,8 +323,6 @@ export default function SalesSouda() {
       };
     });
 
-  
-
     return {
       organisation: currentOrgId,
       customer_id: values.customerId,
@@ -209,22 +348,21 @@ export default function SalesSouda() {
     };
   };
 
-  
-const handleSearch = (value) => {
-  setSearchText(value);
+  const handleSearch = (value) => {
+    setSearchText(value);
 
-  if (!value) {
-    fetchSalesContracts();
-    return;
-  }
+    if (!value) {
+      fetchSalesContracts();
+      return;
+    }
 
-  const filtered = data.filter((item) =>
-    JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
-  );
+    const filtered = data.filter((item) =>
+      JSON.stringify(item).toLowerCase().includes(value.toLowerCase()),
+    );
 
-  setData(filtered);
-};
-const handleExport = () => {
+    setData(filtered);
+  };
+  const handleExport = () => {
     const exportData = [];
 
     data.forEach((contract) => {
@@ -234,19 +372,27 @@ const handleExport = () => {
           exportData.push({
             // --- Header Details ---
             "Contract No": contract.saleContractNumber || "N/A",
-            "Customer": contract.customer || "N/A",
+            Customer: contract.customer || "N/A",
             "Customer Email": contract.customerEmail || "-",
             "Customer Mobile": contract.customerMobile || "-",
-            "Status": contract.status || "Pending",
-            "Start Date": contract.startDate ? dayjs(contract.startDate).format("DD-MM-YYYY") : "-",
-            "End Date": contract.endDate ? dayjs(contract.endDate).format("DD-MM-YYYY") : "-",
-            
+            Status: contract.status || "Pending",
+            "Start Date": contract.startDate
+              ? dayjs(contract.startDate).format("DD-MM-YYYY")
+              : "-",
+            "End Date": contract.endDate
+              ? dayjs(contract.endDate).format("DD-MM-YYYY")
+              : "-",
+
             // --- Item Details ---
             "Item No": index + 1,
             "Vendor/Company": item.vendor_name || item.vendorName || "-",
-            "Product Name": item.product?.product_name || item.product_name || item.itemName || "-",
+            "Product Name":
+              item.product?.product_name ||
+              item.product_name ||
+              item.itemName ||
+              "-",
             "HSN Code": item.hsn_code || item.itemCode || "-",
-            "UOM": item.uom?.unit_name || item.uom || "-",
+            UOM: item.uom?.unit_name || item.uom || "-",
             "Net Qty": item.net_qty || item.qty || 0,
             "Free Qty": item.free_qty || item.freeQty || 0,
             "Gross Qty": item.gross_qty || item.totalQty || 0,
@@ -257,19 +403,27 @@ const handleExport = () => {
 
             // --- Tax & Grand Totals ---
             // --- Inside handleExport ---
-"SGST %": contract.sgst || contract.orderTaxAndTotals?.sgstPercent || 0,
-"CGST %": contract.cgst || contract.orderTaxAndTotals?.cgstPercent || 0,
-"IGST %": contract.igst || contract.orderTaxAndTotals?.igstPercent || 0,
-"TCS Amt (₹)": contract.tcs_amount || contract.orderTaxAndTotals?.tcsAmt || 0,    "Grand Total (₹)": contract.grandTotal || 0,
+            "SGST %":
+              contract.sgst || contract.orderTaxAndTotals?.sgstPercent || 0,
+            "CGST %":
+              contract.cgst || contract.orderTaxAndTotals?.cgstPercent || 0,
+            "IGST %":
+              contract.igst || contract.orderTaxAndTotals?.igstPercent || 0,
+            "TCS Amt (₹)":
+              contract.tcs_amount || contract.orderTaxAndTotals?.tcsAmt || 0,
+            "Grand Total (₹)": contract.grandTotal || 0,
           });
         });
       }
     });
 
     // Call the utility
-    exportToExcel(exportData, `Sales_Contract_Report_${dayjs().format("YYYY-MM-DD")}`);
+    exportToExcel(
+      exportData,
+      `Sales_Contract_Report_${dayjs().format("YYYY-MM-DD")}`,
+    );
   };
-  
+
   // compute per-item + order totals
   const computeFromFormValues = (values) => {
     const items = (values.items || []).map((it, idx) => {
@@ -345,8 +499,6 @@ const handleExport = () => {
       },
     };
   };
-
-  
 
   // Add these functions before the return statement
   const mapApiRecordToForm = (record) => {
@@ -453,17 +605,17 @@ const handleExport = () => {
             (contract.items || []).reduce(
               (s, i) => s + Number(i.discount_amount || 0),
               0,
-            )
+            ),
           ),
           totalGST:
-            Number(contract.sgst) + Number(contract.cgst) + Number(contract.igst),
+            Number(contract.sgst) +
+            Number(contract.cgst) +
+            Number(contract.igst),
 
           grandTotal: Number(contract.grand_total),
         },
       };
 
-     
-    
       mapped.key = contract.sale_contract_id;
 
       setSelectedRecord(mapped);
@@ -483,7 +635,7 @@ const handleExport = () => {
         customer: contract.customer_name,
         customerId: contract.customer_business_id || contract.customer_id,
         customerEmail: contract.customer_email,
-        customerMobile:contract.customer_mobile,
+        customerMobile: contract.customer_mobile,
         status: contract.status,
 
         soudaDate: contract.created_at ? dayjs(contract.created_at) : undefined,
@@ -511,19 +663,21 @@ const handleExport = () => {
         })),
 
         orderTaxAndTotals: {
-igstPercent: Number(contract.igst),          // GST from API
-  sgstPercent: Number(contract.igst) / 2,      // auto 50%
-  cgstPercent: Number(contract.igst) / 2,      // auto 50%
-  tcsAmt: Number(contract.tcs_amount),
+          igstPercent: Number(contract.igst), // GST from API
+          sgstPercent: Number(contract.igst) / 2, // auto 50%
+          cgstPercent: Number(contract.igst) / 2, // auto 50%
+          tcsAmt: Number(contract.tcs_amount),
           grossAmountTotal: Number(contract.total_amount),
           discountTotal: Number(
             (contract.items || []).reduce(
               (s, i) => s + Number(i.discount_amount || 0),
               0,
-            )
+            ),
           ),
           totalGST:
-            Number(contract.sgst) + Number(contract.cgst) + Number(contract.igst),
+            Number(contract.sgst) +
+            Number(contract.cgst) +
+            Number(contract.igst),
           grandTotal: Number(contract.grand_total),
         },
       };
@@ -531,7 +685,7 @@ igstPercent: Number(contract.igst),          // GST from API
       // Fetch products for all vendors in the items to populate Select options
       const uniqueVendorIds = [
         ...new Set(
-          (contract.items || []).map((it) => it.vendor_id).filter(Boolean)
+          (contract.items || []).map((it) => it.vendor_id).filter(Boolean),
         ),
       ];
 
@@ -539,7 +693,7 @@ igstPercent: Number(contract.igst),          // GST from API
         try {
           // Fetch all simultaneously
           const responses = await Promise.all(
-            uniqueVendorIds.map((vid) => getproductbyVendor(vid))
+            uniqueVendorIds.map((vid) => getproductbyVendor(vid)),
           );
 
           setVendorProductsMap((prev) => {
@@ -558,12 +712,10 @@ igstPercent: Number(contract.igst),          // GST from API
       setSelectedRecord(mapped);
       editForm.setFieldsValue(mapped);
       setIsEditModalOpen(true);
-      
     } catch (err) {
       console.error("Failed to fetch contract details", err);
     }
   };
- 
 
   // table columns: replace deliveryDate / company with startDate / endDate
   const columns = [
@@ -586,8 +738,6 @@ igstPercent: Number(contract.igst),          // GST from API
       ),
     },
 
-  
-
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
       dataIndex: "customer",
@@ -603,37 +753,39 @@ igstPercent: Number(contract.igst),          // GST from API
         <span className="text-amber-800">
           {items.length
             ? items
-              .map((i) => i.product?.product_name || i.product_name)
-              .join(" • ")
+                .map((i) => i.product?.product_name || i.product_name)
+                .join(" • ")
             : "-"}
         </span>
       ),
     },
 
-   {
-  title: <span className="text-amber-700 font-semibold">Status</span>,
-  dataIndex: "status",
-  width: 120,
-  render: (status) => {
-    let colorClass = "";
+    {
+      title: <span className="text-amber-700 font-semibold">Status</span>,
+      dataIndex: "status",
+      width: 120,
+      render: (status) => {
+        let colorClass = "";
 
-    if (status === "Approved") {
-      colorClass = "bg-green-100 text-green-700";
-    } else if (status === "Pending") {
-      colorClass = "bg-yellow-100 text-yellow-700";
-    } else if (status === "Rejected") {
-      colorClass = "bg-red-100 text-red-700";
-    } else {
-      colorClass = "bg-gray-100 text-gray-700";
-    }
+        if (status === "Approved") {
+          colorClass = "bg-green-100 text-green-700";
+        } else if (status === "Pending") {
+          colorClass = "bg-yellow-100 text-yellow-700";
+        } else if (status === "Rejected") {
+          colorClass = "bg-red-100 text-red-700";
+        } else {
+          colorClass = "bg-gray-100 text-gray-700";
+        }
 
-    return (
-      <span className={`px-3 py-1 rounded-full font-semibold ${colorClass}`}>
-        {status}
-      </span>
-    );
-  },
-},
+        return (
+          <span
+            className={`px-3 py-1 rounded-full font-semibold ${colorClass}`}
+          >
+            {status}
+          </span>
+        );
+      },
+    },
 
     {
       title: <span className="text-amber-700 font-semibold">Total (₹)</span>,
@@ -653,14 +805,16 @@ igstPercent: Number(contract.igst),          // GST from API
       width: 120,
       render: (record) => (
         <div className="flex gap-3">
-          <EyeOutlined className="text-blue-500!" onClick={() => openView(record)} />
+          <EyeOutlined
+            className="text-blue-500!"
+            onClick={() => openView(record)}
+          />
           {record.status !== "Approved" && (
-        <EditOutlined
-          className="cursor-pointer! text-red-500!"
-          onClick={() => openEdit(record)}
-        />
-      )}
-         
+            <EditOutlined
+              className="cursor-pointer! text-red-500!"
+              onClick={() => openEdit(record)}
+            />
+          )}
         </div>
       ),
     },
@@ -806,9 +960,9 @@ igstPercent: Number(contract.igst),          // GST from API
                                 value: selected?.base_unit,
                               },
                               {
-          name: ["items", field.name, "rate"],
-          value: Number(selected.default_rate), // ✅ Auto fill Rate
-        },
+                                name: ["items", field.name, "rate"],
+                                value: Number(selected.default_rate), // ✅ Auto fill Rate
+                              },
                             ]);
                           }}
                         >
@@ -843,31 +997,33 @@ igstPercent: Number(contract.igst),          // GST from API
 
                     {/* QTY */}
                     <Col span={4}>
-                     <Form.Item
-  label={<span className="text-amber-700">Qty</span>}
-  name={[field.name, "qty"]}
-  rules={[
-    { required: true, message: "Quantity is required" },
-    {
-      validator: (_, value) => {
-          if (value === undefined || value === null) {
-          return Promise.resolve();
-        }
-        if (isNaN(value)) {
-          return Promise.reject(new Error("Enter a valid number"));
-        }
-        if (value > 0) {
-          return Promise.resolve();
-        }
-        return Promise.reject(
-          new Error("Quantity must be greater than 0")
-        );
-      },
-    },
-  ]}
->
-  <Input min={0} className="w-full" />
-</Form.Item>
+                      <Form.Item
+                        label={<span className="text-amber-700">Qty</span>}
+                        name={[field.name, "qty"]}
+                        rules={[
+                          { required: true, message: "Quantity is required" },
+                          {
+                            validator: (_, value) => {
+                              if (value === undefined || value === null) {
+                                return Promise.resolve();
+                              }
+                              if (isNaN(value)) {
+                                return Promise.reject(
+                                  new Error("Enter a valid number"),
+                                );
+                              }
+                              if (value > 0) {
+                                return Promise.resolve();
+                              }
+                              return Promise.reject(
+                                new Error("Quantity must be greater than 0"),
+                              );
+                            },
+                          },
+                        ]}
+                      >
+                        <Input min={0} className="w-full" />
+                      </Form.Item>
                     </Col>
 
                     {/* FREE QTY */}
@@ -875,23 +1031,23 @@ igstPercent: Number(contract.igst),          // GST from API
                       <Form.Item
                         label={<span className="text-amber-700">Free Qty</span>}
                         name={[field.name, "freeQty"]}
-                         rules={[
-       {
-      validator: (_, value) => {
-          if (value === undefined || value === null) {
-          return Promise.resolve();
-        }
-          if (value >= 0) {
-          return Promise.resolve();
-        }
-        if (isNaN(value)) {
-          return Promise.reject(new Error("Enter a valid number"));
-        }
-      
-      
-      },
-    },
-  ]}
+                        rules={[
+                          {
+                            validator: (_, value) => {
+                              if (value === undefined || value === null) {
+                                return Promise.resolve();
+                              }
+                              if (value >= 0) {
+                                return Promise.resolve();
+                              }
+                              if (isNaN(value)) {
+                                return Promise.reject(
+                                  new Error("Enter a valid number"),
+                                );
+                              }
+                            },
+                          },
+                        ]}
                       >
                         <Input min={0} className="w-full" />
                       </Form.Item>
@@ -916,7 +1072,7 @@ igstPercent: Number(contract.igst),          // GST from API
                         name={[field.name, "rate"]}
                         rules={[{ required: true }]}
                       >
-                       <InputNumber min={0} className="w-full" disabled />
+                        <InputNumber min={0} className="w-full" disabled />
                       </Form.Item>
                     </Col>
 
@@ -927,23 +1083,23 @@ igstPercent: Number(contract.igst),          // GST from API
                           <span className="text-amber-700">Discount %</span>
                         }
                         name={[field.name, "discountPercent"]}
-                                                rules={[
-       {
-      validator: (_, value) => {
-          if (value === undefined || value === null) {
-          return Promise.resolve();
-        }
-          if (value >= 0) {
-          return Promise.resolve();
-        }
-        if (isNaN(value)) {
-          return Promise.reject(new Error("Enter a valid number"));
-        }
-      
-      
-      },
-    },
-  ]}
+                        rules={[
+                          {
+                            validator: (_, value) => {
+                              if (value === undefined || value === null) {
+                                return Promise.resolve();
+                              }
+                              if (value >= 0) {
+                                return Promise.resolve();
+                              }
+                              if (isNaN(value)) {
+                                return Promise.reject(
+                                  new Error("Enter a valid number"),
+                                );
+                              }
+                            },
+                          },
+                        ]}
                       >
                         <Input min={0} max={100} className="w-full" />
                       </Form.Item>
@@ -966,23 +1122,23 @@ igstPercent: Number(contract.igst),          // GST from API
                       <Form.Item
                         label={<span className="text-amber-700">Gross Wt</span>}
                         name={[field.name, "grossWt"]}
-                                           rules={[
-       {
-      validator: (_, value) => {
-          if (value === undefined || value === null) {
-          return Promise.resolve();
-        }
-          if (value >= 0) {
-          return Promise.resolve();
-        }
-        if (isNaN(value)) {
-          return Promise.reject(new Error("Enter a valid number"));
-        }
-      
-      
-      },
-    },
-  ]}
+                        rules={[
+                          {
+                            validator: (_, value) => {
+                              if (value === undefined || value === null) {
+                                return Promise.resolve();
+                              }
+                              if (value >= 0) {
+                                return Promise.resolve();
+                              }
+                              if (isNaN(value)) {
+                                return Promise.reject(
+                                  new Error("Enter a valid number"),
+                                );
+                              }
+                            },
+                          },
+                        ]}
                       >
                         <Input min={0} className="w-full" />
                       </Form.Item>
@@ -1042,19 +1198,28 @@ igstPercent: Number(contract.igst),          // GST from API
         grandTotal: contract.grand_total,
       };
 
-      // ✅ Add the new row to the table data
+      // ✅ Add new row to the table data
       setData((prev) => [row, ...prev]);
       setIsAddModalOpen(false);
       addForm.resetFields();
+
+      // Delete active draft after successful submission
+      if (activeDraftId) {
+        deleteSalesDraft(activeDraftId, 'souda');
+        setActiveDraftId(null);
+        loadDraftsList();
+      }
 
       // ✅ Optional: Show success message
       console.log("Sales contract created successfully:", row);
     } catch (error) {
       console.error("Failed to create sales contract", error);
-      // 🔍 Log the error response
+      // 🔍 Log: error response
       console.error("Error response:", error.response?.data);
     }
   };
+
+  // Edit submit handler
   const handleEditFinish = async (values) => {
     try {
       // Re-calculate item totals to be safe
@@ -1064,7 +1229,7 @@ igstPercent: Number(contract.igst),          // GST from API
         const grossQty = netQty + freeQty;
         const mrp = Number(it.rate || 0); // rate is MRP
         const discountPercent = Number(it.discountPercent || 0);
-        
+
         const grossAmount = netQty * mrp;
         const discountAmount = (grossAmount * discountPercent) / 100;
         const lineTotal = grossAmount - discountAmount;
@@ -1087,7 +1252,7 @@ igstPercent: Number(contract.igst),          // GST from API
         customer_id: selectedRecord.customerId, // Use ID from record
         customer_email: values.customerEmail,
         customer_mobile: values.customerMobile,
-         status: values.status,  
+        status: values.status,
         from_date: values.startDate
           ? dayjs(values.startDate).format("YYYY-MM-DD")
           : null,
@@ -1116,20 +1281,20 @@ igstPercent: Number(contract.igst),          // GST from API
         prev.map((d) =>
           d.key === selectedRecord.key
             ? {
-              ...d,
-              ...mapApiRecordToForm(res || {}), // reuse mapper if possible or manually map
-              key: d.key,
-              // Manually update core fields if mapper return structure differs slightly for table
-              saleContractNumber: res.sale_contract_number,
-              customer: res.customer_name,
-              startDate: res.from_date,
-              endDate: res.to_date,
-              status: res.status,
-              grandTotal: res.grand_total,
-              items: res.items,
-            }
-            : d
-        )
+                ...d,
+                ...mapApiRecordToForm(res || {}), // reuse mapper if possible or manually map
+                key: d.key,
+                // Manually update core fields if mapper return structure differs slightly for table
+                saleContractNumber: res.sale_contract_number,
+                customer: res.customer_name,
+                startDate: res.from_date,
+                endDate: res.to_date,
+                status: res.status,
+                grandTotal: res.grand_total,
+                items: res.items,
+              }
+            : d,
+        ),
       );
 
       setIsEditModalOpen(false);
@@ -1166,7 +1331,6 @@ igstPercent: Number(contract.igst),          // GST from API
     });
   };
 
-  
   return (
     <div>
       <div className="flex justify-between items-center mb-2">
@@ -1176,11 +1340,15 @@ igstPercent: Number(contract.igst),          // GST from API
             placeholder="Search..."
             className="w-64! border-amber-300! focus:border-amber-500!"
             value={searchText}
-           onChange={(e) => handleSearch(e.target.value)}   />
-         
+            onChange={(e) => handleSearch(e.target.value)}
+          />
+
           <Button
             icon={<FilterOutlined />}
-            onClick={() => {setSearchText("");fetchSalesContracts();}}
+            onClick={() => {
+              setSearchText("");
+              fetchSalesContracts();
+            }}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Reset
@@ -1236,6 +1404,9 @@ igstPercent: Number(contract.igst),          // GST from API
         </div>
       </div>
 
+      {/* Draft Table */}
+      <DraftTable />
+
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
           Sales Contract Records
@@ -1252,9 +1423,21 @@ igstPercent: Number(contract.igst),          // GST from API
       {/* Add Modal */}
       <Modal
         title={
-          <span className="text-amber-700 text-2xl font-semibold">
-            Add Sales Contract
-          </span>
+          <div className="flex justify-between items-center">
+            <span className="text-amber-700 text-2xl font-semibold">
+              Add Sales Contract{" "}
+              {activeDraftId && (
+                <span className="text-sm text-blue-500">(Draft)</span>
+              )}
+            </span>
+            <Button
+              size="small"
+              onClick={() => handleManualSave(addForm)}
+              className="bg-green-500 hover:bg-green-600 text-white"
+            >
+              Save Draft
+            </Button>
+          </div>
         }
         open={isAddModalOpen}
         onCancel={() => {
@@ -1268,7 +1451,9 @@ igstPercent: Number(contract.igst),          // GST from API
           form={addForm}
           layout="vertical"
           onFinish={handleAddFinish}
-          onValuesChange={handleAddValuesChange}
+          onValuesChange={(changedValues, allValues) =>
+            handleFormValuesChange(changedValues, allValues, addForm)
+          }
         >
           <h6 className="text-amber-500">Basic Information</h6>
           <Row gutter={16}>
@@ -1279,8 +1464,8 @@ igstPercent: Number(contract.igst),          // GST from API
                 rules={[{ required: true }]}
                 initialValue={dayjs()}
               >
-                <DatePicker 
-                  className="w-full" 
+                <DatePicker
+                  className="w-full"
                   disabled
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 />
@@ -1304,7 +1489,7 @@ igstPercent: Number(contract.igst),          // GST from API
                 label={<span className="text-amber-700">End Date</span>}
                 name="endDate"
               >
-               <DatePicker
+                <DatePicker
                   className="w-full"
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 />
@@ -1312,7 +1497,6 @@ igstPercent: Number(contract.igst),          // GST from API
             </Col>
 
             <Col span={6}>
-             
               <Form.Item
                 label={<span className="text-amber-700">Customer Name</span>}
                 name="customerId"
@@ -1320,46 +1504,45 @@ igstPercent: Number(contract.igst),          // GST from API
               >
                 <Select
                   placeholder="Select Customer"
-               onChange={async (customerId) => {
+                  onChange={async (customerId) => {
+                    // ✅ 1. Instant fill from already loaded list
+                    const selectedCustomer = customers.find(
+                      (c) => c.customer_id === customerId,
+                    );
 
-  // ✅ 1. Instant fill from already loaded list
-  const selectedCustomer = customers.find(
-    (c) => c.customer_id === customerId
-  );
+                    if (selectedCustomer) {
+                      addForm.setFieldsValue({
+                        customerEmail:
+                          selectedCustomer.email_address ||
+                          selectedCustomer.email ||
+                          "",
+                        customerMobile:
+                          selectedCustomer.mobile_number ||
+                          selectedCustomer.mobile ||
+                          selectedCustomer.phone_number ||
+                          "",
+                      });
+                    }
 
-  if (selectedCustomer) {
-    addForm.setFieldsValue({
-      customerEmail:
-        selectedCustomer.email_address ||
-        selectedCustomer.email ||
-        "",
-      customerMobile:
-        selectedCustomer.mobile_number ||
-        selectedCustomer.mobile ||
-        selectedCustomer.phone_number ||
-        "",
-    });
-  }
+                    // ✅ 2. Fetch latest details (optional but best practice)
+                    try {
+                      const details = await getAdminCustomerDetails(customerId);
 
-  // ✅ 2. Fetch latest details (optional but best practice)
-  try {
-    const details = await getAdminCustomerDetails(customerId);
-
-    if (details) {
-      addForm.setFieldsValue({
-        customerEmail:
-          details.email_address || details.email || "",
-        customerMobile:
-          details.mobile_number ||
-          details.mobile ||
-          details.phone_number ||
-          "",
-      });
-    }
-  } catch (err) {
-    console.error("Customer auto-fill failed", err);
-  }
-}}
+                      if (details) {
+                        addForm.setFieldsValue({
+                          customerEmail:
+                            details.email_address || details.email || "",
+                          customerMobile:
+                            details.mobile_number ||
+                            details.mobile ||
+                            details.phone_number ||
+                            "",
+                        });
+                      }
+                    } catch (err) {
+                      console.error("Customer auto-fill failed", err);
+                    }
+                  }}
                 >
                   {customers.map((c) => (
                     <Select.Option
@@ -1406,9 +1589,6 @@ igstPercent: Number(contract.igst),          // GST from API
               </Form.Item>
             </Col>
 
-         
-           
-
             <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">Type</span>}
@@ -1435,68 +1615,71 @@ igstPercent: Number(contract.igst),          // GST from API
           {/* Tax & totals */}
           <h6 className="text-amber-500">Tax, Charges & Others</h6>
           <Row gutter={16}>
-                <Col span={6}>
+            <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">GST %</span>}
                 name={["orderTaxAndTotals", "igstPercent"]}
-                                   rules={[{
-                                    required: true, message: "GST % is required"} , 
-       {
-      validator: (_, value) => {
-          if (value === undefined || value === null) {
-          return Promise.resolve();
-        }
-          if (value >= 0) {
-          return Promise.resolve();
-        }
-        if (isNaN(value)) {
-          return Promise.reject(new Error("Enter a valid number"));
-        }
-      
-      
-      },
-    },
-  ]}
+                rules={[
+                  {
+                    required: true,
+                    message: "GST % is required",
+                  },
+                  {
+                    validator: (_, value) => {
+                      if (value === undefined || value === null) {
+                        return Promise.resolve();
+                      }
+                      if (value >= 0) {
+                        return Promise.resolve();
+                      }
+                      if (isNaN(value)) {
+                        return Promise.reject(
+                          new Error("Enter a valid number"),
+                        );
+                      }
+                    },
+                  },
+                ]}
               >
-              <Input
-  className="w-full"
-  min={0}
-  max={100}
-  onChange={(e) => {
-    const igst = parseFloat(e.target.value) || 0;
- const split = (igst / 2).toFixed(2);
+                <Input
+                  className="w-full"
+                  min={0}
+                  max={100}
+                  onChange={(e) => {
+                    const igst = parseFloat(e.target.value) || 0;
+                    const split = (igst / 2).toFixed(2);
 
-    addForm.setFieldsValue({
-      orderTaxAndTotals: {
-        cgstPercent: split,
-        sgstPercent: split,
-      },
-    });
-  }}
-/>
+                    addForm.setFieldsValue({
+                      orderTaxAndTotals: {
+                        cgstPercent: split,
+                        sgstPercent: split,
+                      },
+                    });
+                  }}
+                />
               </Form.Item>
             </Col>
             <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">SGST %</span>}
                 name={["orderTaxAndTotals", "sgstPercent"]}
-                                   rules={[
-       {
-      validator: (_, value) => {
-          if (value === undefined || value === null) {
-          return Promise.resolve();
-        }
-          if (value >= 0) {
-          return Promise.resolve();
-        }
-        if (isNaN(value)) {
-          return Promise.reject(new Error("Enter a valid number"));
-        }
-      
-      
-      },
-    },
-  ]}
+                rules={[
+                  {
+                    validator: (_, value) => {
+                      if (value === undefined || value === null) {
+                        return Promise.resolve();
+                      }
+                      if (value >= 0) {
+                        return Promise.resolve();
+                      }
+                      if (isNaN(value)) {
+                        return Promise.reject(
+                          new Error("Enter a valid number"),
+                        );
+                      }
+                    },
+                  },
+                ]}
               >
                 <Input className="w-full" min={0} max={100} disabled />
               </Form.Item>
@@ -1506,51 +1689,49 @@ igstPercent: Number(contract.igst),          // GST from API
               <Form.Item
                 label={<span className="text-amber-700">CGST %</span>}
                 name={["orderTaxAndTotals", "cgstPercent"]}
-                                   rules={[
-       {
-      validator: (_, value) => {
-          if (value === undefined || value === null) {
-          return Promise.resolve();
-        }
-          if (value >= 0) {
-          return Promise.resolve();
-        }
-        if (isNaN(value)) {
-          return Promise.reject(new Error("Enter a valid number"));
-        }
-      
-      
-      },
-    },
-  ]}
+                rules={[
+                  {
+                    validator: (_, value) => {
+                      if (value === undefined || value === null) {
+                        return Promise.resolve();
+                      }
+                      if (value >= 0) {
+                        return Promise.resolve();
+                      }
+                      if (isNaN(value)) {
+                        return Promise.reject(
+                          new Error("Enter a valid number"),
+                        );
+                      }
+                    },
+                  },
+                ]}
               >
                 <Input className="w-full" min={0} max={100} disabled />
               </Form.Item>
             </Col>
 
-        
-
             <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">TCS Amt (₹)</span>}
                 name={["orderTaxAndTotals", "tcsAmt"]}
-                                   rules={[
-       {
-      validator: (_, value) => {
-          if (value === undefined || value === null) {
-          return Promise.resolve();
-        }
-          if (value >= 0) {
-          return Promise.resolve();
-        }
-        if (isNaN(value)) {
-          return Promise.reject(new Error("Enter a valid number"));
-        }
-      
-      
-      },
-    },
-  ]}
+                rules={[
+                  {
+                    validator: (_, value) => {
+                      if (value === undefined || value === null) {
+                        return Promise.resolve();
+                      }
+                      if (value >= 0) {
+                        return Promise.resolve();
+                      }
+                      if (isNaN(value)) {
+                        return Promise.reject(
+                          new Error("Enter a valid number"),
+                        );
+                      }
+                    },
+                  },
+                ]}
               >
                 <Input className="w-full" min={0} />
               </Form.Item>
@@ -1642,8 +1823,8 @@ igstPercent: Number(contract.igst),          // GST from API
                 name="soudaDate"
                 rules={[{ required: true }]}
               >
-                <DatePicker 
-                  className="w-full" 
+                <DatePicker
+                  className="w-full"
                   disabled
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 />
@@ -1655,8 +1836,8 @@ igstPercent: Number(contract.igst),          // GST from API
                 label={<span className="text-amber-700">Start Date</span>}
                 name="startDate"
               >
-                <DatePicker 
-                  className="w-full" 
+                <DatePicker
+                  className="w-full"
                   disabled
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 />
@@ -1668,8 +1849,8 @@ igstPercent: Number(contract.igst),          // GST from API
                 label={<span className="text-amber-700">End Date</span>}
                 name="endDate"
               >
-                <DatePicker 
-                  className="w-full" 
+                <DatePicker
+                  className="w-full"
                   disabled
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 />
@@ -1677,79 +1858,80 @@ igstPercent: Number(contract.igst),          // GST from API
             </Col>
 
             <Col span={6}>
-             <Form.Item
-  label={<span className="text-amber-700">Customer Name</span>}
-  name="customerId"
-  rules={[{ required: true, message: "Select customer" }]}
->
-  <Select
-    placeholder="Select Customer"
-    onChange={async (value) => {
+              <Form.Item
+                label={<span className="text-amber-700">Customer Name</span>}
+                name="customerId"
+                rules={[{ required: true, message: "Select customer" }]}
+              >
+                <Select
+                  placeholder="Select Customer"
+                  onChange={async (value) => {
+                    // ✅ 1. Instant fill from local list
+                    const selectedCustomer = customers.find(
+                      (c) => c.customer_id === value,
+                    );
 
-      // ✅ 1. Instant fill from local list
-      const selectedCustomer = customers.find(
-        (c) => c.customer_id === value
-      );
+                    if (selectedCustomer) {
+                      editForm.setFieldsValue({
+                        customerId: value,
+                        customerEmail:
+                          selectedCustomer.email_address ||
+                          selectedCustomer.email ||
+                          "",
+                        customerMobile:
+                          selectedCustomer.mobile_number ||
+                          selectedCustomer.mobile ||
+                          selectedCustomer.phone_number ||
+                          "",
+                      });
+                    }
 
-      if (selectedCustomer) {
-        editForm.setFieldsValue({
-          customerId: value,
-          customerEmail:
-            selectedCustomer.email_address ||
-            selectedCustomer.email ||
-            "",
-          customerMobile:
-            selectedCustomer.mobile_number ||
-            selectedCustomer.mobile ||
-            selectedCustomer.phone_number ||
-            "",
-        });
-      }
+                    // ✅ 2. Fetch latest data from API (optional but recommended)
+                    try {
+                      const details = await getAdminCustomerDetails(value);
 
-      // ✅ 2. Fetch latest data from API (optional but recommended)
-      try {
-        const details = await getAdminCustomerDetails(value);
-
-        if (details) {
-          editForm.setFieldsValue({
-            customerId: value,
-            customerEmail:
-              details.email_address || details.email || "",
-            customerMobile:
-              details.mobile_number ||
-              details.mobile ||
-              details.phone_number ||
-              "",
-          });
-        }
-      } catch (err) {
-        console.error("Auto-fill failed", err);
-      }
-    }}
-  >
-    {customers.map((c) => (
-     <Select.Option key={c.customer_id} value={c.customer_id}>   {c.customer_name}
-      </Select.Option>
-    ))}
-  </Select>
-</Form.Item>
+                      if (details) {
+                        editForm.setFieldsValue({
+                          customerId: value,
+                          customerEmail:
+                            details.email_address || details.email || "",
+                          customerMobile:
+                            details.mobile_number ||
+                            details.mobile ||
+                            details.phone_number ||
+                            "",
+                        });
+                      }
+                    } catch (err) {
+                      console.error("Auto-fill failed", err);
+                    }
+                  }}
+                >
+                  {customers.map((c) => (
+                    <Select.Option key={c.customer_id} value={c.customer_id}>
+                      {" "}
+                      {c.customer_name}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
             </Col>
 
             <Col span={6}>
-<Form.Item
-  label={<span className="text-amber-700">Customer Email</span>}
-  name="customerEmail"
->
-  <Input disabled />
-</Form.Item>
+              <Form.Item
+                label={<span className="text-amber-700">Customer Email</span>}
+                name="customerEmail"
+              >
+                <Input disabled />
+              </Form.Item>
             </Col>
-           <Col span={6}>
-             <Form.Item
-  label={<span className="text-amber-700">Customer Mobile</span>}
-  name="customerMobile"
->
-  <Input disabled />
-</Form.Item>
+            <Col span={6}>
+              <Form.Item
+                label={<span className="text-amber-700">Customer Mobile</span>}
+                name="customerMobile"
+              >
+                <Input disabled />
+              </Form.Item>
             </Col>
             <Col span={6}>
               <Form.Item
@@ -1776,41 +1958,45 @@ igstPercent: Number(contract.igst),          // GST from API
 
           <h6 className="text-amber-500">Tax, Charges & Others</h6>
           <Row gutter={16}>
-             <Col span={6}>
-  <Form.Item
-    label={<span className="text-amber-700">GST %</span>}
-    name={["orderTaxAndTotals", "igstPercent"]}
-  >
-    <InputNumber
-      className="w-full"
-      min={0}
-      max={100}
-      onChange={(val) => {
-        const gst = parseFloat(val) || 0;
-        const split = parseFloat((gst / 2).toFixed(2));
-        editForm.setFieldsValue({
-          orderTaxAndTotals: {
-            sgstPercent: split,
-            cgstPercent: split,
-          },
-        });
-      }}
-    />
-  </Form.Item>
-</Col>
-           <Col span={6}>
-  <Form.Item label={<span className="text-amber-700">SGST %</span>} name={["orderTaxAndTotals", "sgstPercent"]}>
-    <InputNumber className="w-full" min={0} max={100} disabled />
-  </Form.Item>
-</Col>
+            <Col span={6}>
+              <Form.Item
+                label={<span className="text-amber-700">GST %</span>}
+                name={["orderTaxAndTotals", "igstPercent"]}
+              >
+                <InputNumber
+                  className="w-full"
+                  min={0}
+                  max={100}
+                  onChange={(val) => {
+                    const gst = parseFloat(val) || 0;
+                    const split = parseFloat((gst / 2).toFixed(2));
+                    editForm.setFieldsValue({
+                      orderTaxAndTotals: {
+                        sgstPercent: split,
+                        cgstPercent: split,
+                      },
+                    });
+                  }}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item
+                label={<span className="text-amber-700">SGST %</span>}
+                name={["orderTaxAndTotals", "sgstPercent"]}
+              >
+                <InputNumber className="w-full" min={0} max={100} disabled />
+              </Form.Item>
+            </Col>
 
-<Col span={6}>
-  <Form.Item label={<span className="text-amber-700">CGST %</span>} name={["orderTaxAndTotals", "cgstPercent"]}>
-    <InputNumber className="w-full" min={0} max={100} disabled />
-  </Form.Item>
-</Col>
-
-           
+            <Col span={6}>
+              <Form.Item
+                label={<span className="text-amber-700">CGST %</span>}
+                name={["orderTaxAndTotals", "cgstPercent"]}
+              >
+                <InputNumber className="w-full" min={0} max={100} disabled />
+              </Form.Item>
+            </Col>
 
             <Col span={6}>
               <Form.Item
@@ -1901,8 +2087,8 @@ igstPercent: Number(contract.igst),          // GST from API
                 label={<span className="text-amber-700">Souda Date</span>}
                 name="soudaDate"
               >
-                <DatePicker 
-                  className="w-full" 
+                <DatePicker
+                  className="w-full"
                   disabled
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 />
@@ -1914,8 +2100,8 @@ igstPercent: Number(contract.igst),          // GST from API
                 label={<span className="text-amber-700">Start Date</span>}
                 name="startDate"
               >
-                <DatePicker 
-                  className="w-full" 
+                <DatePicker
+                  className="w-full"
                   disabled
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 />
@@ -1927,8 +2113,8 @@ igstPercent: Number(contract.igst),          // GST from API
                 label={<span className="text-amber-700">End Date</span>}
                 name="endDate"
               >
-                <DatePicker 
-                  className="w-full" 
+                <DatePicker
+                  className="w-full"
                   disabled
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 />
@@ -1992,15 +2178,11 @@ igstPercent: Number(contract.igst),          // GST from API
               className="grid grid-cols-12 gap-2 items-center py-2 border-b"
             >
               <div className="col-span-2 text-amber-800">{it.vendorName}</div>
-              <div className="col-span-3 text-amber-800">
-                {it.itemName}
-              </div>
+              <div className="col-span-3 text-amber-800">{it.itemName}</div>
               <div className="col-span-1 text-amber-800">
                 {it.itemCode || "-"}
               </div>
-              <div className="col-span-1 text-amber-800">
-                {it.uom || "-"}
-              </div>
+              <div className="col-span-1 text-amber-800">{it.uom || "-"}</div>
               <div className="col-span-1 text-amber-800">{it.qty}</div>
               <div className="col-span-1 text-amber-800">{it.freeQty}</div>
               <div className="col-span-1 text-amber-800">{it.totalQty}</div>
@@ -2013,7 +2195,7 @@ igstPercent: Number(contract.igst),          // GST from API
 
           <h6 className="text-amber-500">Tax, Charges & Others</h6>
           <Row gutter={16}>
-             <Col span={6}>
+            <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">GST %</span>}
                 name={["orderTaxAndTotals", "igstPercent"]}
@@ -2047,8 +2229,6 @@ igstPercent: Number(contract.igst),          // GST from API
                 />
               </Form.Item>
             </Col>
-
-           
 
             <Col span={6}>
               <Form.Item

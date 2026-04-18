@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Table,
   Input,
@@ -24,10 +24,18 @@ import {
   DeleteOutlined,
 } from "@ant-design/icons";
 import { exportToExcel } from "../../../../../utils/exportToExcel";
-import { createFinancialYearDisabledDate, useSelectedFinancialYear } from "../../../../../utils/financialYearValidation";
+import {
+  createFinancialYearDisabledDate,
+  useSelectedFinancialYear,
+} from "../../../../../utils/financialYearValidation";
+import {
+  saveSalesDraft,
+  loadSalesDraft,
+  deleteSalesDraft,
+  getAllSalesDrafts,
+} from "../../../../../utils/salesDraftUtils";
 import dayjs from "dayjs";
 import {
- 
   salesContractItems,
   createSalesOrder,
   getSalesOrders,
@@ -38,7 +46,6 @@ import {
 } from "../../../../../api/sales";
 /* ------------------ data (use your salesOrderJSON) ------------------ */
 
-
 /* ------------------ component ------------------ */
 export default function SaleOrdersInvoice() {
   const [data, setData] = useState([]);
@@ -47,7 +54,7 @@ export default function SaleOrdersInvoice() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const [formMode, setFormMode] = useState(null); 
+  const [formMode, setFormMode] = useState(null);
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [viewForm] = Form.useForm();
@@ -56,12 +63,145 @@ export default function SaleOrdersInvoice() {
   // const [contractItems, setContractItems] = useState([]);
   const selectedFY = useSelectedFinancialYear();
   const [contractItemsMap, setContractItemsMap] = useState({});
+
+  // Draft state
+  const [showDrafts, setShowDrafts] = useState(false);
+  const [drafts, setDrafts] = useState([]);
+  const [activeDraftId, setActiveDraftId] = useState(null);
+  const autoSaveTimeoutRef = useRef(null);
+
+  // Draft functions
+  const handleAutoSave = (form, draftId) => {
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      const values = form.getFieldsValue();
+      if (values && Object.keys(values).length > 0) {
+        saveSalesDraft(draftId, values);
+        setActiveDraftId(draftId);
+      }
+    }, 1500); // Auto-save after 1.5 seconds of inactivity
+  };
+
+  const handleManualSave = (form) => {
+    const values = form.getFieldsValue();
+    if (values && Object.keys(values).length > 0) {
+      const draftId = `sales-order-${Date.now()}`;
+      saveSalesDraft(draftId, values, 'orders');
+      setActiveDraftId(draftId);
+      loadDraftsList();
+    }
+  };
+
+  const loadDraftsList = () => {
+    const allDrafts = getAllSalesDrafts('orders');
+    setDrafts(allDrafts);
+  };
+
+  const handleContinueDraft = (draft) => {
+    addForm.setFieldsValue(draft);
+    setActiveDraftId(draft.id);
+    setIsAddModalOpen(true);
+    setShowDrafts(false);
+  };
+
+  const handleDeleteDraft = (draftId) => {
+    deleteSalesDraft(draftId, 'orders');
+    if (activeDraftId === draftId) {
+      setActiveDraftId(null);
+    }
+    loadDraftsList();
+  };
+
+  const handleFormValuesChange = (changedValues, allValues, form) => {
+    // Auto-save on form changes
+    const draftId = activeDraftId || `sales-order-${Date.now()}`;
+    handleAutoSave(form, draftId);
+  };
+
+  // Load drafts on component mount
+  useEffect(() => {
+    loadDraftsList();
+  }, []);
+
+  // Clean up auto-save timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Draft Table Component
+  const DraftTable = () => (
+    <div className="mb-4">
+      <div className="flex justify-between items-center mb-2">
+        <h1></h1>
+        <Button
+          type="primary"
+          onClick={() => setShowDrafts(!showDrafts)}
+          className="!bg-amber-500 !hover:bg-amber-600"
+        >
+          {showDrafts ? "Hide Drafts" : "Show Drafts"}
+        </Button>
+      </div>
+
+      {showDrafts && (
+        <div className="border border-amber-300 rounded-lg p-4 bg-white">
+          {drafts.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">No drafts found</p>
+          ) : (
+            <div className="space-y-2">
+              {drafts.map((draft) => (
+                <div
+                  key={draft.id}
+                  className="flex justify-between items-center p-3 border border-gray-200 rounded hover:bg-gray-50"
+                >
+                  <div className="flex-1">
+                    <div className="font-medium">
+                      {draft.customerName || "Sales Order Draft"}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {draft.savedAt
+                        ? new Date(draft.savedAt).toLocaleString()
+                        : "Unknown time"}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="small"
+                      type="primary"
+                      onClick={() => handleContinueDraft(draft)}
+                      className="bg-amber-500! hover:bg-amber-600!"
+                    >
+                      Continue
+                    </Button>
+                    <Button
+                      size="small"
+                      danger
+                      onClick={() => handleDeleteDraft(draft.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   useEffect(() => {
     fetchContracts();
     fetchSalesOrders();
-     fetchContractPersons();
+    fetchContractPersons();
   }, []);
-   
+
   /* ---------- search filter ---------- */
   const fetchContractPersons = async () => {
     try {
@@ -72,14 +212,11 @@ export default function SaleOrdersInvoice() {
       console.error("Error fetching customers:", error);
     }
   };
- 
 
   const fetchContracts = async () => {
     try {
       const res = await getAllSalesContracts();
-        const filtered = res.filter((item) =>
-      ["Approved"].includes(item.status)
-    );
+      const filtered = res.filter((item) => ["Approved"].includes(item.status));
       console.log("Fetched All Sales Contracts:", filtered);
       setContractOptions(filtered || []);
     } catch (err) {
@@ -87,179 +224,175 @@ export default function SaleOrdersInvoice() {
     }
   };
 
-const handleExport = () => {
-  if (!data || data.length === 0) {
-    message.warning("No data available to export");
-    return;
-  }
+  const handleExport = () => {
+    if (!data || data.length === 0) {
+      message.warning("No data available to export");
+      return;
+    }
 
-  const exportData = [];
+    const exportData = [];
 
-  data.forEach((order) => {
-    (order.contracts || []).forEach((contract) => {
-      (contract.items || []).forEach((item) => {
+    data.forEach((order) => {
+      (order.contracts || []).forEach((contract) => {
+        (contract.items || []).forEach((item) => {
+          exportData.push({
+            "Order Number": order.orderNumber,
+            "Order Date": order.orderDate
+              ? dayjs(order.orderDate).format("YYYY-MM-DD")
+              : "",
 
-        exportData.push({
-          "Order Number": order.orderNumber,
-          "Order Date": order.orderDate
-            ? dayjs(order.orderDate).format("YYYY-MM-DD")
-            : "",
+            "Customer Name": order.customerName || "",
+            Status: order.status || "",
+            "Bill Mode": order.bill_mode || "",
 
-          "Customer Name": order.customerName || "",
-          "Status": order.status || "",
-          "Bill Mode": order.bill_mode || "",
+            "Contract No": contract.contractNo || "",
 
-          "Contract No": contract.contractNo || "",
+            "Item Name": item.item || "",
+            "Item Code": item.itemCode || "",
+            "HSN Code": item.hsnCode || "",
+            UOM: item.uom || "",
 
-          "Item Name": item.item || "",
-          "Item Code": item.itemCode || "",
-          "HSN Code": item.hsnCode || "",
-          "UOM": item.uom || "",
+            Quantity: item.qty || 0,
+            "Free Quantity": item.freeQty || 0,
+            "Total Quantity": item.totalQty || 0,
 
-          "Quantity": item.qty || 0,
-          "Free Quantity": item.freeQty || 0,
-          "Total Quantity": item.totalQty || 0,
+            Rate: item.rate || 0,
 
-          "Rate": item.rate || 0,
+            Amount: item.amount || 0,
+            "Discount %": item.discountPercent || 0,
+            "Discount Amount": item.discountAmt || 0,
 
-          "Amount": item.amount || 0,
-          "Discount %": item.discountPercent || 0,
-          "Discount Amount": item.discountAmt || 0,
+            "Taxable Amount": item.totalAmount || 0,
 
-          "Taxable Amount": item.totalAmount || 0,
+            "SGST %": order.orderTaxAndTotals?.sgstPercent || 0,
+            "CGST %": order.orderTaxAndTotals?.cgstPercent || 0,
+            "IGST %": order.orderTaxAndTotals?.igstPercent || 0,
 
-          "SGST %": order.orderTaxAndTotals?.sgstPercent || 0,
-          "CGST %": order.orderTaxAndTotals?.cgstPercent || 0,
-          "IGST %": order.orderTaxAndTotals?.igstPercent || 0,
+            "TCS Amount": order.orderTaxAndTotals?.tcsAmt || 0,
 
-          "TCS Amount": order.orderTaxAndTotals?.tcsAmt || 0,
-
-          "Gross Amount": order.orderTaxAndTotals?.grossAmountTotal || 0,
-          "Discount Total": order.orderTaxAndTotals?.discountTotal || 0,
-          "Grand Total": order.orderTaxAndTotals?.grandTotal || 0,
+            "Gross Amount": order.orderTaxAndTotals?.grossAmountTotal || 0,
+            "Discount Total": order.orderTaxAndTotals?.discountTotal || 0,
+            "Grand Total": order.orderTaxAndTotals?.grandTotal || 0,
+          });
         });
-
       });
     });
-  });
 
-  exportToExcel(exportData, "Sales_Orders_Export");
-  message.success("Excel exported successfully");
-};
-
-const handleSearch = (value) => {
-  setSearchText(value);
-
-  if (!value) {
-    fetchSalesOrders();
-    return;
-  }
-
-  const filtered = data.filter((item) =>
-    JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
-  );
-
-  setData(filtered);
-};
-  /* ---------- utilities: compute item and order totals ---------- */
-const computeOrderTotalsFromContracts = (contracts = [], allValues) => {
-  const allItems = [];
-
-  contracts.forEach((c) => {
-    (c.items || []).forEach((it) => allItems.push(it));
-  });
-
-  const grossAmountTotal = allItems.reduce(
-    (s, it) => s + Number(it.amount || 0),
-    0
-  );
-
-  const discountTotal = allItems.reduce(
-    (s, it) => s + Number(it.discountAmt || 0),
-    0
-  );
-
-  const taxable = grossAmountTotal - discountTotal;
-
-  // ✅ ONLY IGST
-  const igst = Number(allValues?.orderTaxAndTotals?.igstPercent || 0);
-  const gstAmount = (taxable * igst) / 100;
-
-  return {
-    orderTaxAndTotals: {
-      grossAmountTotal,
-      discountTotal,
-      grandTotal: taxable + gstAmount,
-    },
+    exportToExcel(exportData, "Sales_Orders_Export");
+    message.success("Excel exported successfully");
   };
-};
 
-  /* ---------- when form values change (add/edit) ---------- */
-const onFormValuesChange = (form, allValues) => {
-  const contracts = (allValues.contracts || []).map((c) => {
-    const items = (c.items || []).map((it) => {
-      const orderQty = Number(it.orderQuantity || 0);
-      const rate = Number(it.rate || 0);
-      const discountPercent = Number(it.discountPercent || 0);
+  const handleSearch = (value) => {
+    setSearchText(value);
 
-      if (!orderQty || !rate) {
-        return {
-          ...it,
-          amount: 0,
-          discountAmt: 0,
-          totalAmount: 0,
-        };
-      }
+    if (!value) {
+      fetchSalesOrders();
+      return;
+    }
 
-      const amount = Math.round(orderQty * rate);
-      const discountAmt = Math.round(
-        (amount * discountPercent) / 100
-      );
-      const totalAmount = amount - discountAmt;
+    const filtered = data.filter((item) =>
+      JSON.stringify(item).toLowerCase().includes(value.toLowerCase()),
+    );
 
-      return {
-        ...it,
-        amount,
-        discountAmt,
-        totalAmount,
-      };
+    setData(filtered);
+  };
+  /* ---------- utilities: compute item and order totals ---------- */
+  const computeOrderTotalsFromContracts = (contracts = [], allValues) => {
+    const allItems = [];
+
+    contracts.forEach((c) => {
+      (c.items || []).forEach((it) => allItems.push(it));
     });
 
-    return { ...c, items };
-  });
+    const grossAmountTotal = allItems.reduce(
+      (s, it) => s + Number(it.amount || 0),
+      0,
+    );
 
-  const { orderTaxAndTotals } =
-   computeOrderTotalsFromContracts(contracts, allValues);
+    const discountTotal = allItems.reduce(
+      (s, it) => s + Number(it.discountAmt || 0),
+      0,
+    );
 
-  form.setFieldsValue({
-    contracts,
-    orderTaxAndTotals,
-  });
-};
+    const taxable = grossAmountTotal - discountTotal;
 
-const handleStatusChange = async (value, form) => {
-  // call API
-  const res = await getTaxByStatus(value); // your API
+    // ✅ ONLY IGST
+    const igst = Number(allValues?.orderTaxAndTotals?.igstPercent || 0);
+    const gstAmount = (taxable * igst) / 100;
 
-  form.setFieldsValue({
-    orderTaxAndTotals: {
-      sgstPercent: res.sgst,
-      cgstPercent: res.cgst,
-      igstPercent: res.igst,
-      tcsAmt: res.tcs,
-    },
-  });
- 
-};
+    return {
+      orderTaxAndTotals: {
+        grossAmountTotal,
+        discountTotal,
+        grandTotal: taxable + gstAmount,
+      },
+    };
+  };
+
+  /* ---------- when form values change (add/edit) ---------- */
+  const onFormValuesChange = (form, allValues) => {
+    const contracts = (allValues.contracts || []).map((c) => {
+      const items = (c.items || []).map((it) => {
+        const orderQty = Number(it.orderQuantity || 0);
+        const rate = Number(it.rate || 0);
+        const discountPercent = Number(it.discountPercent || 0);
+
+        if (!orderQty || !rate) {
+          return {
+            ...it,
+            amount: 0,
+            discountAmt: 0,
+            totalAmount: 0,
+          };
+        }
+
+        const amount = Math.round(orderQty * rate);
+        const discountAmt = Math.round((amount * discountPercent) / 100);
+        const totalAmount = amount - discountAmt;
+
+        return {
+          ...it,
+          amount,
+          discountAmt,
+          totalAmount,
+        };
+      });
+
+      return { ...c, items };
+    });
+
+    const { orderTaxAndTotals } = computeOrderTotalsFromContracts(
+      contracts,
+      allValues,
+    );
+
+    form.setFieldsValue({
+      contracts,
+      orderTaxAndTotals,
+    });
+  };
+
+  const handleStatusChange = async (value, form) => {
+    // call API
+    const res = await getTaxByStatus(value); // your API
+
+    form.setFieldsValue({
+      orderTaxAndTotals: {
+        sgstPercent: res.sgst,
+        cgstPercent: res.cgst,
+        igstPercent: res.igst,
+        tcsAmt: res.tcs,
+      },
+    });
+  };
 
   /* ---------- Add handlers ---------- */
   const openAddModal = () => {
-     setFormMode("add"); 
+    setFormMode("add");
     addForm.resetFields();
 
     // initialize with one contract + one item row to help user
     addForm.setFieldsValue({
-      
       contracts: [
         {
           contractNo: undefined,
@@ -292,7 +425,6 @@ const handleStatusChange = async (value, form) => {
     });
     setIsAddModalOpen(true);
   };
- 
 
   const fetchSalesOrders = async () => {
     try {
@@ -331,26 +463,26 @@ const handleStatusChange = async (value, form) => {
         });
 
         const contracts = Object.values(contractsMap);
-const totals = computeOrderTotalsFromContracts(contracts);
+        const totals = computeOrderTotalsFromContracts(contracts);
 
-const orderTaxAndTotals = {
-  ...totals.orderTaxAndTotals,
-  sgstPercent: Number(order.sgst || 0),
-  cgstPercent: Number(order.cgst || 0),
-  igstPercent: Number(order.igst || 0),
-  tcsAmt: Number(order.tcs_amount || 0),
-};
+        const orderTaxAndTotals = {
+          ...totals.orderTaxAndTotals,
+          sgstPercent: Number(order.sgst || 0),
+          cgstPercent: Number(order.cgst || 0),
+          igstPercent: Number(order.igst || 0),
+          tcsAmt: Number(order.tcs_amount || 0),
+        };
 
-return {
-  key: order.sales_order_id,
-  orderNumber: order.order_number,
-  orderDate: order.order_date,
-  deliveryDate: order.expected_receiving_date,
-  customerName: order.customer?.name || "-",
-  status: order.status,
-  contracts,
-  orderTaxAndTotals
-};
+        return {
+          key: order.sales_order_id,
+          orderNumber: order.order_number,
+          orderDate: order.order_date,
+          deliveryDate: order.expected_receiving_date,
+          customerName: order.customer?.name || "-",
+          status: order.status,
+          contracts,
+          orderTaxAndTotals,
+        };
       });
 
       setData(mappedData);
@@ -362,20 +494,20 @@ return {
 
   const buildSalesOrderPayload = (values) => {
     const { orderTaxAndTotals } = values;
-console.log("PAYLOAD bill_mode 👉", values.bill_mode);
+    console.log("PAYLOAD bill_mode 👉", values.bill_mode);
     return {
-customer_id: values.customer_id,
-status: values.status, 
- purchase_type: values.purchaseType,   // ✅ NEW
- bill_mode: values.bill_mode,
-  narration: values.narration || "", 
- order_date: values.orderDate
+      customer_id: values.customer_id,
+      status: values.status,
+      purchase_type: values.purchaseType, // ✅ NEW
+      bill_mode: values.bill_mode,
+      narration: values.narration || "",
+      order_date: values.orderDate
         ? dayjs(values.orderDate).format("YYYY-MM-DD")
         : null,
-    expected_receiving_date:
-  values.deliveryDate && dayjs(values.deliveryDate).isValid()
-    ? dayjs(values.deliveryDate).format("YYYY-MM-DD")
-    : null,
+      expected_receiving_date:
+        values.deliveryDate && dayjs(values.deliveryDate).isValid()
+          ? dayjs(values.deliveryDate).format("YYYY-MM-DD")
+          : null,
       delivery_address: values.deliveryAddress || "",
       cash_discount: 0,
       cgst: Number(orderTaxAndTotals?.cgstPercent || 0),
@@ -408,7 +540,7 @@ status: values.status,
   };
 
   const handleAddFinish = async (values) => {
-     console.log("ADD bill_mode 👉", values.bill_mode);
+    console.log("ADD bill_mode 👉", values.bill_mode);
 
     try {
       values.contracts.forEach((c, idx) => {
@@ -429,6 +561,13 @@ status: values.status,
       setIsAddModalOpen(false);
       addForm.resetFields();
       fetchSalesOrders();
+
+      // Delete active draft after successful submission
+      if (activeDraftId) {
+        deleteSalesDraft(activeDraftId, 'orders');
+        setActiveDraftId(null);
+        loadDraftsList();
+      }
     } catch (error) {
       console.error("❌ Sales Order API Error");
 
@@ -451,10 +590,8 @@ status: values.status,
     }
   };
 
-
-
   const openEdit = async (record) => {
-     setFormMode("edit");
+    setFormMode("edit");
     try {
       const order = await getSalesOrderById(record.key);
 
@@ -514,21 +651,21 @@ status: values.status,
       const mappedData = {
         key: order.sales_order_id,
         orderNumber: order.order_number,
-      status: order.status,
+        status: order.status,
         orderDate: order.order_date ? dayjs(order.order_date) : undefined,
         deliveryDate: order.expected_receiving_date
           ? dayjs(order.expected_receiving_date)
           : undefined,
 
-      customer_id: order.customer?.customer_id,
+        customer_id: order.customer?.customer_id,
         customerEmail: order.customer?.email_id,
         customerPhone: order.customer?.phone_number,
         deliveryAddress: order.customer?.address_line1,
 
-      bill_mode: order.bill_mode || "Cash",
-purchaseType: order.purchase_type,
- // NEW
-narration: order.narration,      // NEW
+        bill_mode: order.bill_mode || "Cash",
+        purchaseType: order.purchase_type,
+        // NEW
+        narration: order.narration, // NEW
 
         contracts,
         orderTaxAndTotals: {
@@ -565,7 +702,7 @@ narration: order.narration,      // NEW
   };
 
   const handleEditFinish = async (values) => {
-     console.log("EDIT bill_mode 👉", values.bill_mode);
+    console.log("EDIT bill_mode 👉", values.bill_mode);
     try {
       const payload = buildSalesOrderPayload(values);
       console.log("FINAL UPDATE PAYLOAD 🔥", payload);
@@ -584,7 +721,7 @@ narration: order.narration,      // NEW
 
   /* ---------- View ---------- */
   const openView = async (record) => {
-    setFormMode("view"); 
+    setFormMode("view");
     try {
       const order = await getSalesOrderById(record.key);
 
@@ -612,8 +749,7 @@ narration: order.narration,      // NEW
           amount: Number(item.total_amount || 0),
           // approximate discount amount if not directly provided
           discountAmt:
-            Number(item.total_amount || 0) -
-            Number(item.line_total || 0),
+            Number(item.total_amount || 0) - Number(item.line_total || 0),
           totalAmount: Number(item.line_total || 0),
           hsnCode: item.hsn_code,
           orderQuantity: Number(item.ordered_qty || 0),
@@ -651,39 +787,36 @@ narration: order.narration,      // NEW
           ? dayjs(order.expected_receiving_date)
           : undefined,
 
-       customerName:
-  order.customer?.name ||
-  order.customer_name ||
- 
-  "-", customerId: order.customer?.customer_id,
+        customerName: order.customer?.name || order.customer_name || "-",
+        customerId: order.customer?.customer_id,
         customer_id: order.customer?.customer_id,
         customerEmail: order.customer?.email_id,
-         customerPhone: order.customer?.phone_number,
+        customerPhone: order.customer?.phone_number,
         deliveryAddress: order.customer?.address_line1,
 
         status: order.status,
-     bill_mode: order.bill_mode || "Cash",
-purchaseType: order.purchase_type,
-narration: order.narration,      // NEW
+        bill_mode: order.bill_mode || "Cash",
+        purchaseType: order.purchase_type,
+        narration: order.narration, // NEW
 
         contracts,
-      orderTaxAndTotals: {
-  sgstPercent: Number(order.sgst || 0),
-  cgstPercent: Number(order.cgst || 0),
-  igstPercent: Number(order.igst || 0),
-  tcsAmt: Number(order.tcs_amount || 0),
+        orderTaxAndTotals: {
+          sgstPercent: Number(order.sgst || 0),
+          cgstPercent: Number(order.cgst || 0),
+          igstPercent: Number(order.igst || 0),
+          tcsAmt: Number(order.tcs_amount || 0),
 
-  grandTotal: Number(order.grand_total || 0),
-  grossAmountTotal: Number(order.total_amount || 0),
+          grandTotal: Number(order.grand_total || 0),
+          grossAmountTotal: Number(order.total_amount || 0),
 
-  discountTotal: (order.items || []).reduce(
-    (acc, curr) =>
-      acc + (Number(curr.total_amount) - Number(curr.line_total)),
-    0
-  ),
+          discountTotal: (order.items || []).reduce(
+            (acc, curr) =>
+              acc + (Number(curr.total_amount) - Number(curr.line_total)),
+            0,
+          ),
 
-  totalGST: Number(order.total_gst_amount || 0),
-}
+          totalGST: Number(order.total_gst_amount || 0),
+        },
       };
 
       setSelectedRecord(mappedData);
@@ -728,7 +861,7 @@ narration: order.narration,      // NEW
       dataIndex: "customerName",
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
-   
+
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
@@ -760,11 +893,11 @@ narration: order.narration,      // NEW
             onClick={() => openView(record)}
           />
           {record.status !== "Approved" && (
-        <EditOutlined
-          className="cursor-pointer! text-red-500!"
-          onClick={() => openEdit(record)}
-        />
-      )}
+            <EditOutlined
+              className="cursor-pointer! text-red-500!"
+              onClick={() => openEdit(record)}
+            />
+          )}
         </div>
       ),
     },
@@ -823,69 +956,70 @@ narration: order.narration,      // NEW
                 <div className="flex justify-between items-center mb-3">
                   <Form.Item
                     label={<span className="text-amber-700">Contract Id</span>}
-       
                     name={[cf.name, "contract_id"]}
                   >
                     <Select
                       placeholder="Select Contract"
                       disabled={disabled}
-                     onChange={async (contractId) => {
-  let items = [];
+                      onChange={async (contractId) => {
+                        let items = [];
 
-  const selectedContract = contractOptions.find(
-    (c) => c.sale_contract_id === contractId
-  );
+                        const selectedContract = contractOptions.find(
+                          (c) => c.sale_contract_id === contractId,
+                        );
 
-  if (selectedContract && selectedContract.items?.length > 0) {
-    items = selectedContract.items;
-  } else {
-    items = await salesContractItems(contractId);
-  }
+                        if (
+                          selectedContract &&
+                          selectedContract.items?.length > 0
+                        ) {
+                          items = selectedContract.items;
+                        } else {
+                          items = await salesContractItems(contractId);
+                        }
 
-  // ✅ SET TAX VALUES FROM CONTRACT (NO CALCULATION)
-  if (selectedContract) {
-    form.setFieldsValue({
-      orderTaxAndTotals: {
-        sgstPercent: Number(selectedContract.sgst || 0),
-        cgstPercent: Number(selectedContract.cgst || 0),
-        igstPercent: Number(selectedContract.igst || 0),
-        tcsAmt: Number(selectedContract.tcs_amount || 0),
-      },
-    });
-  }
+                        // ✅ SET TAX VALUES FROM CONTRACT (NO CALCULATION)
+                        if (selectedContract) {
+                          form.setFieldsValue({
+                            orderTaxAndTotals: {
+                              sgstPercent: Number(selectedContract.sgst || 0),
+                              cgstPercent: Number(selectedContract.cgst || 0),
+                              igstPercent: Number(selectedContract.igst || 0),
+                              tcsAmt: Number(selectedContract.tcs_amount || 0),
+                            },
+                          });
+                        }
 
-  // update items dropdown
-  setContractItemsMap((prev) => ({
-    ...prev,
-    [cf.key]: items,
-  }));
+                        // update items dropdown
+                        setContractItemsMap((prev) => ({
+                          ...prev,
+                          [cf.key]: items,
+                        }));
 
-  // reset contract row items
-  const contracts = form.getFieldValue("contracts") || [];
-  contracts[ci] = {
-    ...(contracts[ci] || {}),
-    contract_id: contractId,
-    items: [
-      {
-        lineKey: Date.now(),
-        item: undefined,
-        itemCode: undefined,
-        uom: undefined,
-        qty: 0,
-        freeQty: 0,
-        totalQty: 0,
-        rate: 0,
-        amount: 0,
-        discountPercent: 0,
-        discountAmt: 0,
-        totalAmount: 0,
-      },
-    ],
-  };
+                        // reset contract row items
+                        const contracts = form.getFieldValue("contracts") || [];
+                        contracts[ci] = {
+                          ...(contracts[ci] || {}),
+                          contract_id: contractId,
+                          items: [
+                            {
+                              lineKey: Date.now(),
+                              item: undefined,
+                              itemCode: undefined,
+                              uom: undefined,
+                              qty: 0,
+                              freeQty: 0,
+                              totalQty: 0,
+                              rate: 0,
+                              amount: 0,
+                              discountPercent: 0,
+                              discountAmt: 0,
+                              totalAmount: 0,
+                            },
+                          ],
+                        };
 
-  form.setFieldsValue({ contracts });
-
-}}
+                        form.setFieldsValue({ contracts });
+                      }}
                     >
                       {contractOptions.map((c) => (
                         <Select.Option
@@ -921,7 +1055,9 @@ narration: order.narration,      // NEW
                             <Col span={8}>
                               <Form.Item
                                 name={[itf.name, "item"]}
-                                label={<span className="text-amber-700">Item</span>}
+                                label={
+                                  <span className="text-amber-700">Item</span>
+                                }
                                 rules={[{ required: true }]}
                               >
                                 <Select
@@ -957,16 +1093,12 @@ narration: order.narration,      // NEW
                                         (sel.product && sel.product.product_id),
                                       hsnCode: sel.hsn_code,
                                       uom: sel.uom?.unit_name || sel.uom,
-                                      qty: Number(
-                                        sel.net_qty || sel.qty || 0,
-                                      ),
+                                      qty: Number(sel.net_qty || sel.qty || 0),
                                       freeQty: Number(
                                         sel.free_qty || sel.free_qty || 0,
                                       ),
                                       totalQty: Number(
-                                        sel.gross_qty ||
-                                        sel.total_qty ||
-                                        0,
+                                        sel.gross_qty || sel.total_qty || 0,
                                       ),
                                       rate: Number(sel.mrp || sel.rate || 0),
                                       discountPercent: Number(
@@ -976,9 +1108,7 @@ narration: order.narration,      // NEW
                                         sel.discount_amount || 0,
                                       ),
                                       totalAmount: Number(
-                                        sel.line_total ||
-                                        sel.total_amount ||
-                                        0,
+                                        sel.line_total || sel.total_amount || 0,
                                       ),
                                     };
 
@@ -990,28 +1120,28 @@ narration: order.narration,      // NEW
                                     );
                                   }}
                                 >
-                                  {(
-                                    contractItemsMap[cf.key] || []
-                                  ).map((it) => (
-                                    <Select.Option
-                                      key={
-                                        it.product_id ||
-                                        it.item_code ||
-                                        (it.product && it.product.product_id)
-                                      }
-                                      value={
-                                        it.product_name ||
-                                        it.item_name ||
-                                        (it.product && it.product.product_name)
-                                      }
-                                    >
-                                      {
-                                        it.product_name ||
-                                        it.item_name ||
-                                        (it.product && it.product.product_name)
-                                      }
-                                    </Select.Option>
-                                  ))}
+                                  {(contractItemsMap[cf.key] || []).map(
+                                    (it) => (
+                                      <Select.Option
+                                        key={
+                                          it.product_id ||
+                                          it.item_code ||
+                                          (it.product && it.product.product_id)
+                                        }
+                                        value={
+                                          it.product_name ||
+                                          it.item_name ||
+                                          (it.product &&
+                                            it.product.product_name)
+                                        }
+                                      >
+                                        {it.product_name ||
+                                          it.item_name ||
+                                          (it.product &&
+                                            it.product.product_name)}
+                                      </Select.Option>
+                                    ),
+                                  )}
                                 </Select>
                               </Form.Item>
                             </Col>
@@ -1020,7 +1150,9 @@ narration: order.narration,      // NEW
                             <Col span={4}>
                               <Form.Item
                                 name={[itf.name, "hsnCode"]}
-                                label={<span className="text-amber-700">Code</span>}
+                                label={
+                                  <span className="text-amber-700">Code</span>
+                                }
                               >
                                 <Input disabled />
                               </Form.Item>
@@ -1028,8 +1160,12 @@ narration: order.narration,      // NEW
 
                             {/* UOM */}
                             <Col span={4}>
-                              <Form.Item name={[itf.name, "uom"]}  label={<span className="text-amber-700">UOM</span>}
-       >
+                              <Form.Item
+                                name={[itf.name, "uom"]}
+                                label={
+                                  <span className="text-amber-700">UOM</span>
+                                }
+                              >
                                 <Input disabled />
                               </Form.Item>
                             </Col>
@@ -1038,8 +1174,9 @@ narration: order.narration,      // NEW
                             <Col span={3}>
                               <Form.Item
                                 name={[itf.name, "qty"]}
-                                label={<span className="text-amber-700">Qty</span>}
-       
+                                label={
+                                  <span className="text-amber-700">Qty</span>
+                                }
                                 rules={[{ required: true }]}
                               >
                                 <InputNumber
@@ -1060,7 +1197,11 @@ narration: order.narration,      // NEW
                             <Col span={3}>
                               <Form.Item
                                 name={[itf.name, "freeQty"]}
-                                label={<span className="text-amber-700">Free Qty</span>}
+                                label={
+                                  <span className="text-amber-700">
+                                    Free Qty
+                                  </span>
+                                }
                               >
                                 <InputNumber
                                   min={0}
@@ -1080,7 +1221,9 @@ narration: order.narration,      // NEW
                             <Col span={4}>
                               <Form.Item
                                 name={[itf.name, "rate"]}
-                                label={<span className="text-amber-700">Rate</span>}
+                                label={
+                                  <span className="text-amber-700">Rate</span>
+                                }
                                 rules={[{ required: true }]}
                               >
                                 <InputNumber
@@ -1101,7 +1244,9 @@ narration: order.narration,      // NEW
                             <Col span={3}>
                               <Form.Item
                                 name={[itf.name, "discountPercent"]}
-                                label={<span className="text-amber-700">Disc %</span>}
+                                label={
+                                  <span className="text-amber-700">Disc %</span>
+                                }
                               >
                                 <InputNumber
                                   min={0}
@@ -1122,7 +1267,9 @@ narration: order.narration,      // NEW
                             <Col span={3}>
                               <Form.Item
                                 name={[itf.name, "amount"]}
-                                label={<span className="text-amber-700">Amount</span>}
+                                label={
+                                  <span className="text-amber-700">Amount</span>
+                                }
                               >
                                 <InputNumber className="w-full" disabled />
                               </Form.Item>
@@ -1132,7 +1279,11 @@ narration: order.narration,      // NEW
                             <Col span={3}>
                               <Form.Item
                                 name={[itf.name, "discountAmt"]}
-                                label={<span className="text-amber-700">Disc Amt</span>}
+                                label={
+                                  <span className="text-amber-700">
+                                    Disc Amt
+                                  </span>
+                                }
                               >
                                 <InputNumber className="w-full" disabled />
                               </Form.Item>
@@ -1142,75 +1293,88 @@ narration: order.narration,      // NEW
                             <Col span={3}>
                               <Form.Item
                                 name={[itf.name, "totalAmount"]}
-                                label={<span className="text-amber-700">Total Amount</span>}
+                                label={
+                                  <span className="text-amber-700">
+                                    Total Amount
+                                  </span>
+                                }
                               >
                                 <InputNumber className="w-full" disabled />
                               </Form.Item>
                             </Col>
 
-                           
-
                             <Col span={3}>
-                             
+                              <Form.Item
+                                name={[itf.name, "orderQuantity"]}
+                                label={
+                                  <span className="text-amber-700">
+                                    Order Qty
+                                  </span>
+                                }
+                                validateTrigger="onChange" // ✅ IMPORTANT
+                                rules={[
+                                  {
+                                    required: true,
+                                    message: "Please enter order quantity",
+                                  },
+                                  {
+                                    validator: (_, value) => {
+                                      const qty = form.getFieldValue([
+                                        "contracts",
+                                        ci,
+                                        "items",
+                                        itf.name,
+                                        "qty",
+                                      ]);
 
-                   <Form.Item
-  name={[itf.name, "orderQuantity"]}
-  label={<span className="text-amber-700">Order Qty</span>}
-  validateTrigger="onChange"   // ✅ IMPORTANT
-  rules={[
-    {
-      required: true,
-      message: "Please enter order quantity",
-    },
-    {
-      validator: (_, value) => {
-        const qty = form.getFieldValue([
-          "contracts",
-          ci,
-          "items",
-          itf.name,
-          "qty",
-        ]);
+                                      // ❌ don't show error initially
+                                      if (
+                                        value === undefined ||
+                                        value === null
+                                      ) {
+                                        return Promise.resolve();
+                                      }
 
-        // ❌ don't show error initially
-        if (value === undefined || value === null) {
-          return Promise.resolve();
-        }
+                                      if (isNaN(value)) {
+                                        return Promise.reject(
+                                          new Error("Enter a valid number"),
+                                        );
+                                      }
 
-        if (isNaN(value)) {
-          return Promise.reject(new Error("Enter a valid number"));
-        }
+                                      if (value <= 0) {
+                                        return Promise.reject(
+                                          new Error(
+                                            "Order quantity must be greater than zero",
+                                          ),
+                                        );
+                                      }
 
-        if (value <= 0) {
-          return Promise.reject(
-            new Error("Order quantity must be greater than zero")
-          );
-        }
+                                      if (qty && value > qty) {
+                                        return Promise.reject(
+                                          new Error(
+                                            "Order quantity cannot be greater than available quantity",
+                                          ),
+                                        );
+                                      }
 
-        if (qty && value > qty) {
-          return Promise.reject(
-            new Error(
-              "Order quantity cannot be greater than available quantity"
-            )
-          );
-        }
-
-        return Promise.resolve();
-      },
-    },
-  ]}
->
-  <Input
-    min={1}
-    className="w-full"
-    disabled={disabled}
-    onChange={() =>
-      onFormValuesChange(form, form.getFieldsValue())
-    }
-  />
-</Form.Item>
+                                      return Promise.resolve();
+                                    },
+                                  },
+                                ]}
+                              >
+                                <Input
+                                  min={1}
+                                  className="w-full"
+                                  disabled={disabled}
+                                  onChange={() =>
+                                    onFormValuesChange(
+                                      form,
+                                      form.getFieldsValue(),
+                                    )
+                                  }
+                                />
+                              </Form.Item>
                             </Col>
-                           
                           </Row>
                           {!disabled && (
                             <Button
@@ -1218,7 +1382,7 @@ narration: order.narration,      // NEW
                               icon={<DeleteOutlined />}
                               onClick={() => {
                                 removeItem(itf.name);
-                                  }}
+                              }}
                             />
                           )}
                         </div>
@@ -1234,8 +1398,8 @@ narration: order.narration,      // NEW
                               lineKey: Date.now(),
                               item: undefined,
                               itemCode: undefined,
-                             uom: undefined,
-                             qty: 0,
+                              uom: undefined,
+                              qty: 0,
                               freeQty: 0,
                               totalQty: 0,
                               grossWt: 0,
@@ -1267,8 +1431,6 @@ narration: order.narration,      // NEW
     <>
       <h6 className="text-amber-500">Header</h6>
       <Row gutter={16}>
-      
-
         <Col span={6}>
           <Form.Item
             label={<span className="text-amber-700">Order Date</span>}
@@ -1276,8 +1438,8 @@ narration: order.narration,      // NEW
             rules={[{ required: true }]}
             initialValue={dayjs()}
           >
-            <DatePicker 
-              className="w-full" 
+            <DatePicker
+              className="w-full"
               disabled
               disabledDate={createFinancialYearDisabledDate(selectedFY)}
             />
@@ -1289,55 +1451,57 @@ narration: order.narration,      // NEW
             label={<span className="text-amber-700">Delivery Date</span>}
             name="deliveryDate"
           >
-           <DatePicker
-            className="w-full"
-            disabledDate={createFinancialYearDisabledDate(selectedFY)}
-            disabled={disabled}
-          />   </Form.Item>
+            <DatePicker
+              className="w-full"
+              disabledDate={createFinancialYearDisabledDate(selectedFY)}
+              disabled={disabled}
+            />{" "}
+          </Form.Item>
         </Col>
-  <Col span={6}>
- <Form.Item
-  label={<span className="text-amber-700">Customer</span>}
-       name="customer_id"
-  rules={[{ required: true, message: "Please select customer" }]}
->
-<Select
-  placeholder="Select Customer"
-  showSearch
-  disabled={disabled}
-  optionFilterProp="label"
-  onChange={(value) => {
-    const selectedCustomer = contractPersonOptions.find(
-      (c) => c.customer_id === value
-    );
+        <Col span={6}>
+          <Form.Item
+            label={<span className="text-amber-700">Customer</span>}
+            name="customer_id"
+            rules={[{ required: true, message: "Please select customer" }]}
+          >
+            <Select
+              placeholder="Select Customer"
+              showSearch
+              disabled={disabled}
+              optionFilterProp="label"
+              onChange={(value) => {
+                const selectedCustomer = contractPersonOptions.find(
+                  (c) => c.customer_id === value,
+                );
 
-    if (selectedCustomer) {
-      form.setFieldsValue({
-        customer_id: selectedCustomer.customer_id,
+                if (selectedCustomer) {
+                  form.setFieldsValue({
+                    customer_id: selectedCustomer.customer_id,
 
-        // ✅ correct fields from your API
-        customerEmail: selectedCustomer.email_address,
-        customerPhone:
-          selectedCustomer.phone_number || selectedCustomer.mobile_number,
+                    // ✅ correct fields from your API
+                    customerEmail: selectedCustomer.email_address,
+                    customerPhone:
+                      selectedCustomer.phone_number ||
+                      selectedCustomer.mobile_number,
 
-        deliveryAddress: selectedCustomer.address,
-      });
-    }
-  }}
->
-   {contractPersonOptions.map((c) => (
-  <Select.Option
-    key={c.customer_id}
-    value={c.customer_id}   // ✅ correct ID
-    label={c.customer_name}
-  >
-    {c.customer_name}
-  </Select.Option>
-))}
-  </Select>
-</Form.Item>
+                    deliveryAddress: selectedCustomer.address,
+                  });
+                }
+              }}
+            >
+              {contractPersonOptions.map((c) => (
+                <Select.Option
+                  key={c.customer_id}
+                  value={c.customer_id} // ✅ correct ID
+                  label={c.customer_name}
+                >
+                  {c.customer_name}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
         </Col>
-       
+
         <Col span={6}>
           <Form.Item
             label={<span className="text-amber-700">Customer Email</span>}
@@ -1346,14 +1510,14 @@ narration: order.narration,      // NEW
             <Input placeholder="Email" disabled />
           </Form.Item>
         </Col>
-          <Col span={6}>
-  <Form.Item
-    label={<span className="text-amber-700">Customer Phone</span>}
-    name="customerPhone"
-  >
-    <Input placeholder="Phone Number" disabled/>
-  </Form.Item>
-</Col>
+        <Col span={6}>
+          <Form.Item
+            label={<span className="text-amber-700">Customer Phone</span>}
+            name="customerPhone"
+          >
+            <Input placeholder="Phone Number" disabled />
+          </Form.Item>
+        </Col>
         <Col span={6}>
           <Form.Item
             label={<span className="text-amber-700">Delivery Address</span>}
@@ -1363,59 +1527,62 @@ narration: order.narration,      // NEW
           </Form.Item>
         </Col>
 
-       <Col span={6}>
-  <Form.Item
-    label={<span className="text-amber-700">Purchase Type</span>}
-    name="purchaseType"
-    rules={[{ required: true, message: "Select Purchase Type" }]}
-  >
-    <Select disabled={disabled}>
-      <Select.Option value="Transit">Transit</Select.Option>
-      <Select.Option value="Interstate">Interstate</Select.Option>
-      <Select.Option value="Local">Local</Select.Option>
-    </Select>
-  </Form.Item>
-</Col>
-
-<Col span={6}>
- <Form.Item
-  label={<span className="text-amber-700">Bill Mode</span>}
-  name="bill_mode"
-  rules={[{ required: true }]}
->
-  <Select disabled={disabled}>
-    <Select.Option value="Cash">Cash</Select.Option>
-    <Select.Option value="Credit">Credit</Select.Option>
-    <Select.Option value="Online">Online</Select.Option>
-  </Select>
-</Form.Item>
-</Col>
-
-
-
-<Col span={12}>
-  <Form.Item
-    label={<span className="text-amber-700">Narration</span>}
-       
-    name="narration"
-  >
-    <Input.TextArea
-      rows={2}
-      placeholder="Enter narration"
-      disabled={disabled}
-    />
-  </Form.Item>
-</Col>
+        <Col span={6}>
+          <Form.Item
+            label={<span className="text-amber-700">Purchase Type</span>}
+            name="purchaseType"
+            rules={[{ required: true, message: "Select Purchase Type" }]}
+          >
+            <Select disabled={disabled}>
+              <Select.Option value="Transit">Transit</Select.Option>
+              <Select.Option value="Interstate">Interstate</Select.Option>
+              <Select.Option value="Local">Local</Select.Option>
+            </Select>
+          </Form.Item>
+        </Col>
 
         <Col span={6}>
-          <Form.Item name="status" label={<span className="text-amber-700">Status</span>}     rules={[{ required: true, message: "Select Status" }]}
+          <Form.Item
+            label={<span className="text-amber-700">Bill Mode</span>}
+            name="bill_mode"
+            rules={[{ required: true }]}
           >
-  <Select disabled={disabled} onChange={(val) => handleStatusChange(val, form)}>
-    <Select.Option value="Approved">Approved</Select.Option>
-    <Select.Option value="Pending">Pending</Select.Option>
-     <Select.Option value="Rejected">Rejected</Select.Option>
-  </Select>
-</Form.Item>
+            <Select disabled={disabled}>
+              <Select.Option value="Cash">Cash</Select.Option>
+              <Select.Option value="Credit">Credit</Select.Option>
+              <Select.Option value="Online">Online</Select.Option>
+            </Select>
+          </Form.Item>
+        </Col>
+
+        <Col span={12}>
+          <Form.Item
+            label={<span className="text-amber-700">Narration</span>}
+            name="narration"
+          >
+            <Input.TextArea
+              rows={2}
+              placeholder="Enter narration"
+              disabled={disabled}
+            />
+          </Form.Item>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item
+            name="status"
+            label={<span className="text-amber-700">Status</span>}
+            rules={[{ required: true, message: "Select Status" }]}
+          >
+            <Select
+              disabled={disabled}
+              onChange={(val) => handleStatusChange(val, form)}
+            >
+              <Select.Option value="Approved">Approved</Select.Option>
+              <Select.Option value="Pending">Pending</Select.Option>
+              <Select.Option value="Rejected">Rejected</Select.Option>
+            </Select>
+          </Form.Item>
         </Col>
       </Row>
 
@@ -1434,11 +1601,7 @@ narration: order.narration,      // NEW
             label={<span className="text-amber-700">GST %</span>}
             name={["orderTaxAndTotals", "igstPercent"]}
           >
-            <InputNumber
-              min={0}
-              max={100}
-              className="w-full"
-             disabled    />
+            <InputNumber min={0} max={100} className="w-full" disabled />
           </Form.Item>
         </Col>
         <Col span={6}>
@@ -1446,11 +1609,7 @@ narration: order.narration,      // NEW
             label={<span className="text-amber-700">SGST %</span>}
             name={["orderTaxAndTotals", "sgstPercent"]}
           >
-            <InputNumber
-              min={0}
-              max={100}
-              className="w-full"
-             disabled  />
+            <InputNumber min={0} max={100} className="w-full" disabled />
           </Form.Item>
         </Col>
         <Col span={6}>
@@ -1458,24 +1617,16 @@ narration: order.narration,      // NEW
             label={<span className="text-amber-700">CGST %</span>}
             name={["orderTaxAndTotals", "cgstPercent"]}
           >
-            <InputNumber
-              min={0}
-              max={100}
-              className="w-full"
-             disabled  />
+            <InputNumber min={0} max={100} className="w-full" disabled />
           </Form.Item>
         </Col>
-        
+
         <Col span={6}>
           <Form.Item
             label={<span className="text-amber-700">TCS Amt (₹)</span>}
             name={["orderTaxAndTotals", "tcsAmt"]}
           >
-            <InputNumber
-              min={0}
-              className="w-full"
-              disabled
-                  />
+            <InputNumber min={0} className="w-full" disabled />
           </Form.Item>
         </Col>
 
@@ -1497,8 +1648,6 @@ narration: order.narration,      // NEW
           </Form.Item>
         </Col>
 
-        
-
         <Col span={6}>
           <Form.Item
             label={<span className="text-amber-700">Grand Total (₹)</span>}
@@ -1510,8 +1659,6 @@ narration: order.narration,      // NEW
       </Row>
 
       <Divider />
-
-     
     </>
   );
 
@@ -1525,17 +1672,18 @@ narration: order.narration,      // NEW
             placeholder="Search..."
             className="w-64! border-amber-300! focus:border-amber-500!"
             value={searchText}
-           onChange={(e) => handleSearch(e.target.value)}   />
-         <Button
-  icon={<FilterOutlined />}
-  onClick={() => {
-    setSearchText("");
-    fetchSalesOrders(); // ✅ reload original data
-  }}
-  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
->
-  Reset
-</Button>
+            onChange={(e) => handleSearch(e.target.value)}
+          />
+          <Button
+            icon={<FilterOutlined />}
+            onClick={() => {
+              setSearchText("");
+              fetchSalesOrders(); // ✅ reload original data
+            }}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
+            Reset
+          </Button>
         </div>
 
         <div className="flex gap-2">
@@ -1557,13 +1705,15 @@ narration: order.narration,      // NEW
         </div>
       </div>
 
+      <div className="">
+        <DraftTable />
+      </div>
+
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
           Sales Order Records
         </h2>
-        <p className="text-amber-600 mb-3">
-          Manage your sales Order
-        </p>
+        <p className="text-amber-600 mb-3">Manage your sales Order</p>
         <Table
           columns={columns}
           dataSource={data}
@@ -1576,9 +1726,21 @@ narration: order.narration,      // NEW
       {/* Add Modal */}
       <Modal
         title={
-          <span className="text-amber-700 text-2xl font-semibold">
-            Add New Sales Order 
-          </span>
+          <div className="flex justify-between items-center">
+            <span className="text-amber-700 text-2xl font-semibold">
+              Add New Sales Order{" "}
+              {activeDraftId && (
+                <span className="text-sm text-blue-500">(Draft)</span>
+              )}
+            </span>
+            <Button
+              size="small"
+              onClick={() => handleManualSave(addForm)}
+              className="bg-green-500 hover:bg-green-600 text-white"
+            >
+              Save Draft
+            </Button>
+          </div>
         }
         open={isAddModalOpen}
         onCancel={() => {
@@ -1592,11 +1754,9 @@ narration: order.narration,      // NEW
           layout="vertical"
           form={addForm}
           onFinish={handleAddFinish}
-           onValuesChange={(_, allValues) => {
-    if (formMode === "add") {
-      onFormValuesChange(addForm, allValues);
-    }
-  }}
+          onValuesChange={(changedValues, allValues) =>
+            handleFormValuesChange(changedValues, allValues, addForm)
+          }
         >
           {renderFormFields(addForm)}
           <div className="flex justify-end gap-2 mt-4">
@@ -1624,7 +1784,7 @@ narration: order.narration,      // NEW
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            Edit Sales Order 
+            Edit Sales Order
           </span>
         }
         open={isEditModalOpen}
@@ -1640,11 +1800,11 @@ narration: order.narration,      // NEW
           layout="vertical"
           form={editForm}
           onFinish={handleEditFinish}
-           onValuesChange={(_, allValues) => {
-    if (formMode === "edit") {
-      onFormValuesChange(editForm, allValues);
-    }
-  }}
+          onValuesChange={(_, allValues) => {
+            if (formMode === "edit") {
+              onFormValuesChange(editForm, allValues);
+            }
+          }}
         >
           {renderFormFields(editForm)}
           <div className="flex justify-end gap-2 mt-4">
@@ -1673,7 +1833,7 @@ narration: order.narration,      // NEW
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            View Sales Order 
+            View Sales Order
           </span>
         }
         open={isViewModalOpen}
@@ -1691,5 +1851,4 @@ narration: order.narration,      // NEW
       </Modal>
     </div>
   );
-    }
-  
+}
