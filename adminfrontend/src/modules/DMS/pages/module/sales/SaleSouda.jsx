@@ -136,6 +136,19 @@ export default function SalesSouda() {
   };
 
   const handleFormValuesChange = (changedValues, allValues, form) => {
+    // Auto-calculation for add form
+    if (form === addForm) {
+      const computed = computeFromFormValues(allValues || {});
+      form.setFieldsValue({
+        items: computed.items,
+        orderTaxAndTotals: {
+          ...allValues.orderTaxAndTotals,
+          ...computed.orderTaxAndTotals,
+        },
+        orderTotals: computed.orderTotals,
+      });
+    }
+    
     // Auto-save on form changes
     const draftId = activeDraftId || `sales-${Date.now()}`;
     handleAutoSave(form, draftId);
