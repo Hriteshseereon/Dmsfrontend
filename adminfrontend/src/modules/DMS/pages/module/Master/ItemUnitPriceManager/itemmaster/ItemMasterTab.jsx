@@ -81,17 +81,17 @@ export default function ItemMasterTab({ items, setItems }) {
     gstPercent: 0,
     cgstPercent: 0,
     sgstPercent: 0,
-    net_weight: 0,      
-    gross_weight: 0,  
+    net_weight: 0,
+    gross_weight: 0,
   });
   const [search, setSearch] = useState("");
-  
+
   // Draft state
   const [activeDraftId, setActiveDraftId] = useState(null);
   const [draftSavedAt, setDraftSavedAt] = useState(null);
   const [draftTableKey, setDraftTableKey] = useState(0);
   const autosaveTimer = useRef(null);
-  
+  const activeDraftIdRef = useRef(null);
   /* ================= LOAD MASTER DATA ================= */
   useEffect(() => {
     Promise.all([
@@ -137,33 +137,39 @@ export default function ItemMasterTab({ items, setItems }) {
         company: formData.company,
       };
 
-      setActiveDraftId((prevId) => {
-        const id = prevId || createItemMasterDraft(formData, meta);
-        saveItemMasterDraft(id, formData, meta);
-        setDraftSavedAt(new Date());
-        setDraftTableKey((k) => k + 1);
-        return id;
-      });
+      if (!activeDraftIdRef.current) {
+        const newId = createItemMasterDraft(formData, meta);
+        activeDraftIdRef.current = newId;
+        setActiveDraftId(newId);
+      } else {
+        saveItemMasterDraft(activeDraftIdRef.current, formData, meta);
+      }
+
+      setDraftSavedAt(new Date());
+      setDraftTableKey((k) => k + 1);
     }, 1500);
   }, [formData, editingId, viewMode]);
 
   const handleManualSave = () => {
     if (editingId || viewMode) return;
-    
+
     const meta = {
       itemName: formData.itemName,
       itemType: formData.itemType,
       company: formData.company,
     };
 
-    setActiveDraftId((prevId) => {
-      const id = prevId || createItemMasterDraft(formData, meta);
-      saveItemMasterDraft(id, formData, meta);
-      setDraftSavedAt(new Date());
-      setDraftTableKey((k) => k + 1);
-      message.success("Draft saved");
-      return id;
-    });
+    if (!activeDraftIdRef.current) {
+      const newId = createItemMasterDraft(formData, meta);
+      activeDraftIdRef.current = newId;
+      setActiveDraftId(newId);
+    } else {
+      saveItemMasterDraft(activeDraftIdRef.current, formData, meta);
+    }
+
+    setDraftSavedAt(new Date());
+    setDraftTableKey((k) => k + 1);
+    message.success("Draft saved");
   };
 
   const handleContinueDraft = (draftId) => {
@@ -175,6 +181,7 @@ export default function ItemMasterTab({ items, setItems }) {
 
     const restored = deserialiseItemMasterDraft(draft.values);
     setFormData(restored);
+    activeDraftIdRef.current = draftId; // ← sync ref
     setActiveDraftId(draftId);
     setDraftSavedAt(new Date(draft.savedAt));
     setEditingId(null);
@@ -183,8 +190,9 @@ export default function ItemMasterTab({ items, setItems }) {
   };
 
   const discardActiveDraft = () => {
-    if (activeDraftId) {
-      deleteItemMasterDraft(activeDraftId);
+    if (activeDraftIdRef.current) {
+      deleteItemMasterDraft(activeDraftIdRef.current);
+      activeDraftIdRef.current = null;
       setActiveDraftId(null);
       setDraftSavedAt(null);
       setDraftTableKey((k) => k + 1);
@@ -193,6 +201,7 @@ export default function ItemMasterTab({ items, setItems }) {
 
   // Auto-save when formData changes
   useEffect(() => {
+    if (!open || editingId || viewMode) return; // ← guard added
     handleFormValuesChange();
   }, [formData]);
 
@@ -246,7 +255,7 @@ export default function ItemMasterTab({ items, setItems }) {
       message.error("Please fill all required fields");
       return;
     }
-console.log("Submitting", formData);
+    console.log("Submitting", formData);
     const payload = {
       name: formData.itemName,
       product_group: formData.product_group,
@@ -260,8 +269,8 @@ console.log("Submitting", formData);
       sgst: formData.sgstPercent,
       current_stock: formData.currentStock || 0,
       vendor: formData.company,
-       net_weight: formData.net_weight,     
-       gross_weight: formData.gross_weight,
+      net_weight: formData.net_weight,
+      gross_weight: formData.gross_weight,
     };
 
     try {
@@ -545,14 +554,17 @@ console.log("Submitting", formData);
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => {
-setFormData({
-  gstPercent: 0,
-  cgstPercent: 0,
-  sgstPercent: 0,
-  net_weight: 0,
-  gross_weight: 0,
-});  setEditingId(null);
+            setFormData({
+              gstPercent: 0,
+              cgstPercent: 0,
+              sgstPercent: 0,
+              net_weight: 0,
+              gross_weight: 0,
+            });
+            setEditingId(null);
             setViewMode(false);
+            activeDraftIdRef.current = null; // ← reset ref for fresh session
+            setActiveDraftId(null);
             setOpen(true);
           }}
         >
@@ -843,32 +855,32 @@ setFormData({
               </FormField>
             </Col>
             <Col span={12}>
-  <FormField label="Net Weight">
-    <InputNumber
-      disabled={viewMode}
-      min={0}
-      style={{ width: "100%" }}
-      value={formData.net_weight}
-      onChange={(value) =>
-        setFormData({ ...formData, net_weight: value || 0 })
-      }
-    />
-  </FormField>
-</Col>
+              <FormField label="Net Weight">
+                <InputNumber
+                  disabled={viewMode}
+                  min={0}
+                  style={{ width: "100%" }}
+                  value={formData.net_weight}
+                  onChange={(value) =>
+                    setFormData({ ...formData, net_weight: value || 0 })
+                  }
+                />
+              </FormField>
+            </Col>
 
-<Col span={12}>
-  <FormField label="Gross Weight">
-    <InputNumber
-      disabled={viewMode}
-      min={0}
-      style={{ width: "100%" }}
-      value={formData.gross_weight}
-      onChange={(value) =>
-        setFormData({ ...formData, gross_weight: value || 0 })
-      }
-    />
-  </FormField>
-</Col>
+            <Col span={12}>
+              <FormField label="Gross Weight">
+                <InputNumber
+                  disabled={viewMode}
+                  min={0}
+                  style={{ width: "100%" }}
+                  value={formData.gross_weight}
+                  onChange={(value) =>
+                    setFormData({ ...formData, gross_weight: value || 0 })
+                  }
+                />
+              </FormField>
+            </Col>
           </Row>
         </div>
       </Modal>
