@@ -5,12 +5,23 @@ const DRAFT_PREFIX = 'purchase-draft-';
 
 // Serialize form values for draft storage
 export const serializePurchaseDraft = (values) => {
+  const safeDate = (date) => {
+    if (!date) return null;
+    if (date && typeof date === 'object' && typeof date.format === 'function') {
+      return date.isValid() ? date.format('YYYY-MM-DD') : null;
+    }
+    const parsed = dayjs(date);
+    return parsed.isValid() ? parsed.format('YYYY-MM-DD') : null;
+  };
+
   return {
     ...values,
-    // Handle dayjs objects
-    soudaDate: values.soudaDate ? values.soudaDate.format('YYYY-MM-DD') : null,
-    from_date: values.from_date ? values.from_date.format('YYYY-MM-DD') : null,
-    to_date: values.to_date ? values.to_date.format('YYYY-MM-DD') : null,
+    // Handle dayjs objects and string dates safely
+    soudaDate: safeDate(values.soudaDate),
+    from_date: safeDate(values.from_date),
+    to_date: safeDate(values.to_date),
+    order_date: safeDate(values.order_date),
+    expected_receiving_date: safeDate(values.expected_receiving_date),
     // Store timestamp
     savedAt: new Date().toISOString(),
   };
@@ -24,14 +35,18 @@ export const deserializePurchaseDraft = (draft) => {
     soudaDate: draft.soudaDate ? dayjs(draft.soudaDate) : null,
     from_date: draft.from_date ? dayjs(draft.from_date) : null,
     to_date: draft.to_date ? dayjs(draft.to_date) : null,
+    order_date: draft.order_date ? dayjs(draft.order_date) : null,
+    expected_receiving_date: draft.expected_receiving_date
+      ? dayjs(draft.expected_receiving_date)
+      : null,
   };
 };
 
 // Save draft to localStorage
-export const savePurchaseDraft = (draftId, values) => {
+export const savePurchaseDraft = (draftId, values, component = 'default') => {
   try {
     const serialized = serializePurchaseDraft(values);
-    localStorage.setItem(`${DRAFT_PREFIX}${draftId}`, JSON.stringify(serialized));
+    localStorage.setItem(`${DRAFT_PREFIX}${component}-${draftId}`, JSON.stringify(serialized));
     return true;
   } catch (error) {
     console.error('Failed to save purchase draft:', error);
@@ -40,9 +55,11 @@ export const savePurchaseDraft = (draftId, values) => {
 };
 
 // Load draft from localStorage
-export const loadPurchaseDraft = (draftId) => {
+export const loadPurchaseDraft = (draftId, component = 'default') => {
   try {
-    const draftData = localStorage.getItem(`${DRAFT_PREFIX}${draftId}`);
+    const scopedKey = `${DRAFT_PREFIX}${component}-${draftId}`;
+    const legacyKey = `${DRAFT_PREFIX}${draftId}`;
+    const draftData = localStorage.getItem(scopedKey) || localStorage.getItem(legacyKey);
     if (!draftData) return null;
     
     const draft = JSON.parse(draftData);
@@ -54,8 +71,10 @@ export const loadPurchaseDraft = (draftId) => {
 };
 
 // Delete specific draft
-export const deletePurchaseDraft = (draftId) => {
+export const deletePurchaseDraft = (draftId, component = 'default') => {
   try {
+    localStorage.removeItem(`${DRAFT_PREFIX}${component}-${draftId}`);
+    // Remove legacy key if present
     localStorage.removeItem(`${DRAFT_PREFIX}${draftId}`);
     return true;
   } catch (error) {
@@ -65,17 +84,25 @@ export const deletePurchaseDraft = (draftId) => {
 };
 
 // Get all purchase drafts
-export const getAllPurchaseDrafts = () => {
+export const getAllPurchaseDrafts = (component = 'default') => {
   try {
     const drafts = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith(DRAFT_PREFIX)) {
+      if (
+        key &&
+        key.startsWith(DRAFT_PREFIX) &&
+        (component === 'default' || key.startsWith(`${DRAFT_PREFIX}${component}-`))
+      ) {
         try {
           const draftData = JSON.parse(localStorage.getItem(key));
-          const draftId = key.replace(DRAFT_PREFIX, '');
+          let draftId = key.replace(DRAFT_PREFIX, '');
+          if (component !== 'default') {
+            draftId = key.replace(`${DRAFT_PREFIX}${component}-`, '');
+          }
           drafts.push({
             id: draftId,
+            component,
             ...deserializePurchaseDraft(draftData),
             savedAt: draftData.savedAt,
           });

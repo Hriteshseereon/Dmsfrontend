@@ -1,5 +1,5 @@
 // PurchaseSouda.jsx  
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   positiveNumberInputProps,
   percentageInputProps,
@@ -34,6 +34,11 @@ import {
   DeleteOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import {
+  savePurchaseDraft,
+  deletePurchaseDraft,
+  getAllPurchaseDrafts,
+} from "../../../../../utils/purchaseDraftUtils";
 
 const { Option } = Select;
 
@@ -58,13 +63,66 @@ export default function PurchaseSouda() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [showDrafts, setShowDrafts] = useState(false);
+  const [drafts, setDrafts] = useState([]);
+  const [activeDraftId, setActiveDraftId] = useState(null);
+  const autoSaveTimeoutRef = useRef(null);
 const statusOptions = ["Pending","Approved", "Rejected"];
 
   useEffect(() => {
     fetchDropdownData();
     fetchPurchaseContracts();
     getPurchaseContract();
+    loadDraftsList();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const loadDraftsList = () => {
+    const allDrafts = getAllPurchaseDrafts("contract");
+    setDrafts(allDrafts);
+  };
+
+  const handleManualSaveDraft = () => {
+    const values = addForm.getFieldsValue(true);
+    if (!values || Object.keys(values).length === 0) return;
+    const draftId = activeDraftId || `purchase-contract-${Date.now()}`;
+    savePurchaseDraft(draftId, values, "contract");
+    setActiveDraftId(draftId);
+    loadDraftsList();
+  };
+
+  const handleAutoSaveDraft = (allValues) => {
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      const draftId = activeDraftId || `purchase-contract-${Date.now()}`;
+      savePurchaseDraft(draftId, allValues, "contract");
+      setActiveDraftId(draftId);
+    }, 1500);
+  };
+
+  const handleContinueDraft = (draft) => {
+    addForm.setFieldsValue(draft);
+    setActiveDraftId(draft.id);
+    setIsAddModalOpen(true);
+    setShowDrafts(false);
+  };
+
+  const handleDeleteDraft = (draftId) => {
+    deletePurchaseDraft(draftId, "contract");
+    if (activeDraftId === draftId) {
+      setActiveDraftId(null);
+    }
+    loadDraftsList();
+  };
 
 
 
@@ -459,6 +517,9 @@ const handleViewClick = async (record) => {
       // optionally set order-level fields if you have those
       orderTotals: computed.orderTotals,
     });
+    if (form === addForm && isAddModalOpen) {
+      handleAutoSaveDraft(allValues || {});
+    }
   };
 const handleExport = async () => {
   try {
@@ -563,6 +624,11 @@ const handleExport = async () => {
 
     console.log("FINAL PAYLOAD:", payload);
     await addPurchaseContract(payload);
+    if (activeDraftId) {
+      deletePurchaseDraft(activeDraftId, "contract");
+      setActiveDraftId(null);
+      loadDraftsList();
+    }
       await fetchPurchaseContracts(); 
     setIsAddModalOpen(false);
   };
@@ -1207,6 +1273,55 @@ const handleExport = async () => {
       </div>
 
       {/* Table */}
+      <div className="mb-4">
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="text-lg font-semibold text-amber-700">Purchase Contract Drafts</h3>
+          <Button
+            type="primary"
+            onClick={() => setShowDrafts(!showDrafts)}
+            className="!bg-amber-500 !hover:bg-amber-600"
+          >
+            {showDrafts ? "Hide Drafts" : "Show Drafts"}
+          </Button>
+        </div>
+        {showDrafts && (
+          <div className="border border-amber-300 rounded-lg p-4 bg-white">
+            {drafts.length === 0 ? (
+              <p className="text-gray-500 text-center py-4">No drafts found</p>
+            ) : (
+              <div className="space-y-2">
+                {drafts.map((draft) => (
+                  <div
+                    key={draft.id}
+                    className="flex justify-between items-center p-3 border border-gray-200 rounded hover:bg-gray-50"
+                  >
+                    <div className="flex-1">
+                      <div className="font-medium">{draft.vendor_name || "Purchase Contract Draft"}</div>
+                      <div className="text-sm text-gray-500">
+                        {draft.savedAt ? new Date(draft.savedAt).toLocaleString() : "Unknown time"}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="small"
+                        type="primary"
+                        onClick={() => handleContinueDraft(draft)}
+                        className="bg-amber-500! hover:bg-amber-600!"
+                      >
+                        Continue
+                      </Button>
+                      <Button size="small" danger onClick={() => handleDeleteDraft(draft.id)}>
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">Purchase Contract Records</h2>
         <Table columns={columns} dataSource={data} loading={loading} pagination={false} rowKey="key" scroll={{ y: 300 }} />
@@ -1214,10 +1329,20 @@ const handleExport = async () => {
 
       {/* Add Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Add New Purchase Contract</span>}
+        title={
+          <div className="flex justify-between items-center">
+            <span className="text-amber-700 text-2xl font-semibold">
+              Add New Purchase Contract {activeDraftId && <span className="text-sm text-blue-500">(Draft)</span>}
+            </span>
+            <Button size="small" onClick={handleManualSaveDraft} className="bg-green-500 hover:bg-green-600 text-white">
+              Save Draft
+            </Button>
+          </div>
+        }
         open={isAddModalOpen}
         onCancel={() => {
           addForm.resetFields();
+          setActiveDraftId(null);
           setIsAddModalOpen(false);
         }}
         footer={null}
