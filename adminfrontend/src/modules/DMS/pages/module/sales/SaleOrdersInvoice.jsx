@@ -89,26 +89,28 @@ export default function SaleOrdersInvoice() {
     const values = form.getFieldsValue();
     if (values && Object.keys(values).length > 0) {
       const draftId = `sales-order-${Date.now()}`;
-      saveSalesDraft(draftId, values, 'orders');
+      saveSalesDraft(draftId, values, "orders");
       setActiveDraftId(draftId);
       loadDraftsList();
     }
   };
 
   const loadDraftsList = () => {
-    const allDrafts = getAllSalesDrafts('orders');
+    const allDrafts = getAllSalesDrafts("orders");
     setDrafts(allDrafts);
   };
 
   const handleContinueDraft = (draft) => {
-    addForm.setFieldsValue(draft);
+    // Destructure out metadata fields before setting form values
+    const { id, component, savedAt, ...formValues } = draft;
+    addForm.setFieldsValue(formValues); // ✅ Clean form values only
     setActiveDraftId(draft.id);
     setIsAddModalOpen(true);
     setShowDrafts(false);
   };
 
   const handleDeleteDraft = (draftId) => {
-    deleteSalesDraft(draftId, 'orders');
+    deleteSalesDraft(draftId, "orders");
     if (activeDraftId === draftId) {
       setActiveDraftId(null);
     }
@@ -116,7 +118,16 @@ export default function SaleOrdersInvoice() {
   };
 
   const handleFormValuesChange = (changedValues, allValues, form) => {
-    // Auto-save on form changes
+    // Debug: log when deliveryDate changes
+    if (changedValues.deliveryDate !== undefined) {
+      console.log(
+        "Delivery Date changed:",
+        changedValues.deliveryDate,
+        typeof changedValues.deliveryDate,
+      );
+    }
+
+    // Auto-save on form changes (delayed to not interfere with form capture)
     const draftId = activeDraftId || `sales-order-${Date.now()}`;
     handleAutoSave(form, draftId);
   };
@@ -495,20 +506,30 @@ export default function SaleOrdersInvoice() {
   const buildSalesOrderPayload = (values) => {
     const { orderTaxAndTotals } = values;
     console.log("PAYLOAD bill_mode 👉", values.bill_mode);
-    console.log("DELIVERY DATE DEBUG:", values.deliveryDate, typeof values.deliveryDate);
+    console.log(
+      "DELIVERY DATE DEBUG:",
+      values.deliveryDate,
+      typeof values.deliveryDate,
+    );
+    // Safe date formatter that handles dayjs objects, strings, and null
+    const formatDate = (date) => {
+      if (!date) return null;
+      // Already a dayjs object
+      if (typeof date === "object" && typeof date.format === "function") {
+        return date.isValid() ? date.format("YYYY-MM-DD") : null;
+      }
+      // String or other
+      const d = dayjs(date);
+      return d.isValid() ? d.format("YYYY-MM-DD") : null;
+    };
     return {
       customer_id: values.customer_id,
       status: values.status,
       purchase_type: values.purchaseType, // ✅ NEW
       bill_mode: values.bill_mode,
       narration: values.narration || "",
-      order_date: values.orderDate
-        ? dayjs(values.orderDate).format("YYYY-MM-DD")
-        : null,
-      expected_receiving_date:
-        values.deliveryDate && dayjs(values.deliveryDate).isValid()
-          ? dayjs(values.deliveryDate).format("YYYY-MM-DD")
-          : null,
+      order_date: formatDate(values.orderDate),
+      expected_receiving_date: formatDate(values.deliveryDate),
       delivery_address: values.deliveryAddress || "",
       cash_discount: 0,
       cgst: Number(orderTaxAndTotals?.cgstPercent || 0),
@@ -565,7 +586,7 @@ export default function SaleOrdersInvoice() {
 
       // Delete active draft after successful submission
       if (activeDraftId) {
-        deleteSalesDraft(activeDraftId, 'orders');
+        deleteSalesDraft(activeDraftId, "orders");
         setActiveDraftId(null);
         loadDraftsList();
       }
@@ -1456,6 +1477,14 @@ export default function SaleOrdersInvoice() {
               className="w-full"
               disabledDate={createFinancialYearDisabledDate(selectedFY)}
               disabled={disabled}
+              // onChange={(date, dateString) => {
+              //   console.log(
+              //     "DatePicker onChange:",
+              //     date,
+              //     dateString,
+              //     typeof date,
+              //   );
+              // }}
             />{" "}
           </Form.Item>
         </Col>

@@ -5,15 +5,24 @@ const DRAFT_PREFIX = 'sales-draft-';
 
 // Serialize form values for draft storage
 export const serializeSalesDraft = (values) => {
+  const safeDate = (date) => {
+    if (!date) return null;
+    // Handle dayjs objects
+    if (date && typeof date === 'object' && typeof date.format === 'function') {
+      return date.isValid() ? date.format('YYYY-MM-DD') : null;
+    }
+    // Handle strings/other
+    const d = dayjs(date);
+    return d.isValid() ? d.format('YYYY-MM-DD') : null;
+  };
+
   return {
     ...values,
-    // Handle dayjs objects for all components
-    soudaDate: values.soudaDate ? values.soudaDate.format('YYYY-MM-DD') : null,
-    startDate: values.startDate ? values.startDate.format('YYYY-MM-DD') : null,
-    endDate: values.endDate ? values.endDate.format('YYYY-MM-DD') : null,
-    orderDate: values.orderDate ? values.orderDate.format('YYYY-MM-DD') : null,
-    deliveryDate: values.deliveryDate ? values.deliveryDate.format('YYYY-MM-DD') : null,
-    // Store timestamp
+    soudaDate: safeDate(values.soudaDate),
+    startDate: safeDate(values.startDate),
+    endDate: safeDate(values.endDate),
+    orderDate: safeDate(values.orderDate),
+    deliveryDate: safeDate(values.deliveryDate),
     savedAt: new Date().toISOString(),
   };
 };
