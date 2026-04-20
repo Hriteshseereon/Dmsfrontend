@@ -28,6 +28,13 @@ import {
   ArrowRightOutlined,
   CheckOutlined,
 } from "@ant-design/icons";
+import {
+  getCountryOptions,
+  getStateOptions,
+  getCityOptions,
+  getCountryIsoByName,
+  getStateIsoByName,
+} from "../utils/locationHelper.js";
 import LocationPicker from "../modules/DMS/helpers/LocationPicker.jsx";
 import { useCreateOrganization } from "../queries/useCreateOrganization.js";
 import { useNavigate, useParams } from "react-router-dom";
@@ -118,12 +125,48 @@ export default function AddOrganisation() {
   const [orgType, setOrgType] = useState("");
   const [hasBranch, setHasBranch] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  // location add
+  const [selCountryIso, setSelCountryIso] = useState(null);
+  const [selStateIso, setSelStateIso] = useState(null);
+  const [selStateName, setSelStateName] = useState(null);
   const rule = ORG_RULES[orgType];
   const normFile = (e) => (Array.isArray(e) ? e : e?.fileList);
   const navigate = useNavigate();
 
   const { createForm, values, loadValues, setValues, reset } = useFormStore();
 
+  // function handle the country sate
+  const handleCountryChange = (isoCode, option, fieldPath) => {
+    setSelCountryIso(isoCode);
+    setSelStateIso(null);
+    setSelStateName(null);
+
+    form.setFieldValue(fieldPath, {
+      ...form.getFieldValue(fieldPath),
+      country: option.label,
+      state: undefined,
+      city: undefined,
+    });
+  };
+
+  const handleStateChange = (isoCode, option, fieldPath) => {
+    setSelStateIso(isoCode);
+    setSelStateName(option.label);
+
+    form.setFieldValue(fieldPath, {
+      ...form.getFieldValue(fieldPath),
+      state: option.label,
+      city: undefined,
+    });
+  };
+  useEffect(() => {
+    const iso = getCountryIsoByName("India");
+    setSelCountryIso(iso);
+
+    form.setFieldsValue({
+      organisationAddress: { country: "India" },
+    });
+  }, []);
   // validation for mobile number: starts with 6-9 and has total 10 digits
   const handleTenDigitNumber = (fieldPath) => (e) => {
     const value = e.target.value.replace(/\D/g, "").slice(0, 15);
@@ -381,6 +424,7 @@ export default function AddOrganisation() {
         address2: hqAddress?.address_line_2,
         city: hqAddress?.city,
         state: hqAddress?.state,
+        country: hqAddress?.country || "India",
         pin: hqAddress?.pin_code,
       },
 
@@ -452,6 +496,7 @@ export default function AddOrganisation() {
           currentAddress: {
             address1: p.current_address_line_1,
             address2: p.current_address_line_2,
+            country: p.current_country || "India",
             city: p.current_city,
             state: p.current_state,
             pin: p.current_pin_code,
@@ -460,6 +505,7 @@ export default function AddOrganisation() {
           permanentAddress: {
             address1: p.permanent_address_line_1,
             address2: p.permanent_address_line_2,
+            country: p.permanent_country || "India",
             city: p.permanent_city,
             state: p.permanent_state,
             pin: p.permanent_pin_code,
@@ -511,6 +557,7 @@ export default function AddOrganisation() {
         city: b.address?.city,
         gstin: b.gstin,
         state: b.address?.state,
+        country: b.address?.country || "India",
         pinNo: b.address?.pin_code,
         address1: b.address?.address_line_1,
         address2: b.address?.address_line_2,
@@ -535,7 +582,16 @@ export default function AddOrganisation() {
       const values = mapOrgToForm(orgData);
 
       form.setFieldsValue(values);
-
+      const countryIso = getCountryIsoByName(
+        values.organisationAddress?.country || "India",
+      );
+      const stateIso = getStateIsoByName(
+        countryIso,
+        values.organisationAddress?.state,
+      );
+      setSelCountryIso(countryIso);
+      setSelStateIso(stateIso);
+      setSelStateName(values.organisationAddress?.state);
       setOrgType(values.organisationType);
       setHasBranch(values.hasBranch);
       setCurrentStep(0);
@@ -686,7 +742,7 @@ export default function AddOrganisation() {
           landmark: null,
           city: values.organisationAddress?.city ?? "",
           state: values.organisationAddress?.state ?? "",
-          country: "India",
+          country: values.organisationAddress?.country ?? "India",
           pin_code: values.organisationAddress?.pin ?? "",
 
           latitude: null,
@@ -733,12 +789,14 @@ export default function AddOrganisation() {
         current_address_line_2: p.currentAddress?.address2 ?? null,
         current_city: p.currentAddress?.city ?? null,
         current_state: p.currentAddress?.state ?? null,
+        current_country: p.currentAddress?.country ?? "India",
         current_pin_code: p.currentAddress?.pin ?? null,
 
         permanent_address_line_1: p.permanentAddress?.address1 ?? null,
         permanent_address_line_2: p.permanentAddress?.address2 ?? null,
         permanent_city: p.permanentAddress?.city ?? null,
         permanent_state: p.permanentAddress?.state ?? null,
+        permanent_country: p.permanentAddress?.country ?? "India",
         permanent_pin_code: p.permanentAddress?.pin ?? null,
 
         family_details: {
@@ -830,7 +888,8 @@ export default function AddOrganisation() {
               landmark: null,
               city: b.city ?? "",
               state: b.state ?? "",
-              country: "India",
+              country: b.country ?? "India",
+              // country: "India",
               pin_code: b.pinNo ?? "",
 
               latitude: null,
@@ -1105,41 +1164,56 @@ export default function AddOrganisation() {
             <Input placeholder="Address line" />
           </Form.Item>
         </Col>
-        <Col xs={24} sm={12} md={6}>
+        <Col span={6}>
           <Form.Item
-            label="City"
-            name={["organisationAddress", "city"]}
-            rules={[{ required: true, message: "Enter city" }]}
+            label="Country"
+            name={["organisationAddress", "country"]}
+            rules={[{ required: true }]}
           >
-            <Input placeholder="City" />
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={12} md={4}>
-          <Form.Item
-            label="State"
-            name={["organisationAddress", "state"]}
-            rules={[
-              { required: true, message: "Enter state" },
-              {
-                pattern: /^[A-Za-z\s]+$/,
-                message: "Only alphabets are allowed",
-              },
-            ]}
-          >
-            <Input
-              placeholder="State"
-              onChange={(e) => {
-                const value = e.target.value.replace(/[^A-Za-z\s]/g, "");
-                form.setFieldsValue({
-                  organisationAddress: {
-                    ...form.getFieldValue("organisationAddress"),
-                    state: value,
-                  },
-                });
-              }}
+            <Select
+              options={getCountryOptions()}
+              onChange={(iso, option) =>
+                handleCountryChange(iso, option, "organisationAddress")
+              }
+              showSearch
+              optionFilterProp="label"
             />
           </Form.Item>
         </Col>
+
+        <Col span={6}>
+          <Form.Item
+            label="State"
+            name={["organisationAddress", "state"]}
+            rules={[{ required: true }]}
+          >
+            <Select
+              options={getStateOptions(selCountryIso)}
+              onChange={(iso, option) =>
+                handleStateChange(iso, option, "organisationAddress")
+              }
+              disabled={!selCountryIso}
+              showSearch
+              optionFilterProp="label"
+            />
+          </Form.Item>
+        </Col>
+
+        <Col span={6}>
+          <Form.Item
+            label="City"
+            name={["organisationAddress", "city"]}
+            rules={[{ required: true }]}
+          >
+            <Select
+              options={getCityOptions(selCountryIso, selStateIso)}
+              disabled={!selStateIso}
+              showSearch
+              optionFilterProp="label"
+            />
+          </Form.Item>
+        </Col>
+
         <Col xs={24} sm={12} md={4}>
           <Form.Item
             label="PIN Code"
@@ -1658,34 +1732,104 @@ export default function AddOrganisation() {
                       <Input placeholder="Address line2" />
                     </Form.Item>
                   </Col>
-                  <Col xs={24} sm={12} md={4}>
+                  <Col span={6}>
                     <Form.Item
-                      {...restField}
-                      label="City"
-                      name={[name, "currentAddress", "city"]}
-                      rules={[
-                        {
-                          pattern: /^[A-Za-z\s]+$/,
-                          message: "Only letters are allowed",
-                        },
-                      ]}
+                      label="Country"
+                      name={[name, "currentAddress", "country"]}
+                      initialValue="India"
+                      rules={[{ required: true }]}
                     >
-                      <Input placeholder="City" />
+                      <Select
+                        options={getCountryOptions()}
+                        showSearch
+                        optionFilterProp="label"
+                        onChange={(iso, option) => {
+                          form.setFieldValue(
+                            ["partners", name, "currentAddress", "state"],
+                            undefined,
+                          );
+                          form.setFieldValue(
+                            ["partners", name, "currentAddress", "city"],
+                            undefined,
+                          );
+                          form.setFieldValue(
+                            ["partners", name, "currentAddress", "country"],
+                            option.label,
+                          );
+                        }}
+                      />
                     </Form.Item>
                   </Col>
-                  <Col xs={24} sm={12} md={4}>
+
+                  <Col span={6}>
                     <Form.Item
-                      {...restField}
                       label="State"
                       name={[name, "currentAddress", "state"]}
-                      rules={[
-                        {
-                          pattern: /^[A-Za-z\s]+$/,
-                          message: "Only letters are allowed",
-                        },
-                      ]}
+                      rules={[{ required: true }]}
                     >
-                      <Input placeholder="State" />
+                      <Select
+                        options={getStateOptions(
+                          getCountryIsoByName(
+                            form.getFieldValue([
+                              "partners",
+                              name,
+                              "currentAddress",
+                              "country",
+                            ]),
+                          ),
+                        )}
+                        showSearch
+                        optionFilterProp="label"
+                        onChange={(iso, option) => {
+                          form.setFieldValue(
+                            ["partners", name, "currentAddress", "city"],
+                            undefined,
+                          );
+                          form.setFieldValue(
+                            ["partners", name, "currentAddress", "state"],
+                            option.label,
+                          );
+                        }}
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item
+                      label="City"
+                      name={[name, "currentAddress", "city"]}
+                      rules={[{ required: true }]}
+                    >
+                      <Select
+                        options={getCityOptions(
+                          getCountryIsoByName(
+                            form.getFieldValue([
+                              "partners",
+                              name,
+                              "currentAddress",
+                              "country",
+                            ]),
+                          ),
+                          getStateIsoByName(
+                            getCountryIsoByName(
+                              form.getFieldValue([
+                                "partners",
+                                name,
+                                "currentAddress",
+                                "country",
+                              ]),
+                            ),
+                            form.getFieldValue([
+                              "partners",
+                              name,
+                              "currentAddress",
+                              "state",
+                            ]),
+                          ),
+                        )}
+                        showSearch
+                        optionFilterProp="label"
+                      />
                     </Form.Item>
                   </Col>
                   <Col xs={24} sm={12} md={4}>
@@ -1762,34 +1906,104 @@ export default function AddOrganisation() {
                       <Input placeholder="Address line2" />
                     </Form.Item>
                   </Col>
-                  <Col xs={24} sm={12} md={4}>
+                  <Col span={6}>
                     <Form.Item
-                      {...restField}
-                      label="City"
-                      name={[name, "permanentAddress", "city"]}
-                      rules={[
-                        {
-                          pattern: /^[A-Za-z\s]+$/,
-                          message: "Only letters are allowed",
-                        },
-                      ]}
+                      label="Country"
+                      name={[name, "permanentAddress", "country"]}
+                      initialValue="India"
+                      rules={[{ required: true }]}
                     >
-                      <Input placeholder="City" />
+                      <Select
+                        options={getCountryOptions()}
+                        showSearch
+                        optionFilterProp="label"
+                        onChange={(iso, option) => {
+                          form.setFieldValue(
+                            ["partners", name, "permanentAddress", "state"],
+                            undefined,
+                          );
+                          form.setFieldValue(
+                            ["partners", name, "permanentAddress", "city"],
+                            undefined,
+                          );
+                          form.setFieldValue(
+                            ["partners", name, "permanentAddress", "country"],
+                            option.label,
+                          );
+                        }}
+                      />
                     </Form.Item>
                   </Col>
-                  <Col xs={24} sm={12} md={4}>
+
+                  <Col span={6}>
                     <Form.Item
-                      {...restField}
                       label="State"
                       name={[name, "permanentAddress", "state"]}
-                      rules={[
-                        {
-                          pattern: /^[A-Za-z\s]+$/,
-                          message: "Only letters are allowed",
-                        },
-                      ]}
+                      rules={[{ required: true }]}
                     >
-                      <Input placeholder="State" />
+                      <Select
+                        options={getStateOptions(
+                          getCountryIsoByName(
+                            form.getFieldValue([
+                              "partners",
+                              name,
+                              "permanentAddress",
+                              "country",
+                            ]),
+                          ),
+                        )}
+                        showSearch
+                        optionFilterProp="label"
+                        onChange={(iso, option) => {
+                          form.setFieldValue(
+                            ["partners", name, "permanentAddress", "city"],
+                            undefined,
+                          );
+                          form.setFieldValue(
+                            ["partners", name, "permanentAddress", "state"],
+                            option.label,
+                          );
+                        }}
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={6}>
+                    <Form.Item
+                      label="City"
+                      name={[name, "permanentAddress", "city"]}
+                      rules={[{ required: true }]}
+                    >
+                      <Select
+                        options={getCityOptions(
+                          getCountryIsoByName(
+                            form.getFieldValue([
+                              "partners",
+                              name,
+                              "permanentAddress",
+                              "country",
+                            ]),
+                          ),
+                          getStateIsoByName(
+                            getCountryIsoByName(
+                              form.getFieldValue([
+                                "partners",
+                                name,
+                                "permanentAddress",
+                                "country",
+                              ]),
+                            ),
+                            form.getFieldValue([
+                              "partners",
+                              name,
+                              "permanentAddress",
+                              "state",
+                            ]),
+                          ),
+                        )}
+                        showSearch
+                        optionFilterProp="label"
+                      />
                     </Form.Item>
                   </Col>
                   <Col xs={24} sm={12} md={4}>
@@ -2665,28 +2879,100 @@ export default function AddOrganisation() {
                             <Input placeholder="Branch name" />
                           </Form.Item>
                         </Col>
-                        <Col xs={12} sm={6} md={5}>
+                        <Col span={6}>
                           <Form.Item
-                            {...restField}
-                            label="City"
-                            name={[name, "city"]}
+                            label="Country"
+                            name={[name, "country"]}
+                            initialValue="India"
+                            rules={[{ required: true }]}
                           >
-                            <Input placeholder="City" />
+                            <Select
+                              options={getCountryOptions()}
+                              showSearch
+                              optionFilterProp="label"
+                              onChange={(iso, option) => {
+                                form.setFieldValue(
+                                  ["branches", name, "country"],
+                                  option.label,
+                                );
+                                form.setFieldValue(
+                                  ["branches", name, "state"],
+                                  undefined,
+                                );
+                                form.setFieldValue(
+                                  ["branches", name, "city"],
+                                  undefined,
+                                );
+                              }}
+                            />
                           </Form.Item>
                         </Col>
-                        <Col xs={12} sm={6} md={5}>
+
+                        <Col span={6}>
                           <Form.Item
-                            {...restField}
                             label="State"
                             name={[name, "state"]}
-                            rules={[
-                              {
-                                pattern: /^[A-Za-z\s]+$/,
-                                message: "Only letters are allowed",
-                              },
-                            ]}
+                            rules={[{ required: true }]}
                           >
-                            <Input placeholder="State" />
+                            <Select
+                              options={getStateOptions(
+                                getCountryIsoByName(
+                                  form.getFieldValue([
+                                    "branches",
+                                    name,
+                                    "country",
+                                  ]),
+                                ),
+                              )}
+                              showSearch
+                              optionFilterProp="label"
+                              onChange={(iso, option) => {
+                                form.setFieldValue(
+                                  ["branches", name, "state"],
+                                  option.label,
+                                );
+                                form.setFieldValue(
+                                  ["branches", name, "city"],
+                                  undefined,
+                                );
+                              }}
+                            />
+                          </Form.Item>
+                        </Col>
+
+                        <Col span={6}>
+                          <Form.Item
+                            label="City"
+                            name={[name, "city"]}
+                            rules={[{ required: true }]}
+                          >
+                            <Select
+                              options={getCityOptions(
+                                getCountryIsoByName(
+                                  form.getFieldValue([
+                                    "branches",
+                                    name,
+                                    "country",
+                                  ]),
+                                ),
+                                getStateIsoByName(
+                                  getCountryIsoByName(
+                                    form.getFieldValue([
+                                      "branches",
+                                      name,
+                                      "country",
+                                    ]),
+                                  ),
+                                  form.getFieldValue([
+                                    "branches",
+                                    name,
+                                    "state",
+                                  ]),
+                                ),
+                              )}
+                              showSearch
+                              optionFilterProp="label"
+                            />
                           </Form.Item>
                         </Col>
                         <Col xs={12} sm={6} md={5}>
@@ -2853,7 +3139,11 @@ export default function AddOrganisation() {
                   ))}
                   <Button
                     type="dashed"
-                    onClick={() => add()}
+                    onClick={() =>
+                      add({
+                        country: "India",
+                      })
+                    }
                     block
                     icon={<PlusOutlined />}
                   >

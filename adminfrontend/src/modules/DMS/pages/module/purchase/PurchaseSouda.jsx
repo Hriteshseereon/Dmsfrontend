@@ -625,18 +625,18 @@ const handleExport = async () => {
                   <Form.Item
                     {...field}
                     label="Item Name"
-                    name={[field.name, "product_id"]}
+                   name={[field.name, "item_name"]}  
                     rules={[{ required: true, message: "Item is required" }]}
                   >
                     <Select
                       placeholder={!selectedVendor ? "Select vendor first" : "Select Item"}
                      disabled={!selectedVendor || products.length === 0 || disabled} 
-                      onChange={(productId) => {
-                        const selected = products.find(p => p.id === productId);
-
+                     onChange={(productId) => {
+  const selected = products.find(p => p.id === productId);
                         form.setFields([
-                          { name: ["items", field.name, "product_id"], value: productId },
-
+                         { name: ["items", field.name, "product_id"], value: productId }, // keep ID
+    { name: ["items", field.name, "item_name"], value: selected?.name || "" }, // show name
+ 
                           // ✅ SHOW IN UI
                           { name: ["items", field.name, "hsn_code"], value: selected?.hsn_code_value || "" },
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Table,
   Button,
@@ -11,6 +11,9 @@ import {
   Select,
   message,
   Upload,
+  Tag,
+  Typography,
+  Popconfirm,
 } from "antd";
 import {
   PlusOutlined,
@@ -20,6 +23,10 @@ import {
   ReloadOutlined,
   MinusCircleOutlined,
   UploadOutlined,
+  FileTextOutlined,
+  ClockCircleOutlined,
+  DeleteOutlined,
+  SaveOutlined,
 } from "@ant-design/icons";
 import { API_BASE_URL } from "@/utils/config";
 
@@ -41,6 +48,104 @@ import {
   getCountryIsoByName,
   getStateIsoByName,
 } from "../../../../../../../utils/locationHelper";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+dayjs.extend(relativeTime);
+const { Text } = Typography;
+// ================= DRAFT SYSTEM =================
+const DRAFT_PREFIX = "broker-form-draft-";
+const AUTOSAVE_MS = 1500;
+
+// Serialise
+const serialiseDraft = (values) => {
+  const out = {};
+  for (const [key, val] of Object.entries(values)) {
+    if (val === null || val === undefined) {
+      out[key] = val;
+      continue;
+    }
+
+    // Upload fileList
+    if (Array.isArray(val) && val.length && val[0]?.uid !== undefined) {
+      out[key] = val.map(({ uid, name, status, url, thumbUrl }) => ({
+        uid,
+        name,
+        status,
+        url,
+        thumbUrl,
+        _fromDraft: true,
+      }));
+      continue;
+    }
+
+    out[key] = val;
+  }
+  return out;
+};
+
+// Deserialise
+const deserialiseDraft = (values) => {
+  const out = {};
+  for (const [key, val] of Object.entries(values)) {
+    if (Array.isArray(val) && val.length && val[0]?._fromDraft) {
+      out[key] = val;
+      continue;
+    }
+    out[key] = val;
+  }
+  return out;
+};
+
+// Storage helpers
+const saveDraft = (id, values, meta = {}) => {
+  const payload = {
+    id,
+    savedAt: new Date().toISOString(),
+    meta,
+    values: serialiseDraft(values),
+  };
+  localStorage.setItem(id, JSON.stringify(payload));
+  return id;
+};
+
+const createDraft = (values, meta = {}) => {
+  const id = `${DRAFT_PREFIX}${Date.now()}`;
+  return saveDraft(id, values, meta);
+};
+
+const loadDraft = (id) => {
+  try {
+    const raw = localStorage.getItem(id);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const deleteDraft = (id) => localStorage.removeItem(id);
+
+const getAllDrafts = () => {
+  const result = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key?.startsWith(DRAFT_PREFIX)) continue;
+
+    try {
+      const parsed = JSON.parse(localStorage.getItem(key));
+      if (parsed?.values) {
+        result.push({
+          id: key,
+          savedAt: parsed.savedAt,
+          name: parsed.meta?.brokerName || parsed.values?.brokerName || "—",
+          email: parsed.meta?.email || parsed.values?.email || "—",
+          mobile: parsed.meta?.phoneNo || parsed.values?.phoneNo || "—",
+        });
+      }
+    } catch {}
+  }
+
+  return result.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
+};
 
 export const phoneValidator = (_, value) => {
   if (!value) return Promise.resolve(); // allow empty if not required
@@ -98,9 +203,9 @@ const buildFormData = (values) => {
   const fd = new FormData();
 
   fd.append("name", values.brokerName || "");
-  fd.append("temporary_city", values.businessName || "");
+  // fd.append("temporary_city", values.businessName || "");
   fd.append("password", values.password || "");
-  fd.append("username", values.email || values.phoneNo);
+  fd.append("username", values.businessName || "");
   fd.append("email", values.email);
   fd.append("phone_number", values.phoneNo || "");
   fd.append("alternate_phone", values.altPhoneNo || "");
@@ -170,7 +275,53 @@ export default function BrokerTab() {
   const [selStateName, setSelStateName] = useState(null);
   const [selStateIso, setSelStateIso] = useState(null);
   const [form] = Form.useForm();
+  const [activeDraftId, setActiveDraftId] = useState(null);
+  const [draftSavedAt, setDraftSavedAt] = useState(null);
+  const [draftTableKey, setDraftTableKey] = useState(0);
+  const autosaveTimer = useRef(null);
 
+  const handleFormValuesChange = () => {
+    if (selected || viewMode) return;
+
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+
+    autosaveTimer.current = setTimeout(() => {
+      const values = form.getFieldsValue(true);
+      const meta = {
+        brokerName: values.brokerName,
+        email: values.email,
+        phoneNo: values.phoneNo,
+      };
+
+      setActiveDraftId((prevId) => {
+        const id = prevId || createDraft(values, meta);
+        saveDraft(id, values, meta);
+        setDraftSavedAt(new Date());
+        setDraftTableKey((k) => k + 1);
+        return id;
+      });
+    }, AUTOSAVE_MS);
+  };
+
+  // Manual save draft function
+  const handleManualSave = () => {
+    if (selected || viewMode) return;
+    const values = form.getFieldsValue(true);
+    const meta = {
+      brokerName: values.brokerName,
+      email: values.email,
+      phoneNo: values.phoneNo,
+    };
+
+    setActiveDraftId((prevId) => {
+      const id = prevId || createDraft(values, meta);
+      saveDraft(id, values, meta);
+      setDraftSavedAt(new Date());
+      setDraftTableKey((k) => k + 1);
+      message.success("Draft saved");
+      return id;
+    });
+  };
   const generatePassword = (length = 10) => {
     const chars =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$!";
@@ -281,7 +432,7 @@ export default function BrokerTab() {
     aadharNo: d.aadhar_number,
     bankDetails: d.bank_details,
     gstin: d.gstin,
-    businessName: d.temporary_city,
+    businessName: d.username,
     panDoc: fileFromUrl(d.pan_document),
     aadharDoc: fileFromUrl(d.aadhar_document),
     gstinDoc: fileFromUrl(d.gstin_document),
@@ -323,7 +474,12 @@ export default function BrokerTab() {
   const handleSubmit = async (values) => {
     try {
       const formData = buildFormData(values);
-
+      if (!selected && activeDraftId) {
+        deleteDraft(activeDraftId);
+        setActiveDraftId(null);
+        setDraftSavedAt(null);
+        setDraftTableKey((k) => k + 1);
+      }
       if (selected) {
         await updateBrokerById(selected.id, formData);
         message.success("Broker Updated");
@@ -419,7 +575,143 @@ export default function BrokerTab() {
   ];
 
   const filteredData = getFilteredData();
+  // draft table
+  const handleContinueDraft = (id) => {
+    const draft = loadDraft(id);
+    if (!draft) return;
 
+    const restored = deserialiseDraft(draft.values);
+    form.setFieldsValue(restored);
+
+    // Check for uploaded files and show warning
+    const hasFiles = Object.keys(restored).some((key) => {
+      const value = restored[key];
+      return Array.isArray(value) && value.length > 0 && value[0]?._fromDraft;
+    });
+
+    if (hasFiles) {
+      message.warning(
+        "Draft restored! Please re-upload any documents as they are not saved in drafts.",
+        5,
+      );
+    }
+
+    setActiveDraftId(id);
+    setDraftSavedAt(new Date(draft.savedAt));
+    setSelected(null);
+    setViewMode(false);
+    setOpen(true);
+  };
+  function DraftTable({ refreshKey, onContinue, onDelete }) {
+    const [drafts, setDrafts] = useState([]);
+
+    useEffect(() => {
+      setDrafts(getAllDrafts());
+    }, [refreshKey]);
+
+    if (!drafts.length) return null;
+
+    const handleDelete = (id) => {
+      deleteDraft(id);
+      onDelete?.();
+      setDrafts(getAllDrafts());
+    };
+
+    const columns = [
+      {
+        title: (
+          <span className="text-amber-700 font-semibold text-xs">
+            Broker Name
+          </span>
+        ),
+        dataIndex: "name",
+        render: (t) => <span className="text-amber-800 font-medium">{t}</span>,
+      },
+      {
+        title: (
+          <span className="text-amber-700 font-semibold text-xs">Email</span>
+        ),
+        dataIndex: "email",
+        render: (t) => <span className="text-amber-700 text-sm">{t}</span>,
+      },
+      {
+        title: (
+          <span className="text-amber-700 font-semibold text-xs">Mobile</span>
+        ),
+        dataIndex: "mobile",
+        render: (t) => <span className="text-amber-700 text-sm">{t}</span>,
+      },
+      {
+        title: (
+          <span className="text-amber-700 font-semibold text-xs">
+            Last Saved
+          </span>
+        ),
+        dataIndex: "savedAt",
+        render: (v) => (
+          <Tag icon={<ClockCircleOutlined />} color="gold" className="text-xs">
+            {v ? dayjs(v).fromNow() : "—"}
+          </Tag>
+        ),
+      },
+      {
+        title: (
+          <span className="text-amber-700 font-semibold text-xs">Actions</span>
+        ),
+        render: (_, record) => (
+          <div className="flex gap-2">
+            <Button
+              size="small"
+              type="primary"
+              icon={<EditOutlined />}
+              className="bg-amber-500! border-none! text-xs!"
+              onClick={() => onContinue(record.id)}
+            >
+              Continue
+            </Button>
+
+            <Popconfirm
+              title="Delete this draft?"
+              onConfirm={() => handleDelete(record.id)}
+              okText="Delete"
+              cancelText="Keep"
+            >
+              <Button size="small" danger icon={<DeleteOutlined />}>
+                Delete
+              </Button>
+            </Popconfirm>
+          </div>
+        ),
+      },
+    ];
+
+    return (
+      <div className="border border-amber-200 rounded-lg p-4 bg-white shadow-sm mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <FileTextOutlined className="text-amber-500 text-lg" />
+          <h2 className="text-base font-semibold text-amber-700 m-0">
+            Saved Drafts
+          </h2>
+          <Tag color="gold">{drafts.length}</Tag>
+        </div>
+
+        <Text className="text-amber-500 text-xs block mb-3">
+          These forms were not submitted. Click <b>Continue</b> to resume
+          editing.
+        </Text>
+
+        <Table
+          columns={columns}
+          dataSource={drafts}
+          rowKey="id"
+          size="small"
+          bordered
+          pagination={false}
+          rowClassName="hover:bg-amber-50"
+        />
+      </div>
+    );
+  }
   /* ================= UI ================= */
   return (
     <>
@@ -465,7 +757,12 @@ export default function BrokerTab() {
           Add Broker
         </Button>
       </div>
-
+      {/* draft table */}
+      <DraftTable
+        refreshKey={draftTableKey}
+        onContinue={handleContinueDraft}
+        onDelete={() => setDraftTableKey((k) => k + 1)}
+      />
       {/* ===== TABLE CONTAINER ===== */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
@@ -493,9 +790,47 @@ export default function BrokerTab() {
           form.resetFields();
         }}
         title={
-          <span className="text-amber-700 font-semibold text-lg">
-            {viewMode ? "View Broker" : selected ? "Edit Broker" : "Add Broker"}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-amber-700 font-semibold text-lg">
+              {viewMode
+                ? "View Broker"
+                : selected
+                  ? "Edit Broker"
+                  : "Add Broker"}
+            </span>
+
+            {/* Draft indicator — shown only for new-broker forms */}
+            {!selected && !viewMode && (
+              <div className="flex items-center gap-2 ml-2">
+                {activeDraftId ? (
+                  <Tag
+                    color="gold"
+                    icon={<SaveOutlined />}
+                    className="cursor-default select-none"
+                  >
+                    Draft saved
+                  </Tag>
+                ) : (
+                  <Tag
+                    color="default"
+                    className="cursor-default select-none text-xs"
+                  >
+                    Not saved yet
+                  </Tag>
+                )}
+
+                {/* Manual save button */}
+                <Button
+                  size="small"
+                  icon={<SaveOutlined />}
+                  className="border-amber-400! text-amber-700! hover:bg-amber-100! text-xs!"
+                  onClick={handleManualSave}
+                >
+                  Save Draft
+                </Button>
+              </div>
+            )}
+          </div>
         }
         styles={{
           body: { maxHeight: "75vh", overflowY: "auto", paddingRight: 8 },
@@ -505,6 +840,7 @@ export default function BrokerTab() {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
+          onValuesChange={handleFormValuesChange}
           initialValues={{ status: "Active" }}
         >
           {/* ================= Broker Details ================= */}

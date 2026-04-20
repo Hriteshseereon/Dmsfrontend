@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Table,
   Button,
@@ -13,6 +13,11 @@ import {
   InputNumber,
   message,
   Upload,
+  Tag,
+  Tooltip,
+  Popconfirm,
+  Empty,
+  Typography,
 } from "antd";
 import {
   PlusOutlined,
@@ -22,12 +27,18 @@ import {
   ReloadOutlined,
   MinusCircleOutlined,
   UploadOutlined,
+  SaveOutlined,
+  FileTextOutlined,
+  ClockCircleOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+
+dayjs.extend(relativeTime);
 
 import {
   getVendors,
-  addvendor,
   createVendor,
   updateVendor,
   getVendorDetailsByid,
@@ -40,63 +51,353 @@ import {
   getCountryIsoByName,
   getStateIsoByName,
 } from "../../../../../../../utils/locationHelper";
+import { API_BASE_URL } from "@/utils/config";
 
 const { Option } = Select;
-import { API_BASE_URL } from "@/utils/config";
+const { Text } = Typography;
+
 const inputClass = "border-amber-400 h-8";
 const selectClass = "border-amber-400 h-8 w-full";
+const DRAFT_PREFIX = "vendor-form-draft-";
+const AUTOSAVE_MS = 1500;
 
-// /* ================= PHONE VALIDATOR ================= */
+// ─────────────────────────────────────────────────────────────────────────────
+// Phone validator
+// ─────────────────────────────────────────────────────────────────────────────
 export const phoneValidator = (_, value) => {
-  if (!value) return Promise.resolve(); // allow empty if not required
-
+  if (!value) return Promise.resolve();
   const phone = value.toString().trim();
-
-  // E.164 format:
-  // optional +
-  // first digit 1–9
-  // total digits max 15
-  const phoneRegex = /^\+?[1-9]\d{1,14}$/;
-
-  if (!phoneRegex.test(phone)) {
-    return Promise.reject(new Error("Enter valid number "));
+  if (!/^\+?[1-9]\d{1,14}$/.test(phone)) {
+    return Promise.reject(new Error("Enter valid number"));
   }
-
   return Promise.resolve();
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Draft utilities  (inline — no separate file needed for vendor)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Serialise form values for localStorage (handles dayjs + Upload fileList). */
+const serialiseVendorDraft = (values) => {
+  const out = {};
+  for (const [key, val] of Object.entries(values)) {
+    if (val === null || val === undefined) {
+      out[key] = val;
+      continue;
+    }
+
+    // dayjs
+    if (typeof val === "object" && typeof val.isValid === "function") {
+      out[key] = val.isValid() ? val.toISOString() : null;
+      continue;
+    }
+
+    // Upload fileList
+    if (Array.isArray(val) && val.length && val[0]?.uid !== undefined) {
+      out[key] = val.map(({ uid, name, status, url, thumbUrl }) => ({
+        uid,
+        name,
+        status,
+        url,
+        thumbUrl,
+        _fromDraft: true,
+      }));
+      continue;
+    }
+
+    // plants array — recurse each plant entry
+    if (key === "plants" && Array.isArray(val)) {
+      out[key] = val.map((plant) => {
+        if (!plant) return plant;
+        const p = {};
+        for (const [pk, pv] of Object.entries(plant)) {
+          if (
+            pv &&
+            typeof pv === "object" &&
+            typeof pv.isValid === "function"
+          ) {
+            p[pk] = pv.isValid() ? pv.toISOString() : null;
+          } else if (
+            Array.isArray(pv) &&
+            pv.length &&
+            pv[0]?.uid !== undefined
+          ) {
+            p[pk] = pv.map(({ uid, name, status, url }) => ({
+              uid,
+              name,
+              status,
+              url,
+              _fromDraft: true,
+            }));
+          } else {
+            p[pk] = pv;
+          }
+        }
+        return p;
+      });
+      continue;
+    }
+
+    out[key] = val;
+  }
+  return out;
+};
+
+/** Deserialise draft values back into form-compatible shape. */
+const deserialiseVendorDraft = (draft) => {
+  const out = {};
+  for (const [key, val] of Object.entries(draft)) {
+    if (val === null || val === undefined) {
+      out[key] = val;
+      continue;
+    }
+
+    // ISO date string → dayjs
+    if (
+      typeof val === "string" &&
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)
+    ) {
+      const d = dayjs(val);
+      out[key] = d.isValid() ? d : null;
+      continue;
+    }
+
+    // file arrays
+    if (Array.isArray(val) && val.length && val[0]?._fromDraft) {
+      out[key] = val;
+      continue;
+    }
+
+    // plants array
+    if (key === "plants" && Array.isArray(val)) {
+      out[key] = val.map((plant) => {
+        if (!plant) return plant;
+        const p = {};
+        for (const [pk, pv] of Object.entries(plant)) {
+          if (
+            typeof pv === "string" &&
+            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(pv)
+          ) {
+            const d = dayjs(pv);
+            p[pk] = d.isValid() ? d : null;
+          } else if (Array.isArray(pv) && pv.length && pv[0]?._fromDraft) {
+            p[pk] = pv;
+          } else {
+            p[pk] = pv;
+          }
+        }
+        return p;
+      });
+      continue;
+    }
+
+    out[key] = val;
+  }
+  return out;
+};
+
+const saveDraftToStorage = (id, values, meta = {}) => {
+  const payload = {
+    id,
+    savedAt: new Date().toISOString(),
+    meta,
+    values: serialiseVendorDraft(values),
+  };
+  localStorage.setItem(id, JSON.stringify(payload));
+  return id;
+};
+
+const createNewDraft = (values, meta = {}) => {
+  const id = `${DRAFT_PREFIX}${Date.now()}`;
+  return saveDraftToStorage(id, values, meta);
+};
+
+const loadDraftFromStorage = (id) => {
+  try {
+    const raw = localStorage.getItem(id);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const deleteDraftFromStorage = (id) => localStorage.removeItem(id);
+
+const getAllVendorDrafts = () => {
+  const result = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key?.startsWith(DRAFT_PREFIX)) continue;
+    try {
+      const parsed = JSON.parse(localStorage.getItem(key));
+      if (parsed?.values) {
+        result.push({
+          id: key,
+          savedAt: parsed.savedAt,
+          name: parsed.meta?.name || parsed.values?.name || "—",
+          email: parsed.meta?.email || parsed.values?.email1 || "—",
+          mobile: parsed.meta?.mobile || parsed.values?.mobileNo1 || "—",
+        });
+      }
+    } catch {
+      /* skip corrupt */
+    }
+  }
+  return result.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Inline DraftTable (only rendered when drafts exist)
+// ─────────────────────────────────────────────────────────────────────────────
+function VendorDraftTable({ refreshKey, onContinue, onDelete }) {
+  const [drafts, setDrafts] = useState([]);
+
+  useEffect(() => {
+    setDrafts(getAllVendorDrafts());
+  }, [refreshKey]);
+
+  if (!drafts.length) return null; // ← hidden when no drafts
+
+  const handleDelete = (id) => {
+    deleteDraftFromStorage(id);
+    onDelete?.();
+    setDrafts(getAllVendorDrafts());
+  };
+
+  const columns = [
+    {
+      title: (
+        <span className="text-amber-700 font-semibold text-xs">
+          Supplier Name
+        </span>
+      ),
+      dataIndex: "name",
+      render: (t) => <span className="text-amber-800 font-medium">{t}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold text-xs">Email</span>
+      ),
+      dataIndex: "email",
+      render: (t) => <span className="text-amber-700 text-sm">{t}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold text-xs">Mobile</span>
+      ),
+      dataIndex: "mobile",
+      render: (t) => <span className="text-amber-700 text-sm">{t}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold text-xs">Last Saved</span>
+      ),
+      dataIndex: "savedAt",
+      render: (v) => (
+        <Tag
+          icon={<ClockCircleOutlined />}
+          color="gold"
+          className="text-xs font-normal"
+        >
+          {v ? dayjs(v).fromNow() : "—"}
+        </Tag>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold text-xs">Actions</span>
+      ),
+      render: (_, record) => (
+        <div className="flex gap-2">
+          <Button
+            size="small"
+            type="primary"
+            icon={<EditOutlined />}
+            className="bg-amber-500! hover:bg-amber-600! border-none! text-xs!"
+            onClick={() => onContinue(record.id)}
+          >
+            Continue
+          </Button>
+          <Popconfirm
+            title="Delete this draft?"
+            description="This action cannot be undone."
+            onConfirm={() => handleDelete(record.id)}
+            okText="Delete"
+            cancelText="Keep"
+            okButtonProps={{
+              danger: true,
+              className: "bg-red-500! border-none!",
+            }}
+          >
+            <Button
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              className="text-xs!"
+            >
+              Delete
+            </Button>
+          </Popconfirm>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="border border-amber-200 rounded-lg p-4 bg-white shadow-sm mb-4">
+      <div className="flex items-center gap-2 mb-2">
+        <FileTextOutlined className="text-amber-500 text-lg" />
+        <h2 className="text-base font-semibold text-amber-700 m-0">
+          Saved Drafts
+        </h2>
+        <Tag color="gold" className="ml-1">
+          {drafts.length}
+        </Tag>
+      </div>
+      <Text className="text-amber-500 text-xs block mb-3">
+        These forms were not submitted. Click <b>Continue</b> to resume editing.
+      </Text>
+      <Table
+        columns={columns}
+        dataSource={drafts}
+        rowKey="id"
+        size="small"
+        bordered
+        pagination={false}
+        rowClassName="hover:bg-amber-50"
+      />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main VendorTab
+// ─────────────────────────────────────────────────────────────────────────────
 export default function VendorTab() {
   const [data, setData] = useState([]);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState(false);
   const [selected, setSelected] = useState(null);
+
+  // location cascade
   const [selCountryIso, setSelCountryIso] = useState("IN");
   const [selStateName, setSelStateName] = useState(null);
   const [selStateIso, setSelStateIso] = useState(null);
+  const [corpStateName, setCorpStateName] = useState(null);
+  const [corpStateIso, setCorpStateIso] = useState(null);
+  // draft state
+  const [activeDraftId, setActiveDraftId] = useState(null);
+  const [draftSavedAt, setDraftSavedAt] = useState(null);
+  const [draftTableKey, setDraftTableKey] = useState(0);
+
+  const autosaveTimer = useRef(null);
   const [form] = Form.useForm();
 
-  /* ================= FETCH ================= */
-  const fetchVendors = async () => {
-    try {
-      const res = await getVendors();
-
-      const list = Array.isArray(res) ? res : res?.results || [];
-
-      setData(list);
-    } catch {
-      message.error("Failed to fetch vendors");
-    }
-  };
-
-  useEffect(() => {
-    fetchVendors();
-  }, []);
+  // ── helpers ──────────────────────────────────────────────────────────────
   const fileFromUrl = (url) => {
     if (!url) return [];
-
-    // if backend already returns full URL → use it
     const finalUrl = url.startsWith("http") ? url : `${API_BASE_URL}${url}`;
-
     return [
       {
         uid: finalUrl,
@@ -106,7 +407,8 @@ export default function VendorTab() {
       },
     ];
   };
-  // handler for rendering the city state and district
+
+  // ── location handlers ─────────────────────────────────────────────────────
   const handleCountryChange = (isoCode, option) => {
     setSelCountryIso(isoCode);
     setSelStateName(null);
@@ -129,18 +431,158 @@ export default function VendorTab() {
     });
   };
 
-  const handleDistrictChange = () => {
-    form.setFieldsValue({ city: undefined });
+  const handleDistrictChange = () => form.setFieldsValue({ city: undefined });
+
+  // ── fetch ─────────────────────────────────────────────────────────────────
+  const fetchVendors = async () => {
+    try {
+      const res = await getVendors();
+      setData(Array.isArray(res) ? res : res?.results || []);
+    } catch {
+      message.error("Failed to fetch vendors");
+    }
   };
 
-  /* ================= MAP API → FORM ================= */
+  useEffect(() => {
+    fetchVendors();
+  }, []);
+
+  // ── DRAFT: auto-save ──────────────────────────────────────────────────────
+  const handleFormValuesChange = useCallback(() => {
+    if (selected || viewMode) return;
+
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+
+    autosaveTimer.current = setTimeout(() => {
+      const values = form.getFieldsValue(true);
+      const meta = {
+        name: values.name,
+        email: values.email1,
+        mobile: values.mobileNo1,
+      };
+
+      setActiveDraftId((prevId) => {
+        const id = prevId || createNewDraft(values, meta);
+        if (!prevId) {
+          // id was just created inside createNewDraft — save again to be sure
+          saveDraftToStorage(id, values, meta);
+          setDraftSavedAt(new Date());
+          setDraftTableKey((k) => k + 1);
+          return id;
+        }
+        saveDraftToStorage(id, values, meta);
+        setDraftSavedAt(new Date());
+        setDraftTableKey((k) => k + 1);
+        return id;
+      });
+    }, AUTOSAVE_MS);
+  }, [form, selected, viewMode]);
+
+  // ── DRAFT: manual save ────────────────────────────────────────────────────
+  const handleManualSave = () => {
+    if (selected || viewMode) return;
+    const values = form.getFieldsValue(true);
+    const meta = {
+      name: values.name,
+      email: values.email1,
+      mobile: values.mobileNo1,
+    };
+    setActiveDraftId((prevId) => {
+      const id = prevId || createNewDraft(values, meta);
+      saveDraftToStorage(id, values, meta);
+      setDraftSavedAt(new Date());
+      setDraftTableKey((k) => k + 1);
+      message.success("Draft saved");
+      return id;
+    });
+  };
+
+  // ── DRAFT: continue (restore into form) ──────────────────────────────────
+  const handleContinueDraft = (draftId) => {
+    const draft = loadDraftFromStorage(draftId);
+    if (!draft) {
+      message.error("Draft not found");
+      return;
+    }
+
+    const restored = deserialiseVendorDraft(draft.values);
+    form.resetFields();
+    form.setFieldsValue(restored);
+
+    // restore top-level location cascade
+    if (restored.country) {
+      const iso = getCountryIsoByName(restored.country) || "IN";
+      setSelCountryIso(iso);
+    }
+    if (restored.state) {
+      const countryIso = getCountryIsoByName(restored.country) || "IN";
+      const stateIso = getStateIsoByName(countryIso, restored.state);
+      setSelStateName(restored.state);
+      setSelStateIso(stateIso);
+    }
+
+    // Check for uploaded files and show warning
+    const hasFiles = Object.keys(restored).some((key) => {
+      const value = restored[key];
+      return Array.isArray(value) && value.length > 0 && value[0]?._fromDraft;
+    });
+
+    // Also check nested plants for files
+    const hasPlantFiles =
+      Array.isArray(restored.plants) &&
+      restored.plants.some((plant) => {
+        if (!plant) return false;
+        return Object.keys(plant).some((key) => {
+          const value = plant[key];
+          return (
+            Array.isArray(value) && value.length > 0 && value[0]?._fromDraft
+          );
+        });
+      });
+
+    if (hasFiles || hasPlantFiles) {
+      message.warning(
+        "Draft restored! Please re-upload any documents as they are not saved in drafts.",
+        5,
+      );
+    }
+
+    setActiveDraftId(draftId);
+    setDraftSavedAt(draft.savedAt ? new Date(draft.savedAt) : null);
+    setSelected(null);
+    setViewMode(false);
+    setOpen(true);
+  };
+
+  // ── DRAFT: discard on submit ──────────────────────────────────────────────
+  const discardActiveDraft = () => {
+    if (!activeDraftId) return;
+    deleteDraftFromStorage(activeDraftId);
+    setActiveDraftId(null);
+    setDraftSavedAt(null);
+    setDraftTableKey((k) => k + 1);
+  };
+
+  // ── close modal ───────────────────────────────────────────────────────────
+  const closeModal = () => {
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    setOpen(false);
+    form.resetFields();
+    setSelCountryIso("IN");
+    setSelStateName(null);
+    setSelStateIso(null);
+    setSelected(null);
+    // draft stays in localStorage until submitted
+  };
+
+  // ── MAP API → FORM ────────────────────────────────────────────────────────
   const mapDetailsToForm = (d) => ({
     name: d.name || d.company_name,
     shortName: d.short_name,
     companyType: d.company_type,
     mobileNo1: d.mobile_no_1,
     mobileNo2: d.mobile_no_2,
-    phoneNumber: d.phone_number,
+    phoneNumber: d.phone_number || d.mobile_no_1,
     whatsappNo: d.whatsapp_number,
     email1: d.email_address || d.primary_email,
     email2: d.secondary_email,
@@ -155,12 +597,10 @@ export default function VendorTab() {
     contactMobile:
       d.contact_person_input?.contact_person_no ||
       d.contact_person_input?.mobile_no ||
-      d.contact_person_no ||
       d.mobile_no_1,
     contactWhatsapp:
       d.contact_person_input?.contact_person_whats_no ||
       d.contact_person_input?.whatsapp_no ||
-      d.whatsapp_no ||
       d.whatsapp_number,
     contactEmail:
       d.contact_person_input?.contact_person_email ||
@@ -170,11 +610,8 @@ export default function VendorTab() {
     aadharNo:
       d.contact_person_input?.aadhaar_no ||
       d.contact_person_input?.aadhar_no ||
-      d.contact_person_input?.aadharNo ||
-      d.contact_person_input?.adhara_no ||
       d.aadhar_no ||
-      d.aadhaar_no ||
-      d.adhara_no,
+      d.aadhaar_no,
 
     tinNo: d.business_details?.tin_no,
     tinDate: d.business_details?.tin_date
@@ -199,13 +636,11 @@ export default function VendorTab() {
     status: (
       d.is_active !== undefined
         ? d.is_active
-        : d.addresses?.[0]?.status === "Active" ||
-          d.addresses?.status === "Active"
+        : d.addresses?.[0]?.status === "Active"
     )
       ? "Active"
       : "Inactive",
 
-    // ✅ FILE PREVIEW
     panDoc: fileFromUrl(d.pan_document || d.business_details?.pan_document),
     gstDoc: fileFromUrl(d.gstin_document || d.business_details?.gstin_document),
     tinDoc: fileFromUrl(d.tin_document || d.business_details?.tin_document),
@@ -214,7 +649,19 @@ export default function VendorTab() {
         d.aadhar_document ||
         d.business_details?.aadhaar_documents,
     ),
-
+    corporateAddress: d.corporate_addresses?.[0]
+      ? {
+          name: d.corporate_addresses[0].name,
+          address: d.corporate_addresses[0].address,
+          phoneNo: d.corporate_addresses[0].phone_number,
+          email: d.corporate_addresses[0].email_address,
+          country: d.corporate_addresses[0].country,
+          state: d.corporate_addresses[0].state,
+          district: d.corporate_addresses[0].district,
+          city: d.corporate_addresses[0].city,
+          pin: d.corporate_addresses[0].pin,
+        }
+      : {},
     plants: (d.plants || []).map((p) => ({
       plantName: p.name || p.plant_name,
       address: p.address,
@@ -226,25 +673,46 @@ export default function VendorTab() {
       city: p.city,
       pin: p.pin,
       faxNo: p.fax_no,
+      // stateIso is needed for city dropdown — derive it when mapping
+      stateIso: p.state
+        ? getStateIsoByName(
+            getCountryIsoByName(p.country || "India") || "IN",
+            p.state,
+          )
+        : null,
     })),
   });
 
   const openVendor = async (record, view = false) => {
     try {
       const details = await getVendorDetailsByid(record.id);
+      const mapped = mapDetailsToForm(details);
+      form.setFieldsValue(mapped);
 
-      form.setFieldsValue(mapDetailsToForm(details));
+      // restore top-level location cascade for edit/view
+      if (mapped.country) {
+        const iso = getCountryIsoByName(mapped.country) || "IN";
+        setSelCountryIso(iso);
+      }
+      if (mapped.state) {
+        const countryIso = getCountryIsoByName(mapped.country) || "IN";
+        const stateIso = getStateIsoByName(countryIso, mapped.state);
+        setSelStateName(mapped.state);
+        setSelStateIso(stateIso);
+      }
+
       setSelected(details);
       setViewMode(view);
+      setActiveDraftId(null);
       setOpen(true);
     } catch {
       message.error("Failed to load vendor");
     }
   };
-  // payload for create and update the vendor
+
+  // ── build FormData payload ────────────────────────────────────────────────
   const buildFormData = (values) => {
     const fd = new FormData();
-
     const payload = {
       name: values.name,
       short_name: values.shortName,
@@ -268,7 +736,6 @@ export default function VendorTab() {
         contact_person_email: values.contactEmail,
         aadhaar_no: values.aadharNo,
       },
-
       addresses: [
         {
           address_line1: values.address1,
@@ -282,7 +749,21 @@ export default function VendorTab() {
           transaction_type: values.transactionType,
         },
       ],
-
+      corporate_addresses: values.corporateAddress
+        ? [
+            {
+              name: values.corporateAddress.name,
+              address: values.corporateAddress.address,
+              phone_number: values.corporateAddress.phoneNo?.toString(),
+              email_address: values.corporateAddress.email,
+              country: values.corporateAddress.country,
+              state: values.corporateAddress.state,
+              district: values.corporateAddress.district,
+              city: values.corporateAddress.city,
+              pin: values.corporateAddress.pin?.toString(),
+            },
+          ]
+        : [],
       plants: (values.plants || []).map((p) => ({
         name: p.plantName,
         address: p.address,
@@ -295,7 +776,6 @@ export default function VendorTab() {
         phone_number: p.phoneNo?.toString(),
         email_address: p.email,
       })),
-
       business_details: {
         pan: values.panNo,
         gstin: values.gstIn,
@@ -308,15 +788,12 @@ export default function VendorTab() {
       },
     };
 
-    // ✅ JSON inside form-data
     fd.append("data", JSON.stringify(payload));
 
     const appendFile = (key, fileList) => {
-      if (fileList?.[0]?.originFileObj) {
+      if (fileList?.[0]?.originFileObj)
         fd.append(key, fileList[0].originFileObj);
-      }
     };
-
     appendFile("pan_document", values.panDoc);
     appendFile("gstin_document", values.gstDoc);
     appendFile("tin_document", values.tinDoc);
@@ -325,19 +802,18 @@ export default function VendorTab() {
     return fd;
   };
 
-  /* ================= SAVE ================= */
+  // ── submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (values) => {
     try {
       const formData = buildFormData(values);
-
       if (selected) {
         await updateVendor(selected.id, formData);
         message.success("Vendor Updated");
       } else {
         await createVendor(formData);
         message.success("Vendor Created");
+        discardActiveDraft(); // ✅ delete draft on successful submit
       }
-
       setOpen(false);
       form.resetFields();
       fetchVendors();
@@ -347,59 +823,48 @@ export default function VendorTab() {
     }
   };
 
-  const getFilteredData = () => {
+  // ── filter / search ───────────────────────────────────────────────────────
+  const filteredData = (() => {
     if (!search) return data;
-
     const value = search.toLowerCase();
+    return data.filter((item) =>
+      Object.values(item).some(
+        (val) => val && JSON.stringify(val).toLowerCase().includes(value),
+      ),
+    );
+  })();
 
-    return data.filter((item) => {
-      return Object.values(item).some((val) => {
-        if (!val) return false;
-
-        // convert everything safely to string
-        return JSON.stringify(val).toLowerCase().includes(value);
-      });
-    });
-  };
-
-  const handleReset = () => {
-    setSearch("");
-  };
-  /* ================= TABLE ================= */
+  // ── TABLE COLUMNS ─────────────────────────────────────────────────────────
   const columns = [
     {
       title: <span className="text-amber-700 font-semibold">Company Name</span>,
-      render: (_, record) => (
-        <span className="text-amber-800">
-          {record.name || record.company_name}
-        </span>
+      render: (_, r) => (
+        <span className="text-amber-800">{r.name || r.company_name}</span>
       ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Short Name</span>,
       dataIndex: "short_name",
-      render: (text) => <span className="text-amber-800">{text}</span>,
+      render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Mobile</span>,
       dataIndex: "mobile_no_1",
-      render: (text) => <span className="text-amber-800">{text}</span>,
+      render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Email</span>,
-      render: (_, record) => (
+      render: (_, r) => (
         <span className="text-amber-800">
-          {record.email_address || record.primary_email}
+          {r.email_address || r.primary_email}
         </span>
       ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
-      render: (_, record) => (
+      render: (_, r) => (
         <span className="text-amber-800">
-          {record.is_active ||
-          record.addresses?.[0]?.status === "Active" ||
-          record.addresses?.status === "Active"
+          {r.is_active || r.addresses?.[0]?.status === "Active"
             ? "Active"
             : "Inactive"}
         </span>
@@ -422,13 +887,11 @@ export default function VendorTab() {
     },
   ];
 
-  const filteredData = getFilteredData();
-  /* ================= UI ================= */
+  // ── RENDER ────────────────────────────────────────────────────────────────
   return (
     <>
       {/* ===== TOP BAR ===== */}
       <div className="flex justify-between items-center mb-3">
-        {/* Left: Search + Reset */}
         <div className="flex gap-2 items-center">
           <Input
             prefix={<SearchOutlined className="text-amber-500" />}
@@ -440,14 +903,12 @@ export default function VendorTab() {
           />
           <Button
             icon={<ReloadOutlined />}
-            onClick={handleReset}
+            onClick={() => setSearch("")}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Reset
           </Button>
         </div>
-
-        {/* Right: Add Vendor */}
         <Button
           type="primary"
           icon={<PlusOutlined />}
@@ -455,6 +916,8 @@ export default function VendorTab() {
           onClick={() => {
             setSelected(null);
             setViewMode(false);
+            setActiveDraftId(null);
+            setDraftSavedAt(null);
             form.resetFields();
             setOpen(true);
           }}
@@ -462,8 +925,13 @@ export default function VendorTab() {
           Add Supplier
         </Button>
       </div>
-
-      {/* ===== TABLE CONTAINER ===== */}
+      {/* ===== DRAFT TABLE (only renders when drafts exist) ===== */}
+      <VendorDraftTable
+        refreshKey={draftTableKey}
+        onContinue={handleContinueDraft}
+        onDelete={() => setDraftTableKey((k) => k + 1)}
+      />
+      {/* ===== SUPPLIER TABLE ===== */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
           Supplier Records
@@ -485,18 +953,55 @@ export default function VendorTab() {
         open={open}
         footer={null}
         width={1200}
-        onCancel={() => {
-          setOpen(false);
-          form.resetFields();
-        }}
+        onCancel={closeModal}
         title={
-          <span className="text-amber-700 font-semibold text-lg">
-            {viewMode
-              ? "View Supplier"
-              : selected
-                ? "Edit Supplier"
-                : "Add Supplier"}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-amber-700 font-semibold text-lg">
+              {viewMode
+                ? "View Supplier"
+                : selected
+                  ? "Edit Supplier"
+                  : "Add Supplier"}
+            </span>
+
+            {/* Draft indicator — only for new-supplier forms */}
+            {!selected && !viewMode && (
+              <div className="flex items-center gap-2 ml-2">
+                {activeDraftId ? (
+                  <Tooltip
+                    title={
+                      draftSavedAt
+                        ? `Last auto-saved at ${dayjs(draftSavedAt).format("HH:mm:ss")}`
+                        : "Draft saved"
+                    }
+                  >
+                    <Tag
+                      color="gold"
+                      icon={<SaveOutlined />}
+                      className="cursor-default select-none"
+                    >
+                      Draft saved
+                    </Tag>
+                  </Tooltip>
+                ) : (
+                  <Tag
+                    color="default"
+                    className="cursor-default select-none text-xs"
+                  >
+                    Not saved yet
+                  </Tag>
+                )}
+                <Button
+                  size="small"
+                  icon={<SaveOutlined />}
+                  className="border-amber-400! text-amber-700! hover:bg-amber-100! text-xs!"
+                  onClick={handleManualSave}
+                >
+                  Save Draft
+                </Button>
+              </div>
+            )}
+          </div>
         }
         styles={{
           body: { maxHeight: "75vh", overflowY: "auto", paddingRight: 8 },
@@ -506,13 +1011,14 @@ export default function VendorTab() {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
+          onValuesChange={handleFormValuesChange}
           initialValues={{
             status: "Active",
             igstApplicable: "No",
             companyType: "Supplier",
           }}
         >
-          {/* ================= Vendor / Company Details ================= */}
+          {/* ================= Supplier Details ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">
             <h3 className="text-lg font-semibold text-amber-700 mb-3">
               Supplier Details
@@ -533,7 +1039,6 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item
                   label="Short Name"
@@ -547,10 +1052,9 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item
-                  label="Mobile No 1"
+                  label="Mobile No"
                   name="mobileNo1"
                   rules={[
                     { required: true, message: "Mobile number is required" },
@@ -561,32 +1065,25 @@ export default function VendorTab() {
                     className={inputClass}
                     disabled={viewMode}
                     placeholder="+917833242424"
-                    maxLength={16} // + + 15 digits
+                    maxLength={16}
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item
-                  label="Mobile No 2"
+                  label="Phone No"
                   name="mobileNo2"
-                  rules={[
-                    {
-                      message: "Enter a valid 10-digit mobile number",
-                    },
-                    { validator: phoneValidator },
-                  ]}
+                  rules={[{ validator: phoneValidator }]}
                 >
                   <Input
                     className={inputClass}
                     disabled={viewMode}
                     placeholder="7984568331"
-                    style={{ width: "100%" }}
                     maxLength={16}
+                    style={{ width: "100%" }}
                   />
                 </Form.Item>
               </Col>
-
               <Col span={6}>
                 <Form.Item
                   label="Primary Email"
@@ -606,7 +1103,6 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={6}>
                 <Form.Item
                   label="Secondary Email"
@@ -625,7 +1121,6 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item
                   label="WhatsApp No"
@@ -641,7 +1136,6 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item
                   label="Social Link"
@@ -655,7 +1149,6 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={6}>
                 <Form.Item
                   label="Company Website"
@@ -709,7 +1202,6 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item
                   label="Mobile No"
@@ -725,7 +1217,6 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item
                   label="WhatsApp No"
@@ -741,7 +1232,6 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item label="Gender" name="gender">
                   <Select
@@ -755,7 +1245,6 @@ export default function VendorTab() {
                   </Select>
                 </Form.Item>
               </Col>
-
               <Col span={6}>
                 <Form.Item
                   label="Email"
@@ -775,40 +1264,6 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
-              {/* <Col span={6}>
-                <Form.Item label="Aadhar No" name="aadharNo">
-                  <Input
-                    className={inputClass}
-                    disabled={viewMode}
-                    placeholder="123456789012"
-                    maxLength={14}
-                  />
-                </Form.Item>
-              </Col> */}
-
-              {/* <Col span={6}>
-                
-                <Form.Item
-                  name="aadharDoc"
-                  label="Aadhar Document"
-                  valuePropName="fileList"
-                  getValueFromEvent={(e) => e?.fileList}
-                >
-                  <Upload
-                    beforeUpload={() => false}
-                    maxCount={1}
-                    listType="picture"
-                    onPreview={(file) => {
-                      window.open(
-                        file.url || URL.createObjectURL(file.originFileObj),
-                      );
-                    }}
-                  >
-                    <Button disabled={viewMode}>Select File</Button>
-                  </Upload>
-                </Form.Item>
-              </Col> */}
             </Row>
           </Card>
 
@@ -827,9 +1282,7 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
-                {/* <Form.Item label="GSTIN Document" name="gstDoc"> */}
                 <Form.Item
                   name="gstDoc"
                   label="GSTIN Document"
@@ -841,11 +1294,11 @@ export default function VendorTab() {
                     maxCount={1}
                     style={{ width: "100%" }}
                     listType="picture"
-                    onPreview={(file) => {
+                    onPreview={(file) =>
                       window.open(
                         file.url || URL.createObjectURL(file.originFileObj),
-                      );
-                    }}
+                      )
+                    }
                   >
                     <Button
                       disabled={viewMode}
@@ -866,7 +1319,6 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item
                   name="panDoc"
@@ -879,11 +1331,11 @@ export default function VendorTab() {
                     maxCount={1}
                     style={{ width: "100%" }}
                     listType="picture"
-                    onPreview={(file) => {
+                    onPreview={(file) =>
                       window.open(
                         file.url || URL.createObjectURL(file.originFileObj),
-                      );
-                    }}
+                      )
+                    }
                   >
                     <Button
                       disabled={viewMode}
@@ -913,15 +1365,7 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
-              {/* <Col span={4}>
-                <Form.Item label="TIN Date" name="tinDate">
-                  <DatePicker className="w-full h-10" disabled={viewMode} />
-                </Form.Item>
-              </Col> */}
-
               <Col span={4}>
-                {/* <Form.Item label="TIN Document" name="tinDoc"> */}
                 <Form.Item
                   name="tinDoc"
                   label="TIN Document"
@@ -933,11 +1377,11 @@ export default function VendorTab() {
                     maxCount={1}
                     style={{ width: "100%" }}
                     listType="picture"
-                    onPreview={(file) => {
+                    onPreview={(file) =>
                       window.open(
                         file.url || URL.createObjectURL(file.originFileObj),
-                      );
-                    }}
+                      )
+                    }
                   >
                     <Button
                       disabled={viewMode}
@@ -949,7 +1393,6 @@ export default function VendorTab() {
                   </Upload>
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item label="FSSAI No" name="fssaiNo">
                   <Input
@@ -959,18 +1402,6 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-              {/* <Col span={4}>
-                <Form.Item label="IGST Applicable" name="igstApplicable">
-                  <Select
-                    className={selectClass}
-                    disabled={viewMode}
-                    placeholder="Select"
-                  >
-                    <Option value="Yes">Yes</Option>
-                    <Option value="No">No</Option>
-                  </Select>
-                </Form.Item>
-              </Col> */}
             </Row>
           </Card>
 
@@ -995,7 +1426,6 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={6}>
                 <Form.Item label="Address Line 2" name="address2">
                   <Input
@@ -1018,18 +1448,7 @@ export default function VendorTab() {
                     showSearch
                     optionFilterProp="label"
                     options={getCountryOptions()}
-                    onChange={(isoCode, option) => {
-                      setSelCountryIso(isoCode);
-                      setSelStateName(null);
-                      setSelStateIso(null);
-
-                      form.setFieldsValue({
-                        country: option.label,
-                        state: undefined,
-                        district: undefined,
-                        city: undefined,
-                      });
-                    }}
+                    onChange={handleCountryChange}
                   />
                 </Form.Item>
               </Col>
@@ -1046,7 +1465,7 @@ export default function VendorTab() {
                     showSearch
                     optionFilterProp="label"
                     value={selStateIso}
-                    options={getStateOptions("IN")}
+                    options={getStateOptions(selCountryIso || "IN")}
                     onChange={handleStateChange}
                   />
                 </Form.Item>
@@ -1068,7 +1487,6 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item
                   label="City"
@@ -1081,17 +1499,12 @@ export default function VendorTab() {
                     placeholder="Select city"
                     showSearch
                     optionFilterProp="label"
-                    options={getCityOptions("IN", selStateIso)}
+                    options={getCityOptions(selCountryIso || "IN", selStateIso)}
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
-                <Form.Item
-                  label="Google Location"
-                  name="location"
-                  // rules={[{ required: true }]}
-                >
+                <Form.Item label="Google Location" name="location">
                   <Input
                     className={inputClass}
                     disabled={viewMode}
@@ -1099,7 +1512,6 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item
                   label="Pin Code"
@@ -1119,7 +1531,6 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
                 <Form.Item label="Status" name="status">
                   <Select
@@ -1132,7 +1543,6 @@ export default function VendorTab() {
                   </Select>
                 </Form.Item>
               </Col>
-
               <Col span={6}>
                 <Form.Item label="Type of Transaction" name="transactionType">
                   <Select
@@ -1147,8 +1557,140 @@ export default function VendorTab() {
               </Col>
             </Row>
           </Card>
+          {/* ================= Corporate Address (Single) ================= */}
+          <Card className="mb-4 border border-amber-200 rounded-lg">
+            <h3 className="text-lg font-semibold text-amber-700 mb-3">
+              Corporate Address
+            </h3>
 
-          {/* ================= Plant Details (Dynamic) ================= */}
+            <Row gutter={24}>
+              <Col span={6}>
+                <Form.Item
+                  name={["corporateAddress", "name"]}
+                  label="Corporate Name"
+                >
+                  <Input placeholder="Enter Name" />
+                </Form.Item>
+              </Col>
+
+              <Col span={6}>
+                <Form.Item
+                  name={["corporateAddress", "address"]}
+                  label="Address"
+                >
+                  <Input placeholder="Enter Address" />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item
+                  name={["corporateAddress", "phoneNo"]}
+                  label="Phone No"
+                >
+                  <InputNumber style={{ width: "100%" }} />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item name={["corporateAddress", "email"]} label="Email">
+                  <Input />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item
+                  name={["corporateAddress", "country"]}
+                  label="Country"
+                  initialValue="India"
+                >
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    options={getCountryOptions()}
+                    onChange={(iso, option) => {
+                      form.setFieldsValue({
+                        corporateAddress: {
+                          country: option.label,
+                          state: undefined,
+                          district: undefined,
+                          city: undefined,
+                        },
+                      });
+
+                      setCorpStateName(null);
+                      setCorpStateIso(null);
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item name={["corporateAddress", "state"]} label="State">
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select State"
+                    options={getStateOptions("IN")}
+                    onChange={(iso, option) => {
+                      setCorpStateName(option.label);
+                      setCorpStateIso(iso);
+
+                      form.setFieldsValue({
+                        corporateAddress: {
+                          ...form.getFieldValue("corporateAddress"),
+                          state: option.label,
+                          district: undefined,
+                          city: undefined,
+                        },
+                      });
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item
+                  name={["corporateAddress", "district"]}
+                  label="District"
+                >
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select District"
+                    options={getDistrictOptions(corpStateName)}
+                    disabled={!corpStateName}
+                    onChange={() => {
+                      form.setFieldsValue({
+                        corporateAddress: {
+                          ...form.getFieldValue("corporateAddress"),
+                          city: undefined,
+                        },
+                      });
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item name={["corporateAddress", "city"]} label="City">
+                  <Select
+                    options={getCityOptions("IN", corpStateIso)}
+                    disabled={!corpStateIso}
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select City"
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item name={["corporateAddress", "pin"]} label="Pin">
+                  <InputNumber style={{ width: "100%" }} />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+          {/* ================= Company Group ================= */}
           <h3 className="text-lg font-semibold text-amber-700 mt-4 mb-2">
             Company Group name
           </h3>
@@ -1165,6 +1707,8 @@ export default function VendorTab() {
               </Col>
             </Row>
           </Card>
+
+          {/* ================= Plant Details (Dynamic) ================= */}
           <div className="max-h-60 overflow-y-auto pr-2 mb-4">
             <Form.List name="plants">
               {(fields, { add, remove }) => (
@@ -1203,7 +1747,6 @@ export default function VendorTab() {
                             />
                           </Form.Item>
                         </Col>
-
                         <Col span={6}>
                           <Form.Item
                             {...restField}
@@ -1216,7 +1759,6 @@ export default function VendorTab() {
                             />
                           </Form.Item>
                         </Col>
-
                         <Col span={4}>
                           <Form.Item
                             {...restField}
@@ -1227,7 +1769,6 @@ export default function VendorTab() {
                                 required: true,
                                 message: "Mobile number is required",
                               },
-
                               { validator: phoneValidator },
                             ]}
                           >
@@ -1238,7 +1779,6 @@ export default function VendorTab() {
                             />
                           </Form.Item>
                         </Col>
-
                         <Col span={4}>
                           <Form.Item
                             {...restField}
@@ -1272,6 +1812,7 @@ export default function VendorTab() {
                               showSearch
                               optionFilterProp="label"
                               options={getCountryOptions()}
+                              disabled={viewMode}
                               onChange={(isoCode, option) => {
                                 const plants =
                                   form.getFieldValue("plants") || [];
@@ -1285,7 +1826,6 @@ export default function VendorTab() {
                                 };
                                 form.setFieldsValue({ plants });
                               }}
-                              disabled={viewMode}
                             />
                           </Form.Item>
                         </Col>
@@ -1303,6 +1843,7 @@ export default function VendorTab() {
                               placeholder="Select State"
                               optionFilterProp="label"
                               options={getStateOptions("IN")}
+                              disabled={viewMode}
                               onChange={(isoCode, option) => {
                                 const plants =
                                   form.getFieldValue("plants") || [];
@@ -1315,11 +1856,9 @@ export default function VendorTab() {
                                 };
                                 form.setFieldsValue({ plants });
                               }}
-                              disabled={viewMode}
                             />
                           </Form.Item>
                         </Col>
-
                         <Col span={4}>
                           <Form.Item
                             {...restField}
@@ -1352,7 +1891,6 @@ export default function VendorTab() {
                             />
                           </Form.Item>
                         </Col>
-
                         <Col span={4}>
                           <Form.Item
                             {...restField}
@@ -1383,7 +1921,6 @@ export default function VendorTab() {
                             />
                           </Form.Item>
                         </Col>
-
                         <Col span={4}>
                           <Form.Item
                             {...restField}
@@ -1391,9 +1928,9 @@ export default function VendorTab() {
                             label="Pin"
                             rules={[
                               {
+                                required: true,
                                 pattern: /^[0-9]{6}$/,
                                 message: "Please enter a valid Pin Code",
-                                required: true,
                               },
                             ]}
                           >
@@ -1404,23 +1941,9 @@ export default function VendorTab() {
                             />
                           </Form.Item>
                         </Col>
-
-                        {/* <Col span={4}>
-                          <Form.Item
-                            {...restField}
-                            name={[name, "faxNo"]}
-                            label="Fax No"
-                          >
-                            <Input
-                              disabled={viewMode}
-                              placeholder="Enter Fax No"
-                            />
-                          </Form.Item>
-                        </Col> */}
                       </Row>
                     </Card>
                   ))}
-
                   {!viewMode && (
                     <Form.Item>
                       <Button
@@ -1442,14 +1965,7 @@ export default function VendorTab() {
           {/* ===== FOOTER ACTIONS ===== */}
           {!viewMode && (
             <div className="flex justify-end gap-2 pt-2">
-              <Button
-                onClick={() => {
-                  setOpen(false);
-                  form.resetFields();
-                }}
-              >
-                Cancel
-              </Button>
+              <Button onClick={closeModal}>Cancel</Button>
               <Button
                 htmlType="submit"
                 type="primary"

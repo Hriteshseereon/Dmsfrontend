@@ -14,34 +14,19 @@
  */
 
 import { Country, State, City } from "country-state-city";
-import districtJson from "ind-state-district/assets/district.json";
-import statesJson   from "ind-state-district/assets/states.json";
-
+// import districtJson from "ind-state-district/assets/district.json";
+// import statesJson   from "ind-state-district/assets/states.json";
+import { indiaLocations } from "./indiaLocation";
 // ─── raw data from ind-state-district ────────────────────────────────────────
-const ALL_ISD_DISTRICTS = districtJson.districts;   // [{ districtName, stateCode, districtCode }]
-const ALL_ISD_STATES    = statesJson.states;         // [{ stateName, stateCode, tin, isUT }]
 
-// ─── stateName → isdStateCode lookup ─────────────────────────────────────────
-const stateNameToIsdCode = {};
-ALL_ISD_STATES.forEach((s) => {
-  stateNameToIsdCode[s.stateName] = s.stateCode;
-});
 
 /**
  * Bridge for the 2 states whose names differ between packages.
  * Key   = name used by country-state-city
  * Value = stateCode used by ind-state-district
  */
-const NAME_BRIDGE = {
-  "Chhattisgarh": "CG",
-  "Dadra and Nagar Haveli and Daman and Diu": "DN",
-};
 
 // ─── internal: resolve isdCode from a state name (csc naming) ────────────────
-function resolveIsdCode(stateName) {
-  if (!stateName) return null;
-  return stateNameToIsdCode[stateName] ?? NAME_BRIDGE[stateName] ?? null;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PUBLIC API
@@ -84,11 +69,18 @@ export function getStateOptions(countryIsoCode) {
  * @param {string} stateName  e.g. "Odisha"
  */
 export function getDistrictOptions(stateName) {
-  const isdCode = resolveIsdCode(stateName);
-  if (!isdCode) return [];
-  return ALL_ISD_DISTRICTS
-    .filter((d) => d.stateCode === isdCode)
-    .map((d) => ({ value: d.districtName, label: d.districtName }));
+  if (!stateName) return [];
+
+  const stateData = indiaLocations.find(
+    (item) => item.state === stateName
+  );
+
+  if (!stateData) return [];
+
+  return stateData.districts.map((district) => ({
+    value: district,
+    label: district,
+  }));
 }
 
 /**

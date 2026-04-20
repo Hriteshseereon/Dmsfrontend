@@ -1,60 +1,102 @@
-import React from "react";
-import { Card, Form, Input, Avatar, Button, Row, Col } from "antd";
-import { UserOutlined, MailOutlined, TeamOutlined } from "@ant-design/icons";
+import React, { useEffect } from "react";
+import { Card, Form, Input, Avatar, Button, Row, Col, message } from "antd";
+import { UserOutlined } from "@ant-design/icons";
+import { getProfileData, updateProfileData } from "../api/dashboard";
+import useSessionStore from "../store/sessionStrore";
 
 export default function ProfileSettings() {
   const [form] = Form.useForm();
-
-  const user = {
-    registeredName: "John Administrator",
-    password: "John@123",
-    address1: "123 Main St",
-    address2: "Suite 101",
-    phone: "9876543210",
-    telephone: "0123456789",
-    fax: "0123-456789",
-    email: "john.admin@transportcorp.com",
-    contactPerson: "Jane Doe",
-    pan: "ABCDE1234F",
-    gstin: "22AAAAA0000A1Z5",
-    state: "Karnataka",
-    city: "Bangalore",
-    district: "Bangalore Urban",
-    pin: "560001",
-    name: "John Administrator",
-    role: "Operations Manager",
+  const setRegisteredName = useSessionStore((state) => state.setRegisteredName);
+  const phoneRule = {
+    pattern: /^\d{7,15}$/,
+    message: "Enter a valid number",
   };
 
-  const onFinish = (values) => {
-    const updatedProfileJSON = JSON.stringify(values, null, 2);
-    console.log("Updated Profile (JSON):", updatedProfileJSON);
-    alert("Updated Profile JSON:\n" + updatedProfileJSON);
+  const mapProfileToForm = (profile = {}) => ({
+    registeredName: profile.registered_name || "",
+    email: profile.email_id || "",
+    address1: profile.address_1 || "",
+    address2: profile.address_2 || "",
+    phone: profile.phone_number || "",
+    telephone: profile.telephone_number || "",
+    fax: profile.fax_no || "",
+    contactPerson: profile.contact_person_name || "",
+    pan: profile.pan || "",
+    gstin: profile.gstin || "",
+    state: profile.state || "",
+    city: profile.city || "",
+    district: profile.district || "",
+    pin: profile.pin || "",
+  });
+
+  const getProfilePayload = (values) => ({
+    registered_name: values.registeredName,
+    email_id: values.email,
+    address_1: values.address1,
+    address_2: values.address2,
+    phone_number: values.phone,
+    telephone_number: values.telephone,
+    fax_no: values.fax,
+    contact_person_name: values.contactPerson,
+    pan: values.pan,
+    gstin: values.gstin,
+    state: values.state,
+    city: values.city,
+    district: values.district,
+    pin: values.pin,
+  });
+
+  const fetchProfile = async () => {
+    try {
+      const response = await getProfileData();
+      setRegisteredName(response?.registered_name || null);
+      form.setFieldsValue(mapProfileToForm(response));
+    } catch (error) {
+      message.error("Failed to load profile");
+    }
   };
+
+  useEffect(() => {
+    fetchProfile();
+  }, [form]);
+
+  const onFinish = async (values) => {
+    try {
+      const response = await updateProfileData(getProfilePayload(values));
+      const updatedProfile = response?.profile || response;
+      setRegisteredName(updatedProfile?.registered_name || values.registeredName);
+      form.setFieldsValue(mapProfileToForm(updatedProfile));
+      message.success(response?.detail || "Profile updated successfully.");
+    } catch (error) {
+      message.error("Failed to update profile");
+    }
+  };
+
+  const registeredName = Form.useWatch("registeredName", form);
+  const email = Form.useWatch("email", form);
+  const initials =
+    registeredName
+      ?.split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase() || "U";
 
   return (
     <div>
-     
-
       <Card className="rounded-xl! shadow-sm! border! border-amber-200!">
-        {/* User Info */}
         <div className="flex items-center mb-6">
           <Avatar size={64} icon={<UserOutlined />} className="bg-amber-500!" />
           <div className="ml-4">
-            <h3 className="text-lg font-semibold text-amber-900">{user.name}</h3>
-            <p className="text-amber-700">{user.email}</p>
-            <span className="text-xs text-amber-700 bg-amber-100 px-2 py-1 rounded">
-              {user.role}
-            </span>
+            <h3 className="text-lg font-semibold text-amber-900">
+              {registeredName || initials}
+            </h3>
+            <p className="text-amber-700">{email}</p>
           </div>
         </div>
 
-        {/* Editable Form */}
-        <Form
-          form={form}
-          layout="vertical"
-          initialValues={user}
-          onFinish={onFinish}
-        >
+        <Form form={form} layout="vertical" onFinish={onFinish}>
           <Row gutter={16}>
             <Col span={6}>
               <Form.Item
@@ -81,13 +123,6 @@ export default function ProfileSettings() {
 </Form.Item>
 
             </Col>
-            <Col span={6}>
-             
-              <Form.Item label="Password" name="password" rules={[{ required: true, min: 6 ,message: "Please enter a valid 6-digit password" }]}>
-              <Input.Password placeholder="Enter password" />
-            </Form.Item>
-            </Col>
-
             <Col span={6}>
               <Form.Item
                 label="Address 1"
@@ -119,7 +154,7 @@ export default function ProfileSettings() {
                 name="phone"
                 rules={[
                   { required: true, message: "Please enter phone number" },
-                  { pattern: /^\d{10}$/, message: "Enter valid 10-digit phone number" },
+                  phoneRule,
                 ]}
               >
                 <Input placeholder="9876543210" />
@@ -132,7 +167,7 @@ export default function ProfileSettings() {
                 name="telephone"
                 rules={[
                   { required: false },
-                  { pattern: /^\d{10}$/, message: "Enter valid 10-digit telephone number" },
+                  phoneRule,
                 ]}
               >
                 <Input />
@@ -140,7 +175,14 @@ export default function ProfileSettings() {
             </Col>
 
             <Col span={6}>
-               <Form.Item label="Fax No" name="fax" rules={[{ required: true, message:"Please enter Fax No" }]}>
+               <Form.Item
+                label="Fax No"
+                name="fax"
+                rules={[
+                  { required: true, message: "Please enter Fax No" },
+                  phoneRule,
+                ]}
+              >
               <Input placeholder="033-87654321" />
             </Form.Item>
             </Col>
@@ -229,7 +271,7 @@ export default function ProfileSettings() {
 
           <div className="flex justify-end gap-3 mt-4">
             <Button
-              onClick={() => form.resetFields()}
+              onClick={fetchProfile}
               className="text-amber-800! border! border-amber-400! hover:bg-amber-100!"
             >
               Cancel
