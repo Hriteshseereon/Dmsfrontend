@@ -522,6 +522,20 @@ export default function SaleOrdersInvoice() {
       const d = dayjs(date);
       return d.isValid() ? d.format("YYYY-MM-DD") : null;
     };
+    const resolvedDeliveryDate =
+      values.deliveryDate ??
+      values.expected_receiving_date ??
+      values.expectedReceivingDate ??
+      values.delivery_date ??
+      null;
+
+    const resolvedDeliveryAddress =
+      values.deliveryAddress ??
+      values.address_line1 ??
+      values.address1 ??
+      values.address ??
+      "";
+
     return {
       customer_id: values.customer_id,
       status: values.status,
@@ -529,8 +543,8 @@ export default function SaleOrdersInvoice() {
       bill_mode: values.bill_mode,
       narration: values.narration || "",
       order_date: formatDate(values.orderDate),
-      expected_receiving_date: formatDate(values.deliveryDate),
-      delivery_address: values.deliveryAddress || "",
+      expected_receiving_date: formatDate(resolvedDeliveryDate),
+      delivery_address: resolvedDeliveryAddress,
       cash_discount: 0,
       cgst: Number(orderTaxAndTotals?.cgstPercent || 0),
       sgst: Number(orderTaxAndTotals?.sgstPercent || 0),
@@ -682,7 +696,8 @@ export default function SaleOrdersInvoice() {
         customer_id: order.customer?.customer_id,
         customerEmail: order.customer?.email_id,
         customerPhone: order.customer?.phone_number,
-        deliveryAddress: order.customer?.address_line1,
+        deliveryAddress:
+          order.customer?.address_line1 || order.customer?.address1 || "",
 
         bill_mode: order.bill_mode || "Cash",
         purchaseType: order.purchase_type,
@@ -814,7 +829,8 @@ export default function SaleOrdersInvoice() {
         customer_id: order.customer?.customer_id,
         customerEmail: order.customer?.email_id,
         customerPhone: order.customer?.phone_number,
-        deliveryAddress: order.customer?.address_line1,
+        deliveryAddress:
+          order.customer?.address_line1 || order.customer?.address1 || "",
 
         status: order.status,
         bill_mode: order.bill_mode || "Cash",
@@ -1477,14 +1493,9 @@ export default function SaleOrdersInvoice() {
               className="w-full"
               disabledDate={createFinancialYearDisabledDate(selectedFY)}
               disabled={disabled}
-              // onChange={(date, dateString) => {
-              //   console.log(
-              //     "DatePicker onChange:",
-              //     date,
-              //     dateString,
-              //     typeof date,
-              //   );
-              // }}
+              onChange={(date) => {
+                form.setFieldValue("deliveryDate", date || null);
+              }}
             />{" "}
           </Form.Item>
         </Col>
@@ -1514,7 +1525,11 @@ export default function SaleOrdersInvoice() {
                       selectedCustomer.phone_number ||
                       selectedCustomer.mobile_number,
 
-                    deliveryAddress: selectedCustomer.address,
+                    deliveryAddress:
+                      selectedCustomer.address_line1 ||
+                      selectedCustomer.address1 ||
+                      selectedCustomer.address ||
+                      "",
                   });
                 }
               }}
