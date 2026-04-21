@@ -1,4 +1,4 @@
- import React, { useState,useEffect } from "react";  
+ import React, { useState,useEffect, useRef } from "react";  
 import { exportToExcel } from "../../../../../utils/exportToExcel";
 import { getPurchaseOrder,getPurchaseContract ,getSoudaByContractId,addPurchaseOrder,getPurchaseOrderById,updatePurchaseOrder,getAllSalesOrder} from "../../../../../api/purchase";
 import {
@@ -23,6 +23,11 @@ import {
   DownloadOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import {
+  savePurchaseDraft,
+  deletePurchaseDraft,
+  getAllPurchaseDrafts,
+} from "../../../../../utils/purchaseDraftUtils";
 
 const { Option } = Select;
 
@@ -42,6 +47,10 @@ export default function PurchaseIndent() {
  const [contractItems, setContractItems] = useState([]);
 
   const [searchText, setSearchText] = useState("");
+ const [showDrafts, setShowDrafts] = useState(false);
+ const [drafts, setDrafts] = useState([]);
+ const [activeDraftId, setActiveDraftId] = useState(null);
+ const autoSaveTimeoutRef = useRef(null);
  const statusOptions = ["Pending", "Approved", "Rejected"];
   const [addForm] = Form.useForm();
   const [editForm] = Form.useForm();
@@ -49,8 +58,56 @@ export default function PurchaseIndent() {
   useEffect(() => {
   fetchPurchaseOrder();
   fetchSoudaNoOptions();
-   
+  loadDraftsList();
 }, []);
+
+useEffect(() => {
+  return () => {
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+  };
+}, []);
+
+const loadDraftsList = () => {
+  const allDrafts = getAllPurchaseDrafts("order");
+  setDrafts(allDrafts);
+};
+
+const handleManualSaveDraft = () => {
+  const values = addForm.getFieldsValue(true);
+  if (!values || Object.keys(values).length === 0) return;
+  const draftId = activeDraftId || `purchase-order-${Date.now()}`;
+  savePurchaseDraft(draftId, values, "order");
+  setActiveDraftId(draftId);
+  loadDraftsList();
+};
+
+const handleAutoSaveDraft = (allValues) => {
+  if (autoSaveTimeoutRef.current) {
+    clearTimeout(autoSaveTimeoutRef.current);
+  }
+  autoSaveTimeoutRef.current = setTimeout(() => {
+    const draftId = activeDraftId || `purchase-order-${Date.now()}`;
+    savePurchaseDraft(draftId, allValues, "order");
+    setActiveDraftId(draftId);
+  }, 1500);
+};
+
+const handleContinueDraft = (draft) => {
+  addForm.setFieldsValue(draft);
+  setActiveDraftId(draft.id);
+  setIsAddModalOpen(true);
+  setShowDrafts(false);
+};
+
+const handleDeleteDraft = (draftId) => {
+  deletePurchaseDraft(draftId, "order");
+  if (activeDraftId === draftId) {
+    setActiveDraftId(null);
+  }
+  loadDraftsList();
+};
 
 const fetchPurchaseOrder = async () => {
   try {
@@ -373,6 +430,11 @@ console.log("Purchase Order Payload:", payload);
       setIsEditModalOpen(false);
     } else {
       await addPurchaseOrder(payload);
+      if (activeDraftId) {
+        deletePurchaseDraft(activeDraftId, "order");
+        setActiveDraftId(null);
+        loadDraftsList();
+      }
       message.success("Purchase order created successfully");
       setIsAddModalOpen(false);
     }
@@ -1150,6 +1212,55 @@ addForm.setFieldsValue({ order_date: dayjs(), items: [{}] });    setIsAddModalOp
       </div>
 
       {/* Table */}
+      <div className="mb-4">
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="text-lg font-semibold text-amber-700">Purchase Order Drafts</h3>
+          <Button
+            type="primary"
+            onClick={() => setShowDrafts(!showDrafts)}
+            className="!bg-amber-500 !hover:bg-amber-600"
+          >
+            {showDrafts ? "Hide Drafts" : "Show Drafts"}
+          </Button>
+        </div>
+        {showDrafts && (
+          <div className="border border-amber-300 rounded-lg p-4 bg-white">
+            {drafts.length === 0 ? (
+              <p className="text-gray-500 text-center py-4">No drafts found</p>
+            ) : (
+              <div className="space-y-2">
+                {drafts.map((draft) => (
+                  <div
+                    key={draft.id}
+                    className="flex justify-between items-center p-3 border border-gray-200 rounded hover:bg-gray-50"
+                  >
+                    <div className="flex-1">
+                      <div className="font-medium">{draft.vendorName || "Purchase Order Draft"}</div>
+                      <div className="text-sm text-gray-500">
+                        {draft.savedAt ? new Date(draft.savedAt).toLocaleString() : "Unknown time"}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="small"
+                        type="primary"
+                        onClick={() => handleContinueDraft(draft)}
+                        className="bg-amber-500! hover:bg-amber-600!"
+                      >
+                        Continue
+                      </Button>
+                      <Button size="small" danger onClick={() => handleDeleteDraft(draft.id)}>
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
           Purchase Order Records
@@ -1169,12 +1280,20 @@ addForm.setFieldsValue({ order_date: dayjs(), items: [{}] });    setIsAddModalOp
       {/* Add Modal */}
       <Modal
         title={
-          <span className="text-amber-700 text-2xl font-semibold">
-            Add New Purchase Order
-          </span>
+          <div className="flex justify-between items-center">
+            <span className="text-amber-700 text-2xl font-semibold">
+              Add New Purchase Order {activeDraftId && <span className="text-sm text-blue-500">(Draft)</span>}
+            </span>
+            <Button size="small" onClick={handleManualSaveDraft} className="bg-green-500 hover:bg-green-600 text-white">
+              Save Draft
+            </Button>
+          </div>
         }
         open={isAddModalOpen}
-        onCancel={() => setIsAddModalOpen(false)}
+        onCancel={() => {
+          setActiveDraftId(null);
+          setIsAddModalOpen(false);
+        }}
         footer={null}
         width={1100}
       >
@@ -1182,6 +1301,11 @@ addForm.setFieldsValue({ order_date: dayjs(), items: [{}] });    setIsAddModalOp
           layout="vertical"
           form={addForm}
           onFinish={(vals) => handleFormSubmit(vals, "add")}
+          onValuesChange={(_changed, allValues) => {
+            if (isAddModalOpen) {
+              handleAutoSaveDraft(allValues || {});
+            }
+          }}
         >
           <Form.Item noStyle shouldUpdate>
             {() => renderFormFields(addForm, false)}
