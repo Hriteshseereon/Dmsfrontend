@@ -79,7 +79,7 @@ export default function SaleOrdersInvoice() {
     autoSaveTimeoutRef.current = setTimeout(() => {
       const values = form.getFieldsValue();
       if (values && Object.keys(values).length > 0) {
-        saveSalesDraft(draftId, values);
+        saveSalesDraft(draftId, values, "orders");
         setActiveDraftId(draftId);
       }
     }, 1500); // Auto-save after 1.5 seconds of inactivity
@@ -103,7 +103,17 @@ export default function SaleOrdersInvoice() {
   const handleContinueDraft = (draft) => {
     // Destructure out metadata fields before setting form values
     const { id, component, savedAt, ...formValues } = draft;
-    addForm.setFieldsValue(formValues); // ✅ Clean form values only
+    addForm.setFieldsValue({
+      ...formValues,
+      deliveryDate: formValues.deliveryDate
+        ? dayjs(formValues.deliveryDate)
+        : null,
+      deliveryAddress:
+        formValues.deliveryAddress ||
+        formValues.address_line1 ||
+        formValues.address ||
+        "",
+    }); // ✅ Clean form values only
     setActiveDraftId(draft.id);
     setIsAddModalOpen(true);
     setShowDrafts(false);
@@ -544,7 +554,7 @@ export default function SaleOrdersInvoice() {
       narration: values.narration || "",
       order_date: formatDate(values.orderDate),
       expected_receiving_date: formatDate(resolvedDeliveryDate),
-      delivery_address: resolvedDeliveryAddress,
+      delivery_address: values.deliveryAddress,
       cash_discount: 0,
       cgst: Number(orderTaxAndTotals?.cgstPercent || 0),
       sgst: Number(orderTaxAndTotals?.sgstPercent || 0),
@@ -696,9 +706,13 @@ export default function SaleOrdersInvoice() {
         customer_id: order.customer?.customer_id,
         customerEmail: order.customer?.email_id,
         customerPhone: order.customer?.phone_number,
+        // deliveryAddress:
+        //   order.customer?.address_line1 || order.customer?.address1 || "",
         deliveryAddress:
-          order.customer?.address_line1 || order.customer?.address1 || "",
-
+          order.delivery_address ||
+          order.customer?.address_line1 ||
+          order.customer?.address1 ||
+          "",
         bill_mode: order.bill_mode || "Cash",
         purchaseType: order.purchase_type,
         // NEW
@@ -829,9 +843,13 @@ export default function SaleOrdersInvoice() {
         customer_id: order.customer?.customer_id,
         customerEmail: order.customer?.email_id,
         customerPhone: order.customer?.phone_number,
+        // deliveryAddress:
+        //   order.customer?.address_line1 || order.customer?.address1 || "",
         deliveryAddress:
-          order.customer?.address_line1 || order.customer?.address1 || "",
-
+          order.delivery_address ||
+          order.customer?.address_line1 ||
+          order.customer?.address1 ||
+          "",
         status: order.status,
         bill_mode: order.bill_mode || "Cash",
         purchaseType: order.purchase_type,
@@ -1493,6 +1511,7 @@ export default function SaleOrdersInvoice() {
               className="w-full"
               disabledDate={createFinancialYearDisabledDate(selectedFY)}
               disabled={disabled}
+              value={form.getFieldValue("deliveryDate")}
               onChange={(date) => {
                 form.setFieldValue("deliveryDate", date || null);
               }}

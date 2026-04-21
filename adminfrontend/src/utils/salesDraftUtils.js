@@ -29,14 +29,21 @@ export const serializeSalesDraft = (values) => {
 
 // Deserialize draft values for form restoration
 export const deserializeSalesDraft = (draft) => {
+  const safeDayjs = (date) => {
+  if (!date) return null;
+  const d = dayjs(date);
+  return d.isValid() ? d : null;
+};
+
+  
   return {
     ...draft,
     // Restore dayjs objects for all components
-    soudaDate: draft.soudaDate ? dayjs(draft.soudaDate) : null,
-    startDate: draft.startDate ? dayjs(draft.startDate) : null,
-    endDate: draft.endDate ? dayjs(draft.endDate) : null,
-    orderDate: draft.orderDate ? dayjs(draft.orderDate) : null,
-    deliveryDate: draft.deliveryDate ? dayjs(draft.deliveryDate) : null,
+    deliveryDate: safeDayjs(draft.deliveryDate),
+    orderDate: safeDayjs(draft.orderDate),
+    startDate: safeDayjs(draft.startDate),
+    endDate: safeDayjs(draft.endDate),
+    soudaDate: safeDayjs(draft.soudaDate),
   };
 };
 
