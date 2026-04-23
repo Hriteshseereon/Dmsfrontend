@@ -5,9 +5,9 @@ export const getCurrentFinancialYear = () => {
   const month = today.getMonth(); // 0 = Jan, 3 = April
 
   if (month >= 3) {
-    return `${year}-${(year + 1).toString().slice(-2)}`;
+    return `${year}-${(year + 1)}`;
   } else {
-    return `${year - 1}-${year.toString().slice(-2)}`;
+    return `${year - 1}-${year}`;
   }
 };
 
@@ -18,7 +18,7 @@ export const getFinancialYearOptions = (count = 5) => {
 
   return Array.from({ length: count }, (_, i) => {
     const y = startYear - i;
-    return `${y}-${(y + 1).toString().slice(-2)}`;
+    return `${y}-${(y + 1)}`;
   });
 };
 

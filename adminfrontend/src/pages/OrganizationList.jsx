@@ -51,6 +51,12 @@ export default function OrganizationList() {
   };
 
   const handleOpen = (org) => {
+    const { selectedFY, setSelectedFY } = useSessionStore.getState();
+    if (!selectedFY) {
+      const defaultFY = getCurrentFinancialYear();
+      setSelectedFY(defaultFY);
+    }
+
     setCurrentOrgId(org.id);
     setOrgModules(org.modules_data || []);
     const firstModule = org.modules_data.find((m) => m.is_enabled)?.module;

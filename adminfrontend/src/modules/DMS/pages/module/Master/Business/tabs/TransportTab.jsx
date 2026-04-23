@@ -71,7 +71,6 @@ export const phoneValidator = (_, value) => {
 
 // ================= DRAFT SYSTEM =================
 const DRAFT_PREFIX = "transport-form-draft-";
-const AUTOSAVE_MS = 1500;
 
 // Serialise form values (date + upload)
 const serialiseDraft = (values) => {
@@ -200,33 +199,9 @@ export default function TransportTab() {
   const [activeDraftId, setActiveDraftId] = useState(null);
   const [draftSavedAt, setDraftSavedAt] = useState(null);
   const [draftTableKey, setDraftTableKey] = useState(0);
-  const autosaveTimer = useRef(null);
-  const handleFormValuesChange = () => {
-    if (selected || viewMode) return;
-
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-
-    autosaveTimer.current = setTimeout(() => {
-      const values = form.getFieldsValue(true);
-      const meta = {
-        agencyName: values.agencyName,
-        email: values.email,
-        mobileNo: values.mobileNo,
-      };
-
-      setActiveDraftId((prevId) => {
-        const id = prevId || createDraft(values, meta);
-        saveDraft(id, values, meta);
-        setDraftSavedAt(new Date());
-        setDraftTableKey((k) => k + 1);
-        return id;
-      });
-    }, AUTOSAVE_MS);
-  };
-
-  // Manual save draft function
-  const handleManualSave = () => {
-    if (selected || viewMode) return;
+  const draftTableRef = useRef(null);
+  const saveCurrentDraft = ({ showToast = false, closeAfterSave = false } = {}) => {
+    if (selected || viewMode || !open) return;
     const values = form.getFieldsValue(true);
     const meta = {
       agencyName: values.agencyName,
@@ -239,10 +214,48 @@ export default function TransportTab() {
       saveDraft(id, values, meta);
       setDraftSavedAt(new Date());
       setDraftTableKey((k) => k + 1);
-      message.success("Draft saved");
+
+      if (showToast) {
+        message.success("Draft saved");
+      }
+      if (closeAfterSave) {
+        setOpen(false);
+        form.resetFields();
+        setSelCountryIso(null);
+        setSelStateName(null);
+        setSelStateIso(null);
+        setSelected(null);
+        setViewMode(false);
+        setTimeout(() => {
+          draftTableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 0);
+      }
+
       return id;
     });
   };
+
+  // Manual save draft function
+  const handleManualSave = () => {
+    saveCurrentDraft({ showToast: true, closeAfterSave: true });
+  };
+
+  const closeModal = () => {
+    setOpen(false);
+    form.resetFields();
+    setSelected(null);
+    setViewMode(false);
+  };
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (!selected && !viewMode && open) {
+        saveCurrentDraft();
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [open, selected, viewMode]);
   /* ================= FETCH ================= */
   const fetchTransporters = async () => {
     try {
@@ -479,6 +492,7 @@ export default function TransportTab() {
               setSelStateIso(stateIso);
               setSelected(details);
               setViewMode(true);
+              setActiveDraftId(null);
               setOpen(true);
             }}
           />
@@ -497,6 +511,7 @@ export default function TransportTab() {
               setSelStateIso(stateIso);
               setSelected(details);
               setViewMode(false);
+              setActiveDraftId(null);
               setOpen(true);
             }}
           />
@@ -720,6 +735,8 @@ export default function TransportTab() {
             const randomPassword = generatePassword();
             setSelected(null);
             setViewMode(false);
+            setActiveDraftId(null);
+            setDraftSavedAt(null);
             form.resetFields();
 
             const countryIso = getCountryIsoByName("India");
@@ -738,7 +755,13 @@ export default function TransportTab() {
         </Button>
       </div>
       {/* draft table */}
-      <DraftTable refreshKey={draftTableKey} onContinue={handleContinueDraft} />
+      <div ref={draftTableRef}>
+        <DraftTable
+          refreshKey={draftTableKey}
+          onContinue={handleContinueDraft}
+          onDelete={() => setDraftTableKey((k) => k + 1)}
+        />
+      </div>
       {/* ===== TABLE CONTAINER ===== */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
@@ -761,10 +784,7 @@ export default function TransportTab() {
         open={open}
         footer={null}
         width={1200}
-        onCancel={() => {
-          setOpen(false);
-          form.resetFields();
-        }}
+        onCancel={closeModal}
         title={
           <div className="flex items-center gap-3">
             <span className="text-amber-700 font-semibold text-lg">
@@ -816,7 +836,6 @@ export default function TransportTab() {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          onValuesChange={handleFormValuesChange}
         >
           {/* ================= Transporter / Agency Details ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">
@@ -1201,10 +1220,7 @@ export default function TransportTab() {
           {!viewMode && (
             <div className="flex justify-end gap-2 pt-2">
               <Button
-                onClick={() => {
-                  setOpen(false);
-                  form.resetFields();
-                }}
+                onClick={closeModal}
               >
                 Cancel
               </Button>

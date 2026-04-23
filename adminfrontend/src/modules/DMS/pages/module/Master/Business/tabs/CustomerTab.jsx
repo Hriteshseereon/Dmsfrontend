@@ -280,13 +280,16 @@ export default function CustomerTab() {
     }
 
     // Check for uploaded files and show warning
-    const hasFiles = Object.keys(restored).some(key => {
+    const hasFiles = Object.keys(restored).some((key) => {
       const value = restored[key];
       return Array.isArray(value) && value.length > 0 && value[0]?._fromDraft;
     });
 
     if (hasFiles) {
-      message.warning("Draft restored! Please re-upload any documents as they are not saved in drafts.", 5);
+      message.warning(
+        "Draft restored! Please re-upload any documents as they are not saved in drafts.",
+        5,
+      );
     }
 
     // Set active draft so further edits continue saving to this key
