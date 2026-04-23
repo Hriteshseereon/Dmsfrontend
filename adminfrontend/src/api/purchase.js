@@ -18,12 +18,20 @@ export const getDashboardData = async () => {
 //  PURCHASE CONTRACTS
 //fetch all purchase contracts
 export const getPurchaseContract = async () => {
-  const res = await api.get("/purchase/contracts/");
+  const {currentOrgId,selectedFY} = useSessionStore.getState();
+
+  const res = await api.get("/purchase/contracts/", {
+    params: { organisation: currentOrgId, financial_year: selectedFY }
+  });
   return res.data;
 }
 //fetch purchase contract by id
 export const getPurchaseContractById = async (contractId) => {
-  const res = await api.get(`/purchase/contracts/${contractId}/`);
+  const {currentOrgId,selectedFY} = useSessionStore.getState();
+
+  const res = await api.get(`/purchase/contracts/${contractId}/`, {
+    params: { organisation: currentOrgId, financial_year: selectedFY }
+  });
   return res.data;
 }
 //fetch all vendor
@@ -49,19 +57,19 @@ export const getproductbyVendor = async (vendorId) => {
 }
 // add purchase contract
 export const addPurchaseContract = async (payload) => {
-  const currentOrgId = useSessionStore.getState().currentOrgId;
+  const {currentOrgId,selectedFY} = useSessionStore.getState();
   const res = await api.post("/purchase/contracts/", payload, {
-    params: { organisation: currentOrgId }
+    params: { organisation: currentOrgId, financial_year: selectedFY }
   });
   return res.data;
 };
 
  //update purchase contract
 export const updatePurchaseContract = async (contractId, payload) => {
-  const currentOrgId = useSessionStore.getState().currentOrgId;
+  const {currentOrgId,selectedFY} = useSessionStore.getState();
   const res = await api.put(`/purchase/contracts/${contractId}/`,payload, {
     
-    params: { organisation: currentOrgId }  
+    params: { organisation: currentOrgId, financial_year: selectedFY }  
   });
 
   return res.data;
@@ -70,28 +78,34 @@ export const updatePurchaseContract = async (contractId, payload) => {
 // PURCHASE ORDERS
 //fetch all purchase orders
 export const getPurchaseOrder = async () => {
-  const res = await api.get("/purchase/orders/");
+  const {currentOrgId,selectedFY} = useSessionStore.getState();
+  const res = await api.get("/purchase/orders/", {
+    params: { organisation: currentOrgId, financial_year: selectedFY }
+  });
   return res.data;
 }
 //fetch all purchase souda
 export const getSoudaByContractId = async (contractId) => {
-  const currentOrgId = useSessionStore.getState();
+  const {currentOrgId,selectedFY} = useSessionStore.getState();
   const res = await api.get(`/purchase/contracts/${contractId}/`, {
-    params: { organisation: currentOrgId }
+    params: { organisation: currentOrgId, financial_year: selectedFY }
   });
   return res.data;
 }
 
 //add purchase order
 export const addPurchaseOrder = async (payload) => {
-  const { currentOrgId } = useSessionStore.getState(); // ✅ destructure
+  const { currentOrgId, selectedFY } = useSessionStore.getState(); // ✅ destructure
 
   const res = await api.post(
     "/purchase/orders/",
     payload,
     {
       params: {
-        organisation: currentOrgId, // ✅ real UUID
+        organisation: currentOrgId,
+        
+        // ✅ real UUID
+        financial_year: selectedFY,
       },
     }
   );
@@ -101,19 +115,23 @@ export const addPurchaseOrder = async (payload) => {
 
 //get purchase order by id
 export const getPurchaseOrderById = async (orderId) => {
-  const res = await api.get(`/purchase/orders/${orderId}/`);
+  const { currentOrgId, selectedFY } = useSessionStore.getState(); // ✅ destructure
+  const res = await api.get(`/purchase/orders/${orderId}/`, {
+    params: { organisation: currentOrgId, financial_year: selectedFY }
+  });
   return res.data;
 };
 
 //update purchase order
 export const updatePurchaseOrder = async (orderId, payload) => {
-  const { currentOrgId } = useSessionStore.getState(); 
+  const { currentOrgId,selectedFY } = useSessionStore.getState(); 
   const res = await api.put(
     `/purchase/orders/${orderId}/`,
     payload,
     {
       params: {
         organisation: currentOrgId, 
+        financial_year: selectedFY,
       },
     }
   );
@@ -121,12 +139,13 @@ export const updatePurchaseOrder = async (orderId, payload) => {
 }
 // fetch all sales orders for dropdown (by vendor)
 export const getAllSalesOrder = async (vendorId) => {
-  const { currentOrgId } = useSessionStore.getState();
+  const { currentOrgId,selectedFY } = useSessionStore.getState();
 
   const res = await api.get("/sales/orders/by-vendor/", {
     params: {
       organisation: currentOrgId,
       vendor_id: vendorId,
+      financial_year: selectedFY,
     },
   });
 
@@ -137,7 +156,10 @@ export const getAllSalesOrder = async (vendorId) => {
 // PURCHASE INVOICES
 //fetch all purchase invoices
 export const getPurchaseInvoice = async () => {
-  const res = await api.get("/purchase/invoices/");
+  const { currentOrgId,selectedFY } = useSessionStore.getState();
+  const res = await api.get("/purchase/invoices/", {
+    params: { organisation: currentOrgId, financial_year: selectedFY }
+  });
   return res.data;
 };
 //Transport Assignments
@@ -151,18 +173,22 @@ export const addPurchaseInvoice = async (payload) => {
 }
 //fetch Transport Assignments by id
 export const getPurchaseInvoiceById = async (invoiceId) => {
-  const res = await api.get(`/purchase/invoices/${invoiceId}/`);
+  const { currentOrgId,selectedFY } = useSessionStore.getState();
+  const res = await api.get(`/purchase/invoices/${invoiceId}/`, {
+    params: { organisation: currentOrgId, financial_year: selectedFY }
+  });
   return res.data;
 };
 //update Transport Assignments
 export const updatePurchaseInvoice = async (invoiceId, payload) => {
-  const { currentOrgId } = useSessionStore.getState(); 
+  const { currentOrgId,selectedFY } = useSessionStore.getState(); 
   const res = await api.put(
     `/purchase/invoices/${invoiceId}/`,
     payload,
     {
       params: {
         organisation: currentOrgId, 
+        financial_year: selectedFY,
       },
     }
   );
@@ -177,9 +203,9 @@ export const getAllTransport = async () => {
 
 //Assign to transport
 export const addAssignment= async (payload) => {
-  const currentOrgId = useSessionStore.getState().currentOrgId;
+  const { currentOrgId,selectedFY } = useSessionStore.getState();
   const res = await api.post("/transport/assignments/", payload, {
-    params: { organisation: currentOrgId }
+    params: { organisation: currentOrgId, financial_year: selectedFY }
   });
   return res.data;
 }
@@ -192,16 +218,16 @@ export const getInvoiceById = async (invoiceId) => {
 };
 //fetch all purchase invoice 
 export const getAllInvoice = async () => {
-  const { currentOrgId } = useSessionStore.getState();
+  const { currentOrgId,selectedFY } = useSessionStore.getState();
   const res = await api.get(`/purchase/vendor-purchase-invoices/`, {
-    params: { organisation: currentOrgId },
+    params: { organisation: currentOrgId, financial_year: selectedFY },
   });
   return res.data;
 };
 //add purchase invoice
 
 export const addInvoice = async (payload) => {
-  const { currentOrgId } = useSessionStore.getState();
+  const { currentOrgId,selectedFY } = useSessionStore.getState();
 
   const res = await api.post(
     `purchase/vendor-purchase-invoices/`,
@@ -210,7 +236,7 @@ export const addInvoice = async (payload) => {
       headers: {
         "Content-Type": "multipart/form-data",
       },
-      params: { organisation: currentOrgId },
+      params: { organisation: currentOrgId, financial_year: selectedFY },
     }
   );
 
@@ -218,7 +244,7 @@ export const addInvoice = async (payload) => {
 };
 //update purchase invoice
 export const updateInvoice = async (invoiceId, payload) => {
-  const { currentOrgId } = useSessionStore.getState();
+  const { currentOrgId,selectedFY } = useSessionStore.getState();
   const res = await api.put(
     `purchase/vendor-purchase-invoices/${invoiceId}/`,
     payload,
@@ -226,7 +252,7 @@ export const updateInvoice = async (invoiceId, payload) => {
       headers: {
         "Content-Type": "multipart/form-data",
       },
-      params: { organisation: currentOrgId },
+      params: { organisation: currentOrgId, financial_year: selectedFY },
     }
   );
   return res.data;
@@ -241,11 +267,14 @@ export const getDeliveredAdvice = async () => {
 
 //fetch deliverd advices for dropdown data by id
 export const getDeliveredAdviceById = async (loadingAdviceId) => {
+  const { currentOrgId,selectedFY } = useSessionStore.getState();
   const res = await api.get(
     `/purchase/returns/loading-advice-prefill/`,
     {
       params: {
         loading_advice_id: loadingAdviceId,
+        organisation: currentOrgId,
+        financial_year: selectedFY,
       },
     }
   );
@@ -254,31 +283,38 @@ export const getDeliveredAdviceById = async (loadingAdviceId) => {
 
 //fetch all purchase returns
 export const getPurchaseReturn = async () => {
-  const res = await api.get("purchase/returns/");
+  const { currentOrgId,selectedFY } = useSessionStore.getState();
+  const res = await api.get("purchase/returns/", {
+    params: { organisation: currentOrgId, financial_year: selectedFY }
+  });
   return res.data;
 }
 //add purchase return
 export const addPurchaseReturn = async (payload) => {
-  const currentOrgId = useSessionStore.getState().currentOrgId;
+  const { currentOrgId,selectedFY } = useSessionStore.getState();
   const res = await api.post("/purchase/returns/", payload, {
-    params: { organisation: currentOrgId }
+    params: { organisation: currentOrgId, financial_year: selectedFY }
   });
   return res.data;
 }
 //fetch purchase return by id
 export const getPurchaseReturnById = async (returnId) => {
-  const res = await api.get(`/purchase/returns/${returnId}/`);
+  const { currentOrgId,selectedFY } = useSessionStore.getState();
+  const res = await api.get(`/purchase/returns/${returnId}/`, {
+    params: { organisation: currentOrgId, financial_year: selectedFY }
+  });
   return res.data;
 };
 //update purchase return
 export const updatePurchaseReturn = async (returnId, payload) => {
-  const { currentOrgId } = useSessionStore.getState(); 
+  const { currentOrgId,selectedFY } = useSessionStore.getState(); 
   const res = await api.put(
     `/purchase/returns/${returnId}/`,
     payload,
     {
       params: {
         organisation: currentOrgId, 
+        financial_year: selectedFY,
       },
     }
   );
@@ -287,23 +323,35 @@ export const updatePurchaseReturn = async (returnId, payload) => {
 //loding advice
 //get all loading Advices
 export const getLoadingAdvice = async () => 
-  {const res = await api.get("/transport/loading-advices/"); 
+
+  {
+    const { currentOrgId,selectedFY } = useSessionStore.getState();
+    const res = await api.get("/transport/loading-advices/", {
+      params: { organisation: currentOrgId, financial_year: selectedFY }
+    }); 
     return res.data; 
   }
 //get loading advice by id
 export const getLoadingAdviceById = async (adviceId) => {
-  const res = await api.get(`/transport/loading-advices/${adviceId}/`);
+  const { currentOrgId,selectedFY } = useSessionStore.getState();
+  const res = await api.get(`/transport/loading-advices/${adviceId}/`,
+    {
+      params: { organisation: currentOrgId, financial_year: selectedFY }
+    }
+  );
   return res.data;
 }
 //update loading advice
 export const updateLoadingAdvice = async (adviceId, payload) => {
-  const { currentOrgId } = useSessionStore.getState();
+  const { currentOrgId,selectedFY } = useSessionStore.getState();
   const res = await api.put(
     `/transport/loading-advices/${adviceId}/`,
     payload,
     {
       params: {
         organisation: currentOrgId,
+        financial_year: selectedFY,
+
       },
     }
   );
