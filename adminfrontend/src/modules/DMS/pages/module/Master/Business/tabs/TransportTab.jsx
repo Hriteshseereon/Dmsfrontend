@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   Table,
   Button,
@@ -43,14 +43,21 @@ import {
   getStateIsoByName,
 } from "../../../../../../../utils/locationHelper";
 // import { getTransporters, addTransporter, updateTransporter, getTransporterDetails } from "../../../../../../../api/transporter";
+import {
+  createDraft,
+  saveDraft,
+  loadDraft,
+  deleteDraft,
+  deserialiseDraftValues,
+  getAllDrafts,
+  createAutoSaveHandler,
+  createManualSaveHandler,
+  hasDrafts,
+} from "../../../../../../../utils/businessPartnerDraftUtils";
+import UniversalDraftTable from "./UniversalDraftTable";
 import { API_BASE_URL } from "@/utils/config";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-const { Text } = Typography;
-dayjs.extend(relativeTime);
-const inputClass = "border-amber-400 h-8";
-const passwordClass = "border-amber-400 h-8";
-const selectClass = "border-amber-400 h-8 w-full";
 export const phoneValidator = (_, value) => {
   if (!value) return Promise.resolve(); // allow empty if not required
 
@@ -69,110 +76,11 @@ export const phoneValidator = (_, value) => {
   return Promise.resolve();
 };
 
-// ================= DRAFT SYSTEM =================
-const DRAFT_PREFIX = "transport-form-draft-";
-
-// Serialise form values (date + upload)
-const serialiseDraft = (values) => {
-  const out = {};
-  for (const [key, val] of Object.entries(values)) {
-    if (val === null || val === undefined) {
-      out[key] = val;
-      continue;
-    }
-
-    // dayjs
-    if (typeof val === "object" && typeof val.isValid === "function") {
-      out[key] = val.toISOString();
-      continue;
-    }
-
-    // Upload fileList
-    if (Array.isArray(val) && val.length && val[0]?.uid !== undefined) {
-      out[key] = val.map(({ uid, name, status, url, thumbUrl }) => ({
-        uid,
-        name,
-        status,
-        url,
-        thumbUrl,
-        _fromDraft: true,
-      }));
-      continue;
-    }
-
-    out[key] = val;
-  }
-  return out;
-};
-
-// Deserialise
-const deserialiseDraft = (values, dayjs) => {
-  const out = {};
-  for (const [key, val] of Object.entries(values)) {
-    if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}T/.test(val)) {
-      const d = dayjs(val);
-      out[key] = d.isValid() ? d : null;
-      continue;
-    }
-
-    if (Array.isArray(val) && val.length && val[0]?._fromDraft) {
-      out[key] = val;
-      continue;
-    }
-
-    out[key] = val;
-  }
-  return out;
-};
-
-// Storage helpers
-const saveDraft = (id, values, meta = {}) => {
-  const payload = {
-    id,
-    savedAt: new Date().toISOString(),
-    meta,
-    values: serialiseDraft(values),
-  };
-  localStorage.setItem(id, JSON.stringify(payload));
-  return id;
-};
-
-const createDraft = (values, meta = {}) => {
-  const id = `${DRAFT_PREFIX}${Date.now()}`;
-  return saveDraft(id, values, meta);
-};
-
-const loadDraft = (id) => {
-  try {
-    const raw = localStorage.getItem(id);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-};
-
-const deleteDraft = (id) => localStorage.removeItem(id);
-
-const getAllDrafts = () => {
-  const result = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key?.startsWith(DRAFT_PREFIX)) continue;
-    try {
-      const parsed = JSON.parse(localStorage.getItem(key));
-      if (parsed?.values) {
-        result.push({
-          id: key,
-          savedAt: parsed.savedAt,
-          name: parsed.meta?.agencyName || parsed.values?.agencyName || "—",
-          email: parsed.meta?.email || parsed.values?.email || "—",
-          mobile: parsed.meta?.mobileNo || parsed.values?.mobileNo || "—",
-        });
-      }
-    } catch {}
-  }
-  return result.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
-};
+const { Text } = Typography;
+dayjs.extend(relativeTime);
+const inputClass = "border-amber-400 h-8";
+const passwordClass = "border-amber-400 h-8";
+const selectClass = "border-amber-400 h-8 w-full";
 export default function TransportTab() {
   const [data, setData] = useState([]);
   const [search, setSearch] = useState("");
@@ -199,45 +107,48 @@ export default function TransportTab() {
   const [activeDraftId, setActiveDraftId] = useState(null);
   const [draftSavedAt, setDraftSavedAt] = useState(null);
   const [draftTableKey, setDraftTableKey] = useState(0);
-  const draftTableRef = useRef(null);
-  const saveCurrentDraft = ({ showToast = false, closeAfterSave = false } = {}) => {
-    if (selected || viewMode || !open) return;
-    const values = form.getFieldsValue(true);
-    const meta = {
-      agencyName: values.agencyName,
-      email: values.email,
-      mobileNo: values.mobileNo,
-    };
+  const [hasDraft, setHasDraft] = useState(false);
 
-    setActiveDraftId((prevId) => {
-      const id = prevId || createDraft(values, meta);
-      saveDraft(id, values, meta);
-      setDraftSavedAt(new Date());
-      setDraftTableKey((k) => k + 1);
-
-      if (showToast) {
-        message.success("Draft saved");
-      }
-      if (closeAfterSave) {
-        setOpen(false);
-        form.resetFields();
-        setSelCountryIso(null);
-        setSelStateName(null);
-        setSelStateIso(null);
-        setSelected(null);
-        setViewMode(false);
-        setTimeout(() => {
-          draftTableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 0);
-      }
-
-      return id;
-    });
+  // check draft
+  const checkDraftExists = () => {
+    setHasDraft(hasDrafts("transport"));
   };
+  useEffect(() => {
+    checkDraftExists();
+  }, [draftTableKey]);
 
-  // Manual save draft function
-  const handleManualSave = () => {
-    saveCurrentDraft({ showToast: true, closeAfterSave: true });
+  // Auto-save handler
+  const handleFormValuesChange = useCallback(
+    createAutoSaveHandler(
+      "transport",
+      form,
+      activeDraftId,
+      setActiveDraftId,
+      setDraftSavedAt,
+      setDraftTableKey,
+      selected,
+      viewMode,
+    ),
+    [form, selected, viewMode, activeDraftId],
+  );
+
+  // Manual save handler
+  const handleManualSave = createManualSaveHandler(
+    "transport",
+    form,
+    activeDraftId,
+    setActiveDraftId,
+    setDraftSavedAt,
+    setDraftTableKey,
+    selected,
+    viewMode,
+    message,
+  );
+
+  // Close modal from draft table
+  const closeDraftModal = () => {
+    closeModal();
+    setDraftTableKey((k) => k + 1);
   };
 
   const closeModal = () => {
@@ -549,157 +460,33 @@ export default function TransportTab() {
 
   const filteredData = getFilteredData();
 
-  function DraftTable({ refreshKey, onContinue, onDelete }) {
-    const [drafts, setDrafts] = useState([]);
-
-    useEffect(() => {
-      setDrafts(getAllDrafts());
-    }, [refreshKey]);
-
-    if (!drafts.length) return null; // hide when no drafts
-
-    const handleDelete = (id) => {
-      deleteDraft(id);
-      onDelete?.();
-      setDrafts(getAllDrafts());
-    };
-
-    const columns = [
-      {
-        title: (
-          <span className="text-amber-700 font-semibold text-xs">
-            Agency Name
-          </span>
-        ),
-        dataIndex: "name",
-        render: (t) => (
-          <span className="text-amber-800 font-medium">{t || "—"}</span>
-        ),
-      },
-      {
-        title: (
-          <span className="text-amber-700 font-semibold text-xs">Email</span>
-        ),
-        dataIndex: "email",
-        render: (t) => (
-          <span className="text-amber-700 text-sm">{t || "—"}</span>
-        ),
-      },
-      {
-        title: (
-          <span className="text-amber-700 font-semibold text-xs">Mobile</span>
-        ),
-        dataIndex: "mobile",
-        render: (t) => (
-          <span className="text-amber-700 text-sm">{t || "—"}</span>
-        ),
-      },
-      {
-        title: (
-          <span className="text-amber-700 font-semibold text-xs">
-            Last Saved
-          </span>
-        ),
-        dataIndex: "savedAt",
-        render: (v) => (
-          <Tag
-            icon={<ClockCircleOutlined />}
-            color="gold"
-            className="text-xs font-normal"
-          >
-            {v ? dayjs(v).fromNow() : "—"}
-          </Tag>
-        ),
-      },
-      {
-        title: (
-          <span className="text-amber-700 font-semibold text-xs">Actions</span>
-        ),
-        render: (_, record) => (
-          <div className="flex gap-2">
-            <Button
-              size="small"
-              type="primary"
-              icon={<EditOutlined />}
-              className="bg-amber-500! hover:bg-amber-600! border-none! text-xs!"
-              onClick={() => onContinue(record.id)}
-            >
-              Continue
-            </Button>
-
-            <Popconfirm
-              title="Delete this draft?"
-              description="This action cannot be undone."
-              onConfirm={() => handleDelete(record.id)}
-              okText="Delete"
-              cancelText="Keep"
-              okButtonProps={{
-                danger: true,
-                className: "bg-red-500! border-none!",
-              }}
-            >
-              <Button
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-                className="text-xs!"
-              >
-                Delete
-              </Button>
-            </Popconfirm>
-          </div>
-        ),
-      },
-    ];
-
-    return (
-      <div className="border border-amber-200 rounded-lg p-4 bg-white shadow-sm mb-4">
-        <div className="flex items-center gap-2 mb-2">
-          <FileTextOutlined className="text-amber-500 text-lg" />
-          <h2 className="text-base font-semibold text-amber-700 m-0">
-            Saved Drafts
-          </h2>
-          <Tag color="gold" className="ml-1">
-            {drafts.length}
-          </Tag>
-        </div>
-
-        <Text className="text-amber-500 text-xs block mb-3">
-          These forms were not submitted. Click <b>Continue</b> to resume
-          editing.
-        </Text>
-
-        <Table
-          columns={columns}
-          dataSource={drafts}
-          rowKey="id"
-          size="small"
-          bordered
-          pagination={false}
-          rowClassName="hover:bg-amber-50"
-        />
-      </div>
-    );
-  }
   const handleContinueDraft = (id) => {
     const draft = loadDraft(id);
-    if (!draft) return;
+    if (!draft) {
+      message.error("Draft not found");
+      return;
+    }
 
-    const restored = deserialiseDraft(draft.values, dayjs);
+    const restored = deserialiseDraftValues(draft.values, dayjs);
     form.setFieldsValue(restored);
 
     // Check for uploaded files and show warning
-    const hasFiles = Object.keys(restored).some(key => {
+    const hasFiles = Object.keys(restored).some((key) => {
       const value = restored[key];
       return Array.isArray(value) && value.length > 0 && value[0]?._fromDraft;
     });
 
     if (hasFiles) {
-      message.warning("Draft restored! Please re-upload any documents as they are not saved in drafts.", 5);
+      message.warning(
+        "Draft restored! Please re-upload any documents as they are not saved in drafts.",
+        5,
+      );
     }
 
     setActiveDraftId(id);
     setDraftSavedAt(new Date(draft.savedAt));
+    setSelected(null);
+    setViewMode(false);
     setOpen(true);
   };
   /* ================= UI ================= */
@@ -754,14 +541,16 @@ export default function TransportTab() {
           Add Transport
         </Button>
       </div>
-      {/* draft table */}
-      <div ref={draftTableRef}>
-        <DraftTable
-          refreshKey={draftTableKey}
+      {hasDraft && (
+        <UniversalDraftTable
+          key={draftTableKey}
+          moduleType="transport"
+          refreshTrigger={draftTableKey}
           onContinue={handleContinueDraft}
           onDelete={() => setDraftTableKey((k) => k + 1)}
+          onCloseModal={closeDraftModal}
         />
-      </div>
+      )}
       {/* ===== TABLE CONTAINER ===== */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
@@ -820,7 +609,12 @@ export default function TransportTab() {
                   size="small"
                   icon={<SaveOutlined />}
                   className="border-amber-400! text-amber-700! hover:bg-amber-100! text-xs!"
-                  onClick={handleManualSave}
+                  onClick={() => {
+                    handleManualSave();
+                    // Navigate to draft table view after saving
+                    closeModal();
+                    setDraftTableKey((k) => k + 1);
+                  }}
                 >
                   Save Draft
                 </Button>
@@ -836,6 +630,7 @@ export default function TransportTab() {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
+          onValuesChange={handleFormValuesChange}
         >
           {/* ================= Transporter / Agency Details ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">
@@ -1219,11 +1014,7 @@ export default function TransportTab() {
           {/* ===== FOOTER ACTIONS ===== */}
           {!viewMode && (
             <div className="flex justify-end gap-2 pt-2">
-              <Button
-                onClick={closeModal}
-              >
-                Cancel
-              </Button>
+              <Button onClick={closeModal}>Cancel</Button>
               <Button
                 htmlType="submit"
                 type="primary"
