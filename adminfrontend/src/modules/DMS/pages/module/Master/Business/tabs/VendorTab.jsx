@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   Table,
   Button,
@@ -51,6 +51,19 @@ import {
   getCountryIsoByName,
   getStateIsoByName,
 } from "../../../../../../../utils/locationHelper";
+import {
+  createDraft,
+  saveDraft,
+  loadDraft,
+  deleteDraft,
+  deserialiseDraftValues,
+  getAllDrafts,
+  createAutoSaveHandler,
+  createManualSaveHandler,
+  hasDrafts,
+} from "../../../../../../../utils/businessPartnerDraftUtils";
+import UniversalDraftTable from "./UniversalDraftTable";
+
 import { API_BASE_URL } from "@/utils/config";
 
 const { Option } = Select;
@@ -58,11 +71,6 @@ const { Text } = Typography;
 
 const inputClass = "border-amber-400 h-8";
 const selectClass = "border-amber-400 h-8 w-full";
-const DRAFT_PREFIX = "vendor-form-draft-";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Phone validator
-// ─────────────────────────────────────────────────────────────────────────────
 export const phoneValidator = (_, value) => {
   if (!value) return Promise.resolve();
   const phone = value.toString().trim();
@@ -71,303 +79,6 @@ export const phoneValidator = (_, value) => {
   }
   return Promise.resolve();
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Draft utilities  (inline — no separate file needed for vendor)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Serialise form values for localStorage (handles dayjs + Upload fileList). */
-const serialiseVendorDraft = (values) => {
-  const out = {};
-  for (const [key, val] of Object.entries(values)) {
-    if (val === null || val === undefined) {
-      out[key] = val;
-      continue;
-    }
-
-    // dayjs
-    if (typeof val === "object" && typeof val.isValid === "function") {
-      out[key] = val.isValid() ? val.toISOString() : null;
-      continue;
-    }
-
-    // Upload fileList
-    if (Array.isArray(val) && val.length && val[0]?.uid !== undefined) {
-      out[key] = val.map(({ uid, name, status, url, thumbUrl }) => ({
-        uid,
-        name,
-        status,
-        url,
-        thumbUrl,
-        _fromDraft: true,
-      }));
-      continue;
-    }
-
-    // plants array — recurse each plant entry
-    if (key === "plants" && Array.isArray(val)) {
-      out[key] = val.map((plant) => {
-        if (!plant) return plant;
-        const p = {};
-        for (const [pk, pv] of Object.entries(plant)) {
-          if (
-            pv &&
-            typeof pv === "object" &&
-            typeof pv.isValid === "function"
-          ) {
-            p[pk] = pv.isValid() ? pv.toISOString() : null;
-          } else if (
-            Array.isArray(pv) &&
-            pv.length &&
-            pv[0]?.uid !== undefined
-          ) {
-            p[pk] = pv.map(({ uid, name, status, url }) => ({
-              uid,
-              name,
-              status,
-              url,
-              _fromDraft: true,
-            }));
-          } else {
-            p[pk] = pv;
-          }
-        }
-        return p;
-      });
-      continue;
-    }
-
-    out[key] = val;
-  }
-  return out;
-};
-
-/** Deserialise draft values back into form-compatible shape. */
-const deserialiseVendorDraft = (draft) => {
-  const out = {};
-  for (const [key, val] of Object.entries(draft)) {
-    if (val === null || val === undefined) {
-      out[key] = val;
-      continue;
-    }
-
-    // ISO date string → dayjs
-    if (
-      typeof val === "string" &&
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)
-    ) {
-      const d = dayjs(val);
-      out[key] = d.isValid() ? d : null;
-      continue;
-    }
-
-    // file arrays
-    if (Array.isArray(val) && val.length && val[0]?._fromDraft) {
-      out[key] = val;
-      continue;
-    }
-
-    // plants array
-    if (key === "plants" && Array.isArray(val)) {
-      out[key] = val.map((plant) => {
-        if (!plant) return plant;
-        const p = {};
-        for (const [pk, pv] of Object.entries(plant)) {
-          if (
-            typeof pv === "string" &&
-            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(pv)
-          ) {
-            const d = dayjs(pv);
-            p[pk] = d.isValid() ? d : null;
-          } else if (Array.isArray(pv) && pv.length && pv[0]?._fromDraft) {
-            p[pk] = pv;
-          } else {
-            p[pk] = pv;
-          }
-        }
-        return p;
-      });
-      continue;
-    }
-
-    out[key] = val;
-  }
-  return out;
-};
-
-const saveDraftToStorage = (id, values, meta = {}) => {
-  const payload = {
-    id,
-    savedAt: new Date().toISOString(),
-    meta,
-    values: serialiseVendorDraft(values),
-  };
-  localStorage.setItem(id, JSON.stringify(payload));
-  return id;
-};
-
-const createNewDraft = (values, meta = {}) => {
-  const id = `${DRAFT_PREFIX}${Date.now()}`;
-  return saveDraftToStorage(id, values, meta);
-};
-
-const loadDraftFromStorage = (id) => {
-  try {
-    const raw = localStorage.getItem(id);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-};
-
-const deleteDraftFromStorage = (id) => localStorage.removeItem(id);
-
-const getAllVendorDrafts = () => {
-  const result = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key?.startsWith(DRAFT_PREFIX)) continue;
-    try {
-      const parsed = JSON.parse(localStorage.getItem(key));
-      if (parsed?.values) {
-        result.push({
-          id: key,
-          savedAt: parsed.savedAt,
-          name: parsed.meta?.name || parsed.values?.name || "—",
-          email: parsed.meta?.email || parsed.values?.email1 || "—",
-          mobile: parsed.meta?.mobile || parsed.values?.mobileNo1 || "—",
-        });
-      }
-    } catch {
-      /* skip corrupt */
-    }
-  }
-  return result.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Inline DraftTable (only rendered when drafts exist)
-// ─────────────────────────────────────────────────────────────────────────────
-function VendorDraftTable({ refreshKey, onContinue, onDelete }) {
-  const [drafts, setDrafts] = useState([]);
-
-  useEffect(() => {
-    setDrafts(getAllVendorDrafts());
-  }, [refreshKey]);
-
-  if (!drafts.length) return null; // ← hidden when no drafts
-
-  const handleDelete = (id) => {
-    deleteDraftFromStorage(id);
-    onDelete?.();
-    setDrafts(getAllVendorDrafts());
-  };
-
-  const columns = [
-    {
-      title: (
-        <span className="text-amber-700 font-semibold text-xs">
-          Supplier Name
-        </span>
-      ),
-      dataIndex: "name",
-      render: (t) => <span className="text-amber-800 font-medium">{t}</span>,
-    },
-    {
-      title: (
-        <span className="text-amber-700 font-semibold text-xs">Email</span>
-      ),
-      dataIndex: "email",
-      render: (t) => <span className="text-amber-700 text-sm">{t}</span>,
-    },
-    {
-      title: (
-        <span className="text-amber-700 font-semibold text-xs">Mobile</span>
-      ),
-      dataIndex: "mobile",
-      render: (t) => <span className="text-amber-700 text-sm">{t}</span>,
-    },
-    {
-      title: (
-        <span className="text-amber-700 font-semibold text-xs">Last Saved</span>
-      ),
-      dataIndex: "savedAt",
-      render: (v) => (
-        <Tag
-          icon={<ClockCircleOutlined />}
-          color="gold"
-          className="text-xs font-normal"
-        >
-          {v ? dayjs(v).fromNow() : "—"}
-        </Tag>
-      ),
-    },
-    {
-      title: (
-        <span className="text-amber-700 font-semibold text-xs">Actions</span>
-      ),
-      render: (_, record) => (
-        <div className="flex gap-2">
-          <Button
-            size="small"
-            type="primary"
-            icon={<EditOutlined />}
-            className="bg-amber-500! hover:bg-amber-600! border-none! text-xs!"
-            onClick={() => onContinue(record.id)}
-          >
-            Continue
-          </Button>
-          <Popconfirm
-            title="Delete this draft?"
-            description="This action cannot be undone."
-            onConfirm={() => handleDelete(record.id)}
-            okText="Delete"
-            cancelText="Keep"
-            okButtonProps={{
-              danger: true,
-              className: "bg-red-500! border-none!",
-            }}
-          >
-            <Button
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              className="text-xs!"
-            >
-              Delete
-            </Button>
-          </Popconfirm>
-        </div>
-      ),
-    },
-  ];
-
-  return (
-    <div className="border border-amber-200 rounded-lg p-4 bg-white shadow-sm mb-4">
-      <div className="flex items-center gap-2 mb-2">
-        <FileTextOutlined className="text-amber-500 text-lg" />
-        <h2 className="text-base font-semibold text-amber-700 m-0">
-          Saved Drafts
-        </h2>
-        <Tag color="gold" className="ml-1">
-          {drafts.length}
-        </Tag>
-      </div>
-      <Text className="text-amber-500 text-xs block mb-3">
-        These forms were not submitted. Click <b>Continue</b> to resume editing.
-      </Text>
-      <Table
-        columns={columns}
-        dataSource={drafts}
-        rowKey="id"
-        size="small"
-        bordered
-        pagination={false}
-        rowClassName="hover:bg-amber-50"
-      />
-    </div>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main VendorTab
@@ -385,13 +96,55 @@ export default function VendorTab() {
   const [selStateIso, setSelStateIso] = useState(null);
   const [corpStateName, setCorpStateName] = useState(null);
   const [corpStateIso, setCorpStateIso] = useState(null);
+  const [form] = Form.useForm();
+
   // draft state
   const [activeDraftId, setActiveDraftId] = useState(null);
   const [draftSavedAt, setDraftSavedAt] = useState(null);
   const [draftTableKey, setDraftTableKey] = useState(0);
+  const [hasDraft, setHasDraft] = useState(false);
 
-  const draftTableRef = useRef(null);
-  const [form] = Form.useForm();
+  // check draft
+  const checkDraftExists = () => {
+    setHasDraft(hasDrafts("vendor"));
+  };
+  useEffect(() => {
+    checkDraftExists();
+  }, [draftTableKey]);
+
+  // Auto-save handler
+  const handleFormValuesChange = useCallback(
+    createAutoSaveHandler(
+      "vendor",
+      form,
+      activeDraftId,
+      setActiveDraftId,
+      setDraftSavedAt,
+      setDraftTableKey,
+      selected,
+      viewMode,
+    ),
+    [form, selected, viewMode, activeDraftId],
+  );
+
+  // Manual save handler
+  const handleManualSave = createManualSaveHandler(
+    "vendor",
+    form,
+    activeDraftId,
+    setActiveDraftId,
+    setDraftSavedAt,
+    setDraftTableKey,
+    selected,
+    viewMode,
+    message,
+  );
+
+  // Close modal from draft table
+  const closeDraftModal = () => {
+    closeModal();
+    setDraftTableKey((k) => k + 1);
+  };
 
   // ── helpers ──────────────────────────────────────────────────────────────
   const fileFromUrl = (url) => {
@@ -446,55 +199,15 @@ export default function VendorTab() {
     fetchVendors();
   }, []);
 
-  const saveCurrentDraft = ({ showToast = false, closeAfterSave = false } = {}) => {
-    if (selected || viewMode || !open) return;
-    const values = form.getFieldsValue(true);
-    const meta = {
-      name: values.name,
-      email: values.email1,
-      mobile: values.mobileNo1,
-    };
-
-    setActiveDraftId((prevId) => {
-      const id = prevId || createNewDraft(values, meta);
-      saveDraftToStorage(id, values, meta);
-      setDraftSavedAt(new Date());
-      setDraftTableKey((k) => k + 1);
-
-      if (showToast) {
-        message.success("Draft saved");
-      }
-      if (closeAfterSave) {
-        setOpen(false);
-        form.resetFields();
-        setSelCountryIso("IN");
-        setSelStateName(null);
-        setSelStateIso(null);
-        setSelected(null);
-        setViewMode(false);
-        setTimeout(() => {
-          draftTableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 0);
-      }
-
-      return id;
-    });
-  };
-
-  // ── DRAFT: manual save ────────────────────────────────────────────────────
-  const handleManualSave = () => {
-    saveCurrentDraft({ showToast: true, closeAfterSave: true });
-  };
-
   // ── DRAFT: continue (restore into form) ──────────────────────────────────
   const handleContinueDraft = (draftId) => {
-    const draft = loadDraftFromStorage(draftId);
+    const draft = loadDraft(draftId);
     if (!draft) {
       message.error("Draft not found");
       return;
     }
 
-    const restored = deserialiseVendorDraft(draft.values);
+    const restored = deserialiseDraftValues(draft.values, dayjs);
     form.resetFields();
     form.setFieldsValue(restored);
 
@@ -546,7 +259,7 @@ export default function VendorTab() {
   // ── DRAFT: discard on submit ──────────────────────────────────────────────
   const discardActiveDraft = () => {
     if (!activeDraftId) return;
-    deleteDraftFromStorage(activeDraftId);
+    deleteDraft(activeDraftId);
     setActiveDraftId(null);
     setDraftSavedAt(null);
     setDraftTableKey((k) => k + 1);
@@ -923,14 +636,16 @@ export default function VendorTab() {
           Add Supplier
         </Button>
       </div>
-      {/* ===== DRAFT TABLE (only renders when drafts exist) ===== */}
-      <div ref={draftTableRef}>
-        <VendorDraftTable
-          refreshKey={draftTableKey}
+      {hasDraft && (
+        <UniversalDraftTable
+          key={draftTableKey}
+          moduleType="vendor"
+          refreshTrigger={draftTableKey}
           onContinue={handleContinueDraft}
           onDelete={() => setDraftTableKey((k) => k + 1)}
+          onCloseModal={closeDraftModal}
         />
-      </div>
+      )}
       {/* ===== SUPPLIER TABLE ===== */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
@@ -995,7 +710,12 @@ export default function VendorTab() {
                   size="small"
                   icon={<SaveOutlined />}
                   className="border-amber-400! text-amber-700! hover:bg-amber-100! text-xs!"
-                  onClick={handleManualSave}
+                  onClick={() => {
+                    handleManualSave();
+                    // Navigate to draft table view after saving
+                    closeModal();
+                    setDraftTableKey((k) => k + 1);
+                  }}
                 >
                   Save Draft
                 </Button>
@@ -1011,6 +731,7 @@ export default function VendorTab() {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
+          onValuesChange={handleFormValuesChange}
           initialValues={{
             status: "Active",
             igstApplicable: "No",
