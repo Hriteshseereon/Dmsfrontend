@@ -58,8 +58,11 @@ import {
   deleteDraft,
   deserialiseDraftValues,
   getAllCustomerDrafts,
-} from "../../../../../../../utils/customerDraftUtils";
-import DraftTable from "./DraftTable";
+  createAutoSaveHandler,
+  createManualSaveHandler,
+  hasDrafts,
+} from "../../../../../../../utils/businessPartnerDraftUtils";
+import UniversalDraftTable from "./UniversalDraftTable";
 
 const { Option } = Select;
 const inputClass = "border-amber-400 h-8";
@@ -101,8 +104,7 @@ export default function CustomerTab() {
 
   // check draft
   const checkDraftExists = () => {
-    const drafts = getAllCustomerDrafts();
-    setHasDraft(drafts.length > 0);
+    setHasDraft(hasDrafts('customer'));
   };
   useEffect(() => {
     checkDraftExists();
@@ -178,75 +180,33 @@ export default function CustomerTab() {
    * Called by Form's onValuesChange.
    * Only runs for new-customer forms (not edit/view).
    */
-  const handleFormValuesChange = useCallback(() => {
-    // No auto-save when editing an existing record or in view mode
-    if (selected || viewMode) return;
-
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-
-    autosaveTimer.current = setTimeout(() => {
-      const values = form.getFieldsValue(true);
-
-      // Build/update draft id
-      setActiveDraftId((prevId) => {
-        const id =
-          prevId ||
-          createDraft(values, {
-            name: values.name,
-            email: values.email,
-            mobileNo: values.mobileNo,
-          });
-
-        if (!prevId) {
-          // first save – id was just created inside createDraft, return it
-          saveDraft(id, values, {
-            name: values.name,
-            email: values.email,
-            mobileNo: values.mobileNo,
-          });
-          setDraftSavedAt(new Date());
-          setDraftTableKey((k) => k + 1);
-          return id;
-        }
-
-        // subsequent saves
-        saveDraft(id, values, {
-          name: values.name,
-          email: values.email,
-          mobileNo: values.mobileNo,
-        });
-        setDraftSavedAt(new Date());
-        setDraftTableKey((k) => k + 1);
-        return id;
-      });
-    }, AUTOSAVE_DEBOUNCE_MS);
-  }, [form, selected, viewMode]);
+  const handleFormValuesChange = useCallback(
+    createAutoSaveHandler(
+      'customer',
+      form,
+      activeDraftId,
+      setActiveDraftId,
+      setDraftSavedAt,
+      setDraftTableKey,
+      selected,
+      viewMode
+    ),
+    [form, selected, viewMode, activeDraftId]
+  );
 
   // ── DRAFT: manual save ────────────────────────────────────────────────────
 
-  const handleManualSave = () => {
-    if (selected || viewMode) return;
-    const values = form.getFieldsValue(true);
-
-    setActiveDraftId((prevId) => {
-      const id =
-        prevId ||
-        createDraft(values, {
-          name: values.name,
-          email: values.email,
-          mobileNo: values.mobileNo,
-        });
-      saveDraft(id, values, {
-        name: values.name,
-        email: values.email,
-        mobileNo: values.mobileNo,
-      });
-      setDraftSavedAt(new Date());
-      setDraftTableKey((k) => k + 1);
-      message.success("Draft saved");
-      return id;
-    });
-  };
+  const handleManualSave = createManualSaveHandler(
+    'customer',
+    form,
+    activeDraftId,
+    setActiveDraftId,
+    setDraftSavedAt,
+    setDraftTableKey,
+    selected,
+    viewMode,
+    message
+  );
 
   // ── DRAFT: continue (load into form) ─────────────────────────────────────
 
@@ -324,6 +284,14 @@ export default function CustomerTab() {
     setSelected(null);
     setSecurityType(null);
     // Do NOT clear activeDraftId here – the draft should persist until submitted
+  };
+
+  // ── close modal from draft table ─────────────────────────────────────────────
+
+  const closeDraftModal = () => {
+    closeModal();
+    // Navigate back to the draft table view
+    setDraftTableKey((k) => k + 1);
   };
 
   // ── FETCH ─────────────────────────────────────────────────────────────────
@@ -754,11 +722,13 @@ export default function CustomerTab() {
         </Button>
       </div>
       {hasDraft && (
-        <DraftTable
+        <UniversalDraftTable
           key={draftTableKey}
+          moduleType="customer"
           refreshTrigger={draftTableKey}
           onContinue={handleContinueDraft}
           onDelete={() => setDraftTableKey((k) => k + 1)}
+          onCloseModal={closeDraftModal}
         />
       )}
 
@@ -829,7 +799,12 @@ export default function CustomerTab() {
                   size="small"
                   icon={<SaveOutlined />}
                   className="border-amber-400! text-amber-700! hover:bg-amber-100! text-xs!"
-                  onClick={handleManualSave}
+                  onClick={() => {
+                    handleManualSave();
+                    // Navigate to draft table view after saving
+                    closeModal();
+                    setDraftTableKey((k) => k + 1);
+                  }}
                 >
                   Save Draft
                 </Button>
