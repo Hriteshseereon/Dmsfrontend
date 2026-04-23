@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Table,
   Button,
@@ -59,7 +59,6 @@ const { Text } = Typography;
 const inputClass = "border-amber-400 h-8";
 const selectClass = "border-amber-400 h-8 w-full";
 const DRAFT_PREFIX = "vendor-form-draft-";
-const AUTOSAVE_MS = 1500;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Phone validator
@@ -391,7 +390,7 @@ export default function VendorTab() {
   const [draftSavedAt, setDraftSavedAt] = useState(null);
   const [draftTableKey, setDraftTableKey] = useState(0);
 
-  const autosaveTimer = useRef(null);
+  const draftTableRef = useRef(null);
   const [form] = Form.useForm();
 
   // ── helpers ──────────────────────────────────────────────────────────────
@@ -447,54 +446,44 @@ export default function VendorTab() {
     fetchVendors();
   }, []);
 
-  // ── DRAFT: auto-save ──────────────────────────────────────────────────────
-  const handleFormValuesChange = useCallback(() => {
-    if (selected || viewMode) return;
-
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-
-    autosaveTimer.current = setTimeout(() => {
-      const values = form.getFieldsValue(true);
-      const meta = {
-        name: values.name,
-        email: values.email1,
-        mobile: values.mobileNo1,
-      };
-
-      setActiveDraftId((prevId) => {
-        const id = prevId || createNewDraft(values, meta);
-        if (!prevId) {
-          // id was just created inside createNewDraft — save again to be sure
-          saveDraftToStorage(id, values, meta);
-          setDraftSavedAt(new Date());
-          setDraftTableKey((k) => k + 1);
-          return id;
-        }
-        saveDraftToStorage(id, values, meta);
-        setDraftSavedAt(new Date());
-        setDraftTableKey((k) => k + 1);
-        return id;
-      });
-    }, AUTOSAVE_MS);
-  }, [form, selected, viewMode]);
-
-  // ── DRAFT: manual save ────────────────────────────────────────────────────
-  const handleManualSave = () => {
-    if (selected || viewMode) return;
+  const saveCurrentDraft = ({ showToast = false, closeAfterSave = false } = {}) => {
+    if (selected || viewMode || !open) return;
     const values = form.getFieldsValue(true);
     const meta = {
       name: values.name,
       email: values.email1,
       mobile: values.mobileNo1,
     };
+
     setActiveDraftId((prevId) => {
       const id = prevId || createNewDraft(values, meta);
       saveDraftToStorage(id, values, meta);
       setDraftSavedAt(new Date());
       setDraftTableKey((k) => k + 1);
-      message.success("Draft saved");
+
+      if (showToast) {
+        message.success("Draft saved");
+      }
+      if (closeAfterSave) {
+        setOpen(false);
+        form.resetFields();
+        setSelCountryIso("IN");
+        setSelStateName(null);
+        setSelStateIso(null);
+        setSelected(null);
+        setViewMode(false);
+        setTimeout(() => {
+          draftTableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 0);
+      }
+
       return id;
     });
+  };
+
+  // ── DRAFT: manual save ────────────────────────────────────────────────────
+  const handleManualSave = () => {
+    saveCurrentDraft({ showToast: true, closeAfterSave: true });
   };
 
   // ── DRAFT: continue (restore into form) ──────────────────────────────────
@@ -565,7 +554,6 @@ export default function VendorTab() {
 
   // ── close modal ───────────────────────────────────────────────────────────
   const closeModal = () => {
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     setOpen(false);
     form.resetFields();
     setSelCountryIso("IN");
@@ -574,6 +562,16 @@ export default function VendorTab() {
     setSelected(null);
     // draft stays in localStorage until submitted
   };
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (!selected && !viewMode && open) {
+        saveCurrentDraft();
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [open, selected, viewMode]);
 
   // ── MAP API → FORM ────────────────────────────────────────────────────────
   const mapDetailsToForm = (d) => ({
@@ -926,11 +924,13 @@ export default function VendorTab() {
         </Button>
       </div>
       {/* ===== DRAFT TABLE (only renders when drafts exist) ===== */}
-      <VendorDraftTable
-        refreshKey={draftTableKey}
-        onContinue={handleContinueDraft}
-        onDelete={() => setDraftTableKey((k) => k + 1)}
-      />
+      <div ref={draftTableRef}>
+        <VendorDraftTable
+          refreshKey={draftTableKey}
+          onContinue={handleContinueDraft}
+          onDelete={() => setDraftTableKey((k) => k + 1)}
+        />
+      </div>
       {/* ===== SUPPLIER TABLE ===== */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
@@ -1011,7 +1011,6 @@ export default function VendorTab() {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          onValuesChange={handleFormValuesChange}
           initialValues={{
             status: "Active",
             igstApplicable: "No",

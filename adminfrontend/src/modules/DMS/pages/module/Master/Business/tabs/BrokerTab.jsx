@@ -54,7 +54,6 @@ dayjs.extend(relativeTime);
 const { Text } = Typography;
 // ================= DRAFT SYSTEM =================
 const DRAFT_PREFIX = "broker-form-draft-";
-const AUTOSAVE_MS = 1500;
 
 // Serialise
 const serialiseDraft = (values) => {
@@ -278,34 +277,10 @@ export default function BrokerTab() {
   const [activeDraftId, setActiveDraftId] = useState(null);
   const [draftSavedAt, setDraftSavedAt] = useState(null);
   const [draftTableKey, setDraftTableKey] = useState(0);
-  const autosaveTimer = useRef(null);
+  const draftTableRef = useRef(null);
 
-  const handleFormValuesChange = () => {
-    if (selected || viewMode) return;
-
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-
-    autosaveTimer.current = setTimeout(() => {
-      const values = form.getFieldsValue(true);
-      const meta = {
-        brokerName: values.brokerName,
-        email: values.email,
-        phoneNo: values.phoneNo,
-      };
-
-      setActiveDraftId((prevId) => {
-        const id = prevId || createDraft(values, meta);
-        saveDraft(id, values, meta);
-        setDraftSavedAt(new Date());
-        setDraftTableKey((k) => k + 1);
-        return id;
-      });
-    }, AUTOSAVE_MS);
-  };
-
-  // Manual save draft function
-  const handleManualSave = () => {
-    if (selected || viewMode) return;
+  const saveCurrentDraft = ({ showToast = false, closeAfterSave = false } = {}) => {
+    if (selected || viewMode || !open) return;
     const values = form.getFieldsValue(true);
     const meta = {
       brokerName: values.brokerName,
@@ -318,9 +293,30 @@ export default function BrokerTab() {
       saveDraft(id, values, meta);
       setDraftSavedAt(new Date());
       setDraftTableKey((k) => k + 1);
-      message.success("Draft saved");
+
+      if (showToast) {
+        message.success("Draft saved");
+      }
+      if (closeAfterSave) {
+        setOpen(false);
+        form.resetFields();
+        setSelCountryIso(null);
+        setSelStateName(null);
+        setSelStateIso(null);
+        setSelected(null);
+        setViewMode(false);
+        setTimeout(() => {
+          draftTableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 0);
+      }
+
       return id;
     });
+  };
+
+  // Manual save draft function
+  const handleManualSave = () => {
+    saveCurrentDraft({ showToast: true, closeAfterSave: true });
   };
   const generatePassword = (length = 10) => {
     const chars =
@@ -464,11 +460,29 @@ export default function BrokerTab() {
       setSelStateIso(stateIso);
       setSelected(details);
       setViewMode(view);
+      setActiveDraftId(null);
       setOpen(true);
     } catch {
       message.error("Failed to load broker details");
     }
   };
+
+  const closeModal = () => {
+    setOpen(false);
+    form.resetFields();
+    setSelected(null);
+    setViewMode(false);
+  };
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (!selected && !viewMode && open) {
+        saveCurrentDraft();
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [open, selected, viewMode]);
 
   /* ================= SAVE ================= */
   const handleSubmit = async (values) => {
@@ -742,6 +756,8 @@ export default function BrokerTab() {
           onClick={() => {
             setSelected(null);
             setViewMode(false);
+            setActiveDraftId(null);
+            setDraftSavedAt(null);
             form.resetFields();
             const autoPassword = generatePassword();
             const countryIso = getCountryIsoByName("India");
@@ -758,11 +774,13 @@ export default function BrokerTab() {
         </Button>
       </div>
       {/* draft table */}
-      <DraftTable
-        refreshKey={draftTableKey}
-        onContinue={handleContinueDraft}
-        onDelete={() => setDraftTableKey((k) => k + 1)}
-      />
+      <div ref={draftTableRef}>
+        <DraftTable
+          refreshKey={draftTableKey}
+          onContinue={handleContinueDraft}
+          onDelete={() => setDraftTableKey((k) => k + 1)}
+        />
+      </div>
       {/* ===== TABLE CONTAINER ===== */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
@@ -785,10 +803,7 @@ export default function BrokerTab() {
         open={open}
         footer={null}
         width={1200}
-        onCancel={() => {
-          setOpen(false);
-          form.resetFields();
-        }}
+        onCancel={closeModal}
         title={
           <div className="flex items-center gap-3">
             <span className="text-amber-700 font-semibold text-lg">
@@ -840,7 +855,6 @@ export default function BrokerTab() {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          onValuesChange={handleFormValuesChange}
           initialValues={{ status: "Active" }}
         >
           {/* ================= Broker Details ================= */}
@@ -1499,10 +1513,7 @@ export default function BrokerTab() {
           {!viewMode && (
             <div className="flex justify-end gap-2 pt-2">
               <Button
-                onClick={() => {
-                  setOpen(false);
-                  form.resetFields();
-                }}
+                onClick={closeModal}
               >
                 Cancel
               </Button>
