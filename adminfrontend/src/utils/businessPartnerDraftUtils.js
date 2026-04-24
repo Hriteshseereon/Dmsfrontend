@@ -82,8 +82,13 @@ export const serialiseDraftValues = (values) => {
  * - File arrays are returned as-is (no originFileObj; the server URL is kept)
  */
 export const deserialiseDraftValues = (draft, dayjs) => {
+  if (!draft || typeof draft !== 'object') {
+    console.error('[Draft] Invalid draft data provided to deserialiseDraftValues:', draft);
+    return {};
+  }
+
   const out = {};
-  const restoreValue = (val) => {
+  const restoreValue = (val, keyPath = '') => {
     if (val === null || val === undefined) {
       return val;
     }
@@ -91,7 +96,12 @@ export const deserialiseDraftValues = (draft, dayjs) => {
     // ISO date string
     if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)) {
       const d = dayjs(val);
-      return d.isValid() ? d : null;
+      if (d.isValid()) {
+        return d;
+      } else {
+        console.warn(`[Draft] Invalid date string at ${keyPath}:`, val);
+        return null;
+      }
     }
 
     // File meta array
@@ -101,11 +111,11 @@ export const deserialiseDraftValues = (draft, dayjs) => {
 
     // Array of objects - restore recursively
     if (Array.isArray(val)) {
-      return val.map(item => {
+      return val.map((item, index) => {
         if (item && typeof item === "object") {
           const restored = {};
           for (const [key, innerVal] of Object.entries(item)) {
-            restored[key] = restoreValue(innerVal);
+            restored[key] = restoreValue(innerVal, `${keyPath}[${index}].${key}`);
           }
           return restored;
         }
@@ -117,7 +127,7 @@ export const deserialiseDraftValues = (draft, dayjs) => {
     if (val && typeof val === "object") {
       const restored = {};
       for (const [key, innerVal] of Object.entries(val)) {
-        restored[key] = restoreValue(innerVal);
+        restored[key] = restoreValue(innerVal, keyPath ? `${keyPath}.${key}` : key);
       }
       return restored;
     }
@@ -125,11 +135,25 @@ export const deserialiseDraftValues = (draft, dayjs) => {
     return val;
   };
 
-  for (const [key, val] of Object.entries(draft)) {
-    out[key] = restoreValue(val);
-  }
+  try {
+    for (const [key, val] of Object.entries(draft)) {
+      out[key] = restoreValue(val, key);
+    }
 
-  return out;
+    console.log('[Draft] Successfully deserialized draft values:', {
+      totalKeys: Object.keys(draft).length,
+      restoredKeys: Object.keys(out),
+      sampleData: Object.keys(out).slice(0, 3).reduce((acc, key) => {
+        acc[key] = out[key];
+        return acc;
+      }, {})
+    });
+
+    return out;
+  } catch (error) {
+    console.error('[Draft] Error during deserialization:', error);
+    return {};
+  }
 };
 
 // ── CRUD helpers ─────────────────────────────────────────────────────────────
@@ -138,14 +162,48 @@ export const deserialiseDraftValues = (draft, dayjs) => {
  * Save (create or update) a draft. Returns the draft id.
  */
 export const saveDraft = (id, values, meta = {}) => {
-  const payload = {
-    id,
-    savedAt: new Date().toISOString(),
-    meta,
-    values: serialiseDraftValues(values),
-  };
-  localStorage.setItem(id, JSON.stringify(payload));
-  return id;
+  try {
+    // Check localStorage availability
+    if (typeof localStorage === 'undefined') {
+      console.error('[Draft] localStorage is not available');
+      return id;
+    }
+
+    const serializedValues = serialiseDraftValues(values);
+
+    const payload = {
+      id,
+      savedAt: new Date().toISOString(),
+      meta,
+      values: serializedValues,
+    };
+
+    const jsonString = JSON.stringify(payload);
+
+    // Check if localStorage quota might be exceeded
+    if (jsonString.length > 5 * 1024 * 1024) { // 5MB limit
+      console.warn('[Draft] Draft data is very large, might exceed localStorage quota:', {
+        size: jsonString.length,
+        draftId: id
+      });
+    }
+
+    localStorage.setItem(id, jsonString);
+
+    console.log('[Draft] Successfully saved draft:', {
+      draftId: id,
+      hasValues: !!payload.values,
+      valuesKeys: Object.keys(payload.values || {}),
+      savedAt: payload.savedAt,
+      dataSize: jsonString.length
+    });
+
+    return id;
+  } catch (error) {
+    console.error('[Draft] Error saving draft:', error);
+    // Return id anyway so the UI doesn't break, but the save failed
+    return id;
+  }
 };
 
 /**
@@ -166,9 +224,33 @@ export const createDraft = (moduleType, values, meta = {}) => {
 export const loadDraft = (id) => {
   try {
     const raw = localStorage.getItem(id);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
+    if (!raw) {
+      console.warn(`[Draft] No data found for draft ID: ${id}`);
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+
+    // Validate draft structure
+    if (!parsed || typeof parsed !== 'object') {
+      console.error(`[Draft] Invalid draft structure for ID: ${id}`, parsed);
+      return null;
+    }
+
+    if (!parsed.values) {
+      console.error(`[Draft] Draft missing values data for ID: ${id}`, parsed);
+      return null;
+    }
+
+    console.log(`[Draft] Successfully loaded draft: ${id}`, {
+      hasValues: !!parsed.values,
+      valuesKeys: Object.keys(parsed.values || {}),
+      savedAt: parsed.savedAt
+    });
+
+    return parsed;
+  } catch (error) {
+    console.error(`[Draft] Error loading draft ${id}:`, error);
     return null;
   }
 };
@@ -220,6 +302,52 @@ export const hasDrafts = (moduleType) => {
   return drafts.length > 0;
 };
 
+// ── localStorage debugging utility ─────────────────────────────────────────────
+
+/**
+ * Debug localStorage availability and contents
+ */
+export const debugLocalStorage = () => {
+  const info = {
+    available: typeof localStorage !== 'undefined',
+    totalKeys: 0,
+    draftKeys: [],
+    quotaUsed: 0,
+    errors: []
+  };
+
+  try {
+    if (!info.available) {
+      info.errors.push('localStorage is not available');
+      return info;
+    }
+
+    // Count total keys and find draft keys
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key) {
+        info.totalKeys++;
+        if (key.includes('draft') || key.includes('form')) {
+          info.draftKeys.push(key);
+        }
+
+        // Estimate quota usage
+        const value = localStorage.getItem(key);
+        if (value) {
+          info.quotaUsed += key.length + value.length;
+        }
+      }
+    }
+
+    console.log('[Draft] localStorage debug info:', info);
+    return info;
+  } catch (error) {
+    info.errors.push(error.message);
+    console.error('[Draft] localStorage debug error:', error);
+    return info;
+  }
+};
+
 // ── Module-specific getters for backward compatibility ────────────────────────
 
 export const getAllCustomerDrafts = () => getAllDrafts('customer');
@@ -246,12 +374,12 @@ export const createAutoSaveHandler = (moduleType, form, activeDraftId, setActive
     setActiveDraftId((prevId) => {
       // Use existing draft ID or create new one
       const draftId = prevId || createDraft(moduleType, values, meta);
-      
+
       // Save the draft (this updates existing draft if prevId existed)
       saveDraft(draftId, values, meta);
       setDraftSavedAt(new Date());
       setDraftTableKey((k) => k + 1);
-      
+
       return draftId;
     });
   };
@@ -265,7 +393,7 @@ export const createAutoSaveHandler = (moduleType, form, activeDraftId, setActive
 export const createManualSaveHandler = (moduleType, form, activeDraftId, setActiveDraftId, setDraftSavedAt, setDraftTableKey, selected, viewMode, message) => {
   return () => {
     if (selected || viewMode) return;
-    
+
     const values = form.getFieldsValue(true);
     const meta = {
       name: values.name || values.agencyName || values.vendorName || values.brokerName,
