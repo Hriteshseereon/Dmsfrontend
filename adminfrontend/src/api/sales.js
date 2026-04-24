@@ -20,7 +20,11 @@ export const getSalescontractGroups = async () => {
   const res = await api.get(`/sales/contracts/`, { params: { organisation: currentOrgId.currentOrgId,financial_year: selectedFY, } });
   return res.data;
 }
-
+export const getSalesValidContractGroups = async () => {
+  const { currentOrgId, selectedFY } = useSessionStore.getState();
+  const res = await api.get(`/sales/contracts/active-dropdown/`, { params: { organisation: currentOrgId, financial_year: selectedFY } });
+  return res.data;
+}
 export const getAllSalesContracts = async () => {
   const { currentOrgId, selectedFY } = useSessionStore.getState();
   const res = await api.get(`/sales/contracts/`, {
@@ -40,7 +44,7 @@ export const createsalesContract = async (payload) => {
 export const updateSalesContract = async (id, payload) => {
   const { currentOrgId, selectedFY } = useSessionStore.getState();
   const res = await api.patch(`/sales/contracts/${id}/`, payload, {
-    params: { organisation: currentOrgId, financial_year: selectedFY }
+    params: { organisation: currentOrgId}
   });
   return res.data;
 }
