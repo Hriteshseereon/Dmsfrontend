@@ -43,6 +43,7 @@ import {
   updateSalesOrder,
   getCustomersByOrganisation,
   getAllSalesContracts,
+  getSalesValidContractGroups,
 } from "../../../../../api/sales";
 /* ------------------ data (use your salesOrderJSON) ------------------ */
 
@@ -236,7 +237,7 @@ export default function SaleOrdersInvoice() {
 
   const fetchContracts = async () => {
     try {
-      const res = await getAllSalesContracts();
+      const res = await getSalesValidContractGroups();
       const filtered = res.filter((item) => ["Approved"].includes(item.status));
       console.log("Fetched All Sales Contracts:", filtered);
       setContractOptions(filtered || []);
