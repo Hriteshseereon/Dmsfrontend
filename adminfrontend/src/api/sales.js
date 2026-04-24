@@ -44,7 +44,7 @@ export const createsalesContract = async (payload) => {
 export const updateSalesContract = async (id, payload) => {
   const { currentOrgId, selectedFY } = useSessionStore.getState();
   const res = await api.patch(`/sales/contracts/${id}/`, payload, {
-    params: { organisation: currentOrgId}
+    params: { organisation: currentOrgId, financial_year: selectedFY }
   });
   return res.data;
 }
