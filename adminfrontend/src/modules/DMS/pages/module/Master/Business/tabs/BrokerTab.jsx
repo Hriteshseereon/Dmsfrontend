@@ -38,6 +38,7 @@ import {
   createAutoSaveHandler,
   createManualSaveHandler,
   hasDrafts,
+  debugLocalStorage,
 } from "../../../../../../../utils/businessPartnerDraftUtils";
 import UniversalDraftTable from "./UniversalDraftTable";
 
@@ -507,13 +508,44 @@ export default function BrokerTab() {
   const filteredData = getFilteredData();
   // draft table
   const handleContinueDraft = (draftId) => {
+    console.log('[BrokerTab] Attempting to continue draft:', draftId);
+    
+    // Debug localStorage state in production
+    const storageInfo = debugLocalStorage();
+    if (storageInfo.errors.length > 0) {
+      console.error('[BrokerTab] localStorage issues detected:', storageInfo.errors);
+    }
+    
     const draft = loadDraft(draftId);
     if (!draft) {
+      console.error('[BrokerTab] Draft not found or failed to load:', draftId);
       message.error("Draft not found");
       return;
     }
 
+    console.log('[BrokerTab] Draft loaded successfully, attempting to restore values:', {
+      draftId: draft.id,
+      hasValues: !!draft.values,
+      valuesKeys: Object.keys(draft.values || {}),
+      savedAt: draft.savedAt
+    });
+
     const restored = deserialiseDraftValues(draft.values, dayjs);
+    
+    if (!restored || Object.keys(restored).length === 0) {
+      console.error('[BrokerTab] Failed to restore draft values - empty result:', restored);
+      message.error("Failed to restore draft data");
+      return;
+    }
+
+    console.log('[BrokerTab] Successfully restored draft values:', {
+      restoredKeys: Object.keys(restored),
+      sampleValues: Object.keys(restored).slice(0, 3).reduce((acc, key) => {
+        acc[key] = restored[key];
+        return acc;
+      }, {})
+    });
+
     form.resetFields();
     form.setFieldsValue(restored);
 
