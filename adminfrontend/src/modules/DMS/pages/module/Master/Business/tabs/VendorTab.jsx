@@ -805,6 +805,15 @@ export default function VendorTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
+            <Form.Item label="Legal Name" name="legalName">
+              <Input  
+                className={inputClass}
+                disabled={viewMode}
+                placeholder="Enter Legal Name"
+              />
+            </Form.Item>
+          </Col>
+              <Col span={4}>
                 <Form.Item
                   label="Mobile No"
                   name="mobileNo1"
