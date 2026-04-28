@@ -325,6 +325,7 @@ export default function VendorTab() {
     return {
     name: d.name || d.company_name,
     shortName: d.short_name,
+    legalName: d.legal_name,
     companyType: d.company_type,
     mobileNo1: d.mobile_no_1,
     mobileNo2: d.mobile_no_2,
@@ -466,6 +467,7 @@ export default function VendorTab() {
     const payload = {
       name: values.name,
       short_name: values.shortName,
+      legal_name: values.legalName,
       company_type: values.companyType,
       mobile_no_1: values.mobileNo1?.toString(),
       mobile_no_2: values.mobileNo2?.toString(),
@@ -1336,6 +1338,7 @@ export default function VendorTab() {
                 <Form.Item
                   name={["corporateAddress", "name"]}
                   label="Corporate Name"
+                  rules={[{ required: true, message: "Corporate name is required" }]}
                 >
                   <Input placeholder="Enter Name" />
                 </Form.Item>
@@ -1345,6 +1348,7 @@ export default function VendorTab() {
                 <Form.Item
                   name={["corporateAddress", "address"]}
                   label="Address"
+                  rules={[{ required: true, message: "Address is required" }]}
                 >
                   <Input placeholder="Enter Address" />
                 </Form.Item>
@@ -1354,13 +1358,14 @@ export default function VendorTab() {
                 <Form.Item
                   name={["corporateAddress", "phoneNo"]}
                   label="Phone No"
+                  rules={[{ required: true, message: "Phone number is required" }]}
                 >
                   <InputNumber style={{ width: "100%" }} />
                 </Form.Item>
               </Col>
 
               <Col span={4}>
-                <Form.Item name={["corporateAddress", "email"]} label="Email">
+                <Form.Item name={["corporateAddress", "email"]} label="Email" rules={[{ required: true, message: "Email is required" }, { type: "email", message: "Please enter a valid email address" }]}>
                   <Input />
                 </Form.Item>
               </Col>
