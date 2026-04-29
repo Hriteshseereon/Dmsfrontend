@@ -319,9 +319,13 @@ export default function VendorTab() {
   }, [open, selected, viewMode]);
 
   // ── MAP API → FORM ────────────────────────────────────────────────────────
-  const mapDetailsToForm = (d) => ({
+  const mapDetailsToForm = (d) => {
+    const contactDetails = d.contact_person_details || d.contact_person_input || {};
+
+    return {
     name: d.name || d.company_name,
     shortName: d.short_name,
+    legalName: d.legal_name,
     companyType: d.company_type,
     mobileNo1: d.mobile_no_1,
     mobileNo2: d.mobile_no_2,
@@ -333,26 +337,29 @@ export default function VendorTab() {
     websiteUrl: d.company_website,
     companyGroupName: d.company_group_name,
     contactPerson:
-      d.contact_person_input?.name ||
-      d.contact_person_input?.contact_person_name ||
+      contactDetails.name ||
+      contactDetails.contact_person_name ||
       d.contact_person,
-    gender: d.contact_person_details?.gender || d.gender,
+    gender: contactDetails.gender || d.gender,
     contactMobile:
-      d.contact_person_input?.contact_person_no ||
-      d.contact_person_input?.mobile_no ||
+      contactDetails.contact_person_no ||
+      contactDetails.mobile_no ||
+      d.contact_person_no ||
       d.mobile_no_1,
     contactWhatsapp:
-      d.contact_person_input?.contact_person_whats_no ||
-      d.contact_person_input?.whatsapp_no ||
+      contactDetails.contact_person_whats_no ||
+      contactDetails.whatsapp_no ||
+      d.contact_person_details?.whatsapp_no ||
       d.whatsapp_number,
     contactEmail:
-      d.contact_person_input?.contact_person_email ||
-      d.contact_person_input?.email ||
+      contactDetails.contact_person_email ||
+      contactDetails.contract_person_email ||
+      contactDetails.email ||
       d.email_address ||
       d.primary_email,
     aadharNo:
-      d.contact_person_input?.aadhaar_no ||
-      d.contact_person_input?.aadhar_no ||
+      contactDetails.aadhaar_no ||
+      contactDetails.aadhar_no ||
       d.aadhar_no ||
       d.aadhaar_no,
 
@@ -424,7 +431,8 @@ export default function VendorTab() {
           )
         : null,
     })),
-  });
+  };
+  };
 
   const openVendor = async (record, view = false) => {
     try {
@@ -459,6 +467,7 @@ export default function VendorTab() {
     const payload = {
       name: values.name,
       short_name: values.shortName,
+      legal_name: values.legalName,
       company_type: values.companyType,
       mobile_no_1: values.mobileNo1?.toString(),
       mobile_no_2: values.mobileNo2?.toString(),
@@ -804,6 +813,15 @@ export default function VendorTab() {
                   />
                 </Form.Item>
               </Col>
+              <Col span={4}>
+            <Form.Item label="Legal Name" name="legalName">
+              <Input  
+                className={inputClass}
+                disabled={viewMode}
+                placeholder="Enter Legal Name"
+              />
+            </Form.Item>
+          </Col>
               <Col span={4}>
                 <Form.Item
                   label="Mobile No"
@@ -1320,6 +1338,7 @@ export default function VendorTab() {
                 <Form.Item
                   name={["corporateAddress", "name"]}
                   label="Corporate Name"
+                  rules={[{ required: true, message: "Corporate name is required" }]}
                 >
                   <Input placeholder="Enter Name" />
                 </Form.Item>
@@ -1329,6 +1348,7 @@ export default function VendorTab() {
                 <Form.Item
                   name={["corporateAddress", "address"]}
                   label="Address"
+                  rules={[{ required: true, message: "Address is required" }]}
                 >
                   <Input placeholder="Enter Address" />
                 </Form.Item>
@@ -1338,13 +1358,14 @@ export default function VendorTab() {
                 <Form.Item
                   name={["corporateAddress", "phoneNo"]}
                   label="Phone No"
+                  rules={[{ required: true, message: "Phone number is required" }]}
                 >
                   <InputNumber style={{ width: "100%" }} />
                 </Form.Item>
               </Col>
 
               <Col span={4}>
-                <Form.Item name={["corporateAddress", "email"]} label="Email">
+                <Form.Item name={["corporateAddress", "email"]} label="Email" rules={[{ required: true, message: "Email is required" }, { type: "email", message: "Please enter a valid email address" }]}>
                   <Input />
                 </Form.Item>
               </Col>
