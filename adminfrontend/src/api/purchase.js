@@ -25,6 +25,15 @@ export const getPurchaseContract = async () => {
   });
   return res.data;
 }
+
+export const getPurchaseValidContractGroups = async () => {
+  const { currentOrgId, selectedFY } = useSessionStore.getState();
+  const res = await api.get("/purchase/contracts/approved-dropdown/", {
+    params: { organisation: currentOrgId, financial_year: selectedFY }
+  });
+  return res.data;
+};
+
 //fetch purchase contract by id
 export const getPurchaseContractById = async (contractId) => {
   const {currentOrgId,selectedFY} = useSessionStore.getState();
