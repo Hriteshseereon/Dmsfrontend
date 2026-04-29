@@ -105,7 +105,7 @@ export default function CustomerTab() {
 
   // check draft
   const checkDraftExists = () => {
-    setHasDraft(hasDrafts('customer'));
+    setHasDraft(hasDrafts("customer"));
   };
   useEffect(() => {
     checkDraftExists();
@@ -183,22 +183,22 @@ export default function CustomerTab() {
    */
   const handleFormValuesChange = useCallback(
     createAutoSaveHandler(
-      'customer',
+      "customer",
       form,
       activeDraftId,
       setActiveDraftId,
       setDraftSavedAt,
       setDraftTableKey,
       selected,
-      viewMode
+      viewMode,
     ),
-    [form, selected, viewMode, activeDraftId]
+    [form, selected, viewMode, activeDraftId],
   );
 
   // ── DRAFT: manual save ────────────────────────────────────────────────────
 
   const handleManualSave = createManualSaveHandler(
-    'customer',
+    "customer",
     form,
     activeDraftId,
     setActiveDraftId,
@@ -206,49 +206,63 @@ export default function CustomerTab() {
     setDraftTableKey,
     selected,
     viewMode,
-    message
+    message,
   );
 
   // ── DRAFT: continue (load into form) ─────────────────────────────────────
 
   const handleContinueDraft = (draftId) => {
-    console.log('[CustomerTab] Attempting to continue draft:', draftId);
-    
+    console.log("[CustomerTab] Attempting to continue draft:", draftId);
+
     // Debug localStorage state in production
     const storageInfo = debugLocalStorage();
     if (storageInfo.errors.length > 0) {
-      console.error('[CustomerTab] localStorage issues detected:', storageInfo.errors);
+      console.error(
+        "[CustomerTab] localStorage issues detected:",
+        storageInfo.errors,
+      );
     }
-    
+
     const draft = loadDraft(draftId);
     if (!draft) {
-      console.error('[CustomerTab] Draft not found or failed to load:', draftId);
+      console.error(
+        "[CustomerTab] Draft not found or failed to load:",
+        draftId,
+      );
       message.error("Draft not found");
       return;
     }
 
-    console.log('[CustomerTab] Draft loaded successfully, attempting to restore values:', {
-      draftId: draft.id,
-      hasValues: !!draft.values,
-      valuesKeys: Object.keys(draft.values || {}),
-      savedAt: draft.savedAt
-    });
+    console.log(
+      "[CustomerTab] Draft loaded successfully, attempting to restore values:",
+      {
+        draftId: draft.id,
+        hasValues: !!draft.values,
+        valuesKeys: Object.keys(draft.values || {}),
+        savedAt: draft.savedAt,
+      },
+    );
 
     // Restore form values
     const restored = deserialiseDraftValues(draft.values, dayjs);
-    
+
     if (!restored || Object.keys(restored).length === 0) {
-      console.error('[CustomerTab] Failed to restore draft values - empty result:', restored);
+      console.error(
+        "[CustomerTab] Failed to restore draft values - empty result:",
+        restored,
+      );
       message.error("Failed to restore draft data");
       return;
     }
 
-    console.log('[CustomerTab] Successfully restored draft values:', {
+    console.log("[CustomerTab] Successfully restored draft values:", {
       restoredKeys: Object.keys(restored),
-      sampleValues: Object.keys(restored).slice(0, 3).reduce((acc, key) => {
-        acc[key] = restored[key];
-        return acc;
-      }, {})
+      sampleValues: Object.keys(restored)
+        .slice(0, 3)
+        .reduce((acc, key) => {
+          acc[key] = restored[key];
+          return acc;
+        }, {}),
     });
 
     form.resetFields();
@@ -418,7 +432,7 @@ export default function CustomerTab() {
     pdcNumber: details.pdc_cheque_number,
     pdcAmount: details.pdc_amount,
     pdcIssueDate: details.pdc_issue_date ? dayjs(details.pdc_issue_date) : null,
-    pdcDate: details.pdc_cheque_date,
+    pdcDate: details.pdc_cheque_date ? dayjs(details.pdc_cheque_date) : null,
     pdcValid: details.pdc_valid_upto ? dayjs(details.pdc_valid_upto) : null,
 
     fdBank: details.fd_bank_name,
@@ -539,7 +553,10 @@ export default function CustomerTab() {
             ? dayjs(values.pdcIssueDate).format("YYYY-MM-DD")
             : "",
         );
-        formData.append("pdc_cheque_date", values.pdcDate);
+        formData.append(
+          "pdc_cheque_date",
+          values.pdcDate ? dayjs(values.pdcDate).format("YYYY-MM-DD") : "",
+        );
         formData.append("pdc_cheque_number", values.pdcNumber);
         formData.append("pdc_amount", values.pdcAmount);
         formData.append(
@@ -645,8 +662,10 @@ export default function CustomerTab() {
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Name</span>,
-      dataIndex: "customer_name",
+      title: (
+        <span className="text-amber-700 font-semibold">Business Name</span>
+      ),
+      dataIndex: "business_name",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
@@ -1360,7 +1379,11 @@ export default function CustomerTab() {
                         { required: true, message: "Select cheque date" },
                       ]}
                     >
-                      <Input placeholder="DD-MM-YYYY" disabled={viewMode} />
+                      <DatePicker
+                        className="w-full"
+                        format="YYYY-MM-DD"
+                        disabled={viewMode}
+                      />
                     </Form.Item>
                   </Col>
                   <Col span={5}>
