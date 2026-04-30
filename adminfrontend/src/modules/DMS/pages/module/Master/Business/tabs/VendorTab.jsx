@@ -42,6 +42,7 @@ import {
   createVendor,
   updateVendor,
   getVendorDetailsByid,
+  getCompanyGroupDropdown,
 } from "../../../../../../../api/bussinesspatnr";
 import {
   getCountryOptions,
@@ -90,7 +91,7 @@ export default function VendorTab() {
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState(false);
   const [selected, setSelected] = useState(null);
-
+  const [companyGroups, setCompanyGroups] = useState([]);
   // location cascade
   const [selCountryIso, setSelCountryIso] = useState("IN");
   const [selStateName, setSelStateName] = useState(null);
@@ -105,6 +106,23 @@ export default function VendorTab() {
   const [draftTableKey, setDraftTableKey] = useState(0);
   const [hasDraft, setHasDraft] = useState(false);
 
+  const companyGroupOptions = companyGroups.map((item) => ({
+    label: item.name,
+    value: item.id,
+  }));
+  const getCompanyGroups = async () => {
+    try {
+      const res = await getCompanyGroupDropdown();
+      setCompanyGroups(res);
+      console.log("Fetched company groups:", res);
+    } catch {
+      message.error("Failed to fetch company groups");
+    }
+  };
+
+  useEffect(() => {
+    getCompanyGroups();
+  }, []);
   // check draft
   const checkDraftExists = () => {
     setHasDraft(hasDrafts("vendor"));
@@ -202,42 +220,53 @@ export default function VendorTab() {
 
   // ── DRAFT: continue (restore into form) ──────────────────────────────────
   const handleContinueDraft = (draftId) => {
-    console.log('[VendorTab] Attempting to continue draft:', draftId);
-    
+    console.log("[VendorTab] Attempting to continue draft:", draftId);
+
     // Debug localStorage state in production
     const storageInfo = debugLocalStorage();
     if (storageInfo.errors.length > 0) {
-      console.error('[VendorTab] localStorage issues detected:', storageInfo.errors);
+      console.error(
+        "[VendorTab] localStorage issues detected:",
+        storageInfo.errors,
+      );
     }
-    
+
     const draft = loadDraft(draftId);
     if (!draft) {
-      console.error('[VendorTab] Draft not found or failed to load:', draftId);
+      console.error("[VendorTab] Draft not found or failed to load:", draftId);
       message.error("Draft not found");
       return;
     }
 
-    console.log('[VendorTab] Draft loaded successfully, attempting to restore values:', {
-      draftId: draft.id,
-      hasValues: !!draft.values,
-      valuesKeys: Object.keys(draft.values || {}),
-      savedAt: draft.savedAt
-    });
+    console.log(
+      "[VendorTab] Draft loaded successfully, attempting to restore values:",
+      {
+        draftId: draft.id,
+        hasValues: !!draft.values,
+        valuesKeys: Object.keys(draft.values || {}),
+        savedAt: draft.savedAt,
+      },
+    );
 
     const restored = deserialiseDraftValues(draft.values, dayjs);
-    
+
     if (!restored || Object.keys(restored).length === 0) {
-      console.error('[VendorTab] Failed to restore draft values - empty result:', restored);
+      console.error(
+        "[VendorTab] Failed to restore draft values - empty result:",
+        restored,
+      );
       message.error("Failed to restore draft data");
       return;
     }
 
-    console.log('[VendorTab] Successfully restored draft values:', {
+    console.log("[VendorTab] Successfully restored draft values:", {
       restoredKeys: Object.keys(restored),
-      sampleValues: Object.keys(restored).slice(0, 3).reduce((acc, key) => {
-        acc[key] = restored[key];
-        return acc;
-      }, {})
+      sampleValues: Object.keys(restored)
+        .slice(0, 3)
+        .reduce((acc, key) => {
+          acc[key] = restored[key];
+          return acc;
+        }, {}),
     });
 
     form.resetFields();
@@ -320,118 +349,121 @@ export default function VendorTab() {
 
   // ── MAP API → FORM ────────────────────────────────────────────────────────
   const mapDetailsToForm = (d) => {
-    const contactDetails = d.contact_person_details || d.contact_person_input || {};
+    const contactDetails =
+      d.contact_person_details || d.contact_person_input || {};
 
     return {
-    name: d.name || d.company_name,
-    shortName: d.short_name,
-    legalName: d.legal_name,
-    companyType: d.company_type,
-    mobileNo1: d.mobile_no_1,
-    mobileNo2: d.mobile_no_2,
-    phoneNumber: d.phone_number || d.mobile_no_1,
-    whatsappNo: d.whatsapp_number,
-    email1: d.email_address || d.primary_email,
-    email2: d.secondary_email,
-    socialLink: d.social_link,
-    websiteUrl: d.company_website,
-    companyGroupName: d.company_group_name,
-    contactPerson:
-      contactDetails.name ||
-      contactDetails.contact_person_name ||
-      d.contact_person,
-    gender: contactDetails.gender || d.gender,
-    contactMobile:
-      contactDetails.contact_person_no ||
-      contactDetails.mobile_no ||
-      d.contact_person_no ||
-      d.mobile_no_1,
-    contactWhatsapp:
-      contactDetails.contact_person_whats_no ||
-      contactDetails.whatsapp_no ||
-      d.contact_person_details?.whatsapp_no ||
-      d.whatsapp_number,
-    contactEmail:
-      contactDetails.contact_person_email ||
-      contactDetails.contract_person_email ||
-      contactDetails.email ||
-      d.email_address ||
-      d.primary_email,
-    aadharNo:
-      contactDetails.aadhaar_no ||
-      contactDetails.aadhar_no ||
-      d.aadhar_no ||
-      d.aadhaar_no,
+      name: d.name || d.company_name,
+      shortName: d.short_name,
+      legalName: d.legal_name,
+      companyType: d.company_type,
+      mobileNo1: d.mobile_no_1,
+      mobileNo2: d.mobile_no_2,
+      phoneNumber: d.phone_number || d.mobile_no_1,
+      whatsappNo: d.whatsapp_number,
+      email1: d.email_address || d.primary_email,
+      email2: d.secondary_email,
+      socialLink: d.social_link,
+      websiteUrl: d.company_website,
+      companyGroupName: d.company_group_name || d.company_group,
+      contactPerson:
+        contactDetails.name ||
+        contactDetails.contact_person_name ||
+        d.contact_person,
+      gender: contactDetails.gender || d.gender,
+      contactMobile:
+        contactDetails.contact_person_no ||
+        contactDetails.mobile_no ||
+        d.contact_person_no ||
+        d.mobile_no_1,
+      contactWhatsapp:
+        contactDetails.contact_person_whats_no ||
+        contactDetails.whatsapp_no ||
+        d.contact_person_details?.whatsapp_no ||
+        d.whatsapp_number,
+      contactEmail:
+        contactDetails.contact_person_email ||
+        contactDetails.contract_person_email ||
+        contactDetails.email ||
+        d.email_address ||
+        d.primary_email,
+      aadharNo:
+        contactDetails.aadhaar_no ||
+        contactDetails.aadhar_no ||
+        d.aadhar_no ||
+        d.aadhaar_no,
 
-    tinNo: d.business_details?.tin_no,
-    tinDate: d.business_details?.tin_date
-      ? dayjs(d.business_details.tin_date)
-      : null,
-    panNo: d.business_details?.pan || d.business_details?.pan_no,
-    fssaiNo: d.business_details?.fssai_no,
-    gstIn: d.business_details?.gstin || d.business_details?.gstin_no,
-    igstApplicable: d.business_details?.igst_applicable ? "Yes" : "No",
-
-    address1: d.addresses?.[0]?.address_line1 || d.addresses?.address_line_1,
-    address2: d.addresses?.[0]?.address_line2 || d.addresses?.address_line_2,
-    country: d.addresses?.[0]?.country || "India",
-    state: d.addresses?.[0]?.state || d.addresses?.state,
-    district: d.addresses?.[0]?.district || d.addresses?.district,
-    city: d.addresses?.[0]?.city || d.addresses?.city,
-    location: d.addresses?.[0]?.location || d.addresses?.location,
-    pinCode: d.addresses?.[0]?.pin || d.addresses?.pin_code,
-    transactionType:
-      d.addresses?.[0]?.transaction_type || d.addresses?.transaction_type,
-
-    status: (
-      d.is_active !== undefined
-        ? d.is_active
-        : d.addresses?.[0]?.status === "Active"
-    )
-      ? "Active"
-      : "Inactive",
-
-    panDoc: fileFromUrl(d.pan_document || d.business_details?.pan_document),
-    gstDoc: fileFromUrl(d.gstin_document || d.business_details?.gstin_document),
-    tinDoc: fileFromUrl(d.tin_document || d.business_details?.tin_document),
-    aadharDoc: fileFromUrl(
-      d.aadhaar_documents ||
-        d.aadhar_document ||
-        d.business_details?.aadhaar_documents,
-    ),
-    corporateAddress: d.corporate_addresses?.[0]
-      ? {
-          name: d.corporate_addresses[0].name,
-          address: d.corporate_addresses[0].address,
-          phoneNo: d.corporate_addresses[0].phone_number,
-          email: d.corporate_addresses[0].email_address,
-          country: d.corporate_addresses[0].country,
-          state: d.corporate_addresses[0].state,
-          district: d.corporate_addresses[0].district,
-          city: d.corporate_addresses[0].city,
-          pin: d.corporate_addresses[0].pin,
-        }
-      : {},
-    plants: (d.plants || []).map((p) => ({
-      plantName: p.name || p.plant_name,
-      address: p.address,
-      phoneNo: p.phone_number || p.phone_no,
-      email: p.email_address || p.email,
-      country: p.country || "India",
-      state: p.state,
-      district: p.district,
-      city: p.city,
-      pin: p.pin,
-      faxNo: p.fax_no,
-      // stateIso is needed for city dropdown — derive it when mapping
-      stateIso: p.state
-        ? getStateIsoByName(
-            getCountryIsoByName(p.country || "India") || "IN",
-            p.state,
-          )
+      tinNo: d.business_details?.tin_no,
+      tinDate: d.business_details?.tin_date
+        ? dayjs(d.business_details.tin_date)
         : null,
-    })),
-  };
+      panNo: d.business_details?.pan || d.business_details?.pan_no,
+      fssaiNo: d.business_details?.fssai_no,
+      gstIn: d.business_details?.gstin || d.business_details?.gstin_no,
+      igstApplicable: d.business_details?.igst_applicable ? "Yes" : "No",
+
+      address1: d.addresses?.[0]?.address_line1 || d.addresses?.address_line_1,
+      address2: d.addresses?.[0]?.address_line2 || d.addresses?.address_line_2,
+      country: d.addresses?.[0]?.country || "India",
+      state: d.addresses?.[0]?.state || d.addresses?.state,
+      district: d.addresses?.[0]?.district || d.addresses?.district,
+      city: d.addresses?.[0]?.city || d.addresses?.city,
+      location: d.addresses?.[0]?.location || d.addresses?.location,
+      pinCode: d.addresses?.[0]?.pin || d.addresses?.pin_code,
+      transactionType:
+        d.addresses?.[0]?.transaction_type || d.addresses?.transaction_type,
+
+      status: (
+        d.is_active !== undefined
+          ? d.is_active
+          : d.addresses?.[0]?.status === "Active"
+      )
+        ? "Active"
+        : "Inactive",
+
+      panDoc: fileFromUrl(d.pan_document || d.business_details?.pan_document),
+      gstDoc: fileFromUrl(
+        d.gstin_document || d.business_details?.gstin_document,
+      ),
+      tinDoc: fileFromUrl(d.tin_document || d.business_details?.tin_document),
+      aadharDoc: fileFromUrl(
+        d.aadhaar_documents ||
+          d.aadhar_document ||
+          d.business_details?.aadhaar_documents,
+      ),
+      corporateAddress: d.corporate_addresses?.[0]
+        ? {
+            name: d.corporate_addresses[0].name,
+            address: d.corporate_addresses[0].address,
+            phoneNo: d.corporate_addresses[0].phone_number,
+            email: d.corporate_addresses[0].email_address,
+            country: d.corporate_addresses[0].country,
+            state: d.corporate_addresses[0].state,
+            district: d.corporate_addresses[0].district,
+            city: d.corporate_addresses[0].city,
+            pin: d.corporate_addresses[0].pin,
+          }
+        : {},
+      plants: (d.plants || []).map((p) => ({
+        plantName: p.name || p.plant_name,
+        address: p.address,
+        phoneNo: p.phone_number || p.phone_no,
+        email: p.email_address || p.email,
+        country: p.country || "India",
+        state: p.state,
+        district: p.district,
+        city: p.city,
+        pin: p.pin,
+        faxNo: p.fax_no,
+        // stateIso is needed for city dropdown — derive it when mapping
+        stateIso: p.state
+          ? getStateIsoByName(
+              getCountryIsoByName(p.country || "India") || "IN",
+              p.state,
+            )
+          : null,
+      })),
+    };
   };
 
   const openVendor = async (record, view = false) => {
@@ -439,7 +471,9 @@ export default function VendorTab() {
       const details = await getVendorDetailsByid(record.id);
       const mapped = mapDetailsToForm(details);
       form.setFieldsValue(mapped);
-
+      if (!companyGroups.length) {
+        await getCompanyGroups();
+      }
       // restore top-level location cascade for edit/view
       if (mapped.country) {
         const iso = getCountryIsoByName(mapped.country) || "IN";
@@ -479,7 +513,7 @@ export default function VendorTab() {
       social_link: values.socialLink,
       company_website: values.websiteUrl,
       is_active: values.status === "Active",
-      company_group_name: values.companyGroupName,
+      company_group: values.companyGroupName,
       contact_person_input: {
         name: values.contactPerson || "",
         gender: values.gender,
@@ -814,14 +848,14 @@ export default function VendorTab() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-            <Form.Item label="Legal Name" name="legalName">
-              <Input  
-                className={inputClass}
-                disabled={viewMode}
-                placeholder="Enter Legal Name"
-              />
-            </Form.Item>
-          </Col>
+                <Form.Item label="Legal Name" name="legalName">
+                  <Input
+                    className={inputClass}
+                    disabled={viewMode}
+                    placeholder="Enter Legal Name"
+                  />
+                </Form.Item>
+              </Col>
               <Col span={4}>
                 <Form.Item
                   label="Mobile No"
@@ -1338,7 +1372,9 @@ export default function VendorTab() {
                 <Form.Item
                   name={["corporateAddress", "name"]}
                   label="Corporate Name"
-                  rules={[{ required: true, message: "Corporate name is required" }]}
+                  rules={[
+                    { required: true, message: "Corporate name is required" },
+                  ]}
                 >
                   <Input placeholder="Enter Name" />
                 </Form.Item>
@@ -1358,14 +1394,26 @@ export default function VendorTab() {
                 <Form.Item
                   name={["corporateAddress", "phoneNo"]}
                   label="Phone No"
-                  rules={[{ required: true, message: "Phone number is required" }]}
+                  rules={[
+                    { required: true, message: "Phone number is required" },
+                  ]}
                 >
                   <InputNumber style={{ width: "100%" }} />
                 </Form.Item>
               </Col>
 
               <Col span={4}>
-                <Form.Item name={["corporateAddress", "email"]} label="Email" rules={[{ required: true, message: "Email is required" }, { type: "email", message: "Please enter a valid email address" }]}>
+                <Form.Item
+                  name={["corporateAddress", "email"]}
+                  label="Email"
+                  rules={[
+                    { required: true, message: "Email is required" },
+                    {
+                      type: "email",
+                      message: "Please enter a valid email address",
+                    },
+                  ]}
+                >
                   <Input />
                 </Form.Item>
               </Col>
@@ -1470,11 +1518,19 @@ export default function VendorTab() {
           <Card className="mb-4 border border-amber-200 rounded-lg">
             <Row gutter={24}>
               <Col span={6}>
-                <Form.Item label="Company Group Name" name="companyGroupName">
-                  <Input
-                    className={inputClass}
+                <Form.Item
+                  label="Company Group Name"
+                  name="companyGroupName"
+                  rules={[
+                    { required: true, message: "Please select company group" },
+                  ]}
+                >
+                  <Select
+                    placeholder="Select Company Group"
+                    options={companyGroupOptions}
+                    showSearch
+                    optionFilterProp="label"
                     disabled={viewMode}
-                    placeholder="Enter Company Group Name"
                   />
                 </Form.Item>
               </Col>

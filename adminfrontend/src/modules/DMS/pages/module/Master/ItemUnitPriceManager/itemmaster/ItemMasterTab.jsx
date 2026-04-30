@@ -35,6 +35,7 @@ import {
   updateProductById,
   getUnits,
 } from "../../../../../../../api/product";
+import { getCompanyGroupDropdown } from "../../../../../../../api/bussinesspatnr";
 import {
   createItemMasterDraft,
   saveItemMasterDraft,
@@ -96,7 +97,8 @@ export default function ItemMasterTab({ items, setItems }) {
   useEffect(() => {
     Promise.all([
       getProductGroups(),
-      getVendors(),
+      // getVendors(),
+      getCompanyGroupDropdown(), // ✅ FIX 2
       getHSNSACCodes(),
       getSACCodes(),
       getUnits(),
@@ -217,7 +219,7 @@ export default function ItemMasterTab({ items, setItems }) {
       setFormData({
         itemName: data.name,
         itemType: data.product_type,
-        company: data.vendor,
+        company: data.company_group,
         product_group: data.product_group,
         itemCategory: data.category,
         hsn_code: data.hsn_code,
@@ -268,7 +270,8 @@ export default function ItemMasterTab({ items, setItems }) {
       cgst: formData.cgstPercent,
       sgst: formData.sgstPercent,
       current_stock: formData.currentStock || 0,
-      vendor: formData.company,
+      // vendor: formData.company,
+      company_group: formData.company,
       net_weight: formData.net_weight,
       gross_weight: formData.gross_weight,
     };
@@ -308,7 +311,7 @@ export default function ItemMasterTab({ items, setItems }) {
   const columns = [
     { title: "Item Name", dataIndex: "name" },
     { title: "Type", dataIndex: "product_type" },
-    { title: "Company", dataIndex: "vendor_name" },
+    { title: "Company", dataIndex: "company_group" },
     { title: "Base Unit", dataIndex: "base_unit" },
     { title: "Net Weight", dataIndex: "net_weight" },
     { title: "Gross Weight", dataIndex: "gross_weight" },
