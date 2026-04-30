@@ -90,3 +90,10 @@ export const getCompanyGroupById = async (id) => {
   const res = await api.get(`/vendors/company-groups/${id}/`, { params: { organisation: currentOrgId } });
   return res.data;
 }
+
+// commpany group name   dropdown api
+export const getCompanyGroupDropdown = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("/vendors/company-group-dropdown/", { params: { organisation: currentOrgId } });
+  return res.data;
+}
