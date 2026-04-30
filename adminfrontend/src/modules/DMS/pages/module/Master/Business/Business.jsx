@@ -6,6 +6,7 @@ import CustomerTab from "./tabs/CustomerTab";
 import VendorTab from "./tabs/VendorTab";
 import TransportTab from "./tabs/TransportTab";
 import BrokerTab from "./tabs/BrokerTab";
+import CompanyGroupTab from "./tabs/CompanyGroupTab";
 
 export default function Business() {
   const items = [
@@ -28,6 +29,11 @@ export default function Business() {
       key: "broker",
       label: "Broker",
       children: <BrokerTab />,
+    },
+    {
+      key: "company-group",
+      label: "Company Group",
+      children: <CompanyGroupTab />,
     },
   ];
 
