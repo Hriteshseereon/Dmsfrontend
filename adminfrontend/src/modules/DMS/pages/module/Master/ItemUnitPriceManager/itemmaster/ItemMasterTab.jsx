@@ -311,7 +311,7 @@ export default function ItemMasterTab({ items, setItems }) {
   const columns = [
     { title: "Item Name", dataIndex: "name" },
     { title: "Type", dataIndex: "product_type" },
-    { title: "Company", dataIndex: "company_group" },
+    { title: "Company", dataIndex: "company_group_name" },
     { title: "Base Unit", dataIndex: "base_unit" },
     { title: "Net Weight", dataIndex: "net_weight" },
     { title: "Gross Weight", dataIndex: "gross_weight" },
