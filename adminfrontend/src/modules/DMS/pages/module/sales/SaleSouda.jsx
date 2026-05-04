@@ -40,6 +40,8 @@ import {
   createsalesContract,
   getproductbyVendor,
   getVendors,
+  getCompanies,
+  getProductsByCompany,
   getSalescontractGroups,
   approvedSalesContract,
   getCustomersByOrganisation,
@@ -99,7 +101,7 @@ export default function SalesSouda() {
     autoSaveTimeoutRef.current = setTimeout(() => {
       const values = form.getFieldsValue();
       if (values && Object.keys(values).length > 0) {
-        saveSalesDraft(draftId, values, 'souda');
+        saveSalesDraft(draftId, values, "souda");
         setActiveDraftId(draftId);
       }
     }, 1500); // Auto-save after 1.5 seconds of inactivity
@@ -109,14 +111,14 @@ export default function SalesSouda() {
     const values = form.getFieldsValue();
     if (values && Object.keys(values).length > 0) {
       const draftId = `sales-${Date.now()}`;
-      saveSalesDraft(draftId, values, 'souda');
+      saveSalesDraft(draftId, values, "souda");
       setActiveDraftId(draftId);
       loadDraftsList();
     }
   };
 
   const loadDraftsList = () => {
-    const allDrafts = getAllSalesDrafts('souda');
+    const allDrafts = getAllSalesDrafts("souda");
     setDrafts(allDrafts);
   };
 
@@ -128,7 +130,7 @@ export default function SalesSouda() {
   };
 
   const handleDeleteDraft = (draftId) => {
-    deleteSalesDraft(draftId, 'souda');
+    deleteSalesDraft(draftId, "souda");
     if (activeDraftId === draftId) {
       setActiveDraftId(null);
     }
@@ -148,7 +150,7 @@ export default function SalesSouda() {
         orderTotals: computed.orderTotals,
       });
     }
-    
+
     // Auto-save on form changes
     const draftId = activeDraftId || `sales-${Date.now()}`;
     handleAutoSave(form, draftId);
@@ -251,7 +253,7 @@ export default function SalesSouda() {
 
     const fetchVendorProducts = async () => {
       try {
-        const res = await getproductbyVendor(selectedVendorId);
+        const res = await getProductsByCompany(selectedVendorId);
         // assume res = [{ id, name, code }]
         setVendorItems(res || []);
       } catch (err) {
@@ -266,7 +268,7 @@ export default function SalesSouda() {
   useEffect(() => {
     const fetchVendors = async () => {
       try {
-        const res = await getVendors();
+        const res = await getCompanies();
         // expected: [{ id, name }]
         console.log("Fetched vendors:", res);
         setVendors(res || []);
@@ -706,7 +708,7 @@ export default function SalesSouda() {
         try {
           // Fetch all simultaneously
           const responses = await Promise.all(
-            uniqueVendorIds.map((vid) => getproductbyVendor(vid)),
+            uniqueVendorIds.map((vid) => getProductsByCompany(vid)),
           );
 
           setVendorProductsMap((prev) => {
@@ -912,7 +914,7 @@ export default function SalesSouda() {
                           placeholder="Select Supplier"
                           onChange={async (vendorId) => {
                             if (!vendorProductsMap[vendorId]) {
-                              const res = await getproductbyVendor(vendorId);
+                              const res = await getProductsByCompany(vendorId);
 
                               setVendorProductsMap((prev) => ({
                                 ...prev,
@@ -1218,7 +1220,7 @@ export default function SalesSouda() {
 
       // Delete active draft after successful submission
       if (activeDraftId) {
-        deleteSalesDraft(activeDraftId, 'souda');
+        deleteSalesDraft(activeDraftId, "souda");
         setActiveDraftId(null);
         loadDraftsList();
       }
