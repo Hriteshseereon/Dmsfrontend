@@ -81,6 +81,26 @@ export const getVendors = async () => {
   const res = await api.get("/vendors/vendors/", { params: { organisation: currentOrgId } });
   return res.data;
 }
+
+
+export const getCompanies = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("/vendors/company-groups/", {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+
+export const getProductsByCompany = async (companyId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("/product/products/by-company-group/", {
+    params: {
+      organisation: currentOrgId,
+      company_group: companyId,
+    },
+  });
+  return res.data;
+};
 export const approvedSalesContract = async (contractId) => {
   const { currentOrgId } = useSessionStore.getState();
   const res = await api.post(`/sales/contracts/${contractId}/approve/`, null, {

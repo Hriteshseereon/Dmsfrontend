@@ -1,15 +1,28 @@
-// PurchaseSouda.jsx  
+// PurchaseSouda.jsx
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   positiveNumberInputProps,
   percentageInputProps,
-  blockNonNumericInput
+  blockNonNumericInput,
 } from "../../../helpers/numberInput";
 import { exportToExcel } from "../../../../../utils/exportToExcel";
-import { requiredPositiveNumber, } from "../../../helpers/formValidation";
+import { requiredPositiveNumber } from "../../../helpers/formValidation";
 import useSessionStore from "../../../../../store/sessionStore";
-import { createFinancialYearDisabledDate, useSelectedFinancialYear } from "../../../../../utils/financialYearValidation";
-import { getPurchaseContract, getAllVendor, addPurchaseContract, getproductbyVendor, getPlantsByVendor ,getPurchaseContractById,updatePurchaseContract} from "../../../../../api/purchase";
+import {
+  createFinancialYearDisabledDate,
+  useSelectedFinancialYear,
+} from "../../../../../utils/financialYearValidation";
+import {
+  getPurchaseContract,
+  getAllVendor,
+  getCompanies,
+  addPurchaseContract,
+  getproductbyVendor,
+  getProductsByCompany,
+  getPlantsByVendor,
+  getPurchaseContractById,
+  updatePurchaseContract,
+} from "../../../../../api/purchase";
 import {
   Table,
   Input,
@@ -42,8 +55,6 @@ import {
 
 const { Option } = Select;
 
-
-
 export default function PurchaseSouda() {
   // forms
   const [addForm] = Form.useForm();
@@ -67,7 +78,7 @@ export default function PurchaseSouda() {
   const [drafts, setDrafts] = useState([]);
   const [activeDraftId, setActiveDraftId] = useState(null);
   const autoSaveTimeoutRef = useRef(null);
-const statusOptions = ["Pending","Approved", "Rejected"];
+  const statusOptions = ["Pending", "Approved", "Rejected"];
 
   useEffect(() => {
     fetchDropdownData();
@@ -124,21 +135,16 @@ const statusOptions = ["Pending","Approved", "Rejected"];
     loadDraftsList();
   };
 
-
-
   // keep max 3 decimals, no trailing junk
   const round2 = (num) => {
     if (num === null || num === undefined || isNaN(num)) return 0;
     return Number(Number(num).toFixed(2));
   };
 
-
   const fetchDropdownData = async () => {
     try {
       const [vendorRes, plantRes] = await Promise.all([
-        getAllVendor(),   // vendor table
-
-
+        getCompanies(), // vendor table
       ]);
       console.log("PLANT API DATA:", plantRes);
       setVendors(vendorRes);
@@ -146,9 +152,6 @@ const statusOptions = ["Pending","Approved", "Rejected"];
       console.error(err);
     }
   };
-
-
-
 
   // search (simple)
   const handleSearch = (value) => {
@@ -160,19 +163,17 @@ const statusOptions = ["Pending","Approved", "Rejected"];
     }
 
     const filtered = data.filter((item) =>
-      JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
+      JSON.stringify(item).toLowerCase().includes(value.toLowerCase()),
     );
 
     setData(filtered);
   };
-
 
   const fetchPurchaseContracts = async () => {
     try {
       setLoading(true);
       const res = await getPurchaseContract();
 
-     
       const formattedData = res.map((item, index) => ({
         key: item.id || index + 1,
         name: item.name,
@@ -192,190 +193,184 @@ const statusOptions = ["Pending","Approved", "Rejected"];
       setLoading(false);
     }
   };
-const handleEditClick = async (record) => {
-  try {
-    setLoading(true);
+  const handleEditClick = async (record) => {
+    try {
+      setLoading(true);
 
-    const res = await getPurchaseContractById(record.key);
+      const res = await getPurchaseContractById(record.key);
 
-    setSelectedVendor(res.vendor);
+      setSelectedVendor(res.vendor);
 
-    const productRes = await getproductbyVendor(res.vendor);
-    setProducts(productRes?.products || []);
+      const productRes = await getProductsByCompany(res.vendor);
+      setProducts(productRes?.products || []);
 
-    const plantRes = await getPlantsByVendor(res.vendor);
-    setPlants(plantRes || []);
+      const plantRes = await getPlantsByVendor(res.vendor);
+      setPlants(plantRes || []);
 
-    const items = res.items?.map((it) => ({
-      product_id: it.product,
-      item_name: it.item_name || "",
-      base_unit: it.uom_details?.unit_name || "",
-      hsn_id: it.hsn_id || null,
-      hsn_code: it.hsn_code || "",
+      const items =
+        res.items?.map((it) => ({
+          product_id: it.product,
+          item_name: it.item_name || "",
+          base_unit: it.uom_details?.unit_name || "",
+          hsn_id: it.hsn_id || null,
+          hsn_code: it.hsn_code || "",
 
-      qty: Number(it.qty),
-    //  freeQty: Number(it.free_qty),
-      totalQty: Number(it.total_qty),
+          qty: Number(it.qty),
+          //  freeQty: Number(it.free_qty),
+          totalQty: Number(it.total_qty),
 
-      rate: Number(it.rate),
-      discountPercent: Number(it.discount_percent),
-      discountAmt: Number(it.discount_amount),
+          rate: Number(it.rate),
+          discountPercent: Number(it.discount_percent),
+          discountAmt: Number(it.discount_amount),
 
-      grossAmount: Number(it.gross_amount),
+          grossAmount: Number(it.gross_amount),
 
-      sgstPercent: Number(it.sgst_percent),
-      cgstPercent: Number(it.cgst_percent),
-      igstPercent: Number(it.igst_percent),
+          sgstPercent: Number(it.sgst_percent),
+          cgstPercent: Number(it.cgst_percent),
+          igstPercent: Number(it.igst_percent),
 
-      totalGST: Number(it.total_gst_amount),
-      totalAmt: Number(it.total_amount),
-    })) || [];
+          totalGST: Number(it.total_gst_amount),
+          totalAmt: Number(it.total_amount),
+        })) || [];
 
-    // ✅ COMPUTE TOTALS HERE
-    const computed = computeAllFromFormValues({ items });
+      // ✅ COMPUTE TOTALS HERE
+      const computed = computeAllFromFormValues({ items });
 
-    const formattedData = {
-      vendor: res.vendor,
-      vendor_name: res.vendor_name,
-      plant: res.plant,
-      plant_name: res.plant_name,
-      from_date: res.from_date ? dayjs(res.from_date) : null,
-      to_date: res.to_date ? dayjs(res.to_date) : null,
-      status: res.status,
+      const formattedData = {
+        vendor: res.vendor,
+        vendor_name: res.vendor_name,
+        plant: res.plant,
+        plant_name: res.plant_name,
+        from_date: res.from_date ? dayjs(res.from_date) : null,
+        to_date: res.to_date ? dayjs(res.to_date) : null,
+        status: res.status,
 
-      items: computed.items,
-      orderTotals: computed.orderTotals,   // ✅ ADD THIS
-    };
+        items: computed.items,
+        orderTotals: computed.orderTotals, // ✅ ADD THIS
+      };
 
-    editForm.setFieldsValue(formattedData);
+      editForm.setFieldsValue(formattedData);
 
-    setSelectedRecord(res);
-    setIsEditModalOpen(true);
+      setSelectedRecord(res);
+      setIsEditModalOpen(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  } finally {
-    setLoading(false);
-  }
-};
+  const handleEditSubmit = async (values) => {
+    try {
+      const orderTotals = values.orderTotals || {};
 
+      const payload = {
+        vendor: values.vendor,
+        vendor_name: values.vendor_name,
+        plant: values.plant,
+        plant_name: values.plant_name,
+        status: values.status,
 
-const handleEditSubmit = async (values) => {
-  try {
-    const orderTotals = values.orderTotals || {};
+        from_date: values.from_date
+          ? dayjs(values.from_date).format("YYYY-MM-DD")
+          : null,
 
-    const payload = {
-      vendor: values.vendor,
-      vendor_name: values.vendor_name,
-      plant: values.plant,
-      plant_name: values.plant_name,
-      status: values.status,
+        to_date: values.to_date
+          ? dayjs(values.to_date).format("YYYY-MM-DD")
+          : null,
 
-      from_date: values.from_date
-        ? dayjs(values.from_date).format("YYYY-MM-DD")
-        : null,
+        total_qty: round2(orderTotals.totalQty),
+        gross_amount: round2(orderTotals.totalGrossAmount),
+        total_discount: round2(orderTotals.totalDiscount),
+        total_gst_amount: round2(orderTotals.totalGST),
+        total_amount: round2(orderTotals.grandTotal),
 
-      to_date: values.to_date
-        ? dayjs(values.to_date).format("YYYY-MM-DD")
-        : null,
+        items: values.items.map((it) => ({
+          product: it.product_id,
+          uom: it.base_unit,
+          hsn_id: it.hsn_id || null,
+          hsn_code: it.hsn_code || "",
+          item_name: it.item_name || "",
+          qty: round2(it.qty),
+          //  free_qty: round2(it.freeQty),
+          total_qty: round2(it.totalQty),
 
-      total_qty: round2(orderTotals.totalQty),
-      gross_amount: round2(orderTotals.totalGrossAmount),
-      total_discount: round2(orderTotals.totalDiscount),
-      total_gst_amount: round2(orderTotals.totalGST),
-      total_amount: round2(orderTotals.grandTotal),
+          rate: round2(it.rate),
 
-      items: values.items.map((it) => ({
-        product: it.product_id,
-        uom: it.base_unit,
-        hsn_id: it.hsn_id || null,
-        hsn_code: it.hsn_code || "",
-        item_name: it.item_name || "",
-        qty: round2(it.qty),
-      //  free_qty: round2(it.freeQty),
-        total_qty: round2(it.totalQty),
+          discount_percent: round2(it.discountPercent),
+          discount_amount: round2(it.discountAmt),
 
-        rate: round2(it.rate),
+          gross_amount: round2(it.grossAmount),
 
-        discount_percent: round2(it.discountPercent),
-        discount_amount: round2(it.discountAmt),
+          sgst_percent: round2(it.sgstPercent),
+          cgst_percent: round2(it.cgstPercent),
+          igst_percent: round2(it.igstPercent),
 
-        gross_amount: round2(it.grossAmount),
+          total_gst_amount: round2(it.totalGST),
+          total_amount: round2(it.totalAmt),
+        })),
+      };
 
-        sgst_percent: round2(it.sgstPercent),
-        cgst_percent: round2(it.cgstPercent),
-        igst_percent: round2(it.igstPercent),
+      console.log("UPDATE PAYLOAD:", payload);
 
-        total_gst_amount: round2(it.totalGST),
-        total_amount: round2(it.totalAmt),
-      })),
-    };
+      await updatePurchaseContract(selectedRecord.id, payload);
 
-    console.log("UPDATE PAYLOAD:", payload);
+      setIsEditModalOpen(false);
+      fetchPurchaseContracts(); // refresh table
+    } catch (error) {
+      console.error("Update failed:", error);
+    }
+  };
+  const handleViewClick = async (record) => {
+    try {
+      setLoading(true);
 
-    await updatePurchaseContract(selectedRecord.id, payload);
+      const res = await getPurchaseContractById(record.key);
 
-    setIsEditModalOpen(false);
-    fetchPurchaseContracts(); // refresh table
+      const items =
+        res.items?.map((it) => ({
+          product_id: it.product,
+          item_name: it.item_name || "",
+          base_unit: it.uom_details?.unit_name || "",
+          hsn_id: it.hsn_id || null,
+          hsn_code: it.hsn_code || "",
 
-  } catch (error) {
-    console.error("Update failed:", error);
-  }
-};
-const handleViewClick = async (record) => {
-  try {
-    setLoading(true);
+          qty: Number(it.qty),
+          //  freeQty: Number(it.free_qty),
+          totalQty: Number(it.total_qty),
 
-    const res = await getPurchaseContractById(record.key);
+          rate: Number(it.rate),
+          discountPercent: Number(it.discount_percent),
+          discountAmt: Number(it.discount_amount),
 
-    const items = res.items?.map((it) => ({
-      product_id: it.product,
-      item_name: it.item_name || "",
-      base_unit: it.uom_details?.unit_name || "",
-      hsn_id: it.hsn_id || null,
-      hsn_code: it.hsn_code || "",
+          grossAmount: Number(it.gross_amount),
 
-      qty: Number(it.qty),
-      //  freeQty: Number(it.free_qty),
-      totalQty: Number(it.total_qty),
+          sgstPercent: Number(it.sgst_percent),
+          cgstPercent: Number(it.cgst_percent),
+          igstPercent: Number(it.igst_percent),
 
-      rate: Number(it.rate),
-      discountPercent: Number(it.discount_percent),
-      discountAmt: Number(it.discount_amount),
+          totalGST: Number(it.total_gst_amount),
+          totalAmt: Number(it.total_amount),
+        })) || [];
 
-      grossAmount: Number(it.gross_amount),
+      // ✅ ADD THIS BLOCK HERE
+      const computed = computeAllFromFormValues({ items });
 
-      sgstPercent: Number(it.sgst_percent),
-      cgstPercent: Number(it.cgst_percent),
-      igstPercent: Number(it.igst_percent),
+      const formattedData = {
+        vendor: res.vendor,
+        plant: res.plant,
+        from_date: res.from_date ? dayjs(res.from_date) : null,
+        to_date: res.to_date ? dayjs(res.to_date) : null,
+        items: computed.items, // ✅ use computed items
+        orderTotals: computed.orderTotals,
+        status: res.status, // ✅ ADD THIS
+      };
 
-      totalGST: Number(it.total_gst_amount),
-      totalAmt: Number(it.total_amount),
-    })) || [];
+      viewForm.setFieldsValue(formattedData);
 
-    // ✅ ADD THIS BLOCK HERE
-    const computed = computeAllFromFormValues({ items });
-
-    const formattedData = {
-      vendor: res.vendor,
-      plant: res.plant,
-      from_date: res.from_date ? dayjs(res.from_date) : null,
-      to_date: res.to_date ? dayjs(res.to_date) : null,
-      items: computed.items,                // ✅ use computed items
-      orderTotals: computed.orderTotals,  
-      status: res.status  // ✅ ADD THIS
-    };
-
-    viewForm.setFieldsValue(formattedData);
-
-    setIsViewModalOpen(true);
-
-  } finally {
-    setLoading(false);
-  }
-};
-
-
-
-
+      setIsViewModalOpen(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // ---------- Table columns ----------
   const columns = [
@@ -393,7 +388,9 @@ const handleViewClick = async (record) => {
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Supplier Name</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Supplier Name</span>
+      ),
       dataIndex: "vendor_name",
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
       width: 100,
@@ -412,8 +409,6 @@ const handleViewClick = async (record) => {
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
 
-
-
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
@@ -421,10 +416,20 @@ const handleViewClick = async (record) => {
       render: (status) => {
         const base = "px-3 py-1 rounded-full text-sm font-semibold";
         if (status === "Approved")
-          return <span className={`${base} bg-green-100 text-green-700`}>Approved</span>;
+          return (
+            <span className={`${base} bg-green-100 text-green-700`}>
+              Approved
+            </span>
+          );
         if (status === "Pending")
-          return <span className={`${base} bg-yellow-100 text-yellow-700`}>Pending</span>;
-        return <span className={`${base} bg-red-200 text-red-700`}>{status}</span>;
+          return (
+            <span className={`${base} bg-yellow-100 text-yellow-700`}>
+              Pending
+            </span>
+          );
+        return (
+          <span className={`${base} bg-red-200 text-red-700`}>{status}</span>
+        );
       },
     },
     {
@@ -434,16 +439,14 @@ const handleViewClick = async (record) => {
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-blue-500!"
-           onClick={() => handleViewClick(record)}
-
+            onClick={() => handleViewClick(record)}
           />
-            {record.status !== "Approved" && (
-          <EditOutlined
-            className="cursor-pointer! text-red-500!"
-           onClick={() => handleEditClick(record)}
-
-          />
-            )}
+          {record.status !== "Approved" && (
+            <EditOutlined
+              className="cursor-pointer! text-red-500!"
+              onClick={() => handleEditClick(record)}
+            />
+          )}
         </div>
       ),
     },
@@ -497,13 +500,22 @@ const handleViewClick = async (record) => {
     });
 
     const orderTotals = {
-      totalQty: round2(items.reduce((s, it) => s + Number(it.totalQty || 0), 0)),
-      totalGrossAmount: round2(items.reduce((s, it) => s + Number(it.grossAmount || 0), 0)),
-      totalDiscount: round2(items.reduce((s, it) => s + Number(it.discountAmt || 0), 0)),
-      totalGST: round2(items.reduce((s, it) => s + Number(it.totalGST || 0), 0)),
-      grandTotal: round2(items.reduce((s, it) => s + Number(it.totalAmt || 0), 0)),
+      totalQty: round2(
+        items.reduce((s, it) => s + Number(it.totalQty || 0), 0),
+      ),
+      totalGrossAmount: round2(
+        items.reduce((s, it) => s + Number(it.grossAmount || 0), 0),
+      ),
+      totalDiscount: round2(
+        items.reduce((s, it) => s + Number(it.discountAmt || 0), 0),
+      ),
+      totalGST: round2(
+        items.reduce((s, it) => s + Number(it.totalGST || 0), 0),
+      ),
+      grandTotal: round2(
+        items.reduce((s, it) => s + Number(it.totalAmt || 0), 0),
+      ),
     };
-
 
     return { items, orderTotals };
   };
@@ -521,57 +533,54 @@ const handleViewClick = async (record) => {
       handleAutoSaveDraft(allValues || {});
     }
   };
-const handleExport = async () => {
-  try {
-    const fullData = await getPurchaseContract();
+  const handleExport = async () => {
+    try {
+      const fullData = await getPurchaseContract();
 
-    const exportRows = [];
+      const exportRows = [];
 
-    fullData.forEach((record) => {
-      record.items?.forEach((item) => {
-        exportRows.push({
-          "Supplier Name": record.vendor_name,
-          "Plant Name": record.plant_name,
-          "Contract Date": record.created_at, // or contract_date if exists
-          "Start Date": record.from_date,
-          "End Date": record.to_date,
+      fullData.forEach((record) => {
+        record.items?.forEach((item) => {
+          exportRows.push({
+            "Supplier Name": record.vendor_name,
+            "Plant Name": record.plant_name,
+            "Contract Date": record.created_at, // or contract_date if exists
+            "Start Date": record.from_date,
+            "End Date": record.to_date,
 
-          "Item Name": item.item_name,
-          "Item Code": item.hsn_code,
-          "Qty": item.qty,
-          "Free Qty": item.free_qty,
-          "Total Qty": item.total_qty,
-          "UOM": item.uom,
-          "Rate": item.rate,
+            "Item Name": item.item_name,
+            "Item Code": item.hsn_code,
+            Qty: item.qty,
+            "Free Qty": item.free_qty,
+            "Total Qty": item.total_qty,
+            UOM: item.uom,
+            Rate: item.rate,
 
-          "Discount %": item.discount_percent,
-          "Gross Amount (₹)": item.gross_amount,
-          "Discount Amt (₹)": item.discount_amount,
+            "Discount %": item.discount_percent,
+            "Gross Amount (₹)": item.gross_amount,
+            "Discount Amt (₹)": item.discount_amount,
 
-          "SGST %": item.sgst_percent,
-          "CGST %": item.cgst_percent,
-          "IGST %": item.igst_percent,
+            "SGST %": item.sgst_percent,
+            "CGST %": item.cgst_percent,
+            "IGST %": item.igst_percent,
 
             "Total Amount (₹)": item.total_amount,
 
-          "Order Total Qty": record.total_qty,
-          "Total Gross Amount": record.gross_amount,
-          "Total Discount (₹)": record.total_discount,
-          "Total GST (₹)": record.total_gst_amount,
+            "Order Total Qty": record.total_qty,
+            "Total Gross Amount": record.gross_amount,
+            "Total Discount (₹)": record.total_discount,
+            "Total GST (₹)": record.total_gst_amount,
 
-          "Status": record.status,
+            Status: record.status,
+          });
         });
       });
-    });
 
-    exportToExcel(exportRows, "All_Purchase_Contract_Details", "SoudaData");
-
-  } catch (error) {
-    console.error("Export failed:", error);
-  }
-};
-
-
+      exportToExcel(exportRows, "All_Purchase_Contract_Details", "SoudaData");
+    } catch (error) {
+      console.error("Export failed:", error);
+    }
+  };
 
   // ---------- Form submit ----------
   const handleFormSubmit = async (values) => {
@@ -599,14 +608,14 @@ const handleExport = async () => {
         uom: it.base_unit || null,
 
         qty: round2(it.qty),
-       // free_qty: round2(it.freeQty),
+        // free_qty: round2(it.freeQty),
         total_qty: round2(it.totalQty),
 
         rate: round2(it.rate),
         item_name: it.item_name || "",
         hsn_id: it.hsn_id || null,
         hsn_code: it.hsn_code || "",
-        
+
         discount_percent: round2(it.discountPercent),
         discount_amount: round2(it.discountAmt),
 
@@ -621,7 +630,6 @@ const handleExport = async () => {
       })),
     };
 
-
     console.log("FINAL PAYLOAD:", payload);
     await addPurchaseContract(payload);
     if (activeDraftId) {
@@ -629,16 +637,9 @@ const handleExport = async () => {
       setActiveDraftId(null);
       loadDraftsList();
     }
-      await fetchPurchaseContracts(); 
+    await fetchPurchaseContracts();
     setIsAddModalOpen(false);
   };
-
-
-
-
-
-
-
 
   const ItemsList = ({ form, disabled = false }) => (
     <Form.List name="items">
@@ -656,7 +657,7 @@ const handleExport = async () => {
                     item: undefined,
 
                     qty: 0,
-                  // freeQty: 0,
+                    // freeQty: 0,
                     totalQty: 0,
                     rate: 0,
                     discountPercent: 0,
@@ -693,32 +694,56 @@ const handleExport = async () => {
                   <Form.Item
                     {...field}
                     label="Item Name"
-                   name={[field.name, "item_name"]}  
+                    name={[field.name, "item_name"]}
                     rules={[{ required: true, message: "Item is required" }]}
                   >
                     <Select
-                      placeholder={!selectedVendor ? "Select vendor first" : "Select Item"}
-                     disabled={!selectedVendor || products.length === 0 || disabled} 
-                     onChange={(productId) => {
-  const selected = products.find(p => p.id === productId);
+                      placeholder={
+                        !selectedVendor ? "Select vendor first" : "Select Item"
+                      }
+                      disabled={
+                        !selectedVendor || products.length === 0 || disabled
+                      }
+                      onChange={(productId) => {
+                        const selected = products.find(
+                          (p) => p.id === productId,
+                        );
                         form.setFields([
-                         { name: ["items", field.name, "product_id"], value: productId }, // keep ID
-    { name: ["items", field.name, "item_name"], value: selected?.name || "" }, // show name
- 
+                          {
+                            name: ["items", field.name, "product_id"],
+                            value: productId,
+                          }, // keep ID
+                          {
+                            name: ["items", field.name, "item_name"],
+                            value: selected?.name || "",
+                          }, // show name
+
                           // ✅ SHOW IN UI
-                          { name: ["items", field.name, "hsn_code"], value: selected?.hsn_code_value || "" },
+                          {
+                            name: ["items", field.name, "hsn_code"],
+                            value: selected?.hsn_code_value || "",
+                          },
 
                           // ✅ SEND TO BACKEND (ID)
-                          { name: ["items", field.name, "hsn_id"], value: selected?.hsn_code || null },
+                          {
+                            name: ["items", field.name, "hsn_id"],
+                            value: selected?.hsn_code || null,
+                          },
 
-                          { name: ["items", field.name, "item_name"], value: selected?.name || "" },
-                          { name: ["items", field.name, "base_unit"], value: selected?.base_unit || "" },
-                          { name: ["items", field.name, "rate"], value: selected?.rate || 0 },
-                             ]);
+                          {
+                            name: ["items", field.name, "item_name"],
+                            value: selected?.name || "",
+                          },
+                          {
+                            name: ["items", field.name, "base_unit"],
+                            value: selected?.base_unit || "",
+                          },
+                          {
+                            name: ["items", field.name, "rate"],
+                            value: selected?.rate || 0,
+                          },
+                        ]);
                       }}
-
-                      
-                    
                     >
                       {products.map((p) => (
                         <Select.Option key={p.id} value={p.id}>
@@ -727,16 +752,13 @@ const handleExport = async () => {
                       ))}
                     </Select>
                   </Form.Item>
-
                 </Col>
 
                 <Col span={4}>
                   <Form.Item label="Item Code" name={[field.name, "hsn_code"]}>
                     <Input disabled />
                   </Form.Item>
-
                 </Col>
-
 
                 {/* FIX: Qty with proper validation */}
                 <Col span={4}>
@@ -744,17 +766,17 @@ const handleExport = async () => {
                     {...field}
                     label="Qty"
                     name={[field.name, "qty"]}
-                                    rules={[
-                       { required: true, message: "Quantity is required" },
-                       {
-                         validator: (_, value) =>
-                           value >= 0
-                             ? Promise.resolve()
-                             : Promise.reject("Enter valid positive number"),
-                       },
-                     ]}  >
+                    rules={[
+                      { required: true, message: "Quantity is required" },
+                      {
+                        validator: (_, value) =>
+                          value >= 0
+                            ? Promise.resolve()
+                            : Promise.reject("Enter valid positive number"),
+                      },
+                    ]}
+                  >
                     <Input
-
                       disabled={disabled}
                       onChange={() => {
                         const all = form.getFieldsValue();
@@ -807,13 +829,14 @@ const handleExport = async () => {
                 </Col>
 
                 <Col span={4}>
-                  <Form.Item {...field} label="UOM" name={[field.name, "base_unit"]}>
+                  <Form.Item
+                    {...field}
+                    label="UOM"
+                    name={[field.name, "base_unit"]}
+                  >
                     <Input disabled />
                   </Form.Item>
-
                 </Col>
-
-
 
                 {/* FIX: Rate with proper validation */}
                 <Col span={4}>
@@ -844,17 +867,17 @@ const handleExport = async () => {
                     label="Dis%"
                     name={[field.name, "discountPercent"]}
                     fieldKey={[field.fieldKey, "discountPercent"]}
-                                    rules={[
-                       { required: true, message: "Discount % is required" },
-                       {
-                         validator: (_, value) =>
-                           value >= 0
-                             ? Promise.resolve()
-                             : Promise.reject("Enter valid positive number"),
-                       },
-                     ]}  >
+                    rules={[
+                      { required: true, message: "Discount % is required" },
+                      {
+                        validator: (_, value) =>
+                          value >= 0
+                            ? Promise.resolve()
+                            : Promise.reject("Enter valid positive number"),
+                      },
+                    ]}
+                  >
                     <Input
-                     
                       max={100}
                       disabled={disabled}
                       onChange={() => {
@@ -867,8 +890,7 @@ const handleExport = async () => {
                   </Form.Item>
                 </Col>
 
-               
-  <Col span={4}>
+                <Col span={4}>
                   <Form.Item
                     {...field}
                     label="GST %"
@@ -885,22 +907,27 @@ const handleExport = async () => {
                     ]}
                   >
                     <Input
-                    
                       max={100}
                       disabled={disabled}
-                    onChange={(e) => {
-  const igst = Number(e.target.value || 0);
-  const half = igst / 2;
+                      onChange={(e) => {
+                        const igst = Number(e.target.value || 0);
+                        const half = igst / 2;
 
-  form.setFields([
-    { name: ["items", field.name, "sgstPercent"], value: half },
-    { name: ["items", field.name, "cgstPercent"], value: half },
-  ]);
+                        form.setFields([
+                          {
+                            name: ["items", field.name, "sgstPercent"],
+                            value: half,
+                          },
+                          {
+                            name: ["items", field.name, "cgstPercent"],
+                            value: half,
+                          },
+                        ]);
 
-  const all = form.getFieldsValue();
-  const computed = computeAllFromFormValues(all || {});
-  form.setFieldsValue({ items: computed.items });
-}}
+                        const all = form.getFieldsValue();
+                        const computed = computeAllFromFormValues(all || {});
+                        form.setFieldsValue({ items: computed.items });
+                      }}
                       className="w-full!"
                     />
                   </Form.Item>
@@ -912,18 +939,17 @@ const handleExport = async () => {
                     label="SGST %"
                     name={[field.name, "sgstPercent"]}
                     fieldKey={[field.fieldKey, "sgstPercent"]}
-                                     rules={[
-                        { required: true, message: "SGST % is required" },
-                        {
-                          validator: (_, value) =>
-                            value >= 0
-                              ? Promise.resolve()
-                              : Promise.reject("Enter valid positive number"),
-                        },
-                      ]}
+                    rules={[
+                      { required: true, message: "SGST % is required" },
+                      {
+                        validator: (_, value) =>
+                          value >= 0
+                            ? Promise.resolve()
+                            : Promise.reject("Enter valid positive number"),
+                      },
+                    ]}
                   >
                     <Input
-                     
                       max={100}
                       disabled
                       onChange={() => {
@@ -943,18 +969,17 @@ const handleExport = async () => {
                     label="CGST %"
                     name={[field.name, "cgstPercent"]}
                     fieldKey={[field.fieldKey, "cgstPercent"]}
-                                    rules={[
-                       { required: true, message: "CGST % is required" },
-                       {
-                         validator: (_, value) =>
-                           value >= 0
-                             ? Promise.resolve()
-                             : Promise.reject("Enter valid positive number"),
-                       },
-                     ]}
+                    rules={[
+                      { required: true, message: "CGST % is required" },
+                      {
+                        validator: (_, value) =>
+                          value >= 0
+                            ? Promise.resolve()
+                            : Promise.reject("Enter valid positive number"),
+                      },
+                    ]}
                   >
                     <Input
-                     
                       max={100}
                       disabled
                       onChange={() => {
@@ -968,7 +993,6 @@ const handleExport = async () => {
                 </Col>
 
                 {/* FIX: IGST% with proper validation */}
-              
 
                 <Col span={4}>
                   <Form.Item
@@ -980,7 +1004,7 @@ const handleExport = async () => {
                     <InputNumber className="w-full!" disabled />
                   </Form.Item>
                 </Col>
- <Col span={4}>
+                <Col span={4}>
                   <Form.Item
                     {...field}
                     label="Gross Amount (₹)"
@@ -1021,7 +1045,11 @@ const handleExport = async () => {
   // ---------- Combined form content (Basic Info, Items, Tax) ----------
   const RenderFormBody = ({ form, disabled = false }) => (
     <>
-      <Card size="small" style={{ marginBottom: 12, border: "1px solid #FDE68A" }} bodyStyle={{ padding: 12 }}>
+      <Card
+        size="small"
+        style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
+        bodyStyle={{ padding: 12 }}
+      >
         <h6 className="text-amber-500">Basic Information</h6>
         <Row gutter={16}>
           <Col span={4}>
@@ -1035,7 +1063,9 @@ const handleExport = async () => {
                 showSearch
                 optionFilterProp="label"
                 onChange={async (vendorId) => {
-                const selectedVendorObj = vendors.find(v => v.id === vendorId);
+                  const selectedVendorObj = vendors.find(
+                    (v) => v.id === vendorId,
+                  );
 
                   setSelectedVendor(vendorId);
 
@@ -1045,7 +1075,7 @@ const handleExport = async () => {
                   });
 
                   // fetch products
-                  const productRes = await getproductbyVendor(vendorId);
+                  const productRes = await getProductsByCompany(vendorId);
                   setProducts(productRes?.products || []);
 
                   // fetch plants
@@ -1055,24 +1085,15 @@ const handleExport = async () => {
                   // reset plant
                   addForm.setFieldsValue({ plant: undefined });
                 }}
-                
-    disabled={disabled || isEditModalOpen || isViewModalOpen}
+                disabled={disabled || isEditModalOpen || isViewModalOpen}
               >
-                {vendors.map(v => (
+                {vendors.map((v) => (
                   <Select.Option key={v.id} value={v.id} label={v.name}>
                     {v.name}
                   </Select.Option>
                 ))}
               </Select>
             </Form.Item>
-
-
-
-
-
-
-
-
           </Col>
           <Col span={4}>
             <Form.Item
@@ -1085,46 +1106,32 @@ const handleExport = async () => {
                 showSearch
                 optionFilterProp="label"
                 onChange={(plantId) => {
-                  const selectedPlantObj = plants.find(p => p.id === plantId);
+                  const selectedPlantObj = plants.find((p) => p.id === plantId);
 
                   // ✅ STORE PLANT NAME
                   addForm.setFieldsValue({
                     plant_name: selectedPlantObj?.name || "",
                   });
                 }}
-                
-    disabled={disabled || isEditModalOpen || isViewModalOpen}
+                disabled={disabled || isEditModalOpen || isViewModalOpen}
               >
-                {plants.map(p => (
-                  <Select.Option
-                    key={p.id}
-                    value={p.id}
-                    label={p.name}
-                  >
+                {plants.map((p) => (
+                  <Select.Option key={p.id} value={p.id} label={p.name}>
                     {p.name}
                   </Select.Option>
                 ))}
-                
               </Select>
             </Form.Item>
-
-
-
-
-
           </Col>
 
-
-
-
-
-
-
-
           <Col span={4}>
-            <Form.Item label="Contract Date" name="soudaDate" initialValue={dayjs()}>
-              <DatePicker 
-                className="w-full" 
+            <Form.Item
+              label="Contract Date"
+              name="soudaDate"
+              initialValue={dayjs()}
+            >
+              <DatePicker
+                className="w-full"
                 disabled={disabled}
                 disabledDate={createFinancialYearDisabledDate(selectedFY)}
               />
@@ -1134,8 +1141,8 @@ const handleExport = async () => {
           {/* REMOVED Delivery Date; ADDED Start / End */}
           <Col span={4}>
             <Form.Item label="Start Date" name="from_date">
-              <DatePicker 
-                className="w-full" 
+              <DatePicker
+                className="w-full"
                 disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 disabled={disabled}
               />
@@ -1144,8 +1151,8 @@ const handleExport = async () => {
 
           <Col span={4}>
             <Form.Item label="End Date" name="to_date">
-              <DatePicker 
-                className="w-full" 
+              <DatePicker
+                className="w-full"
                 disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 disabled={disabled}
               />
@@ -1154,12 +1161,20 @@ const handleExport = async () => {
         </Row>
       </Card>
 
-      <Card size="small" style={{ marginBottom: 12, border: "1px solid #FDE68A" }} bodyStyle={{ padding: 12 }}>
+      <Card
+        size="small"
+        style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
+        bodyStyle={{ padding: 12 }}
+      >
         <ItemsList form={form} disabled={disabled} />
       </Card>
 
       {/* Optional order-level totals display (read-only) */}
-      <Card size="small" style={{ border: "1px solid #FDE68A" }} bodyStyle={{ padding: 12 }}>
+      <Card
+        size="small"
+        style={{ border: "1px solid #FDE68A" }}
+        bodyStyle={{ padding: 12 }}
+      >
         <h6 className="text-amber-500">Order Totals</h6>
         <Row gutter={12}>
           <Col span={4}>
@@ -1168,12 +1183,18 @@ const handleExport = async () => {
             </Form.Item>
           </Col>
           <Col span={4}>
-            <Form.Item label="Total Gross Amount" name={["orderTotals", "totalGrossAmount"]}>
+            <Form.Item
+              label="Total Gross Amount"
+              name={["orderTotals", "totalGrossAmount"]}
+            >
               <InputNumber className="w-full!" disabled />
             </Form.Item>
           </Col>
           <Col span={4}>
-            <Form.Item label="Total Discount (₹)" name={["orderTotals", "totalDiscount"]}>
+            <Form.Item
+              label="Total Discount (₹)"
+              name={["orderTotals", "totalDiscount"]}
+            >
               <InputNumber className="w-full!" disabled />
             </Form.Item>
           </Col>
@@ -1190,8 +1211,15 @@ const handleExport = async () => {
           </Col> */}
 
           <Col span={4}>
-            <Form.Item label="Status" name="status" rules={[{ required: true }]}>
-              <Select placeholder="Select Status"  disabled={disabled || isAddModalOpen} >
+            <Form.Item
+              label="Status"
+              name="status"
+              rules={[{ required: true }]}
+            >
+              <Select
+                placeholder="Select Status"
+                disabled={disabled || isAddModalOpen}
+              >
                 {statusOptions.map((opt) => (
                   <Option key={opt} value={opt}>
                     {opt}
@@ -1205,8 +1233,6 @@ const handleExport = async () => {
     </>
   );
 
-
-
   return (
     <div>
       {/* Header */}
@@ -1219,20 +1245,23 @@ const handleExport = async () => {
             value={searchText}
             onChange={(e) => handleSearch(e.target.value)}
           />
-          <Button icon={<FilterOutlined />} className="border-amber-400! text-amber-700! hover:bg-amber-100!" onClick={() => handleSearch("")}>
+          <Button
+            icon={<FilterOutlined />}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            onClick={() => handleSearch("")}
+          >
             Reset
           </Button>
         </div>
 
         <div className="flex gap-2">
-         <Button
-  icon={<DownloadOutlined />}
-  onClick={handleExport}
-  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
->
-  Export
-</Button>
-
+          <Button
+            icon={<DownloadOutlined />}
+            onClick={handleExport}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
+            Export
+          </Button>
 
           <Button
             type="primary"
@@ -1242,14 +1271,14 @@ const handleExport = async () => {
               addForm.resetFields();
               // initialize an empty item row
               addForm.setFieldsValue({
-                  status: "Pending",
+                status: "Pending",
                 items: [
                   {
                     lineKey: new Date().getTime(),
                     item: undefined,
 
                     qty: 0,
-                   // freeQty: 0,
+                    // freeQty: 0,
                     totalQty: 0,
                     rate: 0,
                     discountPercent: 0,
@@ -1275,7 +1304,9 @@ const handleExport = async () => {
       {/* Table */}
       <div className="mb-4">
         <div className="flex justify-between items-center mb-2">
-          <h3 className="text-lg font-semibold text-amber-700">Purchase Contract Drafts</h3>
+          <h3 className="text-lg font-semibold text-amber-700">
+            Purchase Contract Drafts
+          </h3>
           <Button
             type="primary"
             onClick={() => setShowDrafts(!showDrafts)}
@@ -1296,9 +1327,13 @@ const handleExport = async () => {
                     className="flex justify-between items-center p-3 border border-gray-200 rounded hover:bg-gray-50"
                   >
                     <div className="flex-1">
-                      <div className="font-medium">{draft.vendor_name || "Purchase Contract Draft"}</div>
+                      <div className="font-medium">
+                        {draft.vendor_name || "Purchase Contract Draft"}
+                      </div>
                       <div className="text-sm text-gray-500">
-                        {draft.savedAt ? new Date(draft.savedAt).toLocaleString() : "Unknown time"}
+                        {draft.savedAt
+                          ? new Date(draft.savedAt).toLocaleString()
+                          : "Unknown time"}
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -1310,7 +1345,11 @@ const handleExport = async () => {
                       >
                         Continue
                       </Button>
-                      <Button size="small" danger onClick={() => handleDeleteDraft(draft.id)}>
+                      <Button
+                        size="small"
+                        danger
+                        onClick={() => handleDeleteDraft(draft.id)}
+                      >
                         Delete
                       </Button>
                     </div>
@@ -1323,8 +1362,17 @@ const handleExport = async () => {
       </div>
 
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
-        <h2 className="text-lg font-semibold text-amber-700 mb-0">Purchase Contract Records</h2>
-        <Table columns={columns} dataSource={data} loading={loading} pagination={false} rowKey="key" scroll={{ y: 300 }} />
+        <h2 className="text-lg font-semibold text-amber-700 mb-0">
+          Purchase Contract Records
+        </h2>
+        <Table
+          columns={columns}
+          dataSource={data}
+          loading={loading}
+          pagination={false}
+          rowKey="key"
+          scroll={{ y: 300 }}
+        />
       </div>
 
       {/* Add Modal */}
@@ -1332,9 +1380,16 @@ const handleExport = async () => {
         title={
           <div className="flex justify-between items-center">
             <span className="text-amber-700 text-2xl font-semibold">
-              Add New Purchase Contract {activeDraftId && <span className="text-sm text-blue-500">(Draft)</span>}
+              Add New Purchase Contract{" "}
+              {activeDraftId && (
+                <span className="text-sm text-blue-500">(Draft)</span>
+              )}
             </span>
-            <Button size="small" onClick={handleManualSaveDraft} className="bg-green-500 hover:bg-green-600 text-white">
+            <Button
+              size="small"
+              onClick={handleManualSaveDraft}
+              className="bg-green-500 hover:bg-green-600 text-white"
+            >
               Save Draft
             </Button>
           </div>
@@ -1348,11 +1403,25 @@ const handleExport = async () => {
         footer={null}
         width={1000}
       >
-        <Form form={addForm} layout="vertical" onFinish={(vals) => handleFormSubmit(vals, "add")} onValuesChange={handleFormValuesChangeFactory(addForm)}>
+        <Form
+          form={addForm}
+          layout="vertical"
+          onFinish={(vals) => handleFormSubmit(vals, "add")}
+          onValuesChange={handleFormValuesChangeFactory(addForm)}
+        >
           <RenderFormBody form={addForm} disabled={false} />
           <div className="flex justify-end gap-2 mt-4">
-            <Button onClick={() => setIsAddModalOpen(false)} className="border-amber-400! text-amber-700! hover:bg-amber-100!">Cancel</Button>
-            <Button type="primary" htmlType="submit" className="bg-amber-500! border-none!">
+            <Button
+              onClick={() => setIsAddModalOpen(false)}
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              className="bg-amber-500! border-none!"
+            >
               Add
             </Button>
           </div>
@@ -1360,44 +1429,49 @@ const handleExport = async () => {
       </Modal>
 
       {/* Edit Modal */}
-   <Modal
-  title={<span className="text-amber-700 text-2xl font-semibold">Edit Purchase Contract</span>}
-  open={isEditModalOpen}
-  onCancel={() => {
-    editForm.resetFields();
-    setIsEditModalOpen(false);
-  }}
-  footer={null}
-  width={1000}
->
-  <Form
-    form={editForm}
-    layout="vertical"
-    onFinish={handleEditSubmit}   // ✅ THIS IS WHERE YOU ADD
-    onValuesChange={handleFormValuesChangeFactory(editForm)}
-  >
-    <RenderFormBody form={editForm} disabled={false} />
-
-    <div className="flex justify-end gap-2 mt-4">
-      <Button onClick={() => setIsEditModalOpen(false)}>
-        Cancel
-      </Button>
-
-      <Button
-        type="primary"
-        htmlType="submit"
-        className="bg-amber-500 border-none"
+      <Modal
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Edit Purchase Contract
+          </span>
+        }
+        open={isEditModalOpen}
+        onCancel={() => {
+          editForm.resetFields();
+          setIsEditModalOpen(false);
+        }}
+        footer={null}
+        width={1000}
       >
-        Update
-      </Button>
-    </div>
-  </Form>
-</Modal>
+        <Form
+          form={editForm}
+          layout="vertical"
+          onFinish={handleEditSubmit} // ✅ THIS IS WHERE YOU ADD
+          onValuesChange={handleFormValuesChangeFactory(editForm)}
+        >
+          <RenderFormBody form={editForm} disabled={false} />
 
+          <div className="flex justify-end gap-2 mt-4">
+            <Button onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
+
+            <Button
+              type="primary"
+              htmlType="submit"
+              className="bg-amber-500 border-none"
+            >
+              Update
+            </Button>
+          </div>
+        </Form>
+      </Modal>
 
       {/* View Modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">View Purchase Contract</span>}
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            View Purchase Contract
+          </span>
+        }
         open={isViewModalOpen}
         onCancel={() => {
           viewForm.resetFields();
