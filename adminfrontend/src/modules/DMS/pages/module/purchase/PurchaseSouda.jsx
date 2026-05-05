@@ -178,7 +178,7 @@ export default function PurchaseSouda() {
         key: item.id || index + 1,
         name: item.name,
         souda_number: item.souda_number,
-        vendor_name: item.vendor_name,
+        vendor_name: item.company_group || item.vendor_name,
         plant_name: item.plant_name,
         startDate: item.startDate,
         to_date: item.to_date,
@@ -199,9 +199,10 @@ export default function PurchaseSouda() {
 
       const res = await getPurchaseContractById(record.key);
 
-      setSelectedVendor(res.vendor);
+      // setSelectedVendor(res.vendor);
+      setSelectedVendor(res.company_group_id);
 
-      const productRes = await getProductsByCompany(res.vendor);
+      const productRes = await getProductsByCompany(res.company_group_id);
       setProducts(productRes?.products || []);
 
       const plantRes = await getPlantsByVendor(res.vendor);
@@ -237,8 +238,9 @@ export default function PurchaseSouda() {
       const computed = computeAllFromFormValues({ items });
 
       const formattedData = {
-        vendor: res.vendor,
-        vendor_name: res.vendor_name,
+        // vendor: res.vendor,
+        vendor: res.company_group_id,
+        vendor_name: res.company_group,
         plant: res.plant,
         plant_name: res.plant_name,
         from_date: res.from_date ? dayjs(res.from_date) : null,
@@ -263,7 +265,8 @@ export default function PurchaseSouda() {
       const orderTotals = values.orderTotals || {};
 
       const payload = {
-        vendor: values.vendor,
+        // vendor: values.vendor,
+        company_group_id: values.vendor,
         vendor_name: values.vendor_name,
         plant: values.plant,
         plant_name: values.plant_name,
@@ -355,7 +358,7 @@ export default function PurchaseSouda() {
       const computed = computeAllFromFormValues({ items });
 
       const formattedData = {
-        vendor: res.vendor,
+        vendor: res.company_group,
         plant: res.plant,
         from_date: res.from_date ? dayjs(res.from_date) : null,
         to_date: res.to_date ? dayjs(res.to_date) : null,
@@ -588,7 +591,8 @@ export default function PurchaseSouda() {
 
     const payload = {
       organisation: currentOrgId,
-      vendor: values.vendor,
+      // vendor: values.vendor,
+      company_group_id: values.vendor, // assuming company group is same as vendor for now
       vendor_name: values.vendor_name,
       plant: values.plant,
       plant_name: values.plant_name,

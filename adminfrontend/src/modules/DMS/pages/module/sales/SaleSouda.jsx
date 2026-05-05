@@ -325,7 +325,8 @@ export default function SalesSouda() {
       const discountAmount = (grossAmount * discountPercent) / 100;
 
       return {
-        vendor_id: it.vendorId,
+        // vendor_id: it.vendorId,
+        company_group_id: it.vendorId, // assuming company group is same as vendor for now
         product_id: it.item,
         uom: it.uom ? it.uom.toLowerCase() : null,
         net_qty: netQty,
@@ -588,11 +589,14 @@ export default function SalesSouda() {
         items: (contract.items || []).map((it, idx) => ({
           lineKey: it.id || idx + 1,
 
-          vendorId: it.vendor_id,
-          vendorName: it.vendor_name,
+          // vendorId: it.vendor_id,
+          vendorId: it.company_group_id,
+          vendorName: it.company_group_name,
 
-          item: it.product?.product_id || it.product_id,
-          itemName: it.product?.product_name || it.product_name,
+          // item: it.product?.product_id || it.product_id,
+          item: it.product?.product_id,
+          // itemName: it.product?.product_name || it.product_name,
+          itemName: it.product?.product_name,
           itemCode: it.hsn_code,
 
           uom: it.uom?.unit_name || "",
@@ -659,10 +663,14 @@ export default function SalesSouda() {
 
         items: (contract.items || []).map((it, idx) => ({
           lineKey: it.id || idx + 1,
-          vendorId: it.vendor_id,
-          vendorName: it.vendor_name,
-          item: it.product?.product_id || it.product_id,
-          itemName: it.product?.product_name || it.product_name,
+          // vendorId: it.vendor_id,
+          // vendorName: it.company_group_name,
+          vendorId: it.company_group_id,
+          vendorName: it.company_group_name,
+          // item: it.product?.product_id || it.product_id,
+          // itemName: it.product?.product_name || it.product_name,
+          item: it.product?.product_id,
+          itemName: it.product?.product_name,
           itemCode: it.hsn_code,
 
           uom: it.uom?.unit_name || "",
@@ -698,9 +706,16 @@ export default function SalesSouda() {
       };
 
       // Fetch products for all vendors in the items to populate Select options
+      // const uniqueVendorIds = [
+      //   ...new Set(
+      //     (contract.items || []).map((it) => it.vendor_id).filter(Boolean),
+      //   ),
+      // ];
       const uniqueVendorIds = [
         ...new Set(
-          (contract.items || []).map((it) => it.vendor_id).filter(Boolean),
+          (contract.items || [])
+            .map((it) => it.company_group_id)
+            .filter(Boolean),
         ),
       ];
 
@@ -1250,7 +1265,8 @@ export default function SalesSouda() {
         const lineTotal = grossAmount - discountAmount;
 
         return {
-          vendor_id: it.vendorId,
+          // vendor_id: it.vendorId,
+          company_group_id: it.vendorId,
           product_id: it.item, // Using item as product_id
           uom: it.uom ? it.uom.toLowerCase() : null,
           mrp,
