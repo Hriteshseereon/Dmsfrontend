@@ -351,7 +351,9 @@ export default function VendorTab() {
   const mapDetailsToForm = (d) => {
     const contactDetails =
       d.contact_person_details || d.contact_person_input || {};
-
+    const group = companyGroups.find(
+      (g) => g.name === d.company_group || g.name === d.company_group_name,
+    );
     return {
       name: d.name || d.company_name,
       shortName: d.short_name,
@@ -365,7 +367,8 @@ export default function VendorTab() {
       email2: d.secondary_email,
       socialLink: d.social_link,
       websiteUrl: d.company_website,
-      companyGroupName: d.company_group_name || d.company_group,
+      // companyGroupName: d.company_group_name || d.company_group,
+      companyGroupName: group?.id || null,
       contactPerson:
         contactDetails.name ||
         contactDetails.contact_person_name ||
@@ -469,11 +472,12 @@ export default function VendorTab() {
   const openVendor = async (record, view = false) => {
     try {
       const details = await getVendorDetailsByid(record.id);
-      const mapped = mapDetailsToForm(details);
-      form.setFieldsValue(mapped);
+
       if (!companyGroups.length) {
         await getCompanyGroups();
       }
+      const mapped = mapDetailsToForm(details);
+      form.setFieldsValue(mapped);
       // restore top-level location cascade for edit/view
       if (mapped.country) {
         const iso = getCountryIsoByName(mapped.country) || "IN";
