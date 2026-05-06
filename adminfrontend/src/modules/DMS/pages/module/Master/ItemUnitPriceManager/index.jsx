@@ -30,7 +30,7 @@ export default function ItemUnitPriceManager() {
   }, []);
 
   return (
-    <div >
+    <div>
       {/* ✅ Scoped Amber Tabs Styling */}
       <style>
         {`
@@ -105,7 +105,7 @@ export default function ItemUnitPriceManager() {
 
             {
               key: "5",
-              label: "HSN & SAC Manager",
+              label: "HSN & SAC Master",
               children: <HsnSacManager />,
             },
           ]}
