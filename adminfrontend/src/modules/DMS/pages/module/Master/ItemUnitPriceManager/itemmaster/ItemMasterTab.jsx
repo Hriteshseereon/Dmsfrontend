@@ -34,6 +34,7 @@ import {
   getProductById,
   updateProductById,
   getUnits,
+  getProductGroupHSN,
 } from "../../../../../../../api/product";
 import { getCompanyGroupDropdown } from "../../../../../../../api/bussinesspatnr";
 import {
@@ -114,7 +115,35 @@ export default function ItemMasterTab({ items, setItems }) {
       })
       .catch(() => message.error("Failed to load master data"));
   }, []);
+  // get the hsn sac code
+  const handleProductGroupChange = async (value) => {
+    try {
+      setLoading(true);
 
+      // set product group first
+      setFormData((prev) => ({
+        ...prev,
+        product_group: value,
+      }));
+
+      // call API
+      const res = await getProductGroupHSN(value);
+
+      console.log("HSN Mapping 👉", res);
+
+      setFormData((prev) => ({
+        ...prev,
+        product_group: value,
+        hsn_code: res?.hsn_code || null,
+        sac_code: res?.sac_code || null,
+      }));
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to fetch tax details");
+    } finally {
+      setLoading(false);
+    }
+  };
   /* ================= GST SPLIT ================= */
   const handleGstChange = (value = 0) => {
     const gst = Math.min(100, Math.max(0, value));
@@ -697,28 +726,6 @@ export default function ItemMasterTab({ items, setItems }) {
               </FormField>
             </Col>
             <Col span={12}>
-              <FormField label="Product Group" required>
-                <Select
-                  showSearch
-                  placeholder="Select product group"
-                  loading={loading}
-                  style={{ width: "100%" }}
-                  value={formData.product_group}
-                  onChange={(value) =>
-                    setFormData({ ...formData, product_group: value })
-                  }
-                  optionFilterProp="label"
-                  options={groups.map((g) => ({
-                    value: g.id, // UUID goes to backend
-                    label: g.name, // Name shown to user
-                  }))}
-                />
-              </FormField>
-            </Col>
-          </Row>
-
-          <Row gutter={16}>
-            <Col span={12}>
               <FormField label="Category" required>
                 <Select
                   disabled={viewMode}
@@ -742,7 +749,26 @@ export default function ItemMasterTab({ items, setItems }) {
                 </Select>
               </FormField>
             </Col>
+          </Row>
 
+          <Row gutter={16}>
+            <Col span={12}>
+              <FormField label="Product Group" required>
+                <Select
+                  showSearch
+                  placeholder="Select product group"
+                  loading={loading}
+                  style={{ width: "100%" }}
+                  value={formData.product_group}
+                  onChange={handleProductGroupChange}
+                  optionFilterProp="label"
+                  options={groups.map((g) => ({
+                    value: g.id, // UUID goes to backend
+                    label: g.name, // Name shown to user
+                  }))}
+                />
+              </FormField>
+            </Col>
             <Col span={12}>
               {/* GOODS → HSN */}
               {formData.itemCategory === "GOODS" && (
@@ -767,6 +793,7 @@ export default function ItemMasterTab({ items, setItems }) {
               {formData.itemCategory === "SERVICE" && (
                 <FormField label="SAC Code" required>
                   <Select
+                    disabled={!!formData.product_group && !!formData.hsn_code}
                     showSearch
                     placeholder="Select SAC code"
                     value={formData.sac_code || undefined}

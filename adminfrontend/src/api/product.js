@@ -191,3 +191,27 @@ export const updateUnitById = async (payload, id) => {
   return res.data;
 }
 
+export const addProductgroupToHSN = async (payload,productId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.patch(`/product/product-groups/${productId}/`, payload, {
+    params: { organisation: currentOrgId, },
+  });
+  return res.data;
+}
+
+
+export const getProductGroupHSN = async (productId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/product/product-groups/${productId}/tax-details/`, {
+    params: { organisation: currentOrgId, },
+  });
+  return res.data;
+}
+
+export const getproductGroupHSNList = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/product/product-groups/`, {
+    params: { organisation: currentOrgId, },
+  });
+  return res.data;
+}

@@ -1,95 +1,136 @@
-import React, { useState } from "react";
-import { Card, Table, Button, Modal, Checkbox, Popconfirm } from "antd";
+import React, { useState, useEffect } from "react";
+import {
+  Card,
+  Table,
+  Button,
+  Modal,
+  Popconfirm,
+  Select,
+  Form,
+  message,
+} from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
-import hsnSacData from "../../hsnSacData.json";
-import { getHSNSACCodes, getSACCodes } from "../../../../../../../api/product";
 
-/* ================= Code Selector (Structured Modal) ================= */
-const CodeSelector = ({ open, title, data, onClose, onAdd }) => {
-  const [selected, setSelected] = useState([]);
-  const [showAll, setShowAll] = useState(false);
+import {
+  getHSNSACCodes,
+  getSACCodes,
+  getproductGroupHSNList,
+} from "../../../../../../../api/product";
 
-  // Show 6 items (3 rows of 2) by default for a balanced look
-  const visibleList = showAll ? data || [] : (data || []).slice(0, 6);
+import {
+  getProductGroups,
+  addProductgroupToHSN,
+} from "../../../../../../../api/product";
 
-  const toggleSelect = (item) => {
-    setSelected((prev) =>
-      prev.some((i) => i.code === item.code)
-        ? prev.filter((i) => i.code !== item.code)
-        : [...prev, item],
-    );
-  };
+/* ================= ADD MODAL ================= */
+const AddTaxModal = ({
+  open,
+  type,
+  productGroups,
+  codes,
+  onClose,
+  onSuccess,
+}) => {
+  const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
 
-  const handleAdd = () => {
-    onAdd(selected);
-    setSelected([]);
-    setShowAll(false);
-    onClose();
+  const handleSubmit = async () => {
+    try {
+      const values = await form.validateFields();
+      setLoading(true);
+
+      const selectedGroup = productGroups.find(
+        (p) => p.id === values.productGroup,
+      );
+
+      const selectedCode = codes.find((c) => c.id === values.code);
+
+      const payload = {
+        name: selectedGroup?.name,
+        hsn_code: type === "hsn" ? selectedCode?.id : null,
+        sac_code: type === "sac" ? selectedCode?.id : null,
+      };
+
+      await addProductgroupToHSN(payload, values.productGroup);
+
+      message.success(`${type.toUpperCase()} added successfully`);
+
+      onSuccess({
+        key: `${values.productGroup}-${values.code}`,
+        productGroupId: values.productGroup,
+        productGroupName: selectedGroup?.name,
+        code: selectedCode?.code,
+        description: selectedCode?.description,
+      });
+
+      form.resetFields();
+      onClose();
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to add");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <Modal
       open={open}
       title={
-        <span className="text-lg! font-bold! text-amber-800!">{title}</span>
+        <span className="text-lg font-bold text-amber-800">
+          Add {type.toUpperCase()}
+        </span>
       }
       onCancel={onClose}
-      footer={null}
-      width={650}
+      onOk={handleSubmit}
+      okText="Add"
+      okButtonProps={{
+        className: "!bg-amber-500 !hover:bg-amber-600 !text-white !border-none",
+      }}
+      confirmLoading={loading}
       centered
     >
-      <div className="pt-4">
-        {/* Two-Column Grid Layout */}
-        <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-          {visibleList.map((item) => (
-            <div key={item.code} className="flex items-start">
-              <Checkbox
-                checked={selected.some((i) => i.code === item.code)}
-                onChange={() => toggleSelect(item)}
-              >
-                <div className="leading-tight">
-                  <span className="text-amber-700 font-bold mr-1">
-                    {item.code}
-                  </span>
-                  <span className="text-amber-800/80 font-medium">
-                    – {item.description}
-                  </span>
-                </div>
-              </Checkbox>
-            </div>
-          ))}
-        </div>
+      <Form form={form} layout="vertical" className="pt-4">
+        {/* Product Group */}
+        <Form.Item
+          name="productGroup"
+          label={
+            <span className="text-amber-700 font-semibold">Product Group</span>
+          }
+          rules={[{ required: true }]}
+        >
+          <Select placeholder="Select Product Group" className="rounded">
+            {productGroups.map((pg) => (
+              <Select.Option key={pg.id} value={pg.id}>
+                {pg.name}
+              </Select.Option>
+            ))}
+          </Select>
+        </Form.Item>
 
-        {/* Show More/Less Toggle */}
-        {data.length > 6 && (
-          <div className="mt-4">
-            <Button
-              type="link"
-              className="text-blue-500 p-0 h-auto text-sm font-semibold"
-              onClick={() => setShowAll(!showAll)}
-            >
-              {showAll ? "Show Less" : "Show More"}
-            </Button>
-          </div>
-        )}
-
-        {/* Footer Action */}
-        <div className="mt-8 flex justify-end border-t pt-4">
-          <Button
-            type="primary"
-            size="large"
-            disabled={!selected.length}
-            onClick={handleAdd}
-            className={`px-8 rounded shadow-sm border-none ${
-              selected.length
-                ? "bg-amber-500! hover:bg-amber-600!"
-                : "bg-gray-100!"
-            }`}
+        {/* Code */}
+        <Form.Item
+          name="code"
+          label={
+            <span className="text-amber-700 font-semibold">
+              {type.toUpperCase()} Code
+            </span>
+          }
+          rules={[{ required: true }]}
+        >
+          <Select
+            placeholder={`Select ${type.toUpperCase()} Code`}
+            showSearch
+            optionFilterProp="children"
           >
-            Add Selected
-          </Button>
-        </div>
-      </div>
+            {codes.map((c) => (
+              <Select.Option key={c.id} value={c.id}>
+                {c.code} - {c.description}
+              </Select.Option>
+            ))}
+          </Select>
+        </Form.Item>
+      </Form>
     </Modal>
   );
 };
@@ -98,172 +139,192 @@ const CodeSelector = ({ open, title, data, onClose, onAdd }) => {
 const HsnSacManager = () => {
   const [hsnList, setHsnList] = useState([]);
   const [sacList, setSacList] = useState([]);
+  const [productGroups, setProductGroups] = useState([]);
   const [modalType, setModalType] = useState(null);
-  // const fetAllHSNSACCodes = async () => {
-  //   try {
-  //     const data = await getHSNSACCodes();
-  //     setHsnList(data);
-  //     setSacList(data.sac);
-  //     console.log("Fetched HSN codes:", data);
-  //     console.log("Fetched SAC codes:", data.sac);
-  //     return data;
-  //   } catch (error) {
-  //     console.error("Error fetching HSN/SAC codes:", error);
-  //     return { hsn: [], sac: [] };
-  //   }
-  // };
-  const fetAllHSNSACCodes = async () => {
+
+  /* ===== Fetch Data ===== */
+  useEffect(() => {
+    fetchAll();
+  }, []);
+
+  const fetchAll = async () => {
     try {
-      const hsnData = await getHSNSACCodes();
-      const sacData = await getSACCodes();
+      const [hsnData, sacData, groupData, mappedData] = await Promise.all([
+        getHSNSACCodes(),
+        getSACCodes(),
+        getProductGroups(),
+        getproductGroupHSNList(), // ✅ NEW
+      ]);
 
-      console.log("HSN API 👉", hsnData);
-      console.log("SAC API 👉", sacData);
+      /* ===== Normalize master codes ===== */
+      const normalizedHsn = (hsnData || []).map((i) => ({
+        id: i.id,
+        code: i.hsn_code,
+        description: i.description,
+      }));
 
-      const normalizedHsn = Array.isArray(hsnData)
-        ? hsnData.map((item) => ({
-            ...item,
-            code: item.hsn_code,
-            description: item.description,
-          }))
-        : [];
+      const normalizedSac = (sacData || []).map((i) => ({
+        id: i.id,
+        code: i.sac_code,
+        description: i.description,
+      }));
 
-      const normalizedSac = Array.isArray(sacData)
-        ? sacData.map((item) => ({
-            ...item,
-            code: item.sac_code,
-            description: item.description,
-          }))
-        : [];
+      setAvailableHsn(normalizedHsn);
+      setAvailableSac(normalizedSac);
+      setProductGroups(groupData || []);
 
-      setHsnList(normalizedHsn);
-      setSacList(normalizedSac);
+      /* ===== ✅ MAP EXISTING DATA ===== */
 
-      // Update modal data source
-      hsnSacData.hsn = normalizedHsn;
-      hsnSacData.sac = normalizedSac;
+      const hsnMapped = (mappedData || [])
+        .filter((item) => item.hsn_code) // only mapped
+        .map((item) => {
+          const matched = normalizedHsn.find((h) => h.id === item.hsn_code);
 
-      return { hsn: normalizedHsn, sac: normalizedSac };
-    } catch (error) {
-      console.error("Error fetching HSN/SAC codes:", error);
-      return { hsn: [], sac: [] };
+          return {
+            key: `${item.id}-${item.hsn_code}`,
+            productGroupId: item.id,
+            productGroupName: item.name,
+            code: matched?.code || item.hsn_code_value, // fallback
+            description: matched?.description || "",
+          };
+        });
+
+      const sacMapped = (mappedData || [])
+        .filter((item) => item.sac_code)
+        .map((item) => {
+          const matched = normalizedSac.find((s) => s.id === item.sac_code);
+
+          return {
+            key: `${item.id}-${item.sac_code}`,
+            productGroupId: item.id,
+            productGroupName: item.name,
+            code: matched?.code || "",
+            description: matched?.description || "",
+          };
+        });
+
+      setHsnList(hsnMapped);
+      setSacList(sacMapped);
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  React.useEffect(() => {
-    const fetchData = async () => {
-      const data = await fetAllHSNSACCodes();
-      hsnSacData.hsn = data.hsn;
-      hsnSacData.sac = data.sac;
-    };
-    fetchData();
-  }, []);
+  const [availableHsn, setAvailableHsn] = useState([]);
+  const [availableSac, setAvailableSac] = useState([]);
 
+  /* ===== Table Columns ===== */
   const columns = (onDelete) => [
     {
-      title: <span className="text-amber-600!">Code</span>,
+      title: <span className="text-amber-600">Product Group</span>,
+      dataIndex: "productGroupName",
+      render: (text) => (
+        <span className="text-amber-700 font-semibold">{text}</span>
+      ),
+    },
+    {
+      title: <span className="text-amber-600">Code</span>,
       dataIndex: "code",
-      width: 100,
-      render: (text) => <span className=" text-amber-700!">{text}</span>,
+      render: (text) => <span className="text-amber-700">{text}</span>,
     },
     {
-      title: <span className="text-amber-600!">Description</span>,
+      title: <span className="text-amber-600">Description</span>,
       dataIndex: "description",
-      width: 180,
-      render: (text) => <span className=" text-amber-700!">{text}</span>,
+      render: (text) => <span className="text-amber-700">{text}</span>,
     },
     {
-      title: <span className="text-amber-600!">Action</span>,
-      width: 80,
+      title: <span className="text-amber-600">Action</span>,
       align: "center",
       render: (_, record) => (
         <Popconfirm
-          title=" Are you sure you want to delete ?"
-          onConfirm={() => onDelete(record.code)}
+          title="Are you sure you want to delete?"
+          onConfirm={() => onDelete(record.key)}
         >
-          <DeleteOutlined className="cursor-pointer! text-red-500!" />
+          <DeleteOutlined className="text-red-500 cursor-pointer" />
         </Popconfirm>
       ),
     },
   ];
 
-  const addItems = (type, items) => {
-    const listSetter = type === "hsn" ? setHsnList : setSacList;
-    listSetter((prev) => [
-      ...prev,
-      ...items.filter((i) => !prev.some((p) => p.code === i.code)),
-    ]);
+  /* ===== Add Row ===== */
+  const addItem = (type, item) => {
+    const setter = type === "hsn" ? setHsnList : setSacList;
+
+    setter((prev) => {
+      const exists = prev.some(
+        (p) => p.productGroupId === item.productGroupId && p.code === item.code,
+      );
+      if (exists) return prev;
+      return [...prev, item];
+    });
   };
 
+  /* ===== Render ===== */
   return (
     <div className="p-2">
-      <h2 className="text-lg font-semibold text-amber-700 mb-2 mt-0 pt-0">
-        Easily manage your HSN and SAC code masters{" "}
+      <h2 className="text-lg font-semibold text-amber-700 mb-2">
+        Easily manage your HSN and SAC code masters
       </h2>
+
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* HSN TABLE CARD */}
+        {/* HSN CARD */}
         <Card
           title={<span className="text-amber-700">HSN Codes</span>}
           extra={
             <Button
-              type="primary"
               icon={<PlusOutlined />}
-              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              className="bg-amber-500 hover:bg-amber-600 border-none text-white"
               onClick={() => setModalType("hsn")}
             >
               Add HSN
             </Button>
           }
-          className="shadow-sm border-amber-100"
         >
           <Table
-            rowKey="code"
-            columns={columns((code) =>
-              setHsnList((prev) => prev.filter((i) => i.code !== code)),
+            rowKey="key"
+            columns={columns((key) =>
+              setHsnList((prev) => prev.filter((i) => i.key !== key)),
             )}
             dataSource={hsnList}
             pagination={{ pageSize: 5 }}
             size="small"
-            scroll={{ y: 100 }}
           />
         </Card>
 
-        {/* SAC TABLE CARD */}
+        {/* SAC CARD */}
         <Card
           title={<span className="text-amber-700">SAC Codes</span>}
           extra={
             <Button
-              type="primary"
               icon={<PlusOutlined />}
-              className="bg-amber-500! hover:bg-amber-600! border-none!"
+              className="bg-amber-500 hover:bg-amber-600 border-none text-white"
               onClick={() => setModalType("sac")}
             >
               Add SAC
             </Button>
           }
-          className="shadow-sm border-amber-100"
         >
           <Table
-            rowKey="code"
-            columns={columns((code) =>
-              setSacList((prev) => prev.filter((i) => i.code !== code)),
+            rowKey="key"
+            columns={columns((key) =>
+              setSacList((prev) => prev.filter((i) => i.key !== key)),
             )}
             dataSource={sacList}
             pagination={{ pageSize: 5 }}
             size="small"
-            scroll={{ y: 100 }}
           />
         </Card>
       </div>
 
-      {/* MODAL CONTROLLER */}
+      {/* MODAL */}
       {modalType && (
-        <CodeSelector
+        <AddTaxModal
           open={!!modalType}
-          title={`Select ${modalType.toUpperCase()} Codes`}
-          data={hsnSacData[modalType]}
+          type={modalType}
+          productGroups={productGroups}
+          codes={modalType === "hsn" ? availableHsn : availableSac}
           onClose={() => setModalType(null)}
-          onAdd={(items) => addItems(modalType, items)}
+          onSuccess={(item) => addItem(modalType, item)}
         />
       )}
     </div>

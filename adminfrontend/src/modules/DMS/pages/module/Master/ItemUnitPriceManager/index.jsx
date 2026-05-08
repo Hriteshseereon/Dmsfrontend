@@ -30,7 +30,7 @@ export default function ItemUnitPriceManager() {
   }, []);
 
   return (
-    <div >
+    <div>
       {/* ✅ Scoped Amber Tabs Styling */}
       <style>
         {`
@@ -56,19 +56,13 @@ export default function ItemUnitPriceManager() {
           items={[
             {
               key: "1",
-              label: "Item Master",
-              children: (
-                <ItemMasterTab
-                  items={items}
-                  setItems={setItems}
-                  reloadProducts={loadProducts}
-                />
-              ),
+              label: "Product Group",
+              children: <ProductGroupMaster />,
             },
             {
               key: "2",
-              label: "Product Group",
-              children: <ProductGroupMaster />,
+              label: "HSN & SAC Master",
+              children: <HsnSacManager />,
             },
             {
               key: "3",
@@ -77,14 +71,12 @@ export default function ItemUnitPriceManager() {
             },
             {
               key: "4",
-              label: "Unit Conversions",
+              label: "Item Master",
               children: (
-                <UnitConversionTab
+                <ItemMasterTab
                   items={items}
-                  selectedItem={selectedItem}
-                  setSelectedItem={setSelectedItem}
-                  unitConversions={unitConversions}
-                  setUnitConversions={setUnitConversions}
+                  setItems={setItems}
+                  reloadProducts={loadProducts}
                 />
               ),
             },
@@ -105,8 +97,17 @@ export default function ItemUnitPriceManager() {
 
             {
               key: "5",
-              label: "HSN & SAC Manager",
-              children: <HsnSacManager />,
+
+              label: "Unit Conversions",
+              children: (
+                <UnitConversionTab
+                  items={items}
+                  selectedItem={selectedItem}
+                  setSelectedItem={setSelectedItem}
+                  unitConversions={unitConversions}
+                  setUnitConversions={setUnitConversions}
+                />
+              ),
             },
           ]}
         />
