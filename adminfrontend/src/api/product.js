@@ -215,3 +215,11 @@ export const getproductGroupHSNList = async () => {
   });
   return res.data;
 }
+
+export const deleteProductGroup = async (id) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.delete(`/product/product-groups/${id}/`, {
+    params: { organisation: currentOrgId }, 
+  });
+  return res.data;
+}
