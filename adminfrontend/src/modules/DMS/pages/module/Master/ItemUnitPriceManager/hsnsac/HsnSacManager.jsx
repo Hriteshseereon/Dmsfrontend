@@ -8,6 +8,7 @@ import {
   Select,
   Form,
   message,
+  Input, // ✅ added
 } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 
@@ -15,6 +16,7 @@ import {
   getHSNSACCodes,
   getSACCodes,
   getproductGroupHSNList,
+  deleteProductGroup,
 } from "../../../../../../../api/product";
 
 import {
@@ -23,14 +25,7 @@ import {
 } from "../../../../../../../api/product";
 
 /* ================= ADD MODAL ================= */
-const AddTaxModal = ({
-  open,
-  type,
-  productGroups,
-  codes,
-  onClose,
-  onSuccess,
-}) => {
+const AddTaxModal = ({ open, type, productGroups, onClose, onSuccess }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
 
@@ -43,12 +38,10 @@ const AddTaxModal = ({
         (p) => p.id === values.productGroup,
       );
 
-      const selectedCode = codes.find((c) => c.id === values.code);
-
       const payload = {
         name: selectedGroup?.name,
-        hsn_code: type === "hsn" ? selectedCode?.id : null,
-        sac_code: type === "sac" ? selectedCode?.id : null,
+        hsn_code: type === "hsn" ? values.code : null,
+        sac_code: type === "sac" ? values.code : null,
       };
 
       await addProductgroupToHSN(payload, values.productGroup);
@@ -59,8 +52,8 @@ const AddTaxModal = ({
         key: `${values.productGroup}-${values.code}`,
         productGroupId: values.productGroup,
         productGroupName: selectedGroup?.name,
-        code: selectedCode?.code,
-        description: selectedCode?.description,
+        code: values.code,
+        description: "",
       });
 
       form.resetFields();
@@ -108,7 +101,7 @@ const AddTaxModal = ({
           </Select>
         </Form.Item>
 
-        {/* Code */}
+        {/* ✅ MANUAL CODE INPUT */}
         <Form.Item
           name="code"
           label={
@@ -116,19 +109,21 @@ const AddTaxModal = ({
               {type.toUpperCase()} Code
             </span>
           }
-          rules={[{ required: true }]}
+          rules={[
+            { required: true, message: "Code is required" },
+            {
+              pattern: type === "hsn" ? /^[0-9]{4,8}$/ : /^[0-9]{6}$/,
+              message:
+                type === "hsn"
+                  ? "HSN must be 4 to 8 digits"
+                  : "SAC must be 6 digits",
+            },
+          ]}
         >
-          <Select
-            placeholder={`Select ${type.toUpperCase()} Code`}
-            showSearch
-            optionFilterProp="children"
-          >
-            {codes.map((c) => (
-              <Select.Option key={c.id} value={c.id}>
-                {c.code} - {c.description}
-              </Select.Option>
-            ))}
-          </Select>
+          <Input
+            placeholder={`Enter ${type.toUpperCase()} Code`}
+            maxLength={type === "hsn" ? 8 : 6}
+          />
         </Form.Item>
       </Form>
     </Modal>
@@ -142,7 +137,6 @@ const HsnSacManager = () => {
   const [productGroups, setProductGroups] = useState([]);
   const [modalType, setModalType] = useState(null);
 
-  /* ===== Fetch Data ===== */
   useEffect(() => {
     fetchAll();
   }, []);
@@ -153,10 +147,9 @@ const HsnSacManager = () => {
         getHSNSACCodes(),
         getSACCodes(),
         getProductGroups(),
-        getproductGroupHSNList(), // ✅ NEW
+        getproductGroupHSNList(),
       ]);
 
-      /* ===== Normalize master codes ===== */
       const normalizedHsn = (hsnData || []).map((i) => ({
         id: i.id,
         code: i.hsn_code,
@@ -169,39 +162,27 @@ const HsnSacManager = () => {
         description: i.description,
       }));
 
-      setAvailableHsn(normalizedHsn);
-      setAvailableSac(normalizedSac);
       setProductGroups(groupData || []);
 
-      /* ===== ✅ MAP EXISTING DATA ===== */
-
       const hsnMapped = (mappedData || [])
-        .filter((item) => item.hsn_code) // only mapped
-        .map((item) => {
-          const matched = normalizedHsn.find((h) => h.id === item.hsn_code);
-
-          return {
-            key: `${item.id}-${item.hsn_code}`,
-            productGroupId: item.id,
-            productGroupName: item.name,
-            code: matched?.code || item.hsn_code_value, // fallback
-            description: matched?.description || "",
-          };
-        });
+        .filter((item) => item.hsn_code)
+        .map((item) => ({
+          key: `${item.id}-${item.hsn_code}`,
+          productGroupId: item.id,
+          productGroupName: item.name,
+          code: item.hsn_code_value || item.hsn_code,
+          description: "",
+        }));
 
       const sacMapped = (mappedData || [])
         .filter((item) => item.sac_code)
-        .map((item) => {
-          const matched = normalizedSac.find((s) => s.id === item.sac_code);
-
-          return {
-            key: `${item.id}-${item.sac_code}`,
-            productGroupId: item.id,
-            productGroupName: item.name,
-            code: matched?.code || "",
-            description: matched?.description || "",
-          };
-        });
+        .map((item) => ({
+          key: `${item.id}-${item.sac_code}`,
+          productGroupId: item.id,
+          productGroupName: item.name,
+          code: item.sac_code_value || item.sac_code,
+          description: "",
+        }));
 
       setHsnList(hsnMapped);
       setSacList(sacMapped);
@@ -210,11 +191,24 @@ const HsnSacManager = () => {
     }
   };
 
-  const [availableHsn, setAvailableHsn] = useState([]);
-  const [availableSac, setAvailableSac] = useState([]);
+  const handleDelete = async (type, record) => {
+    try {
+      await deleteProductGroup(record.productGroupId);
 
-  /* ===== Table Columns ===== */
-  const columns = (onDelete) => [
+      message.success("Deleted successfully");
+
+      if (type === "hsn") {
+        setHsnList((prev) => prev.filter((item) => item.key !== record.key));
+      } else {
+        setSacList((prev) => prev.filter((item) => item.key !== record.key));
+      }
+    } catch (err) {
+      console.error(err);
+      message.error("Delete failed");
+    }
+  };
+
+  const columns = (type) => [
     {
       title: <span className="text-amber-600">Product Group</span>,
       dataIndex: "productGroupName",
@@ -228,17 +222,12 @@ const HsnSacManager = () => {
       render: (text) => <span className="text-amber-700">{text}</span>,
     },
     {
-      title: <span className="text-amber-600">Description</span>,
-      dataIndex: "description",
-      render: (text) => <span className="text-amber-700">{text}</span>,
-    },
-    {
       title: <span className="text-amber-600">Action</span>,
       align: "center",
       render: (_, record) => (
         <Popconfirm
           title="Are you sure you want to delete?"
-          onConfirm={() => onDelete(record.key)}
+          onConfirm={() => handleDelete(type, record)} // ✅ FIXED
         >
           <DeleteOutlined className="text-red-500 cursor-pointer" />
         </Popconfirm>
@@ -246,7 +235,6 @@ const HsnSacManager = () => {
     },
   ];
 
-  /* ===== Add Row ===== */
   const addItem = (type, item) => {
     const setter = type === "hsn" ? setHsnList : setSacList;
 
@@ -259,7 +247,6 @@ const HsnSacManager = () => {
     });
   };
 
-  /* ===== Render ===== */
   return (
     <div className="p-2">
       <h2 className="text-lg font-semibold text-amber-700 mb-2">
@@ -267,7 +254,7 @@ const HsnSacManager = () => {
       </h2>
 
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* HSN CARD */}
+        {/* HSN */}
         <Card
           title={<span className="text-amber-700">HSN Codes</span>}
           extra={
@@ -282,16 +269,14 @@ const HsnSacManager = () => {
         >
           <Table
             rowKey="key"
-            columns={columns((key) =>
-              setHsnList((prev) => prev.filter((i) => i.key !== key)),
-            )}
+            columns={columns("hsn")}
             dataSource={hsnList}
             pagination={{ pageSize: 5 }}
             size="small"
           />
         </Card>
 
-        {/* SAC CARD */}
+        {/* SAC */}
         <Card
           title={<span className="text-amber-700">SAC Codes</span>}
           extra={
@@ -306,9 +291,7 @@ const HsnSacManager = () => {
         >
           <Table
             rowKey="key"
-            columns={columns((key) =>
-              setSacList((prev) => prev.filter((i) => i.key !== key)),
-            )}
+            columns={columns("sac")}
             dataSource={sacList}
             pagination={{ pageSize: 5 }}
             size="small"
@@ -316,13 +299,11 @@ const HsnSacManager = () => {
         </Card>
       </div>
 
-      {/* MODAL */}
       {modalType && (
         <AddTaxModal
           open={!!modalType}
           type={modalType}
           productGroups={productGroups}
-          codes={modalType === "hsn" ? availableHsn : availableSac}
           onClose={() => setModalType(null)}
           onSuccess={(item) => addItem(modalType, item)}
         />
