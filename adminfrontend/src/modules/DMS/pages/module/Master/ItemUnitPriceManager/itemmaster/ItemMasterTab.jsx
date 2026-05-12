@@ -773,7 +773,7 @@ export default function ItemMasterTab({ items, setItems }) {
               {/* GOODS → HSN */}
               {formData.itemCategory === "GOODS" && (
                 <FormField label="HSN Code" required>
-                  <Select
+                  {/* <Select
                     showSearch
                     placeholder="Select HSN code"
                     value={formData.hsn_code || undefined}
@@ -785,6 +785,11 @@ export default function ItemMasterTab({ items, setItems }) {
                       value: h.id,
                       label: `${h.hsn_code} - ${h.description}`,
                     }))}
+                  /> */}
+                  <Input
+                    value={formData.hsn_code || ""}
+                    disabled
+                    placeholder="Auto-filled from product group"
                   />
                 </FormField>
               )}
@@ -792,7 +797,7 @@ export default function ItemMasterTab({ items, setItems }) {
               {/* SERVICE → SAC */}
               {formData.itemCategory === "SERVICE" && (
                 <FormField label="SAC Code" required>
-                  <Select
+                  {/* <Select
                     disabled={!!formData.product_group && !!formData.hsn_code}
                     showSearch
                     placeholder="Select SAC code"
@@ -805,6 +810,11 @@ export default function ItemMasterTab({ items, setItems }) {
                       value: s.id,
                       label: `${s.sac_code} - ${s.description}`,
                     }))}
+                  /> */}
+                  <Input
+                    value={formData.sac_code || ""}
+                    disabled
+                    placeholder="Auto-filled from product group"
                   />
                 </FormField>
               )}
