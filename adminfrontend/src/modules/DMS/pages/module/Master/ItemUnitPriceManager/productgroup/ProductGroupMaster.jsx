@@ -14,9 +14,11 @@ import {
   getProductGroups,
   getProductGroupById,
   updateProductGroupById,
+  deleteProductGroup,
 } from "../../../../../../../api/product";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+
 export default function ProductGroupMaster() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -29,7 +31,31 @@ export default function ProductGroupMaster() {
   const [viewForm] = Form.useForm();
   const [data, setData] = useState([]);
 
-  // mapper function
+  /* ================= FETCH ================= */
+  const fetchProductGroups = async () => {
+    try {
+      setLoading(true);
+      const res = await getProductGroups();
+
+      const formatted = res.map((item, index) => ({
+        key: item.id || index + 1,
+        productGroupName: item.name,
+        raw: item,
+      }));
+
+      setData(formatted);
+    } catch (err) {
+      message.error("Failed to load product groups");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProductGroups();
+  }, []);
+
+  /* ================= VIEW / EDIT ================= */
   const openProductGroup = async (record, mode) => {
     try {
       setLoading(true);
@@ -63,71 +89,39 @@ export default function ProductGroupMaster() {
       setLoading(false);
     }
   };
-  //  /* ---------------- FETCH PRODUCT GROUPS ---------------- */
-  const fetchProductGroups = async () => {
+
+  /* ================= DELETE (FIXED) ================= */
+  const handleDelete = async (record) => {
+    console.log("DIRECT DELETE TEST");
+
     try {
-      setLoading(true);
-      const res = await getProductGroups();
-
-      // adapt API response to table format
-      const formatted = res.map((item, index) => ({
-        key: item.id || index + 1,
-        productGroupName: item.name,
-        raw: item,
-      }));
-
-      setData(formatted);
+      await deleteProductGroup(record.key);
+      console.log("API HIT SUCCESS ✅");
+      await fetchProductGroups();
     } catch (err) {
-      message.error("Failed to load product groups");
-    } finally {
-      setLoading(false);
+      console.error(err);
     }
   };
-
-  useEffect(() => {
-    fetchProductGroups();
-  }, []);
-
-  /* ---------------- SEARCH FILTER ---------------- */
+  /* ================= SEARCH ================= */
   const filteredData = data.filter((item) =>
     item.productGroupName.toLowerCase().includes(searchText.toLowerCase()),
   );
 
-  /* ---------------- DELETE (LOCAL ONLY) ---------------- */
-  const handleDelete = (record) => {
-    Modal.confirm({
-      title: "Delete Product Group",
-      content: `Are you sure you want to delete "${record.productGroupName}"?`,
-      okText: "Delete",
-      okType: "danger",
-      onOk: async () => {
-        // TODO: integrate delete API here when backend is ready
-        setData((prev) => prev.filter((i) => i.key !== record.key));
-        message.success("Product group deleted");
-      },
-    });
-  };
-
-  // handle export button
+  /* ================= EXPORT ================= */
   const handleExport = () => {
     if (filteredData.length === 0) {
       message.warning("No data to export");
       return;
     }
 
-    // format data for excel
     const exportData = filteredData.map((item) => ({
       "Product Group Name": item.productGroupName,
     }));
 
-    // create worksheet
     const worksheet = XLSX.utils.json_to_sheet(exportData);
-
-    // create workbook
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Product Groups");
 
-    // generate excel file
     const excelBuffer = XLSX.write(workbook, {
       bookType: "xlsx",
       type: "array",
@@ -139,7 +133,8 @@ export default function ProductGroupMaster() {
 
     saveAs(fileData, "Product_Group_List.xlsx");
   };
-  /* ---------------- TABLE COLUMNS ---------------- */
+
+  /* ================= TABLE ================= */
   const columns = [
     {
       title: (
@@ -152,7 +147,7 @@ export default function ProductGroupMaster() {
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       width: 140,
-      render: (record) => (
+      render: (_, record) => (
         <div className="flex gap-3">
           <EyeOutlined
             className="cursor-pointer! text-red-500! hover:text-red-600!"
@@ -162,16 +157,19 @@ export default function ProductGroupMaster() {
             className="cursor-pointer! text-blue-500! hover:text-blue-600!"
             onClick={() => openProductGroup(record, "edit")}
           />
-          {/* <DeleteOutlined
+          <DeleteOutlined
             className="cursor-pointer text-gray-600 hover:text-red-600"
-            onClick={() => handleDelete(record)}
-          /> */}
+            onClick={() => {
+              console.log("DELETE CLICKED 👉", record);
+              handleDelete(record);
+            }}
+          />
         </div>
       ),
     },
   ];
 
-  /* ---------------- ADD / EDIT SUBMIT ---------------- */
+  /* ================= SUBMIT ================= */
   const handleFormSubmit = async (values) => {
     try {
       const payload = {
@@ -186,7 +184,7 @@ export default function ProductGroupMaster() {
         message.success("Product group added successfully");
       }
 
-      fetchProductGroups(); // always refresh
+      await fetchProductGroups();
 
       setIsAddModalOpen(false);
       setIsEditModalOpen(false);
@@ -233,6 +231,7 @@ export default function ProductGroupMaster() {
             Reset
           </Button>
         </div>
+
         <div className="flex gap-2">
           <Button
             icon={<DownloadOutlined />}
@@ -241,6 +240,7 @@ export default function ProductGroupMaster() {
           >
             Export
           </Button>
+
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -255,11 +255,12 @@ export default function ProductGroupMaster() {
         </div>
       </div>
 
-      <div className=" border border-amber-300 rounded-lg p-4 shadow-md">
+      <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
           Product Group Records
         </h2>
         <p className="text-amber-600 mb-3">Manage your product group data</p>
+
         <Table
           columns={columns}
           dataSource={filteredData}
@@ -269,6 +270,7 @@ export default function ProductGroupMaster() {
         />
       </div>
 
+      {/* ADD / EDIT */}
       <Modal
         title={
           <span className="text-amber-700 font-semibold text-lg">
@@ -308,6 +310,7 @@ export default function ProductGroupMaster() {
         </Form>
       </Modal>
 
+      {/* VIEW */}
       <Modal
         title={
           <span className="text-amber-700 font-semibold">
