@@ -91,6 +91,11 @@ export const getCompanyGroupById = async (id) => {
   return res.data;
 }
 
+export const deleteCompanyGroup = async (id) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.delete(`/vendors/company-groups/${id}/`, { params: { organisation: currentOrgId } });
+  return res.data;
+}
 // commpany group name   dropdown api
 export const getCompanyGroupDropdown = async () => {
   const { currentOrgId } = useSessionStore.getState();

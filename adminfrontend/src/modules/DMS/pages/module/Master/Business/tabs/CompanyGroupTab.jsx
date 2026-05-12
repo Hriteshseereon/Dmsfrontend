@@ -5,6 +5,7 @@ import {
   PlusOutlined,
   EyeOutlined,
   EditOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 
 import {
@@ -12,6 +13,7 @@ import {
   getCompanyGroupById,
   getCompanyGroups,
   updateCompanyGroup,
+  deleteCompanyGroup,
 } from "../../../../../../../api/bussinesspatnr";
 
 export default function CompanyGroupTab() {
@@ -69,6 +71,16 @@ export default function CompanyGroupTab() {
     }
   };
 
+  const handleDelete = async (record) => {
+    try {
+      await deleteCompanyGroup(record.id);
+      message.success("Company deleted successfully");
+      await fetchCompanyGroups();
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to delete company");
+    }
+  };
   const handleView = async (record) => {
     try {
       setLoading(true);
@@ -122,6 +134,10 @@ export default function CompanyGroupTab() {
               });
               setIsModalOpen(true);
             }}
+          />
+          <DeleteOutlined
+            style={{ color: "#555", cursor: "pointer" }}
+            onClick={() => handleDelete(record)}
           />
         </div>
       ),
