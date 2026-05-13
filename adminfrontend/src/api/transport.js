@@ -81,3 +81,14 @@ export const sendTransportCredential =   async (payload) =>{
   const res = await api.post('/credentials/send-credentials/',payload)
   return res;
 }
+
+
+// delte transport  
+export const deleteTransport = async (id) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.delete(
+    `/transport/transporters/${id}/`,
+    { params: { organisation: currentOrgId } }
+  );
+  return res.data;
+}

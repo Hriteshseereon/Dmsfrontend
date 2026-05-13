@@ -55,3 +55,12 @@ export const sendCustomerCredential = async (payload) => {
     const res = await api.post('/credentials/send-credentials/',payload)
     return res;
 }
+
+// delete the customer
+export const deleteAdminCustomer = async (customerId) => {
+    const { currentOrgId } = useSessionStore.getState();
+    const res = await api.delete(`/customers/admin/customers/${customerId}/details`, {
+        params: { organisation: currentOrgId },
+    });
+    return res.data;
+};

@@ -22,6 +22,7 @@ import {
   ReloadOutlined,
   UploadOutlined,
   SaveOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import { API_BASE_URL } from "@/utils/config";
 import {
@@ -30,6 +31,7 @@ import {
   updateAdminCustomer,
   getAdminCustomers,
   sendCustomerCredential,
+  deleteAdminCustomer,
 } from "../../../../../../../api/customer";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
@@ -339,7 +341,34 @@ export default function CustomerTab() {
     // Navigate back to the draft table view
     setDraftTableKey((k) => k + 1);
   };
+  // delte the customer
+  const handleDeleteCustomer = async (customerId) => {
+    try {
+      const res = await deleteAdminCustomer(customerId);
 
+      console.log("DELETE RESPONSE 👉", res);
+
+      // 🔥 HANDLE BACKEND FAILURE HERE
+      if (res?.success === false) {
+        if (res.message?.toLowerCase().includes("cannot be deleted")) {
+          message.error(
+            "Customer is linked with sale contracts and cannot be deleted.",
+          );
+        } else {
+          message.error(res.message || "Delete failed");
+        }
+        return; // ⛔ STOP execution
+      }
+
+      // ✅ SUCCESS CASE
+      message.success("Customer deleted");
+      fetchCustomers();
+    } catch (err) {
+      console.error("DELETE ERROR 👉", err);
+
+      message.error("Something went wrong");
+    }
+  };
   // ── FETCH ─────────────────────────────────────────────────────────────────
 
   const fetchCustomers = async () => {
@@ -699,6 +728,12 @@ export default function CustomerTab() {
           <EditOutlined
             className="text-blue-500! cursor-pointer! text-base! hover:text-blue-600!"
             onClick={() => openCustomer(record, false)}
+          />
+          <DeleteOutlined
+            className="text-gray-500! cursor-pointer! text-base! hover:text-gray-700!"
+            onClick={() =>
+              handleDeleteCustomer(record.customer_id || record.id)
+            }
           />
         </div>
       ),

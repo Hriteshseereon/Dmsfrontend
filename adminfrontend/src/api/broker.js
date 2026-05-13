@@ -70,3 +70,11 @@ export const sendBrokerPassword = async (id) => {
     method: "POST",
   });
 };
+
+export const deleteBrokerById = async (id) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.delete(`/brokers/broker/${id}/`, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
