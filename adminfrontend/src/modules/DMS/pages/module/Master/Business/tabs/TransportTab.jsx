@@ -33,6 +33,7 @@ import {
   updateTransport,
   getTransportById,
   sendTransportCredential,
+  deleteTransport,
 } from "@/api/transport.js";
 import {
   getCountryOptions,
@@ -287,6 +288,17 @@ export default function TransportTab() {
 
     return fd;
   };
+  // dlete transporter
+  const handleDelete = async (id) => {
+    try {
+      await deleteTransport(id);
+      message.success("Transporter deleted");
+      fetchTransporters();
+    } catch {
+      message.error("Failed to delete transporter");
+    }
+  };
+
   /* ================= SAVE ================= */
   const handleSubmit = async (values) => {
     try {
@@ -427,6 +439,10 @@ export default function TransportTab() {
               setOpen(true);
             }}
           />
+          <DeleteOutlined
+            className="text-gray-500! cursor-pointer! text-base! hover:text-gray-700!"
+            onClick={() => handleDelete(record.id)}
+          />
         </div>
       ),
     },
@@ -462,42 +478,53 @@ export default function TransportTab() {
   const filteredData = getFilteredData();
 
   const handleContinueDraft = (id) => {
-    console.log('[TransportTab] Attempting to continue draft:', id);
-    
+    console.log("[TransportTab] Attempting to continue draft:", id);
+
     // Debug localStorage state in production
     const storageInfo = debugLocalStorage();
     if (storageInfo.errors.length > 0) {
-      console.error('[TransportTab] localStorage issues detected:', storageInfo.errors);
+      console.error(
+        "[TransportTab] localStorage issues detected:",
+        storageInfo.errors,
+      );
     }
-    
+
     const draft = loadDraft(id);
     if (!draft) {
-      console.error('[TransportTab] Draft not found or failed to load:', id);
+      console.error("[TransportTab] Draft not found or failed to load:", id);
       message.error("Draft not found");
       return;
     }
 
-    console.log('[TransportTab] Draft loaded successfully, attempting to restore values:', {
-      draftId: draft.id,
-      hasValues: !!draft.values,
-      valuesKeys: Object.keys(draft.values || {}),
-      savedAt: draft.savedAt
-    });
+    console.log(
+      "[TransportTab] Draft loaded successfully, attempting to restore values:",
+      {
+        draftId: draft.id,
+        hasValues: !!draft.values,
+        valuesKeys: Object.keys(draft.values || {}),
+        savedAt: draft.savedAt,
+      },
+    );
 
     const restored = deserialiseDraftValues(draft.values, dayjs);
-    
+
     if (!restored || Object.keys(restored).length === 0) {
-      console.error('[TransportTab] Failed to restore draft values - empty result:', restored);
+      console.error(
+        "[TransportTab] Failed to restore draft values - empty result:",
+        restored,
+      );
       message.error("Failed to restore draft data");
       return;
     }
 
-    console.log('[TransportTab] Successfully restored draft values:', {
+    console.log("[TransportTab] Successfully restored draft values:", {
       restoredKeys: Object.keys(restored),
-      sampleValues: Object.keys(restored).slice(0, 3).reduce((acc, key) => {
-        acc[key] = restored[key];
-        return acc;
-      }, {})
+      sampleValues: Object.keys(restored)
+        .slice(0, 3)
+        .reduce((acc, key) => {
+          acc[key] = restored[key];
+          return acc;
+        }, {}),
     });
 
     form.setFieldsValue(restored);

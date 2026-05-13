@@ -51,6 +51,7 @@ import {
   getAllVendor,
   getproductbyVendor,
   sendBrokerPassword,
+  deleteBrokerById,
 } from "@/api/broker";
 import {
   getCountryOptions,
@@ -366,6 +367,16 @@ export default function BrokerTab() {
     })),
   });
 
+  //   delete handler
+  const handleDeleteBroker = async (broker_id) => {
+    try {
+      await deleteBrokerById(broker_id);
+      message.success("Broker deleted");
+      fetchBrokers();
+    } catch {
+      message.error("Failed to delete broker");
+    }
+  };
   const openBroker = async (record, view = false) => {
     try {
       const details = await getBrokerById(record.id);
@@ -487,6 +498,10 @@ export default function BrokerTab() {
             className="text-blue-500! cursor-pointer! text-base! hover:text-blue-600!"
             onClick={() => openBroker(record, false)}
           />
+          <DeleteOutlined
+            className="text-gray-500! cursor-pointer! text-base! hover:text-gray-700!"
+            onClick={() => handleDeleteBroker(record.id)}
+          />
         </div>
       ),
     },
@@ -508,42 +523,53 @@ export default function BrokerTab() {
   const filteredData = getFilteredData();
   // draft table
   const handleContinueDraft = (draftId) => {
-    console.log('[BrokerTab] Attempting to continue draft:', draftId);
-    
+    console.log("[BrokerTab] Attempting to continue draft:", draftId);
+
     // Debug localStorage state in production
     const storageInfo = debugLocalStorage();
     if (storageInfo.errors.length > 0) {
-      console.error('[BrokerTab] localStorage issues detected:', storageInfo.errors);
+      console.error(
+        "[BrokerTab] localStorage issues detected:",
+        storageInfo.errors,
+      );
     }
-    
+
     const draft = loadDraft(draftId);
     if (!draft) {
-      console.error('[BrokerTab] Draft not found or failed to load:', draftId);
+      console.error("[BrokerTab] Draft not found or failed to load:", draftId);
       message.error("Draft not found");
       return;
     }
 
-    console.log('[BrokerTab] Draft loaded successfully, attempting to restore values:', {
-      draftId: draft.id,
-      hasValues: !!draft.values,
-      valuesKeys: Object.keys(draft.values || {}),
-      savedAt: draft.savedAt
-    });
+    console.log(
+      "[BrokerTab] Draft loaded successfully, attempting to restore values:",
+      {
+        draftId: draft.id,
+        hasValues: !!draft.values,
+        valuesKeys: Object.keys(draft.values || {}),
+        savedAt: draft.savedAt,
+      },
+    );
 
     const restored = deserialiseDraftValues(draft.values, dayjs);
-    
+
     if (!restored || Object.keys(restored).length === 0) {
-      console.error('[BrokerTab] Failed to restore draft values - empty result:', restored);
+      console.error(
+        "[BrokerTab] Failed to restore draft values - empty result:",
+        restored,
+      );
       message.error("Failed to restore draft data");
       return;
     }
 
-    console.log('[BrokerTab] Successfully restored draft values:', {
+    console.log("[BrokerTab] Successfully restored draft values:", {
       restoredKeys: Object.keys(restored),
-      sampleValues: Object.keys(restored).slice(0, 3).reduce((acc, key) => {
-        acc[key] = restored[key];
-        return acc;
-      }, {})
+      sampleValues: Object.keys(restored)
+        .slice(0, 3)
+        .reduce((acc, key) => {
+          acc[key] = restored[key];
+          return acc;
+        }, {}),
     });
 
     form.resetFields();

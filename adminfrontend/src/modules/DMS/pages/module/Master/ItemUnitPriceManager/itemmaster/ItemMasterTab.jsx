@@ -35,6 +35,7 @@ import {
   updateProductById,
   getUnits,
   getProductGroupHSN,
+  deleteProductById,
 } from "../../../../../../../api/product";
 import { getCompanyGroupDropdown } from "../../../../../../../api/bussinesspatnr";
 import {
@@ -155,6 +156,7 @@ export default function ItemMasterTab({ items, setItems }) {
     }));
   };
 
+  // Initialize GST fields to 0 on component mount
   // ================= DRAFT FUNCTIONALITY =================
   const handleFormValuesChange = useCallback(() => {
     if (editingId || viewMode) return;
@@ -236,6 +238,21 @@ export default function ItemMasterTab({ items, setItems }) {
     handleFormValuesChange();
   }, [formData]);
 
+  // handle delete product
+  const handleDeleteProduct = async (id) => {
+    try {
+      setLoading(true);
+      await deleteProductById(id);
+      message.success("Product deleted successfully");
+      const updated = await getProducts();
+      setItems(updated);
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to delete product");
+    } finally {
+      setLoading(false);
+    }
+  };
   /* ================= SAFE EDIT MAPPING ================= */
   const openEdit = async (record, view = false) => {
     try {
@@ -353,6 +370,10 @@ export default function ItemMasterTab({ items, setItems }) {
             onClick={() => openEdit(r, true)}
           />
           <EditOutlined className="action-edit" onClick={() => openEdit(r)} />
+          <DeleteOutlined
+            className="text-gray-500! cursor-pointer! text-base! hover:text-gray-700!"
+            onClick={() => handleDeleteProduct(r.id)}
+          />
         </Space>
       ),
     },
