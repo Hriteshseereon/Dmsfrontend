@@ -47,6 +47,13 @@ export const getVendorDetailsByid = async (id) => {
   const res = await api.get(`/vendors/vendors/${id}/`, { params: { organisation: currentOrgId } });
   return res.data;
 }
+
+// delete vendor partner details
+export const deleteVendor = async (id) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.delete(`/vendors/vendors/${id}/`, { params: { organisation: currentOrgId } });
+  return res.data;
+}
 // working api on create and get the customer api
 export const addcustomer = async (payload) => {
   const { currentOrgId } = useSessionStore.getState();

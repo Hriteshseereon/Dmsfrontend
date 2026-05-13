@@ -72,6 +72,14 @@ export const updateProductById = async (payload,id) =>{
     params: { organisation: currentOrgId },
   })
 }
+
+export const deleteProductById = async (id) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.delete(`/product/products/${id}/`, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+}
 export const getVendors = async () => {
   const { currentOrgId } = useSessionStore.getState();
   const res = await api.get("/vendors/vendors/", {

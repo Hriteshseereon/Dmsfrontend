@@ -43,6 +43,7 @@ import {
   updateVendor,
   getVendorDetailsByid,
   getCompanyGroupDropdown,
+  deleteVendor,
 } from "../../../../../../../api/bussinesspatnr";
 import {
   getCountryOptions,
@@ -218,6 +219,16 @@ export default function VendorTab() {
     fetchVendors();
   }, []);
 
+  // ── delete ────────────────────────────────────────────────────────────────
+  const handleDelete = async (id) => {
+    try {
+      await deleteVendor(id);
+      message.success("Vendor deleted");
+      fetchVendors();
+    } catch {
+      message.error("Failed to delete vendor");
+    }
+  };
   // ── DRAFT: continue (restore into form) ──────────────────────────────────
   const handleContinueDraft = (draftId) => {
     console.log("[VendorTab] Attempting to continue draft:", draftId);
@@ -671,6 +682,10 @@ export default function VendorTab() {
           <EditOutlined
             className="text-blue-500! cursor-pointer! text-base! hover:text-blue-600!"
             onClick={() => openVendor(record, false)}
+          />
+          <DeleteOutlined
+            className="text-gray-500! cursor-pointer! text-base! hover:text-gray-700!"
+            onClick={() => handleDelete(record.id)}
           />
         </div>
       ),
