@@ -227,6 +227,7 @@ export default function VendorTab() {
       fetchVendors();
     } catch {
       message.error("Failed to delete vendor");
+      alert(`Vendor might be linked with other records`);
     }
   };
   // ── DRAFT: continue (restore into form) ──────────────────────────────────
@@ -683,10 +684,15 @@ export default function VendorTab() {
             className="text-blue-500! cursor-pointer! text-base! hover:text-blue-600!"
             onClick={() => openVendor(record, false)}
           />
-          <DeleteOutlined
-            className="text-gray-500! cursor-pointer! text-base! hover:text-gray-700!"
-            onClick={() => handleDelete(record.id)}
-          />
+          <Popconfirm
+            title="Are you sure to delete this vendor?"
+            onConfirm={() => handleDelete(record.id)}
+            okText="Yes"
+            cancelText="No"
+            okButtonProps={{ danger: true }}
+          >
+            <DeleteOutlined className="text-gray-500! cursor-pointer! text-base! hover:text-gray-700!" />
+          </Popconfirm>
         </div>
       ),
     },
