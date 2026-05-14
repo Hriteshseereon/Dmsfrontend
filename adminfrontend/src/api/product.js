@@ -198,7 +198,13 @@ export const updateUnitById = async (payload, id) => {
   });
   return res.data;
 }
-
+export const deleteUnitById = async (id) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.delete(`/product/unit-groups/${id}/`, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+}
 export const addProductgroupToHSN = async (payload,productId) => {
   const { currentOrgId } = useSessionStore.getState();
   const res = await api.patch(`/product/product-groups/${productId}/`, payload, {
