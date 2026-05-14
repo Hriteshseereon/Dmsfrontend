@@ -296,6 +296,7 @@ export default function TransportTab() {
       fetchTransporters();
     } catch {
       message.error("Failed to delete transporter");
+      alert(`Transporter might be linked with other records`);
     }
   };
 
@@ -439,10 +440,15 @@ export default function TransportTab() {
               setOpen(true);
             }}
           />
-          <DeleteOutlined
-            className="text-gray-500! cursor-pointer! text-base! hover:text-gray-700!"
-            onClick={() => handleDelete(record.id)}
-          />
+          <Popconfirm
+            title="Are you sure to delete this transporter?"
+            onConfirm={() => handleDelete(record.id)}
+            okText="Yes"
+            cancelText="No"
+            okButtonProps={{ danger: true }}
+          >
+            <DeleteOutlined className="text-gray-500! cursor-pointer! text-base! hover:text-gray-700!" />
+          </Popconfirm>
         </div>
       ),
     },
