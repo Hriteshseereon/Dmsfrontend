@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Table, Input, Button, Modal, Form, message } from "antd";
+import { Table, Input, Button, Modal, Form, message, Popconfirm } from "antd";
 import {
   SearchOutlined,
   PlusOutlined,
@@ -100,6 +100,9 @@ export default function ProductGroupMaster() {
       await fetchProductGroups();
     } catch (err) {
       console.error(err);
+      alert(
+        `Failed to delete product group. It might be linked with other records.`,
+      );
     }
   };
   /* ================= SEARCH ================= */
@@ -157,13 +160,15 @@ export default function ProductGroupMaster() {
             className="cursor-pointer! text-blue-500! hover:text-blue-600!"
             onClick={() => openProductGroup(record, "edit")}
           />
-          <DeleteOutlined
-            className="cursor-pointer text-gray-600 hover:text-red-600"
-            onClick={() => {
-              console.log("DELETE CLICKED 👉", record);
-              handleDelete(record);
-            }}
-          />
+          <Popconfirm
+            title="Are you sure to delete this product group?"
+            onConfirm={() => handleDelete(record)}
+            okText="Yes"
+            cancelText="No"
+            okButtonProps={{ danger: true }}
+          >
+            <DeleteOutlined className="cursor-pointer text-gray-600 hover:text-red-600" />
+          </Popconfirm>
         </div>
       ),
     },
