@@ -1,22 +1,12 @@
 import React, { useState, useEffect } from "react";
-import {
-  Card,
-  Table,
-  Button,
-  Modal,
-  Popconfirm,
-  Select,
-  Form,
-  message,
-  Input, // ✅ added
-} from "antd";
-import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
+import { Card, Table, Button, Modal, Select, Form, message, Input } from "antd";
+import { PlusOutlined, EditOutlined } from "@ant-design/icons";
 
 import {
   getHSNSACCodes,
   getSACCodes,
   getproductGroupHSNList,
-  deleteProductGroup,
+  updateProductGroupById,
 } from "../../../../../../../api/product";
 
 import {
@@ -24,10 +14,29 @@ import {
   addProductgroupToHSN,
 } from "../../../../../../../api/product";
 
-/* ================= ADD MODAL ================= */
-const AddTaxModal = ({ open, type, productGroups, onClose, onSuccess }) => {
+/* ================= MODAL ================= */
+const AddTaxModal = ({
+  open,
+  type,
+  productGroups,
+  onClose,
+  onSuccess,
+  initialValues,
+  isEdit,
+}) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (initialValues) {
+      form.setFieldsValue({
+        productGroup: initialValues.productGroupId,
+        code: initialValues.code,
+      });
+    } else {
+      form.resetFields();
+    }
+  }, [initialValues]);
 
   const handleSubmit = async () => {
     try {
@@ -44,23 +53,21 @@ const AddTaxModal = ({ open, type, productGroups, onClose, onSuccess }) => {
         sac_code: type === "sac" ? values.code : null,
       };
 
-      await addProductgroupToHSN(payload, values.productGroup);
+      if (isEdit) {
+        // ✅ USE KEY (LIKE WORKING COMPONENT)
+        await updateProductGroupById(payload, initialValues.key);
+        message.success("Updated successfully");
+      } else {
+        await addProductgroupToHSN(payload, values.productGroup);
+        message.success(`${type.toUpperCase()} added successfully`);
+      }
 
-      message.success(`${type.toUpperCase()} added successfully`);
-
-      onSuccess({
-        key: `${values.productGroup}-${values.code}`,
-        productGroupId: values.productGroup,
-        productGroupName: selectedGroup?.name,
-        code: values.code,
-        description: "",
-      });
-
-      form.resetFields();
+      onSuccess();
       onClose();
+      form.resetFields();
     } catch (err) {
       console.error(err);
-      message.error("Failed to add");
+      message.error("Operation failed");
     } finally {
       setLoading(false);
     }
@@ -71,12 +78,12 @@ const AddTaxModal = ({ open, type, productGroups, onClose, onSuccess }) => {
       open={open}
       title={
         <span className="text-lg font-bold text-amber-800">
-          Add {type.toUpperCase()}
+          {isEdit ? "Edit" : "Add"} {type.toUpperCase()}
         </span>
       }
       onCancel={onClose}
       onOk={handleSubmit}
-      okText="Add"
+      okText={isEdit ? "Update" : "Add"}
       okButtonProps={{
         className: "!bg-amber-500 !hover:bg-amber-600 !text-white !border-none",
       }}
@@ -84,7 +91,6 @@ const AddTaxModal = ({ open, type, productGroups, onClose, onSuccess }) => {
       centered
     >
       <Form form={form} layout="vertical" className="pt-4">
-        {/* Product Group */}
         <Form.Item
           name="productGroup"
           label={
@@ -92,7 +98,7 @@ const AddTaxModal = ({ open, type, productGroups, onClose, onSuccess }) => {
           }
           rules={[{ required: true }]}
         >
-          <Select placeholder="Select Product Group" className="rounded">
+          <Select placeholder="Select Product Group" disabled={isEdit}>
             {productGroups.map((pg) => (
               <Select.Option key={pg.id} value={pg.id}>
                 {pg.name}
@@ -101,7 +107,6 @@ const AddTaxModal = ({ open, type, productGroups, onClose, onSuccess }) => {
           </Select>
         </Form.Item>
 
-        {/* ✅ MANUAL CODE INPUT */}
         <Form.Item
           name="code"
           label={
@@ -110,32 +115,28 @@ const AddTaxModal = ({ open, type, productGroups, onClose, onSuccess }) => {
             </span>
           }
           rules={[
-            { required: true, message: "Code is required" },
+            { required: true },
             {
               pattern: type === "hsn" ? /^[0-9]{4,8}$/ : /^[0-9]{6}$/,
-              message:
-                type === "hsn"
-                  ? "HSN must be 4 to 8 digits"
-                  : "SAC must be 6 digits",
             },
           ]}
         >
-          <Input
-            placeholder={`Enter ${type.toUpperCase()} Code`}
-            maxLength={type === "hsn" ? 8 : 6}
-          />
+          <Input maxLength={type === "hsn" ? 8 : 6} />
         </Form.Item>
       </Form>
     </Modal>
   );
 };
 
-/* ================= MAIN COMPONENT ================= */
+/* ================= MAIN ================= */
 const HsnSacManager = () => {
   const [hsnList, setHsnList] = useState([]);
   const [sacList, setSacList] = useState([]);
   const [productGroups, setProductGroups] = useState([]);
   const [modalType, setModalType] = useState(null);
+
+  const [editRecord, setEditRecord] = useState(null);
+  const [editType, setEditType] = useState(null);
 
   useEffect(() => {
     fetchAll();
@@ -143,45 +144,31 @@ const HsnSacManager = () => {
 
   const fetchAll = async () => {
     try {
-      const [hsnData, sacData, groupData, mappedData] = await Promise.all([
+      const [_, __, groupData, mappedData] = await Promise.all([
         getHSNSACCodes(),
         getSACCodes(),
         getProductGroups(),
         getproductGroupHSNList(),
       ]);
 
-      const normalizedHsn = (hsnData || []).map((i) => ({
-        id: i.id,
-        code: i.hsn_code,
-        description: i.description,
-      }));
-
-      const normalizedSac = (sacData || []).map((i) => ({
-        id: i.id,
-        code: i.sac_code,
-        description: i.description,
-      }));
-
       setProductGroups(groupData || []);
 
       const hsnMapped = (mappedData || [])
         .filter((item) => item.hsn_code)
         .map((item) => ({
-          key: `${item.id}-${item.hsn_code}`,
+          key: item.id, // ✅ ONLY ID
           productGroupId: item.id,
           productGroupName: item.name,
           code: item.hsn_code_value || item.hsn_code,
-          description: "",
         }));
 
       const sacMapped = (mappedData || [])
         .filter((item) => item.sac_code)
         .map((item) => ({
-          key: `${item.id}-${item.sac_code}`,
+          key: item.id, // ✅ ONLY ID
           productGroupId: item.id,
           productGroupName: item.name,
           code: item.sac_code_value || item.sac_code,
-          description: "",
         }));
 
       setHsnList(hsnMapped);
@@ -191,121 +178,61 @@ const HsnSacManager = () => {
     }
   };
 
-  const handleDelete = async (type, record) => {
-    try {
-      await deleteProductGroup(record.productGroupId);
-
-      message.success("Deleted successfully");
-
-      if (type === "hsn") {
-        setHsnList((prev) => prev.filter((item) => item.key !== record.key));
-      } else {
-        setSacList((prev) => prev.filter((item) => item.key !== record.key));
-      }
-    } catch (err) {
-      console.error(err);
-      message.error("Delete failed");
-    }
-  };
-
   const columns = (type) => [
     {
-      title: <span className="text-amber-600">Product Group</span>,
+      title: "Product Group",
       dataIndex: "productGroupName",
-      render: (text) => (
-        <span className="text-amber-700 font-semibold">{text}</span>
-      ),
     },
     {
-      title: <span className="text-amber-600">Code</span>,
+      title: "Code",
       dataIndex: "code",
-      render: (text) => <span className="text-amber-700">{text}</span>,
     },
     {
-      title: <span className="text-amber-600">Action</span>,
+      title: "Action",
       align: "center",
       render: (_, record) => (
-        <Popconfirm
-          title="Are you sure you want to delete?"
-          onConfirm={() => handleDelete(type, record)} // ✅ FIXED
-        >
-          <DeleteOutlined className="text-red-500 cursor-pointer" />
-        </Popconfirm>
+        <EditOutlined
+          className="cursor-pointer !text-blue-500"
+          onClick={() => {
+            setEditRecord(record);
+            setEditType(type);
+          }}
+        />
       ),
     },
   ];
 
-  const addItem = (type, item) => {
-    const setter = type === "hsn" ? setHsnList : setSacList;
-
-    setter((prev) => {
-      const exists = prev.some(
-        (p) => p.productGroupId === item.productGroupId && p.code === item.code,
-      );
-      if (exists) return prev;
-      return [...prev, item];
-    });
-  };
-
   return (
     <div className="p-2">
-      <h2 className="text-lg font-semibold text-amber-700 mb-2">
-        Easily manage your HSN and SAC code masters
-      </h2>
-
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* HSN */}
+      <div className="grid grid-cols-2 gap-4">
         <Card
-          title={<span className="text-amber-700">HSN Codes</span>}
-          extra={
-            <Button
-              icon={<PlusOutlined />}
-              className="bg-amber-500 hover:bg-amber-600 border-none text-white"
-              onClick={() => setModalType("hsn")}
-            >
-              Add HSN
-            </Button>
-          }
+          title="HSN Codes"
+          extra={<Button onClick={() => setModalType("hsn")}>Add HSN</Button>}
         >
-          <Table
-            rowKey="key"
-            columns={columns("hsn")}
-            dataSource={hsnList}
-            pagination={{ pageSize: 5 }}
-            size="small"
-          />
+          <Table rowKey="key" columns={columns("hsn")} dataSource={hsnList} />
         </Card>
 
-        {/* SAC */}
         <Card
-          title={<span className="text-amber-700">SAC Codes</span>}
-          extra={
-            <Button
-              icon={<PlusOutlined />}
-              className="bg-amber-500 hover:bg-amber-600 border-none text-white"
-              onClick={() => setModalType("sac")}
-            >
-              Add SAC
-            </Button>
-          }
+          title="SAC Codes"
+          extra={<Button onClick={() => setModalType("sac")}>Add SAC</Button>}
         >
-          <Table
-            rowKey="key"
-            columns={columns("sac")}
-            dataSource={sacList}
-            pagination={{ pageSize: 5 }}
-            size="small"
-          />
+          <Table rowKey="key" columns={columns("sac")} dataSource={sacList} />
         </Card>
       </div>
 
-      {modalType && (
+      {(modalType || editType) && (
         <AddTaxModal
-          open={!!modalType}
-          type={modalType}
+          open={true}
+          type={modalType || editType}
           productGroups={productGroups}
-          onClose={() => setModalType(null)}
-          onSuccess={(item) => addItem(modalType, item)}
+          initialValues={editRecord}
+          isEdit={!!editRecord}
+          onClose={() => {
+            setModalType(null);
+            setEditType(null);
+            setEditRecord(null);
+          }}
+          onSuccess={fetchAll}
         />
       )}
     </div>

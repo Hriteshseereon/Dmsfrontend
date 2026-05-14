@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from "react";
-import { Table, Input, Button, Modal, Form, message } from "antd";
+import { Table, Input, Button, Modal, Form, message, Popconfirm } from "antd";
 import {
   SearchOutlined,
   PlusOutlined,
   EyeOutlined,
   EditOutlined,
   FilterOutlined,
-
-
+  DeleteOutlined,
 } from "@ant-design/icons";
 
 import {
   getUnits,
   addUnit,
   updateUnitById,
+  deleteUnitById,
 } from "../../../../../../../api/product";
 
 export default function UnitMaster() {
@@ -109,24 +109,34 @@ export default function UnitMaster() {
     }
   };
 
-   const getFilteredData = () => {
-  if (!search) return data;
+  const getFilteredData = () => {
+    if (!search) return data;
 
-  const value = search.toLowerCase();
+    const value = search.toLowerCase();
 
-  return data.filter((item) => {
-    return Object.values(item).some((val) => {
-      if (!val) return false;
+    return data.filter((item) => {
+      return Object.values(item).some((val) => {
+        if (!val) return false;
 
-      // convert everything safely to string
-      return JSON.stringify(val).toLowerCase().includes(value);
+        // convert everything safely to string
+        return JSON.stringify(val).toLowerCase().includes(value);
+      });
     });
-  });
-};
+  };
 
-const handleReset = () => {
-  setSearch("");
-};
+  const handleDelete = async (id) => {
+    try {
+      await deleteUnitById(id);
+      message.success("Unit deleted successfully");
+      fetchUnits();
+    } catch (err) {
+      message.error("Failed to delete unit");
+      alert(`Unit might be linked with other records`);
+    }
+  };
+  const handleReset = () => {
+    setSearch("");
+  };
   /* ---------------- TABLE COLUMNS ---------------- */
 
   const columns = [
@@ -149,6 +159,15 @@ const handleReset = () => {
             className="cursor-pointer text-blue-500! hover:text-blue-600!"
             onClick={() => openUnit(record, "edit")}
           />
+          <Popconfirm
+            title="Are you sure to delete this unit?"
+            onConfirm={() => handleDelete(record.key)}
+            okText="Yes"
+            cancelText="No"
+            okButtonProps={{ danger: true }}
+          >
+            <DeleteOutlined className="text-gray-500! cursor-pointer! text-base! hover:text-gray-700!" />
+          </Popconfirm>
         </div>
       ),
     },
@@ -171,7 +190,6 @@ const handleReset = () => {
       />
     </Form.Item>
   );
-
 
   return (
     <div>

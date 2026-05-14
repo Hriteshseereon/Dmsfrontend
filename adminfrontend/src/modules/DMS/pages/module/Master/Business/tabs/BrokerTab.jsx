@@ -375,6 +375,7 @@ export default function BrokerTab() {
       fetchBrokers();
     } catch {
       message.error("Failed to delete broker");
+      alert(`Broker is linked with other model Status: ${status}`);
     }
   };
   const openBroker = async (record, view = false) => {
@@ -498,10 +499,15 @@ export default function BrokerTab() {
             className="text-blue-500! cursor-pointer! text-base! hover:text-blue-600!"
             onClick={() => openBroker(record, false)}
           />
-          <DeleteOutlined
-            className="text-gray-500! cursor-pointer! text-base! hover:text-gray-700!"
-            onClick={() => handleDeleteBroker(record.id)}
-          />
+          <popconfirm
+            title="Are you sure to delete this broker?"
+            onConfirm={() => handleDeleteBroker(record.id)}
+            okText="Yes"
+            cancelText="No"
+            okButtonProps={{ danger: true }}
+          >
+            <DeleteOutlined className="text-gray-500! cursor-pointer! text-base! hover:text-gray-700!" />
+          </popconfirm>
         </div>
       ),
     },

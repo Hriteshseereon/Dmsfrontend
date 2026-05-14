@@ -13,6 +13,7 @@ import {
   message,
   Tag,
   Tooltip,
+  Popconfirm,
 } from "antd";
 import {
   PlusOutlined,
@@ -344,29 +345,18 @@ export default function CustomerTab() {
   // delte the customer
   const handleDeleteCustomer = async (customerId) => {
     try {
-      const res = await deleteAdminCustomer(customerId);
-
-      console.log("DELETE RESPONSE 👉", res);
-
-      // 🔥 HANDLE BACKEND FAILURE HERE
-      if (res?.success === false) {
-        if (res.message?.toLowerCase().includes("cannot be deleted")) {
-          message.error(
-            "Customer is linked with sale contracts and cannot be deleted.",
-          );
-        } else {
-          message.error(res.message || "Delete failed");
-        }
-        return; // ⛔ STOP execution
-      }
-
-      // ✅ SUCCESS CASE
-      message.success("Customer deleted");
+      await deleteAdminCustomer(customerId);
+      message.success("Customer deleted successfully");
       fetchCustomers();
     } catch (err) {
-      console.error("DELETE ERROR 👉", err);
-
-      message.error("Something went wrong");
+      const status = err?.response?.status;
+      alert(`Customer is linked with other model Status: ${status}`); // temporary test
+      if (status === 400) {
+        message.error(
+          "Customer is linked with other records and cannot be deleted.",
+          5,
+        );
+      }
     }
   };
   // ── FETCH ─────────────────────────────────────────────────────────────────
@@ -729,12 +719,18 @@ export default function CustomerTab() {
             className="text-blue-500! cursor-pointer! text-base! hover:text-blue-600!"
             onClick={() => openCustomer(record, false)}
           />
-          <DeleteOutlined
-            className="text-gray-500! cursor-pointer! text-base! hover:text-gray-700!"
-            onClick={() =>
+          <Popconfirm
+            title="Delete Customer"
+            description="This customer will be permanently deleted. Are you sure?"
+            onConfirm={() =>
               handleDeleteCustomer(record.customer_id || record.id)
             }
-          />
+            okText="Yes, Delete"
+            cancelText="Cancel"
+            okButtonProps={{ danger: true }}
+          >
+            <DeleteOutlined className="text-gray-500! cursor-pointer! text-base! hover:text-gray-700!" />
+          </Popconfirm>
         </div>
       ),
     },
