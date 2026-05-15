@@ -46,3 +46,28 @@ export const updateInventory = async (inventoryId, payload) => {
 
   return res.data;
 };
+
+export const getCompanyGroups = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("/vendors/company-groups/", { params: { organisation: currentOrgId } });
+  return res.data;
+}
+
+export const getProductsByCompany = async (companyId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("/product/products/by-company-group/", {
+    params: {
+      organisation: currentOrgId,
+      company_group: companyId,
+    },
+  });
+  return res.data;
+};
+
+export const deleteInventory = async (inventoryId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.delete(`/inventory/inventory/${inventoryId}/`, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};

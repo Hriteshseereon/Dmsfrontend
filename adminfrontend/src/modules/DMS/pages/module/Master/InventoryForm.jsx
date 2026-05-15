@@ -13,6 +13,7 @@ import {
   Tag,
   Tooltip,
   message,
+  Popconfirm,
 } from "antd";
 import {
   SearchOutlined,
@@ -42,6 +43,9 @@ import {
   getInventoryById,
   updateInventory,
   getAllVendor,
+  getCompanyGroups,
+  getProductsByCompany,
+  deleteInventory,
 } from "../../../../../api/masterinventory";
 import {
   createInventoryDraft,
@@ -87,7 +91,7 @@ export default function InventoryForm() {
       const res = await getAllInventory();
       const formattedData = (res || []).map((item) => ({
         key: item.id,
-        vendorName: item.vendor_name,
+        vendorName: item.company_group_name,
         productName: item.product_name,
         productType: item.product_type,
         totalStock: item.current_stock,
@@ -102,7 +106,7 @@ export default function InventoryForm() {
 
   const fetchVendors = async () => {
     try {
-      const res = await getAllVendor();
+      const res = await getCompanyGroups();
       setVendorList(res);
     } catch (error) {
       console.log(error);
@@ -119,7 +123,7 @@ export default function InventoryForm() {
       mrp: null,
       totalStock: null,
     });
-    const res = await getproductbyVendor(vendorId);
+    const res = await getProductsByCompany(vendorId);
     setProductList(res?.products || []);
   };
 
@@ -129,7 +133,7 @@ export default function InventoryForm() {
       form.setFieldsValue({
         productGroup: selectedProduct.product_group_name,
         productType: selectedProduct.product_type,
-        hsnCode: selectedProduct.hsn_code_value,
+        hsnCode: selectedProduct.hsn_code,
         totalStock: selectedProduct.current_stock,
         mrp: selectedProduct.mrp,
       });
@@ -139,7 +143,7 @@ export default function InventoryForm() {
   const handleAdd = async (values) => {
     try {
       const payload = {
-        vendor: values.vendor,
+        company_group: values.vendor,
         product: values.product,
         product_group_name: values.productGroup,
         product_type: values.productType,
@@ -191,8 +195,12 @@ export default function InventoryForm() {
       const res = await getInventoryById(id);
       setSelectedRow(res);
 
+      // 🔥 Load product list first
+      const productRes = await getproductbyVendor(res.company_group);
+      setProductList(productRes?.products || []);
+
       viewForm.setFieldsValue({
-        vendor: res.vendor,
+        vendor: res.company_group,
         product: res.product,
         productGroup: res.product_group_name,
         productType: res.product_type,
@@ -207,15 +215,27 @@ export default function InventoryForm() {
       console.log(error);
     }
   };
+
+  // handle delete inventory
+  const handleDeleteClick = async (id) => {
+    try {
+      await deleteInventory(id);
+      message.success("Inventory deleted successfully");
+      fetchInventory();
+    } catch (error) {
+      console.log(error);
+      alert("Failed to delete inventory");
+    }
+  };
   const handleEditClick = async (id) => {
     try {
       const res = await getInventoryById(id);
       setSelectedRow(res);
-      const productRes = await getproductbyVendor(res.vendor);
+      const productRes = await getproductbyVendor(res.company_group);
       const products = productRes?.products || [];
       setProductList(products);
       editForm.setFieldsValue({
-        vendor: res.vendor,
+        vendor: res.company_group,
         product: res.product, // This ID must exist in the products array
         productGroup: res.product_group_name,
         productType: res.product_type,
@@ -328,7 +348,7 @@ export default function InventoryForm() {
 
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Vendor Name</span>,
+      title: <span className="text-amber-700 font-semibold">Company Name</span>,
       dataIndex: "vendorName",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
@@ -365,6 +385,14 @@ export default function InventoryForm() {
             className="cursor-pointer! text-blue-500! hover:text-blue-600!"
             onClick={() => handleEditClick(record.key)}
           />
+          <Popconfirm
+            title="Are you sure to delete this inventory?"
+            onConfirm={() => handleDeleteClick(record.key)}
+            okText="Yes"
+            cancelText="No"
+          >
+            <DeleteOutlined className="cursor-pointer! text-gray-500! hover:text-gray-700!" />
+          </Popconfirm>
         </div>
       ),
     },
@@ -494,7 +522,7 @@ export default function InventoryForm() {
     <Row gutter={16}>
       <Col span={6}>
         <Form.Item
-          label="Vendor Name"
+          label="Company Name"
           name="vendor"
           rules={[{ required: !disabled }]}
         >
@@ -752,7 +780,7 @@ export default function InventoryForm() {
         <Form form={editForm} layout="vertical" onFinish={handleEdit}>
           <Card bordered className="border-amber-300">
             <h6 className="text-amber-500 mb-3">Inventory Details</h6>
-            <InventoryFields form={editForm} disableVendor disableProduct />
+            <InventoryFields form={editForm} />
           </Card>
           <div className="flex justify-end gap-2 mt-4">
             <Button onClick={() => setEditOpen(false)}>Cancel</Button>

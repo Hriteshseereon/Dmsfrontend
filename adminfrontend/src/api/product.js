@@ -109,6 +109,13 @@ export const addProductUnitConversion = async (payload) => {
   return res.data;
 };
 
+export const deleteProductUnitConversion = async (conversionId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.delete(`/product/product-unit-conversions/${conversionId}/`, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+}
 // product unit conversion reference units
 export const getProductReferenceUnits = async (productId) => {
   const { currentOrgId } = useSessionStore.getState();

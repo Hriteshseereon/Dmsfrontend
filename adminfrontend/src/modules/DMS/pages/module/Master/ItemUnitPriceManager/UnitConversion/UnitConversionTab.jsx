@@ -11,8 +11,9 @@ import {
   Col,
   message,
   Form,
+  Popconfirm,
 } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
 
 import {
   addProductUnitConversion,
@@ -20,6 +21,7 @@ import {
   getProductReferenceUnits,
   setDisplayUnit,
   getUnits,
+  deleteProductUnitConversion,
 } from "@/api/product";
 import { useProductUnitConversions } from "@/queries/useProductUnitConversions";
 
@@ -106,7 +108,18 @@ export default function UnitConversionTab({ items }) {
       message.error("Failed to set display unit");
     }
   };
-
+  // handle delete unit conversion
+  const handleDelete = async (conversionId) => {
+    try {
+      await deleteProductUnitConversion(conversionId);
+      message.success("Unit conversion deleted successfully");
+      refreshData(); // 🔥 important
+    } catch (error) {
+      console.error("Delete error:", error);
+      message.error("Failed to delete unit conversion");
+      alert("unit is set as display unit .");
+    }
+  };
   /* ================= SAVE ================= */
   const handleSave = async () => {
     if (!formData.unit_group_id || !formData.multiplier) {
@@ -374,6 +387,20 @@ export default function UnitConversionTab({ items }) {
                       Set Display
                     </Button>
                   ),
+              },
+              {
+                title: "Actions",
+                render: (_, record) => (
+                  <Popconfirm
+                    title="Delete Unit Conversion"
+                    description="Are you sure you want to delete this?"
+                    okText="Yes"
+                    cancelText="No"
+                    onConfirm={() => handleDelete(record.conversion_id)}
+                  >
+                    <DeleteOutlined className="text-gray-500! cursor-pointer! text-base! hover:text-gray-700!" />
+                  </Popconfirm>
+                ),
               },
             ]}
           />
