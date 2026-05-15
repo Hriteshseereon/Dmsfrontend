@@ -63,3 +63,11 @@ export const getProductsByCompany = async (companyId) => {
   });
   return res.data;
 };
+
+export const deleteInventory = async (inventoryId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.delete(`/inventory/inventory/${inventoryId}/`, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
