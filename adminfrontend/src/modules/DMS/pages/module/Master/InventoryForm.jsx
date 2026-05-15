@@ -42,6 +42,8 @@ import {
   getInventoryById,
   updateInventory,
   getAllVendor,
+  getCompanyGroups,
+  getProductsByCompany,
 } from "../../../../../api/masterinventory";
 import {
   createInventoryDraft,
@@ -102,7 +104,7 @@ export default function InventoryForm() {
 
   const fetchVendors = async () => {
     try {
-      const res = await getAllVendor();
+      const res = await getCompanyGroups();
       setVendorList(res);
     } catch (error) {
       console.log(error);
@@ -119,7 +121,7 @@ export default function InventoryForm() {
       mrp: null,
       totalStock: null,
     });
-    const res = await getproductbyVendor(vendorId);
+    const res = await getProductsByCompany(vendorId);
     setProductList(res?.products || []);
   };
 
@@ -129,7 +131,7 @@ export default function InventoryForm() {
       form.setFieldsValue({
         productGroup: selectedProduct.product_group_name,
         productType: selectedProduct.product_type,
-        hsnCode: selectedProduct.hsn_code_value,
+        hsnCode: selectedProduct.hsn_code,
         totalStock: selectedProduct.current_stock,
         mrp: selectedProduct.mrp,
       });
@@ -494,7 +496,7 @@ export default function InventoryForm() {
     <Row gutter={16}>
       <Col span={6}>
         <Form.Item
-          label="Vendor Name"
+          label="Company Name"
           name="vendor"
           rules={[{ required: !disabled }]}
         >
