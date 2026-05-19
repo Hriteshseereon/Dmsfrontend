@@ -94,6 +94,7 @@ export default function TransportTab() {
   const [selCountryIso, setSelCountryIso] = useState(null);
   const [selStateName, setSelStateName] = useState(null);
   const [selStateIso, setSelStateIso] = useState(null);
+  const [selDistrict, setSelDistrict] = useState(null);
   const [form] = Form.useForm();
   const generatePassword = (length = 10) => {
     const chars =
@@ -208,7 +209,8 @@ export default function TransportTab() {
     });
   };
 
-  const handleDistrictChange = () => {
+  const handleDistrictChange = (value) => {
+    setSelDistrict(value);
     form.setFieldsValue({ city: undefined });
   };
 
@@ -928,11 +930,13 @@ export default function TransportTab() {
                 >
                   <Select
                     className={selectClass}
-                    disabled={viewMode || !selStateIso}
-                    options={getCityOptions(selCountryIso, selStateIso)}
+                    disabled={viewMode || !selDistrict}
+                    placeholder={
+                      selDistrict ? "Select city" : "Select district first"
+                    }
                     showSearch
                     optionFilterProp="label"
-                    placeholder="Select City"
+                    options={getCityOptions(selStateName, selDistrict)}
                   />
                 </Form.Item>
               </Col>

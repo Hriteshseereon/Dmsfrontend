@@ -744,7 +744,7 @@ export default function ItemMasterTab({ items, setItems }) {
               </FormField>
             </Col>
             <Col span={12}>
-              <FormField label="Company Name" required>
+              <FormField label="Company Group Name" required>
                 <Select
                   disabled={viewMode}
                   showSearch

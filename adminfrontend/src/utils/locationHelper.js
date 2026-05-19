@@ -14,6 +14,7 @@
  */
 
 import { Country, State, City } from "country-state-city";
+import { cityData } from "../modules/DMS/pages/module/Master/Business/tabs/cityData";
 // import districtJson from "ind-state-district/assets/district.json";
 // import statesJson   from "ind-state-district/assets/states.json";
 import { indiaLocations } from "./indiaLocation";
@@ -91,14 +92,21 @@ export function getDistrictOptions(stateName) {
  * @param {string} countryIsoCode  e.g. "IN"
  * @param {string} stateIsoCode    e.g. "OR"  (csc isoCode, NOT ind stateCode)
  */
-export function getCityOptions(countryIsoCode, stateIsoCode) {
-  if (!countryIsoCode || !stateIsoCode) return [];
-  return City.getCitiesOfState(countryIsoCode, stateIsoCode).map((c) => ({
-    value: c.name,
-    label: c.name,
+export function getCityOptions(stateName, district) {
+  if (!stateName || !district) return [];
+
+  const cities = cityData?.[stateName]?.[district];
+
+  if (!cities) {
+    console.warn("No cities found for:", stateName, district);
+    return [];
+  }
+
+  return cities.map((city) => ({
+    value: city,
+    label: city,
   }));
 }
-
 // ─────────────────────────────────────────────────────────────────────────────
 // EDIT / VIEW helpers
 // Used in openCustomer() to restore isoCode state variables from plain names

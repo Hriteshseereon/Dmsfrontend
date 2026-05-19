@@ -91,7 +91,7 @@ export default function CustomerTab() {
   const [selCountryIso, setSelCountryIso] = useState(null);
   const [selStateName, setSelStateName] = useState(null);
   const [selStateIso, setSelStateIso] = useState(null);
-
+  const [selDistrict, setSelDistrict] = useState(null);
   // ── draft state ──────────────────────────────────────────────────────────
   /**
    * activeDraftId: the localStorage key currently being auto-saved.
@@ -174,7 +174,8 @@ export default function CustomerTab() {
     });
   };
 
-  const handleDistrictChange = () => {
+  const handleDistrictChange = (value) => {
+    setSelDistrict(value);
     form.setFieldsValue({ city: undefined });
   };
 
@@ -1175,13 +1176,13 @@ export default function CustomerTab() {
                 >
                   <Select
                     className={selectClass}
-                    disabled={viewMode || !selStateIso}
+                    disabled={viewMode || !selDistrict}
                     placeholder={
-                      selStateIso ? "Select or type city" : "Select state first"
+                      selDistrict ? "Select city" : "Select district first"
                     }
                     showSearch
                     optionFilterProp="label"
-                    options={getCityOptions(selCountryIso, selStateIso)}
+                    options={getCityOptions(selStateName, selDistrict)}
                   />
                 </Form.Item>
               </Col>
