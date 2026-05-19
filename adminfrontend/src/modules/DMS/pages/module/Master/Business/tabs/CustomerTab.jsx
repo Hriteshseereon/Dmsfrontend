@@ -1169,13 +1169,15 @@ export default function CustomerTab() {
                 <Form.Item
                   label="City"
                   name="city"
-                  rules={[{ required: true, message: "Please select city" }]}
+                  rules={[
+                    { required: true, message: "Please select or type city" },
+                  ]}
                 >
                   <Select
                     className={selectClass}
                     disabled={viewMode || !selStateIso}
                     placeholder={
-                      selStateIso ? "Select city" : "Select state first"
+                      selStateIso ? "Select or type city" : "Select state first"
                     }
                     showSearch
                     optionFilterProp="label"
@@ -1227,33 +1229,11 @@ export default function CustomerTab() {
             </Row>
           </Card>
 
-          {/* ================= Credit Facility Details ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">
             <h3 className="text-lg font-semibold text-amber-700 mb-3">
-              Credit Facility Details
+              Security for Credit
             </h3>
             <Row gutter={24}>
-              <Col span={4}>
-                <Form.Item
-                  label="Credit Facility type"
-                  name="creditFacility"
-                  rules={[
-                    { required: true, message: "Please select security type" },
-                  ]}
-                >
-                  <Select
-                    className={selectClass}
-                    disabled={viewMode}
-                    placeholder="Select credit facility"
-                  >
-                    <Option value="Advance">Advance</Option>
-                    <Option value="Cheque">Cheque</Option>
-                    <Option value="Online">Online</Option>
-                    <Option value="Credit Limit">Credit Limit</Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-
               <Col span={5}>
                 <Form.Item
                   label="Security for Credit"
@@ -1564,6 +1544,35 @@ export default function CustomerTab() {
                   </Col>
                 </>
               )}
+            </Row>
+          </Card>
+
+          {/* ================= Credit Facility Details ================= */}
+          <Card className="mb-4 border border-amber-200 rounded-lg">
+            <h3 className="text-lg font-semibold text-amber-700 mb-3">
+              Credit Facility Details
+            </h3>
+            <Row gutter={24}>
+              <Col span={4}>
+                <Form.Item
+                  label="Credit Facility type"
+                  name="creditFacility"
+                  rules={[
+                    { required: true, message: "Please select security type" },
+                  ]}
+                >
+                  <Select
+                    className={selectClass}
+                    disabled={viewMode}
+                    placeholder="Select credit facility"
+                  >
+                    <Option value="Advance">Advance</Option>
+                    <Option value="Cheque">Cheque</Option>
+                    <Option value="Online">Online</Option>
+                    <Option value="Credit Limit">Credit Limit</Option>
+                  </Select>
+                </Form.Item>
+              </Col>
 
               <Col span={4}>
                 <Form.Item

@@ -86,6 +86,11 @@ export default function ItemMasterTab({ items, setItems }) {
     sgstPercent: 0,
     net_weight: 0,
     gross_weight: 0,
+    base_unit: null,
+    lower_unit: null,
+    upper_unit: null,
+    multiplier: null,
+    is_active: true,
   });
   const [search, setSearch] = useState("");
 
@@ -270,7 +275,11 @@ export default function ItemMasterTab({ items, setItems }) {
         itemCategory: data.category,
         hsn_code: data.hsn_code,
         sac_code: data.sac_code || null,
-        base_unit_group: data.base_unit_group,
+        base_unit: data.base_unit,
+        lower_unit: data.lower_unit,
+        upper_unit: data.upper_unit,
+        multiplier: data.multiplier,
+        is_active: data.is_active,
         gstPercent: Number(data.gst_percentage),
         cgstPercent: Number(data.gst_percentage) / 2,
         sgstPercent: Number(data.gst_percentage) / 2,
@@ -293,7 +302,7 @@ export default function ItemMasterTab({ items, setItems }) {
     if (
       !formData.itemName ||
       !formData.product_group ||
-      !formData.base_unit_group ||
+      !formData.base_unit ||
       !formData.itemType ||
       !formData.company ||
       !formData.itemCategory ||
@@ -309,7 +318,10 @@ export default function ItemMasterTab({ items, setItems }) {
       product_group: formData.product_group,
       hsn_code: formData.itemCategory === "GOODS" ? formData.hsn_code : null,
       sac_code: formData.itemCategory === "SERVICE" ? formData.sac_code : null,
-      base_unit_group: formData.base_unit_group,
+      base_unit: formData.base_unit,
+      lower_unit: formData.lower_unit,
+      upper_unit: formData.upper_unit,
+      multiplier: formData.multiplier,
       product_type: formData.itemType,
       category: formData.itemCategory,
       gst_percentage: formData.gstPercent,
@@ -320,6 +332,7 @@ export default function ItemMasterTab({ items, setItems }) {
       company_group: formData.company,
       net_weight: formData.net_weight,
       gross_weight: formData.gross_weight,
+      is_active: formData.is_active,
     };
 
     try {
@@ -359,6 +372,9 @@ export default function ItemMasterTab({ items, setItems }) {
     { title: "Type", dataIndex: "product_type" },
     { title: "Company", dataIndex: "company_group_name" },
     { title: "Base Unit", dataIndex: "base_unit" },
+    { title: "Lower Unit", dataIndex: "lower_unit" },
+    { title: "Upper Unit", dataIndex: "upper_unit" },
+
     { title: "Net Weight", dataIndex: "net_weight" },
     { title: "Gross Weight", dataIndex: "gross_weight" },
     {
@@ -887,15 +903,62 @@ export default function ItemMasterTab({ items, setItems }) {
                   disabled={viewMode}
                   placeholder="Select unit"
                   style={{ width: "100%" }}
-                  value={formData.base_unit_group}
+                  value={formData.base_unit}
                   onChange={(value) =>
-                    setFormData({ ...formData, base_unit_group: value })
+                    setFormData({ ...formData, base_unit: value })
                   }
                   optionFilterProp="label"
                   options={units.map((u) => ({
-                    value: u.id,
+                    value: u.name,
                     label: u.name,
                   }))}
+                />
+              </FormField>
+            </Col>
+            <Col span={12}>
+              <FormField label="Lower Unit" required>
+                <Select
+                  disabled={viewMode}
+                  placeholder="Select unit"
+                  style={{ width: "100%" }}
+                  value={formData.lower_unit}
+                  onChange={(value) =>
+                    setFormData({ ...formData, lower_unit: value })
+                  }
+                  optionFilterProp="label"
+                  options={units.map((u) => ({
+                    value: u.name,
+                    label: u.name,
+                  }))}
+                />
+              </FormField>
+            </Col>
+            <Col span={12}>
+              <FormField label="Uppper Unit" required>
+                <Select
+                  disabled={viewMode}
+                  placeholder="Select unit"
+                  style={{ width: "100%" }}
+                  value={formData.upper_unit}
+                  onChange={(value) =>
+                    setFormData({ ...formData, upper_unit: value })
+                  }
+                  optionFilterProp="label"
+                  options={units.map((u) => ({
+                    value: u.name,
+                    label: u.name,
+                  }))}
+                />
+              </FormField>
+            </Col>
+            <Col span={12}>
+              <FormField label="Multiplier" required>
+                <InputNumber
+                  style={{ width: "100%" }}
+                  value={formData.multiplier}
+                  onChange={(value) =>
+                    setFormData({ ...formData, multiplier: value })
+                  }
                 />
               </FormField>
             </Col>
@@ -940,6 +1003,20 @@ export default function ItemMasterTab({ items, setItems }) {
                     setFormData({ ...formData, gross_weight: value || 0 })
                   }
                 />
+              </FormField>
+            </Col>
+            <Col span={12}>
+              <FormField label="Status">
+                <Select
+                  style={{ width: "100%" }}
+                  value={formData.is_active}
+                  onChange={(value) =>
+                    setFormData({ ...formData, is_active: value })
+                  }
+                >
+                  <Option value={true}>Active</Option>
+                  <Option value={false}>Inactive</Option>
+                </Select>
               </FormField>
             </Col>
           </Row>

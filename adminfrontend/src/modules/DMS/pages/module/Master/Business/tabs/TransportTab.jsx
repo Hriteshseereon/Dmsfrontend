@@ -924,7 +924,7 @@ export default function TransportTab() {
                 <Form.Item
                   label="City"
                   name="city"
-                  rules={[{ required: true, message: "Select city" }]}
+                  rules={[{ required: true, message: "Select or type city" }]}
                 >
                   <Select
                     className={selectClass}
@@ -942,9 +942,10 @@ export default function TransportTab() {
                   label="Pin Code"
                   name="pinCode"
                   rules={[
+                    { required: true, message: "Enter Pin Code" },
                     {
                       pattern: /^[0-9]{6}$/,
-                      message: "Only numbers are allowed",
+                      message: "Pin Code must be exactly 6 digits",
                     },
                   ]}
                 >
