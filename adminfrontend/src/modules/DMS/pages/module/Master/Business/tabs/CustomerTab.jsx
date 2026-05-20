@@ -91,7 +91,7 @@ export default function CustomerTab() {
   const [selCountryIso, setSelCountryIso] = useState(null);
   const [selStateName, setSelStateName] = useState(null);
   const [selStateIso, setSelStateIso] = useState(null);
-
+  const [selDistrict, setSelDistrict] = useState(null);
   // ── draft state ──────────────────────────────────────────────────────────
   /**
    * activeDraftId: the localStorage key currently being auto-saved.
@@ -174,7 +174,8 @@ export default function CustomerTab() {
     });
   };
 
-  const handleDistrictChange = () => {
+  const handleDistrictChange = (value) => {
+    setSelDistrict(value);
     form.setFieldsValue({ city: undefined });
   };
 
@@ -1169,17 +1170,19 @@ export default function CustomerTab() {
                 <Form.Item
                   label="City"
                   name="city"
-                  rules={[{ required: true, message: "Please select city" }]}
+                  rules={[
+                    { required: true, message: "Please select or type city" },
+                  ]}
                 >
                   <Select
                     className={selectClass}
-                    disabled={viewMode || !selStateIso}
+                    disabled={viewMode || !selDistrict}
                     placeholder={
-                      selStateIso ? "Select city" : "Select state first"
+                      selDistrict ? "Select city" : "Select district first"
                     }
                     showSearch
                     optionFilterProp="label"
-                    options={getCityOptions(selCountryIso, selStateIso)}
+                    options={getCityOptions(selStateName, selDistrict)}
                   />
                 </Form.Item>
               </Col>
@@ -1227,33 +1230,11 @@ export default function CustomerTab() {
             </Row>
           </Card>
 
-          {/* ================= Credit Facility Details ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">
             <h3 className="text-lg font-semibold text-amber-700 mb-3">
-              Credit Facility Details
+              Security for Credit
             </h3>
             <Row gutter={24}>
-              <Col span={4}>
-                <Form.Item
-                  label="Credit Facility type"
-                  name="creditFacility"
-                  rules={[
-                    { required: true, message: "Please select security type" },
-                  ]}
-                >
-                  <Select
-                    className={selectClass}
-                    disabled={viewMode}
-                    placeholder="Select credit facility"
-                  >
-                    <Option value="Advance">Advance</Option>
-                    <Option value="Cheque">Cheque</Option>
-                    <Option value="Online">Online</Option>
-                    <Option value="Credit Limit">Credit Limit</Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-
               <Col span={5}>
                 <Form.Item
                   label="Security for Credit"
@@ -1564,6 +1545,35 @@ export default function CustomerTab() {
                   </Col>
                 </>
               )}
+            </Row>
+          </Card>
+
+          {/* ================= Credit Facility Details ================= */}
+          <Card className="mb-4 border border-amber-200 rounded-lg">
+            <h3 className="text-lg font-semibold text-amber-700 mb-3">
+              Credit Facility Details
+            </h3>
+            <Row gutter={24}>
+              <Col span={4}>
+                <Form.Item
+                  label="Credit Facility type"
+                  name="creditFacility"
+                  rules={[
+                    { required: true, message: "Please select security type" },
+                  ]}
+                >
+                  <Select
+                    className={selectClass}
+                    disabled={viewMode}
+                    placeholder="Select credit facility"
+                  >
+                    <Option value="Advance">Advance</Option>
+                    <Option value="Cheque">Cheque</Option>
+                    <Option value="Online">Online</Option>
+                    <Option value="Credit Limit">Credit Limit</Option>
+                  </Select>
+                </Form.Item>
+              </Col>
 
               <Col span={4}>
                 <Form.Item

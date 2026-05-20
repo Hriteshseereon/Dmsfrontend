@@ -99,8 +99,9 @@ export default function VendorTab() {
   const [selStateIso, setSelStateIso] = useState(null);
   const [corpStateName, setCorpStateName] = useState(null);
   const [corpStateIso, setCorpStateIso] = useState(null);
+  const [corpDistrict, setCorpDistrict] = useState(null);
   const [form] = Form.useForm();
-
+  const [selDistrict, setSelDistrict] = useState(null);
   // draft state
   const [activeDraftId, setActiveDraftId] = useState(null);
   const [draftSavedAt, setDraftSavedAt] = useState(null);
@@ -196,6 +197,7 @@ export default function VendorTab() {
   const handleStateChange = (isoCode, option) => {
     setSelStateName(option.label);
     setSelStateIso(isoCode);
+    setSelDistrict(null);
     form.setFieldsValue({
       state: option.label,
       district: undefined,
@@ -203,7 +205,10 @@ export default function VendorTab() {
     });
   };
 
-  const handleDistrictChange = () => form.setFieldsValue({ city: undefined });
+  const handleDistrictChange = (value) => {
+    setSelDistrict(value);
+    form.setFieldsValue({ city: undefined });
+  };
 
   // ── fetch ─────────────────────────────────────────────────────────────────
   const fetchVendors = async () => {
@@ -501,7 +506,9 @@ export default function VendorTab() {
         setSelStateName(mapped.state);
         setSelStateIso(stateIso);
       }
-
+      if (mapped.district) {
+        setSelDistrict(mapped.district);
+      }
       setSelected(details);
       setViewMode(view);
       setActiveDraftId(null);
@@ -1324,11 +1331,13 @@ export default function VendorTab() {
                 >
                   <Select
                     className={selectClass}
-                    disabled={viewMode || !selStateIso}
-                    placeholder="Select city"
+                    disabled={viewMode || !selDistrict}
+                    placeholder={
+                      selDistrict ? "Select city" : "Select district first"
+                    }
                     showSearch
                     optionFilterProp="label"
-                    options={getCityOptions(selCountryIso || "IN", selStateIso)}
+                    options={getCityOptions(selStateName, selDistrict)}
                   />
                 </Form.Item>
               </Col>
@@ -1505,10 +1514,13 @@ export default function VendorTab() {
                     placeholder="Select District"
                     options={getDistrictOptions(corpStateName)}
                     disabled={!corpStateName}
-                    onChange={() => {
+                    onChange={(value) => {
+                      setCorpDistrict(value); // ✅ IMPORTANT
+
                       form.setFieldsValue({
                         corporateAddress: {
                           ...form.getFieldValue("corporateAddress"),
+                          district: value,
                           city: undefined,
                         },
                       });
@@ -1520,7 +1532,7 @@ export default function VendorTab() {
               <Col span={4}>
                 <Form.Item name={["corporateAddress", "city"]} label="City">
                   <Select
-                    options={getCityOptions("IN", corpStateIso)}
+                    options={getCityOptions(corpStateName, corpDistrict)}
                     disabled={!corpStateIso}
                     showSearch
                     optionFilterProp="label"
@@ -1733,11 +1745,12 @@ export default function VendorTab() {
                               options={getDistrictOptions(
                                 form.getFieldValue(["plants", name, "state"]),
                               )}
-                              onChange={() => {
+                              onChange={(value) => {
                                 const plants =
                                   form.getFieldValue("plants") || [];
                                 plants[name] = {
                                   ...plants[name],
+                                  district: value, // ✅ store district
                                   city: undefined,
                                 };
                                 form.setFieldsValue({ plants });
@@ -1761,15 +1774,15 @@ export default function VendorTab() {
                                 !form.getFieldValue([
                                   "plants",
                                   name,
-                                  "stateIso",
+                                  "district",
                                 ])
                               }
                               options={getCityOptions(
-                                "IN",
+                                form.getFieldValue(["plants", name, "state"]),
                                 form.getFieldValue([
                                   "plants",
                                   name,
-                                  "stateIso",
+                                  "district",
                                 ]),
                               )}
                             />

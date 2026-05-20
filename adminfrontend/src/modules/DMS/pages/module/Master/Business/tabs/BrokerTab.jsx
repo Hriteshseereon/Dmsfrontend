@@ -200,7 +200,7 @@ export default function BrokerTab() {
   const [draftSavedAt, setDraftSavedAt] = useState(null);
   const [draftTableKey, setDraftTableKey] = useState(0);
   const [hasDraft, setHasDraft] = useState(false);
-
+  const [selDistrict, setSelDistrict] = useState(null);
   // check draft
   const checkDraftExists = () => {
     setHasDraft(hasDrafts("broker"));
@@ -299,7 +299,8 @@ export default function BrokerTab() {
     });
   };
 
-  const handleDistrictChange = () => {
+  const handleDistrictChange = (value) => {
+    setSelDistrict(value);
     form.setFieldsValue({ permanent_city: undefined });
   };
   // password send button handler
@@ -974,11 +975,13 @@ export default function BrokerTab() {
                 >
                   <Select
                     className={selectClass}
-                    disabled={viewMode || !selStateIso}
-                    options={getCityOptions(selCountryIso, selStateIso)}
+                    disabled={viewMode || !selDistrict}
+                    placeholder={
+                      selDistrict ? "Select city" : "Select district first"
+                    }
                     showSearch
                     optionFilterProp="label"
-                    placeholder="Select City"
+                    options={getCityOptions(selStateName, selDistrict)}
                   />
                 </Form.Item>
               </Col>
