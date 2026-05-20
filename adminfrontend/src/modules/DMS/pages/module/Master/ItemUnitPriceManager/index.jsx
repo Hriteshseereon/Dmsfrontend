@@ -95,20 +95,20 @@ export default function ItemUnitPriceManager() {
             //   ),
             // },
 
-            {
-              key: "5",
+            // {
+            //   key: "5",
 
-              label: "Unit Conversions",
-              children: (
-                <UnitConversionTab
-                  items={items}
-                  selectedItem={selectedItem}
-                  setSelectedItem={setSelectedItem}
-                  unitConversions={unitConversions}
-                  setUnitConversions={setUnitConversions}
-                />
-              ),
-            },
+            //   label: "Unit Conversions",
+            //   children: (
+            //     <UnitConversionTab
+            //       items={items}
+            //       selectedItem={selectedItem}
+            //       setSelectedItem={setSelectedItem}
+            //       unitConversions={unitConversions}
+            //       setUnitConversions={setUnitConversions}
+            //     />
+            //   ),
+            // },
           ]}
         />
       </Card>
