@@ -229,6 +229,57 @@ export default function TransportTab() {
       },
     ];
   };
+  // add the error field
+  // Maps form field name → human-readable label
+  const FIELD_LABELS = {
+    agencyName: "Agency Name",
+    contactPersonName: "Contact Person Name",
+    email: "Primary Email",
+    status: "Status",
+    address1: "Address Line 1",
+    country: "Country",
+    state: "State",
+    district: "District",
+    city: "City",
+    pinCode: "Pin Code",
+  };
+
+  const getFailedFields = (errorFields) =>
+    errorFields
+      .map(({ name }) => {
+        const key = Array.isArray(name) ? name[0] : name;
+        return FIELD_LABELS[key] || key;
+      })
+      .filter(Boolean);
+
+  const handleFinishFailed = ({ errorFields }) => {
+    const labels = getFailedFields(errorFields);
+
+    // Scroll to the first failed field automatically
+    if (errorFields.length > 0) {
+      form.scrollToField(errorFields[0].name, {
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+
+    if (!labels.length) return;
+
+    Modal.error({
+      title: "Please fill in the required fields",
+      content: (
+        <ul style={{ margin: "8px 0 0", paddingLeft: 20 }}>
+          {labels.map((label) => (
+            <li key={label} style={{ marginBottom: 4 }}>
+              {label}
+            </li>
+          ))}
+        </ul>
+      ),
+      okText: "Got it",
+      okButtonProps: { className: "bg-amber-500! border-none!" },
+    });
+  };
   /* ================= MAP API → FORM ================= */
   const mapDetailsToForm = (d) => ({
     agencyName: d.registered_name,
@@ -698,6 +749,7 @@ export default function TransportTab() {
           layout="vertical"
           onFinish={handleSubmit}
           onValuesChange={handleFormValuesChange}
+          onFinishFailed={handleFinishFailed}
         >
           {/* ================= Transporter / Agency Details ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">

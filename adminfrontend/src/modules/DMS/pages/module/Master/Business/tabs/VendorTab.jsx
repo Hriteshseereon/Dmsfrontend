@@ -643,6 +643,83 @@ export default function VendorTab() {
     );
   })();
 
+  // error box scroll
+  const FIELD_LABELS = {
+    // Supplier Details
+    name: "Supplier Name",
+    shortName: "Short Name",
+    mobileNo1: "Mobile No",
+    email1: "Primary Email",
+    companyType: "Supplier Type",
+    // Contact Person
+    contactPerson: "Contact Person Name",
+    contactMobile: "Contact Mobile No",
+    contactEmail: "Contact Email",
+    // Address
+    address1: "Address Line 1",
+    country: "Country",
+    state: "State",
+    district: "District",
+    city: "City",
+    // Corporate Address
+    "corporateAddress,name": "Corporate Name",
+    "corporateAddress,address": "Corporate Address",
+    "corporateAddress,phoneNo": "Corporate Phone No",
+    "corporateAddress,email": "Corporate Email",
+    // Company Group
+    companyGroupName: "Company Group Name",
+  };
+
+  const getFailedFields = (errorFields) =>
+    errorFields.map(({ name }) => {
+      const key = Array.isArray(name) ? name.join(",") : name;
+
+      // Handle plant fields: ["plants", 0, "plantName"] → "Plant 1 - Plant Name"
+      if (Array.isArray(name) && name[0] === "plants") {
+        const index = name[1];
+        const field = name[2];
+        const plantFieldLabels = {
+          plantName: "Plant Name",
+          phoneNo: "Phone No",
+          email: "Email",
+          country: "Country",
+          state: "State",
+          district: "District",
+          city: "City",
+          pin: "Pin Code",
+        };
+        return `Plant ${index + 1} → ${plantFieldLabels[field] || field}`;
+      }
+
+      return FIELD_LABELS[key] || key;
+    });
+  const handleFinishFailed = ({ errorFields }) => {
+    if (errorFields.length > 0) {
+      form.scrollToField(errorFields[0].name, {
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+
+    const labels = getFailedFields(errorFields);
+    if (!labels.length) return;
+
+    Modal.error({
+      title: "Please fill in the required fields",
+      content: (
+        <ul style={{ margin: "8px 0 0", paddingLeft: 20 }}>
+          {labels.map((label) => (
+            <li key={label} style={{ marginBottom: 4 }}>
+              {label}
+            </li>
+          ))}
+        </ul>
+      ),
+      okText: "Got it",
+      okButtonProps: { className: "bg-amber-500! border-none!" },
+    });
+  };
+
   // ── TABLE COLUMNS ─────────────────────────────────────────────────────────
   const columns = [
     {
@@ -844,6 +921,7 @@ export default function VendorTab() {
             igstApplicable: "No",
             companyType: "Supplier",
           }}
+          onFinishFailed={handleFinishFailed}
         >
           {/* ================= Supplier Details ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">

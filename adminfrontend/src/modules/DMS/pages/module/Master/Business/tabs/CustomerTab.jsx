@@ -149,7 +149,26 @@ export default function CustomerTab() {
       form.setFieldsValue({ pdcValid: dayjs(date).add(6, "month") });
     }
   };
+  // handle functio for error messege showing
+  const handleFinishFailed = (errorInfo) => {
+    const errorFields = errorInfo.errorFields;
 
+    if (!errorFields.length) return;
+
+    // Extract field names
+    const missingFields = errorFields.map(
+      (field) => field.errors[0] || field.name[0],
+    );
+
+    // Show popup
+    message.error(
+      `Please fill required fields: ${missingFields.join(", ")}`,
+      4,
+    );
+
+    // Scroll to first error
+    form.scrollToField(errorFields[0].name);
+  };
   // ── location handlers ─────────────────────────────────────────────────────
 
   const handleCountryChange = (isoCode, option) => {
@@ -908,6 +927,7 @@ export default function CustomerTab() {
           layout="vertical"
           onFinish={handleSubmit}
           onValuesChange={handleFormValuesChange}
+          onFinishFailed={handleFinishFailed}
         >
           {/* ================= Customer Basic Details ================= */}
           <Card className="mb-4 border border-amber-200 rounded-lg">
