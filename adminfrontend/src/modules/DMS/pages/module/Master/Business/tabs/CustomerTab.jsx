@@ -1298,7 +1298,7 @@ export default function CustomerTab() {
                     >
                       <DatePicker
                         className="w-full"
-                        format="YYYY-MM-DD"
+                        format="DD-MM-YYYY"
                         disabled={viewMode}
                       />
                     </Form.Item>
@@ -1329,7 +1329,7 @@ export default function CustomerTab() {
                     >
                       <DatePicker
                         className="w-full"
-                        format="YYYY-MM-DD"
+                        format="DD-MM-YYYY"
                         disabled={viewMode}
                         onChange={handleBgValidFromChange}
                       />
@@ -1343,7 +1343,7 @@ export default function CustomerTab() {
                     >
                       <DatePicker
                         className="w-full"
-                        format="YYYY-MM-DD"
+                        format="DD-MM-YYYY"
                         disabled={viewMode}
                       />
                     </Form.Item>
@@ -1397,7 +1397,7 @@ export default function CustomerTab() {
                     >
                       <DatePicker
                         className="w-full"
-                        format="YYYY-MM-DD"
+                        format="DD-MM-YYYY"
                         disabled={viewMode}
                         onChange={handlePdcIssueDateChange}
                       />
@@ -1413,7 +1413,7 @@ export default function CustomerTab() {
                     >
                       <DatePicker
                         className="w-full"
-                        format="YYYY-MM-DD"
+                        format="DD-MM-YYYY"
                         disabled={viewMode}
                       />
                     </Form.Item>
@@ -1450,7 +1450,7 @@ export default function CustomerTab() {
                     >
                       <DatePicker
                         className="w-full"
-                        format="YYYY-MM-DD"
+                        format="DD-MM-YYYY"
                         disabled={viewMode}
                       />
                     </Form.Item>
@@ -1478,7 +1478,7 @@ export default function CustomerTab() {
                     >
                       <DatePicker
                         className="w-full"
-                        format="YYYY-MM-DD"
+                        format="DD-MM-YYYY"
                         disabled={viewMode}
                       />
                     </Form.Item>
