@@ -463,22 +463,33 @@ export default function CustomerTab() {
     bgBankName: details.bg_bank_name,
     bgAmount: details.bg_amount,
     bgNumber: details.bg_number,
-    bgDate: details.bg_date ? dayjs(details.bg_date) : null,
-    bgValidFrom: details.bg_valid_from ? dayjs(details.bg_valid_from) : null,
-    bgValidUpto: details.bg_valid_upto ? dayjs(details.bg_valid_upto) : null,
+    bgDate: details.bg_date ? dayjs(details.bg_date, "DD-MM-YYYY") : null,
+    bgValidFrom: details.bg_valid_from
+      ? dayjs(details.bg_valid_from, "DD-MM-YYYY")
+      : null,
+    bgValidUpto: details.bg_valid_upto
+      ? dayjs(details.bg_valid_upto, "DD-MM-YYYY")
+      : null,
 
     pdcBank: details.pdc_bank_name,
     pdcNumber: details.pdc_cheque_number,
     pdcAmount: details.pdc_amount,
-    pdcIssueDate: details.pdc_issue_date ? dayjs(details.pdc_issue_date) : null,
-    pdcDate: details.pdc_cheque_date ? dayjs(details.pdc_cheque_date) : null,
-    pdcValid: details.pdc_valid_upto ? dayjs(details.pdc_valid_upto) : null,
+    pdcIssueDate: details.pdc_issue_date
+      ? dayjs(details.pdc_issue_date, "DD-MM-YYYY")
+      : null,
+
+    pdcDate: details.pdc_cheque_date
+      ? dayjs(details.pdc_cheque_date, "DD-MM-YYYY")
+      : null,
+    pdcValid: details.pdc_valid_upto
+      ? dayjs(details.pdc_valid_upto, "DD-MM-YYYY")
+      : null,
 
     fdBank: details.fd_bank_name,
     fdCheque: details.fd_cheque_number,
     fdSecurity: details.fd_security_detail,
     fdInterest: details.fd_rate_of_interest,
-    fdDate: details.fd_date ? dayjs(details.fd_date) : null,
+    fdDate: details.fd_date ? dayjs(details.fd_date, "DD-MM-YYYY") : null,
 
     collateralDetails: details.collateral_details,
     collateralAddress: details.collateral_address,
