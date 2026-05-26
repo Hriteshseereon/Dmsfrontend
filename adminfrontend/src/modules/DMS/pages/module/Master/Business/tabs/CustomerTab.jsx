@@ -1885,9 +1885,6 @@ export default function CustomerTab() {
                 <Form.Item
                   label="Rate of TDS"
                   name="tdsRate"
-                  rules={[
-                    { required: true, message: "Rate of TDS is required" },
-                  ]}
                   initialValue="0.10"
                 >
                   <Input disabled />
