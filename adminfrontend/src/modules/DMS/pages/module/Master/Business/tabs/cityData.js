@@ -4,7 +4,7 @@ export const cityData = {
     Cuttack: ["Athagad","Badamba","Banki","Banki- Dampara","Baranga","Cuttacksadar","Kantapada","Mahanga","Narasinghpur","Niali","Nischinta Koili","Salepur","Tangi Choudwar","Tigiria"],
     Puri: ["Puri", "Pipili", "Konark","Astaranga","Brahmagiri","Delanga","Gop","Kakat Pur","Kanas","Krushnaprasad","Nimapada","Sadar","Satyabadi"],
     Balasore: ["Bahanaga","Baleshwar","Baliapal","Basta","Bhograi","Jaleswar","Khaira","Nilgiri","Oupada","Remuna","Simulia","Soro"],
-    Bhadrak: ["Basudevpur","Bhadrak","Bhandaripokhari","Bonth","Chandabali","Dhamanagar","Tihidi"],
+    Bhadrak: ["Basudevpur","Bhadrak","Bhandaripokhari","Bonth","Chandabali","Dhamanagar","Tihidi","Pirahat"],
     Jajapur: ["Jajpur", "Vyasanagar", "Panikoili","Badchana","Bari","Binjharpur","Dahrmasala","Danagadi","Dasarathapur","Korei","Rasulpur","Sukinda"],
     Jagatsinghpur: ["Balikuda","Biridi","Erasama","Jagatsinghpur","Kujang","Naugaon","Raghunathpur","Tirtol","Paradip"],
     Kendrapara: ["Kendrapara", "Pattamundai", "Marshaghai","Aul","Derabish","Garadapur","Kendrapada","Mahakalapada","Marsaghai","Rajkanika","Rajnagar"],

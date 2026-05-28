@@ -876,9 +876,9 @@ export const indiaLocations = [
             "Alipurduar",
             "Bankura",
             "Birbhum",
-            "Burdwan (Bardhaman)",
+            "Burdwan",
             "Cooch Behar",
-            "Dakshin Dinajpur (South Dinajpur)",
+            "Dakshin Dinajpur",
             "Darjeeling",
             "Hooghly",
             "Howrah",
@@ -889,11 +889,11 @@ export const indiaLocations = [
             "Murshidabad",
             "Nadia",
             "North 24 Parganas",
-            "Paschim Medinipur (West Medinipur)",
-            "Purba Medinipur (East Medinipur)",
+            "Paschim Medinipur",
+            "Purba Medinipur",
             "Purulia",
             "South 24 Parganas",
-            "Uttar Dinajpur (North Dinajpur)"
+            "Uttar Dinajpur"
          ]
       }
 ]
