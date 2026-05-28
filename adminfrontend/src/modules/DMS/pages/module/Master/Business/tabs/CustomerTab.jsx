@@ -472,8 +472,8 @@ export default function CustomerTab() {
       : null,
 
     pdcBank: details.pdc_bank_name,
-    pdcNumber: details.pdc_cheque_number,
-    pdcAmount: details.pdc_amount,
+    pdcNumberOfCheques: details.pdc_number_of_cheques,
+    pdcCheques: details.pdc_cheques || [],
     pdcIssueDate: details.pdc_issue_date
       ? dayjs(details.pdc_issue_date, "DD-MM-YYYY")
       : null,
@@ -607,8 +607,12 @@ export default function CustomerTab() {
           "pdc_cheque_date",
           values.pdcDate ? dayjs(values.pdcDate).format("YYYY-MM-DD") : "",
         );
-        formData.append("pdc_cheque_number", values.pdcNumber);
-        formData.append("pdc_amount", values.pdcAmount);
+        formData.append(
+          "pdc_number_of_cheques",
+          values.pdcNumberOfCheques || 0,
+        );
+
+        formData.append("pdc_cheques", JSON.stringify(values.pdcCheques || []));
         formData.append(
           "pdc_valid_upto",
           values.pdcValid ? dayjs(values.pdcValid).format("YYYY-MM-DD") : "",
@@ -1398,7 +1402,7 @@ export default function CustomerTab() {
                       <Input className={inputClass} disabled={viewMode} />
                     </Form.Item>
                   </Col>
-                  <Col span={5}>
+                  <Col span={4}>
                     <Form.Item
                       label="Cheque Issue Date"
                       name="pdcIssueDate"
@@ -1414,7 +1418,7 @@ export default function CustomerTab() {
                       />
                     </Form.Item>
                   </Col>
-                  <Col span={5}>
+                  <Col span={4}>
                     <Form.Item
                       label="Cheque Dated"
                       name="pdcDate"
@@ -1429,29 +1433,7 @@ export default function CustomerTab() {
                       />
                     </Form.Item>
                   </Col>
-                  <Col span={5}>
-                    <Form.Item
-                      label="Cheque Number"
-                      name="pdcNumber"
-                      rules={[
-                        { required: true, message: "Enter cheque number" },
-                      ]}
-                    >
-                      <Input className={inputClass} disabled={viewMode} />
-                    </Form.Item>
-                  </Col>
-                  <Col span={5}>
-                    <Form.Item
-                      label="Cheque Amount"
-                      name="pdcAmount"
-                      rules={[
-                        { required: true, message: "Enter cheque amount" },
-                      ]}
-                    >
-                      <Input className={inputClass} disabled={viewMode} />
-                    </Form.Item>
-                  </Col>
-                  <Col span={5}>
+                  <Col span={4}>
                     <Form.Item
                       label="Valid Upto"
                       name="pdcValid"
@@ -1466,6 +1448,90 @@ export default function CustomerTab() {
                       />
                     </Form.Item>
                   </Col>
+                  <Col span={5}>
+                    <Form.Item
+                      label="Number of Cheques"
+                      name="pdcNumberOfCheques"
+                      rules={[
+                        { required: true, message: "Enter number of cheques" },
+                      ]}
+                    >
+                      <Input
+                        type="number"
+                        className={inputClass}
+                        disabled={viewMode}
+                        min={1}
+                        onChange={(e) => {
+                          const count = Number(e.target.value || 0);
+
+                          const existing =
+                            form.getFieldValue("pdcCheques") || [];
+
+                          const updated = Array.from(
+                            { length: count },
+                            (_, index) => ({
+                              cheque_number:
+                                existing[index]?.cheque_number || "",
+                              cheque_amount:
+                                existing[index]?.cheque_amount || "",
+                            }),
+                          );
+
+                          form.setFieldsValue({
+                            pdcCheques: updated,
+                          });
+                        }}
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Form.List name="pdcCheques">
+                    {(fields) => (
+                      <>
+                        {fields.map(({ key, name, ...restField }, index) => (
+                          <React.Fragment key={key}>
+                            <Col span={4}>
+                              <Form.Item
+                                {...restField}
+                                label={`Cheque Number ${index + 1}`}
+                                name={[name, "cheque_number"]}
+                                rules={[
+                                  {
+                                    required: true,
+                                    message: "Enter cheque number",
+                                  },
+                                ]}
+                              >
+                                <Input
+                                  className={inputClass}
+                                  disabled={viewMode}
+                                />
+                              </Form.Item>
+                            </Col>
+
+                            <Col span={4}>
+                              <Form.Item
+                                {...restField}
+                                label={`Cheque Amount ${index + 1}`}
+                                name={[name, "cheque_amount"]}
+                                rules={[
+                                  {
+                                    required: true,
+                                    message: "Enter cheque amount",
+                                  },
+                                ]}
+                              >
+                                <Input
+                                  className={inputClass}
+                                  disabled={viewMode}
+                                />
+                              </Form.Item>
+                            </Col>
+                          </React.Fragment>
+                        ))}
+                      </>
+                    )}
+                  </Form.List>
                 </>
               )}
 
