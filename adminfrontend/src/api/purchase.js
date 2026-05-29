@@ -166,13 +166,13 @@ export const updatePurchaseOrder = async (orderId, payload) => {
   return res.data;
 }
 // fetch all sales orders for dropdown (by vendor)
-export const getAllSalesOrder = async (vendorId) => {
+export const getAllSalesOrder = async (company_group_id) => {
   const { currentOrgId,selectedFY } = useSessionStore.getState();
 
   const res = await api.get("/sales/orders/by-vendor/", {
     params: {
       organisation: currentOrgId,
-      vendor_id: vendorId,
+      company_group_id: company_group_id,
       financial_year: selectedFY,
     },
   });
