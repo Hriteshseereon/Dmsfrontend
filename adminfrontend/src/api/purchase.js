@@ -385,3 +385,26 @@ export const updateLoadingAdvice = async (adviceId, payload) => {
   );
   return res.data;
 }
+
+
+// get all the venfor details for dropdown in purchase order form
+export const getVendorDetails = async (vendorId) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get(
+    "/vendors/vendor-plants-by-vendor/",
+    {
+      params: {
+        organisation: currentOrgId,
+        vendor_id: vendorId,
+      },
+    }
+  );
+
+  return res.data;
+};
+export const getVendors = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("/vendors/vendors/", { params: { organisation: currentOrgId } });
+  return res.data;
+}
