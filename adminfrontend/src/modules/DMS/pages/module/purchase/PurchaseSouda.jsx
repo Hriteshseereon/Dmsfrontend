@@ -1204,7 +1204,7 @@ export default function PurchaseSouda() {
           setIsEditModalOpen(false);
         }}
         footer={null}
-        width={1000}
+        width={1600}
       >
         <Form
           form={editForm}
@@ -1240,7 +1240,7 @@ export default function PurchaseSouda() {
           setIsViewModalOpen(false);
         }}
         footer={null}
-        width={1000}
+        width={1600}
       >
         <Form form={viewForm} layout="vertical">
           <RenderFormBody form={viewForm} disabled={true} />
