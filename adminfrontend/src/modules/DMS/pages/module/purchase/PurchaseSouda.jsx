@@ -622,7 +622,7 @@ export default function PurchaseSouda() {
               }
             >
               <Row gutter={12} align="middle">
-                <Col span={6}>
+                <Col span={7}>
                   <Form.Item
                     {...field}
                     label="Item Name"
@@ -758,9 +758,18 @@ export default function PurchaseSouda() {
                     <Input disabled />
                   </Form.Item>
                 </Col>
-
+                <Col span={1}>
+                  <Form.Item label="GST" name={[field.name, "igstPercent"]}>
+                    <Input disabled />
+                  </Form.Item>
+                </Col>
+                <Col span={2}>
+                  <Form.Item name={[field.name, "netWt"]} label="Net Wt">
+                    <InputNumber className="w-full" disabled />
+                  </Form.Item>
+                </Col>
                 {/* FIX: Rate with proper validation */}
-                <Col span={3}>
+                <Col span={2}>
                   <Form.Item
                     {...field}
                     label="Rate"
@@ -829,11 +838,7 @@ export default function PurchaseSouda() {
                     <InputNumber className="w-full!" disabled />
                   </Form.Item>
                 </Col>
-                <Col span={2}>
-                  <Form.Item label="GST %" name={[field.name, "igstPercent"]}>
-                    <Input disabled />
-                  </Form.Item>
-                </Col>
+
                 {/* FIX: SGST% with proper validation */}
 
                 {/* FIX: CGST% with proper validation */}
@@ -850,15 +855,11 @@ export default function PurchaseSouda() {
                     <InputNumber className="w-full!" disabled />
                   </Form.Item>
                 </Col>
+
                 <Col span={2}>
-                  <Form.Item name={[field.name, "netWt"]} label="Net Wt">
-                    <InputNumber className="w-full" disabled />
-                  </Form.Item>
-                </Col>
-                <Col span={6}>
                   <Form.Item
                     {...field}
-                    label="Total Amount (₹)"
+                    label="Total Amt"
                     name={[field.name, "totalAmt"]}
                     fieldKey={[field.fieldKey, "totalAmt"]}
                   >
@@ -882,7 +883,7 @@ export default function PurchaseSouda() {
       >
         <h6 className="text-amber-500">Basic Information</h6>
         <Row gutter={16}>
-          <Col span={4}>
+          <Col span={7}>
             <Form.Item
               label="Supplier Name"
               name="vendor"
@@ -932,12 +933,12 @@ export default function PurchaseSouda() {
               </Select>
             </Form.Item>
           </Col>
-          <Col span={4}>
+          <Col span={3}>
             <Form.Item label="Company Group" name="company_group_name">
               <Input disabled />
             </Form.Item>
           </Col>
-          <Col span={4}>
+          <Col span={3}>
             <Form.Item label="Plant Name" name="plant_name">
               <Input disabled />
             </Form.Item>
@@ -945,7 +946,7 @@ export default function PurchaseSouda() {
           <Form.Item name="plant" hidden>
             <Input />
           </Form.Item>
-          <Col span={4}>
+          <Col span={3}>
             <Form.Item
               label="Contract Date"
               name="soudaDate"
@@ -961,7 +962,7 @@ export default function PurchaseSouda() {
           </Col>
 
           {/* REMOVED Delivery Date; ADDED Start / End */}
-          <Col span={4}>
+          <Col span={3}>
             <Form.Item
               label="Start Date"
               name="from_date"
@@ -976,7 +977,7 @@ export default function PurchaseSouda() {
             </Form.Item>
           </Col>
 
-          <Col span={4}>
+          <Col span={3}>
             <Form.Item label="End Date" name="to_date" initialValue={dayjs()}>
               <DatePicker
                 className="w-full"
@@ -1005,40 +1006,7 @@ export default function PurchaseSouda() {
       >
         <h6 className="text-amber-500">Order Totals</h6>
         <Row gutter={12}>
-          <Col span={6}>
-            <Form.Item
-              label="Total Gross Amount"
-              name={["orderTotals", "totalGrossAmount"]}
-            >
-              <InputNumber disabled className="w-full!" />
-            </Form.Item>
-          </Col>
-          <Col span={3}>
-            <Form.Item label="Total Qty" name={["orderTotals", "totalQty"]}>
-              <InputNumber disabled className="w-full!" />
-            </Form.Item>
-          </Col>
-          {/* <Col span={4}>
-            <Form.Item
-              label="Total Discount (₹)"
-              name={["orderTotals", "totalDiscount"]}
-            >
-              <InputNumber className="w-full!" disabled />
-            </Form.Item>
-          </Col>
-          <Col span={4}>
-            <Form.Item label="Total GST (₹)" name={["orderTotals", "totalGST"]}>
-              <InputNumber className="w-full!" disabled />
-            </Form.Item>
-          </Col> */}
-
-          {/* <Col span={6}>
-            <Form.Item label="Grand Total (₹)" name={["orderTotals", "grandTotal"]}>
-              <InputNumber className="w-full" disabled />
-            </Form.Item>
-          </Col> */}
-
-          <Col span={4}>
+          <Col span={7}>
             <Form.Item
               label="Status"
               name="status"
@@ -1054,6 +1022,39 @@ export default function PurchaseSouda() {
                   </Option>
                 ))}
               </Select>
+            </Form.Item>
+          </Col>
+          <Col span={3}>
+            <Form.Item label="Total Qty" name={["orderTotals", "totalQty"]}>
+              <InputNumber disabled className="w-full!" />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            {/* <Form.Item
+              label="Total Discount (₹)"
+              name={["orderTotals", "totalDiscount"]}
+            >
+              <InputNumber className="w-full!" disabled />
+            </Form.Item>
+          </Col>
+          <Col span={4}>
+            <Form.Item label="Total GST (₹)" name={["orderTotals", "totalGST"]}>
+              <InputNumber className="w-full!" disabled />
+            </Form.Item> */}
+          </Col>
+
+          {/* <Col span={6}>
+            <Form.Item label="Grand Total (₹)" name={["orderTotals", "grandTotal"]}>
+              <InputNumber className="w-full" disabled />
+            </Form.Item>
+          </Col> */}
+
+          <Col span={6}>
+            <Form.Item
+              label="Total Gross Amount"
+              name={["orderTotals", "totalGrossAmount"]}
+            >
+              <InputNumber disabled className="w-full!" />
             </Form.Item>
           </Col>
         </Row>
@@ -1164,7 +1165,7 @@ export default function PurchaseSouda() {
           setIsAddModalOpen(false);
         }}
         footer={null}
-        width={1000}
+        width={1600}
       >
         <Form
           form={addForm}
