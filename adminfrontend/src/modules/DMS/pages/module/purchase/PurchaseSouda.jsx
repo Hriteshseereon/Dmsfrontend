@@ -188,17 +188,21 @@ export default function PurchaseSouda() {
       const computed = computeAllFromFormValues({ items });
 
       const formattedData = {
-        // vendor: res.vendor,
-        vendor: res.company_group_id,
-        vendor_name: res.company_group,
+        vendor: res.vendor,
+
+        company_group_name: res.company_group,
+
         plant: res.plant,
         plant_name: res.plant_name,
+
         from_date: res.from_date ? dayjs(res.from_date) : null,
+
         to_date: res.to_date ? dayjs(res.to_date) : null,
+
         status: res.status,
 
         items: computed.items,
-        orderTotals: computed.orderTotals, // ✅ ADD THIS
+        orderTotals: computed.orderTotals,
       };
 
       editForm.setFieldsValue(formattedData);
@@ -308,13 +312,21 @@ export default function PurchaseSouda() {
       const computed = computeAllFromFormValues({ items });
 
       const formattedData = {
-        vendor: res.company_group,
+        vendor: res.vendor,
+
+        company_group_name: res.company_group,
+
         plant: res.plant,
+        plant_name: res.plant_name,
+
         from_date: res.from_date ? dayjs(res.from_date) : null,
+
         to_date: res.to_date ? dayjs(res.to_date) : null,
-        items: computed.items, // ✅ use computed items
+
+        status: res.status,
+
+        items: computed.items,
         orderTotals: computed.orderTotals,
-        status: res.status, // ✅ ADD THIS
       };
 
       viewForm.setFieldsValue(formattedData);
