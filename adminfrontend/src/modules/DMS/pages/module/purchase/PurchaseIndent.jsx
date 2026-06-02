@@ -155,9 +155,9 @@ export default function PurchaseIndent() {
     }
   };
 
-  const fetchSalesOrderOptions = async (vendorId) => {
+  const fetchSalesOrderOptions = async (company_group_id) => {
     try {
-      const res = await getAllSalesOrder(vendorId);
+      const res = await getAllSalesOrder(company_group_id);
       const list = res?.data || res;
       setSalesOrders(list);
     } catch (err) {
@@ -192,7 +192,7 @@ export default function PurchaseIndent() {
       const data = res?.data || res;
 
       setContractItems(data.items || []);
-      fetchSalesOrderOptions(data.vendor);
+      fetchSalesOrderOptions(data.company_group_id);
       // Merge existing items if provided
       const itemsToSet = existingItems.length
         ? existingItems.map((it) => ({
@@ -202,8 +202,8 @@ export default function PurchaseIndent() {
         : [{}]; // keep one empty row
 
       formInstance.setFieldsValue({
-        vendor: data.vendor,
-        vendorName: data.vendor_name,
+        companyGroupId: data.company_group_id,
+        vendorName: data.company_group,
         plantName: data.plant_name,
         deliveryAddress: data.delivery_address,
         items: itemsToSet, // ✅ keep existing items
