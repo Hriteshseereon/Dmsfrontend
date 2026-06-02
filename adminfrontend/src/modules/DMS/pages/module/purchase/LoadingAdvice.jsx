@@ -21,12 +21,15 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { exportToExcel } from "../../../../../utils/exportToExcel";
-import { getLoadingAdvice, getLoadingAdviceById, updateLoadingAdvice, getAllVendor } from "../../../../../api/purchase";
+import {
+  getLoadingAdvice,
+  getLoadingAdviceById,
+  updateLoadingAdvice,
+  getAllVendor,
+} from "../../../../../api/purchase";
 const { Option } = Select;
 
-
 const ALL_STATUS = [
-
   "Approved",
   "Dispatched",
   "In-Transit",
@@ -37,11 +40,11 @@ const ALL_STATUS = [
 const SALE_ORDER_STATUS_FLOW = {
   "In-Transit": ["In-Transit", "Out for Delivery"],
   "Out for Delivery": ["Out for Delivery", "Delivered"],
-  "Delivered": ["Delivered"],
+  Delivered: ["Delivered"],
 };
 
 const statusFlow = {
-  Pending: ["Pending",],
+  Pending: ["Pending"],
 
   Approved: ["Approved", "Dispatched"],
   Dispatched: ["Dispatched", "In-Transit"],
@@ -57,7 +60,7 @@ export default function LoadingAdvice() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
-   const [messageApi, contextHolder] = message.useMessage(); 
+  const [messageApi, contextHolder] = message.useMessage();
 
   const [form] = Form.useForm();
   const [viewForm] = Form.useForm();
@@ -74,7 +77,7 @@ export default function LoadingAdvice() {
     }
 
     const filtered = data.filter((item) =>
-      JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
+      JSON.stringify(item).toLowerCase().includes(value.toLowerCase()),
     );
 
     setData(filtered);
@@ -94,7 +97,7 @@ export default function LoadingAdvice() {
             // Basic
             "Advice No": detail.advice_no,
             "Loading Advice Date": detail.advice_date,
-            "Status": detail.status,
+            Status: detail.status,
 
             // Company Details
             "Vendor Name": detail.vendor_name,
@@ -112,10 +115,10 @@ export default function LoadingAdvice() {
             "Item Name": item.product_name,
             "Required Qty": item.required_qty,
             "Actual Qty": item.actual_qty,
-            "Variance": item.variance,
+            Variance: item.variance,
 
             // Transport Details
-            "Transporter": detail.transporter_name,
+            Transporter: detail.transporter_name,
             "Vehicle No": detail.vehicle_no,
             "Driver Name": detail.driver_name,
             "Driver Contact": detail.driver_contact,
@@ -134,7 +137,6 @@ export default function LoadingAdvice() {
       }
 
       exportToExcel(exportRows, "Loading_Advice_Details", "LoadingAdvice");
-
     } catch (error) {
       console.error("Export failed:", error);
       message.error("Export failed");
@@ -178,8 +180,7 @@ export default function LoadingAdvice() {
         netWeight: item.net_weight_kg || 0,
         grossWeight: item.gross_weight_kg || 0,
 
-
-        itemCode: item.items?.[0]?.hsn_code || "-",   // 👈 HSN code
+        itemCode: item.items?.[0]?.hsn_code || "-", // 👈 HSN code
         itemName: item.items?.[0]?.product_name || "-",
 
         reqQty: item.items?.[0]?.required_qty || 0,
@@ -195,8 +196,6 @@ export default function LoadingAdvice() {
     }
   };
 
-
-
   const handleOpenEdit = async (record) => {
     try {
       const res = await getLoadingAdviceById(record.id);
@@ -207,7 +206,7 @@ export default function LoadingAdvice() {
         lodingadvicedate: res.advice_date ? dayjs(res.advice_date) : null,
         status: res.status,
 
-        companyName: res.vendor_name,
+        companyName: res.company_group_name || "",
         companyAddress: res.vendor_addresses?.[0]?.address_line1 || "",
         contactPerson: res.vendor_details?.contact_person || "",
         contactNo: res.vendor_details?.contact_person_no || "",
@@ -226,9 +225,7 @@ export default function LoadingAdvice() {
           ? dayjs(res.insurance_valid_upto)
           : null,
 
-        puValidUpto: res.pu_valid_upto
-          ? dayjs(res.pu_valid_upto)
-          : null,
+        puValidUpto: res.pu_valid_upto ? dayjs(res.pu_valid_upto) : null,
 
         fitnessValidUpto: res.fitness_valid_upto
           ? dayjs(res.fitness_valid_upto)
@@ -254,113 +251,110 @@ export default function LoadingAdvice() {
           sale_order_no: delivery.sales_order_number,
           customer_name: delivery.customer_name,
           delivery_address: delivery.customer_delivery_address,
-          delivery_date: delivery.delivery_date ? dayjs(delivery.delivery_date) : null,
+          delivery_date: delivery.delivery_date
+            ? dayjs(delivery.delivery_date)
+            : null,
           status: delivery.status,
           items: delivery.items?.map((itm) => ({
             item_id: itm.id,
             product_name: itm.item_name,
             qty: itm.order_qty,
             delivered_qty: itm.delivered_qty,
-           
           })),
         })),
       });
 
       setSelectedRecord(res);
       setIsEditModalOpen(true);
-
     } catch (error) {
       console.error("Error fetching by ID:", error);
       message.error("Failed to load data");
     }
   };
-const handleOpenView = async (record) => {
-  try {
-    const res = await getLoadingAdviceById(record.id);
+  const handleOpenView = async (record) => {
+    try {
+      const res = await getLoadingAdviceById(record.id);
 
-    viewForm.setFieldsValue({
-      advice_no: res.advice_no,
-      invoiceNo: res.invoice_number,
-      lodingadvicedate: res.advice_date ? dayjs(res.advice_date) : null,
-      status: res.status,
+      viewForm.setFieldsValue({
+        advice_no: res.advice_no,
+        invoiceNo: res.invoice_number,
+        lodingadvicedate: res.advice_date ? dayjs(res.advice_date) : null,
+        status: res.status,
 
-      companyName: res.vendor_name,
-      companyAddress: res.vendor_addresses?.[0]?.address_line1 || "",
-      contactPerson: res.vendor_details?.contact_person || "",
-      contactNo: res.vendor_details?.contact_person_no || "",
+        companyName: res.company_group_name || "",
+        companyAddress: res.vendor_addresses?.[0]?.address_line1 || "",
+        contactPerson: res.vendor_details?.contact_person || "",
+        contactNo: res.vendor_details?.contact_person_no || "",
 
-      plantName: res.plant_name,
-      plantAddress: res.plant_details?.address || "",
-      plantContactPerson: res.vendor_details?.contact_person || "",
-      plantPhone: res.plant_details?.phone_number || "",
+        plantName: res.plant_name,
+        plantAddress: res.plant_details?.address || "",
+        plantContactPerson: res.vendor_details?.contact_person || "",
+        plantPhone: res.plant_details?.phone_number || "",
 
-      transporter: res.transporter_name,
-      vehicleNo: res.vehicle_number,
-      driverName: res.driver_name,
-      driverContact: res.driver_contact,
+        transporter: res.transporter_name,
+        vehicleNo: res.vehicle_number,
+        driverName: res.driver_name,
+        driverContact: res.driver_contact,
 
-      insuranceValidUpto: res.insurance_valid_upto
-        ? dayjs(res.insurance_valid_upto)
-        : null,
-
-      puValidUpto: res.pu_valid_upto
-        ? dayjs(res.pu_valid_upto)
-        : null,
-
-      fitnessValidUpto: res.fitness_valid_upto
-        ? dayjs(res.fitness_valid_upto)
-        : null,
-
-      vehicleInTime: res.vehicle_in_time,
-      vehicleOutTime: res.vehicle_out_time,
-      tareWeight: res.tare_weight_kg,
-      netWeight: res.net_weight_kg,
-
-      items: res.items?.map((itm) => ({
-        id: itm.id,
-        product: itm.product,
-        product_name: itm.product_name,
-        required_qty: itm.required_qty,
-        actual_qty: itm.actual_qty,
-        variance: itm.variance,
-      })),
-
-      sale_orders: res.deliveries?.map((delivery) => ({
-        delivery_id: delivery.id,
-        sale_order_no: delivery.sales_order_number,
-        customer_name: delivery.customer_name,
-        delivery_address: delivery.customer_delivery_address,
-        delivery_date: delivery.delivery_date
-          ? dayjs(delivery.delivery_date)
+        insuranceValidUpto: res.insurance_valid_upto
+          ? dayjs(res.insurance_valid_upto)
           : null,
-        status: delivery.status,
 
-        items: delivery.items?.map((itm) => ({
-          item_id: itm.id,
-          product_name: itm.item_name,
-          qty: itm.order_qty,
-          delivered_qty: itm.delivered_qty,
+        puValidUpto: res.pu_valid_upto ? dayjs(res.pu_valid_upto) : null,
+
+        fitnessValidUpto: res.fitness_valid_upto
+          ? dayjs(res.fitness_valid_upto)
+          : null,
+
+        vehicleInTime: res.vehicle_in_time,
+        vehicleOutTime: res.vehicle_out_time,
+        tareWeight: res.tare_weight_kg,
+        netWeight: res.net_weight_kg,
+
+        items: res.items?.map((itm) => ({
+          id: itm.id,
+          product: itm.product,
+          product_name: itm.product_name,
+          required_qty: itm.required_qty,
+          actual_qty: itm.actual_qty,
+          variance: itm.variance,
         })),
-      })),
-    });
 
-    setSelectedRecord(res);
-    setIsViewModalOpen(true);
+        sale_orders: res.deliveries?.map((delivery) => ({
+          delivery_id: delivery.id,
+          sale_order_no: delivery.sales_order_number,
+          customer_name: delivery.customer_name,
+          delivery_address: delivery.customer_delivery_address,
+          delivery_date: delivery.delivery_date
+            ? dayjs(delivery.delivery_date)
+            : null,
+          status: delivery.status,
 
-  } catch (error) {
-    console.error("Error fetching loading advice:", error);
-    message.error("Failed to load data");
-  }
-};
+          items: delivery.items?.map((itm) => ({
+            item_id: itm.id,
+            product_name: itm.item_name,
+            qty: itm.order_qty,
+            delivered_qty: itm.delivered_qty,
+          })),
+        })),
+      });
+
+      setSelectedRecord(res);
+      setIsViewModalOpen(true);
+    } catch (error) {
+      console.error("Error fetching loading advice:", error);
+      message.error("Failed to load data");
+    }
+  };
   const handleEdit = async (values) => {
     try {
-        if (
-      ["Pending Approval"].includes(selectedRecord.status) &&
-      values.status === selectedRecord.status
-    ) {
-      messageApi.warning("Please change status to update");
-      return;
-    }
+      if (
+        ["Pending Approval"].includes(selectedRecord.status) &&
+        values.status === selectedRecord.status
+      ) {
+        messageApi.warning("Please change status to update");
+        return;
+      }
 
       const payload = {
         status: values.status,
@@ -373,7 +367,7 @@ const handleOpenView = async (record) => {
 
         deliveries: values.sale_orders?.map((so) => ({
           id: so.delivery_id,
-           status: so.status, 
+          status: so.status,
           delivery_date: so.delivery_date
             ? dayjs(so.delivery_date).format("YYYY-MM-DD")
             : null,
@@ -382,7 +376,7 @@ const handleOpenView = async (record) => {
             id: itm.item_id,
             delivered_qty: itm.delivered_qty
               ? Number(itm.delivered_qty).toFixed(3)
-              : "0.000"
+              : "0.000",
           })),
         })),
       };
@@ -394,18 +388,15 @@ const handleOpenView = async (record) => {
       setIsEditModalOpen(false);
       form.resetFields();
       fetchLoadingAdvice();
-
     } catch (error) {
       console.error("Update failed:", error);
       message.error("Update failed");
     }
   };
 
- 
-const getSaleOrderAllowedStatus = (currentStatus) => {
-  return SALE_ORDER_STATUS_FLOW[currentStatus] || ["In-Transit"];
-};
-
+  const getSaleOrderAllowedStatus = (currentStatus) => {
+    return SALE_ORDER_STATUS_FLOW[currentStatus] || ["In-Transit"];
+  };
 
   // Columns - removed Assign button; Admin can only approve pending ones
   const columns = [
@@ -413,7 +404,6 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
       title: <span className="text-amber-700 font-semibold">Advice No</span>,
       dataIndex: "advice_no",
       render: (t) => <span className="text-amber-800">{t}</span>,
-
     },
     {
       title: <span className="text-amber-700 font-semibold">Assign No</span>,
@@ -421,13 +411,15 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
 
-
     {
-      title: <span className="text-amber-700 font-semibold">Loading Advice Date</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Loading Advice Date
+        </span>
+      ),
       dataIndex: "lodingadvicedate",
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
-
 
     // transporter + vehicle/driver columns (display-only)
     {
@@ -460,55 +452,53 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
           Dispatched: "bg-blue-100 text-blue-700",
           "In-Transit": "bg-orange-100 text-orange-700",
           "Out for Delivery": "bg-purple-100 text-purple-700 ",
-          "Partially Delivered": "bg-blue-100 text-blue-700"
-
-
+          "Partially Delivered": "bg-blue-100 text-blue-700",
         };
 
         return (
-          <span className={`px-3 py-1 rounded-full font-semibold inline-block text-sm ${colorMap[status] || ""}`}>
+          <span
+            className={`px-3 py-1 rounded-full font-semibold inline-block text-sm ${colorMap[status] || ""}`}
+          >
             {status || "-"}
           </span>
         );
-      }
-
+      },
     },
-   {
-  title: <span className="text-amber-700 font-semibold">Actions</span>,
-  key: "actions",
-  render: (_, record) => {
+    {
+      title: <span className="text-amber-700 font-semibold">Actions</span>,
+      key: "actions",
+      render: (_, record) => {
+        const restrictedStatus = [
+          "In-Transit",
+          "Out for Delivery",
+          "Partially Delivered",
+          "Delivered",
+        ];
 
-    const restrictedStatus = [
-      "In-Transit",
-      "Out for Delivery",
-      "Partially Delivered",
-      "Delivered",
-    ];
+        const showEdit =
+          record.driverName &&
+          record.vehicleNo &&
+          record.driverName !== "-" &&
+          record.vehicleNo !== "-";
+        // !restrictedStatus.includes(record.status); // 👈 hide edit
 
-    const showEdit =
-      record.driverName &&
-      record.vehicleNo &&
-      record.driverName !== "-" &&
-      record.vehicleNo !== "-" 
-     // !restrictedStatus.includes(record.status); // 👈 hide edit
+        return (
+          <div className="flex gap-3">
+            <EyeOutlined
+              className="cursor-pointer! text-blue-500!"
+              onClick={() => handleOpenView(record)}
+            />
 
-    return (
-      <div className="flex gap-3">
-        <EyeOutlined
-          className="cursor-pointer! text-blue-500!"
-          onClick={() => handleOpenView(record)}
-        />
-
-        {showEdit && (
-          <EditOutlined
-            className="cursor-pointer! text-red-500!"
-            onClick={() => handleOpenEdit(record)}
-          />
-        )}
-      </div>
-    );
-  },
-}
+            {showEdit && (
+              <EditOutlined
+                className="cursor-pointer! text-red-500!"
+                onClick={() => handleOpenEdit(record)}
+              />
+            )}
+          </div>
+        );
+      },
+    },
   ];
   const getAllowedStatus = (formInstance) => {
     const currentStatus = formInstance.getFieldValue("status");
@@ -519,9 +509,7 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
     const hasDriverVehicle =
       driver && vehicle && driver !== "-" && vehicle !== "-";
 
-    const hasActualQty = items.some(
-      (itm) => Number(itm.actual_qty) > 0
-    );
+    const hasActualQty = items.some((itm) => Number(itm.actual_qty) > 0);
 
     // ❌ No driver/vehicle → restrict
     if (!hasDriverVehicle) {
@@ -541,375 +529,445 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
     // ✅ Default flow
     return statusFlow[currentStatus] || [];
   };
- const renderFormFields = (disabled = false, formInstance) => {
-  const status = formInstance.getFieldValue("status");
+  const renderFormFields = (disabled = false, formInstance) => {
+    const status = formInstance.getFieldValue("status");
 
-  const isSalesDisabled = ["In-Transit", "Out for Delivery","Partially Delivered", "Delivered"].includes(status);
+    const isSalesDisabled = [
+      "In-Transit",
+      "Out for Delivery",
+      "Partially Delivered",
+      "Delivered",
+    ].includes(status);
 
-  return (
-    <>
-     {contextHolder}
+    return (
+      <>
+        {contextHolder}
 
-      {/* Date and Order */}
-      <Row gutter={16}>
-        <Col span={6}>
-          <Form.Item label="Advice No" name="advice_no">
-            <Input disabled />
-          </Form.Item>
-        </Col>
-        <Col span={6}>
-          <Form.Item label="Assign No" name="invoiceNo" >
-            <Select
-              placeholder="Select assign No"
-              disabled
-              showSearch
+        {/* Date and Order */}
+        <Row gutter={16}>
+          <Col span={6}>
+            <Form.Item label="Advice No" name="advice_no">
+              <Input disabled />
+            </Form.Item>
+          </Col>
+          <Col span={6}>
+            <Form.Item label="Assign No" name="invoiceNo">
+              <Select placeholder="Select assign No" disabled showSearch>
+                {data.map((item) => (
+                  <Option key={item.invoiceNo} value={item.invoiceNo}>
+                    {item.invoiceNo}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+          </Col>
+          <Col span={6}>
+            <Form.Item
+              label="Loading Advice Date"
+              name="lodingadvicedate"
+              rules={[{ required: true }]}
             >
-              {data.map((item) => (
-                <Option key={item.invoiceNo} value={item.invoiceNo}>
-                  {item.invoiceNo}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
-        </Col>
-        <Col span={6}>
-          <Form.Item label="Loading Advice Date" name="lodingadvicedate" rules={[{ required: true }]}>
-            <DatePicker className="w-full" disabled format="YYYY-MM-DD" />
-          </Form.Item>
-        </Col>
+              <DatePicker className="w-full" disabled format="YYYY-MM-DD" />
+            </Form.Item>
+          </Col>
 
-        <Col span={6}>
-         <Form.Item label="Status" name="status" rules={[{ required: true }]}>
-  <Select
-    placeholder="Select Status"
-    disabled={
-      ["Dispatched","In-Transit", "Out for Delivery", "Partially Delivered", "Delivered"]
-        .includes(formInstance.getFieldValue("status"))
-    }
-  >     {getAllowedStatus(formInstance).map((status) => (<Option key={status} value={status}>
-                {status}
-              </Option>
-              ))}
-            </Select>
-          </Form.Item>
-        </Col>
-      </Row>
-         {/* Item Details */}
-      <Row gutter={24} className="mt-2">
-        <Col span={24}>
-          <h6 className="text-amber-600 ">Items Details</h6>
-        </Col>
+          <Col span={6}>
+            <Form.Item
+              label="Status"
+              name="status"
+              rules={[{ required: true }]}
+            >
+              <Select
+                placeholder="Select Status"
+                disabled={[
+                  "Dispatched",
+                  "In-Transit",
+                  "Out for Delivery",
+                  "Partially Delivered",
+                  "Delivered",
+                ].includes(formInstance.getFieldValue("status"))}
+              >
+                {" "}
+                {getAllowedStatus(formInstance).map((status) => (
+                  <Option key={status} value={status}>
+                    {status}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+          </Col>
+        </Row>
+        {/* Item Details */}
+        <Row gutter={24} className="mt-2">
+          <Col span={24}>
+            <h6 className="text-amber-600 ">Items Details</h6>
+          </Col>
 
-        <Form.List name="items">
-          {(fields) => (
-            <>
-              {fields.map(({ key, name }) => (
-                <Row gutter={16} key={key} style={{ width: "100%" }} className="mt-2 ml-2! mr-2! border border-amber-200 rounded-lg p-2">
-
-
-                  <Col span={6}>
-                    <Form.Item label="Item Name" name={[name, "product_name"]}>
-                      <Input disabled className="w-full!" />
-                    </Form.Item>
-                  </Col>
-
-                  <Col span={6}>
-                    <Form.Item label="Req. Qty" name={[name, "required_qty"]}>
-                      <Input disabled className="w-full!" />
-                    </Form.Item>
-                  </Col>
-
-                  <Col span={6}>
-                    <Form.Item label="Actual Qty" name={[name, "actual_qty"]}>
-                      <Input disabled className="w-full!" />
-                    </Form.Item>
-                  </Col>
-                  <Col span={6}>
-                    <Form.Item label="Variance" name={[name, "variance"]}>
-                      <Input disabled className="w-full!" />
-                    </Form.Item>
-                  </Col>
-                </Row>
-              ))}
-            </>
-          )}
-        </Form.List>
-
-      </Row>
-     {["Dispatched", "In-Transit", "Out for Delivery","Partially Delivered", "Delivered"].includes(
-  formInstance.getFieldValue("status")
-) && (  
-    <>
-          <h6 className="text-amber-500 pb-2 font-semibold">
-            Sale Order Details
-          </h6>
-
-          <Form.List name="sale_orders">
+          <Form.List name="items">
             {(fields) => (
               <>
                 {fields.map(({ key, name }) => (
-                  <div
+                  <Row
+                    gutter={16}
                     key={key}
-                    className="border border-amber-200 rounded-lg p-3 mb-3"
+                    style={{ width: "100%" }}
+                    className="mt-2 ml-2! mr-2! border border-amber-200 rounded-lg p-2"
                   >
-                    <Row gutter={24}>
-                      <Col span={6}>
-                        <Form.Item label="Sale Order No" name={[name, "sale_order_no"]}>
-                          <Input disabled />
-                        </Form.Item>
-                      </Col>
-
-                      <Col span={6}>
-                        <Form.Item label="Customer Name" name={[name, "customer_name"]}>
-                          <Input disabled />
-                        </Form.Item>
-                      </Col>
-
-                      <Col span={6}>
-                        <Form.Item label="Delivery Address" name={[name, "delivery_address"]}>
-                          <Input disabled />
-                        </Form.Item>
-                      </Col>
-                      <Col span={6}>
-                        <Form.Item label="Delivery Date" name={[name, "delivery_date"]} rules={[{ required: true }]}>
-                          <DatePicker className="w-full" disabled={isSalesDisabled} />
-                        </Form.Item>
-                      </Col>
                     <Col span={6}>
-  <Form.Item label="Status" name={[name, "status"]} rules={[{ required: true }]}>
-      <Select disabled={disabled}>
-      {getSaleOrderAllowedStatus(
-        formInstance.getFieldValue(["sale_orders", name, "status"])
-      ).map((st) => (
-        <Option key={st} value={st}>
-          {st}
-        </Option>
-      ))}
-      
-    </Select>
-  </Form.Item>
-</Col>
-                    </Row>
+                      <Form.Item
+                        label="Item Name"
+                        name={[name, "product_name"]}
+                      >
+                        <Input disabled className="w-full!" />
+                      </Form.Item>
+                    </Col>
 
-                    <Form.List name={[name, "items"]}>
-                      {(itemFields) => (
-                        <>
-                          {itemFields.map(({ key: k, name: n }) => (
-                            <Row gutter={24} key={k}>
-                              <Col span={6}>
-                                <Form.Item label="Item" name={[n, "product_name"]}>
-                                  <Input disabled />
-                                </Form.Item>
-                              </Col>
+                    <Col span={6}>
+                      <Form.Item label="Req. Qty" name={[name, "required_qty"]}>
+                        <Input disabled className="w-full!" />
+                      </Form.Item>
+                    </Col>
 
-                              <Col span={6}>
-                                <Form.Item label="Quantity" name={[n, "qty"]}>
-                                  <Input disabled />
-                                </Form.Item>
-                              </Col>
-
-                              <Col span={6}>
-                               <Form.Item
-  label="Delivered Qty"
-  name={[n, "delivered_qty"]}
-  rules={[
-    ({ getFieldValue }) => ({
-      validator(_, value) {
-
-        const orderQty = Number(
-          getFieldValue(["sale_orders", name, "items", n, "qty"])
-        );
-
-        const actualItems = getFieldValue("items") || [];
-
-        const actualQty = Number(actualItems[0]?.actual_qty || 0);
-
-        const allOrders = getFieldValue("sale_orders") || [];
-
-        let totalDelivered = 0;
-
-        allOrders.forEach(so => {
-          so.items?.forEach(it => {
-            totalDelivered += Number(it.delivered_qty || 0);
-          });
-        });
-
-        if (value && Number(value) > orderQty) {
-          return Promise.reject(
-            new Error(`Delivered qty cannot exceed order qty (${orderQty})`)
-          );
-        }
-
-        if (totalDelivered > actualQty) {
-          return Promise.reject(
-            new Error(`Total delivered qty cannot exceed actual qty (${actualQty})`)
-          );
-        }
-
-        return Promise.resolve();
-      },
-    }),
-  ]}
->
-  <Input disabled={isSalesDisabled}/>
-</Form.Item>
-                              </Col>
-
-                            </Row>
-                          ))}
-                        </>
-                      )}
-                    </Form.List>
-                  </div>
+                    <Col span={6}>
+                      <Form.Item label="Actual Qty" name={[name, "actual_qty"]}>
+                        <Input disabled className="w-full!" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={6}>
+                      <Form.Item label="Variance" name={[name, "variance"]}>
+                        <Input disabled className="w-full!" />
+                      </Form.Item>
+                    </Col>
+                  </Row>
                 ))}
               </>
             )}
           </Form.List>
-        </>
-      )}
-      {/* Company Details */}
-      <Row gutter={24}>
-        <Col span={24}>
-          <h6 className="text-amber-600 ">Vendor Details</h6>
-        </Col>
+        </Row>
+        {[
+          "Dispatched",
+          "In-Transit",
+          "Out for Delivery",
+          "Partially Delivered",
+          "Delivered",
+        ].includes(formInstance.getFieldValue("status")) && (
+          <>
+            <h6 className="text-amber-500 pb-2 font-semibold">
+              Sale Order Details
+            </h6>
 
-        <Col span={6}>
-          <Form.Item label="Vendor Name" name="companyName" rules={[{ required: true }]}>
-            <Input disabled />
-          </Form.Item>
-        </Col>
+            <Form.List name="sale_orders">
+              {(fields) => (
+                <>
+                  {fields.map(({ key, name }) => (
+                    <div
+                      key={key}
+                      className="border border-amber-200 rounded-lg p-3 mb-3"
+                    >
+                      <Row gutter={24}>
+                        <Col span={6}>
+                          <Form.Item
+                            label="Sale Order No"
+                            name={[name, "sale_order_no"]}
+                          >
+                            <Input disabled />
+                          </Form.Item>
+                        </Col>
 
-        <Col span={6}>
-          <Form.Item label="Address" name="companyAddress">
-            <Input disabled />
-          </Form.Item>
-        </Col>
+                        <Col span={6}>
+                          <Form.Item
+                            label="Customer Name"
+                            name={[name, "customer_name"]}
+                          >
+                            <Input disabled />
+                          </Form.Item>
+                        </Col>
 
-        <Col span={6}>
-          <Form.Item label="Phone" name="contactNo">
-            <Input disabled />
-          </Form.Item>
-        </Col>
+                        <Col span={6}>
+                          <Form.Item
+                            label="Delivery Address"
+                            name={[name, "delivery_address"]}
+                          >
+                            <Input disabled />
+                          </Form.Item>
+                        </Col>
+                        <Col span={6}>
+                          <Form.Item
+                            label="Delivery Date"
+                            name={[name, "delivery_date"]}
+                            rules={[{ required: true }]}
+                          >
+                            <DatePicker
+                              className="w-full"
+                              disabled={isSalesDisabled}
+                            />
+                          </Form.Item>
+                        </Col>
+                        <Col span={6}>
+                          <Form.Item
+                            label="Status"
+                            name={[name, "status"]}
+                            rules={[{ required: true }]}
+                          >
+                            <Select disabled={disabled}>
+                              {getSaleOrderAllowedStatus(
+                                formInstance.getFieldValue([
+                                  "sale_orders",
+                                  name,
+                                  "status",
+                                ]),
+                              ).map((st) => (
+                                <Option key={st} value={st}>
+                                  {st}
+                                </Option>
+                              ))}
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                      </Row>
 
-        <Col span={6}>
-          <Form.Item label="Contact Person" name="contactPerson">
-            <Input disabled />
-          </Form.Item>
-        </Col>
-      </Row>
+                      <Form.List name={[name, "items"]}>
+                        {(itemFields) => (
+                          <>
+                            {itemFields.map(({ key: k, name: n }) => (
+                              <Row gutter={24} key={k}>
+                                <Col span={6}>
+                                  <Form.Item
+                                    label="Item"
+                                    name={[n, "product_name"]}
+                                  >
+                                    <Input disabled />
+                                  </Form.Item>
+                                </Col>
 
-      {/* Plant */}
-      <Row gutter={24} className="mt-2">
-        <Col span={24}>
-          <h6 className="text-amber-600  "> Plant Details</h6>
-        </Col>
+                                <Col span={6}>
+                                  <Form.Item label="Quantity" name={[n, "qty"]}>
+                                    <Input disabled />
+                                  </Form.Item>
+                                </Col>
 
-        <Col span={6}>
-          <Form.Item label="Plant Name" name="plantName">
-            <Input disabled />
-          </Form.Item>
-        </Col>
+                                <Col span={6}>
+                                  <Form.Item
+                                    label="Delivered Qty"
+                                    name={[n, "delivered_qty"]}
+                                    rules={[
+                                      ({ getFieldValue }) => ({
+                                        validator(_, value) {
+                                          const orderQty = Number(
+                                            getFieldValue([
+                                              "sale_orders",
+                                              name,
+                                              "items",
+                                              n,
+                                              "qty",
+                                            ]),
+                                          );
 
-        <Col span={6}>
-          <Form.Item label="Address" name="plantAddress">
-            <Input disabled />
-          </Form.Item>
-        </Col>
-        <Col span={6}>
-          <Form.Item label="Contact Person" name="plantContactPerson">
-            <Input disabled />
-          </Form.Item>
-        </Col>
-        <Col span={6}>
-          <Form.Item label="Phone" name="plantPhone">
-            <Input disabled />
-          </Form.Item>
-        </Col>
-      </Row>
+                                          const actualItems =
+                                            getFieldValue("items") || [];
 
-   
+                                          const actualQty = Number(
+                                            actualItems[0]?.actual_qty || 0,
+                                          );
 
-      {/* Transport Details (display-only) */}
-      <Row gutter={24} className="mt-2">
-        <Col span={24}>
-          <h6 className="text-amber-600 "> Transport Details </h6>
-        </Col>
+                                          const allOrders =
+                                            getFieldValue("sale_orders") || [];
 
-        <Col span={6}>
-          <Form.Item label="Transporter" name="transporter">
-            <Input disabled />
-          </Form.Item>
-        </Col>
+                                          let totalDelivered = 0;
 
-        <Col span={6}>
-          <Form.Item label="Vehicle No" name="vehicleNo">
-            <Input disabled />
-          </Form.Item>
-        </Col>
+                                          allOrders.forEach((so) => {
+                                            so.items?.forEach((it) => {
+                                              totalDelivered += Number(
+                                                it.delivered_qty || 0,
+                                              );
+                                            });
+                                          });
 
-        <Col span={6}>
-          <Form.Item label="Driver Name" name="driverName">
-            <Input disabled />
-          </Form.Item>
-        </Col>
+                                          if (
+                                            value &&
+                                            Number(value) > orderQty
+                                          ) {
+                                            return Promise.reject(
+                                              new Error(
+                                                `Delivered qty cannot exceed order qty (${orderQty})`,
+                                              ),
+                                            );
+                                          }
 
-        <Col span={6}>
-          <Form.Item label="Driver Contact" name="driverContact">
-            <Input disabled />
-          </Form.Item>
-        </Col>
+                                          if (totalDelivered > actualQty) {
+                                            return Promise.reject(
+                                              new Error(
+                                                `Total delivered qty cannot exceed actual qty (${actualQty})`,
+                                              ),
+                                            );
+                                          }
 
-        <Col span={6}>
-          <Form.Item label="Insurance Valid Upto" name="insuranceValidUpto">
-            <DatePicker className="w-full" format="DD-MM-YYYY" disabled />
-          </Form.Item>
-        </Col>
+                                          return Promise.resolve();
+                                        },
+                                      }),
+                                    ]}
+                                  >
+                                    <Input disabled={isSalesDisabled} />
+                                  </Form.Item>
+                                </Col>
+                              </Row>
+                            ))}
+                          </>
+                        )}
+                      </Form.List>
+                    </div>
+                  ))}
+                </>
+              )}
+            </Form.List>
+          </>
+        )}
+        {/* Company Details */}
+        <Row gutter={24}>
+          <Col span={24}>
+            <h6 className="text-amber-600 ">Vendor Details</h6>
+          </Col>
 
-        <Col span={6}>
-          <Form.Item label="PU Valid Upto" name="puValidUpto">
-            <DatePicker className="w-full" format="DD-MM-YYYY" disabled />
-          </Form.Item>
-        </Col>
+          <Col span={6}>
+            <Form.Item
+              label="Vendor Name"
+              name="companyName"
+              rules={[{ required: true }]}
+            >
+              <Input disabled />
+            </Form.Item>
+          </Col>
 
-        <Col span={6}>
-          <Form.Item label="Fitness Valid Upto" name="fitnessValidUpto">
-            <DatePicker className="w-full" format="DD-MM-YYYY" disabled />
-          </Form.Item>
-        </Col>
-      </Row>
+          <Col span={6}>
+            <Form.Item label="Address" name="companyAddress">
+              <Input disabled />
+            </Form.Item>
+          </Col>
 
-      {/* Loading Details */}
-      <Row gutter={24} className="mt-2">
-        <Col span={24}>
-          <h6 className="text-amber-600 "> Loading Details</h6>
-        </Col>
+          <Col span={6}>
+            <Form.Item label="Phone" name="contactNo">
+              <Input disabled />
+            </Form.Item>
+          </Col>
 
-        <Col span={6}>
-          <Form.Item label="Vehicle In Time" name="vehicleInTime">
-            <Input disabled />
-          </Form.Item>
-        </Col>
+          <Col span={6}>
+            <Form.Item label="Contact Person" name="contactPerson">
+              <Input disabled />
+            </Form.Item>
+          </Col>
+        </Row>
 
-        <Col span={6}>
-          <Form.Item label="Vehicle Out Time" name="vehicleOutTime">
-            <Input disabled />
-          </Form.Item>
-        </Col>
+        {/* Plant */}
+        <Row gutter={24} className="mt-2">
+          <Col span={24}>
+            <h6 className="text-amber-600  "> Plant Details</h6>
+          </Col>
 
-        <Col span={6}>
-          <Form.Item label="Tare Weight (KG)" name="tareWeight">
-            <Input type="number" disabled />
-          </Form.Item>
-        </Col>
+          <Col span={6}>
+            <Form.Item label="Plant Name" name="plantName">
+              <Input disabled />
+            </Form.Item>
+          </Col>
 
-        <Col span={6}>
-          <Form.Item label="Net Weight (KG)" name="netWeight">
-            <Input type="number" disabled />
-          </Form.Item>
-        </Col>
-      </Row>
-    </>
-  );};
+          <Col span={6}>
+            <Form.Item label="Address" name="plantAddress">
+              <Input disabled />
+            </Form.Item>
+          </Col>
+          <Col span={6}>
+            <Form.Item label="Contact Person" name="plantContactPerson">
+              <Input disabled />
+            </Form.Item>
+          </Col>
+          <Col span={6}>
+            <Form.Item label="Phone" name="plantPhone">
+              <Input disabled />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        {/* Transport Details (display-only) */}
+        <Row gutter={24} className="mt-2">
+          <Col span={24}>
+            <h6 className="text-amber-600 "> Transport Details </h6>
+          </Col>
+
+          <Col span={6}>
+            <Form.Item label="Transporter" name="transporter">
+              <Input disabled />
+            </Form.Item>
+          </Col>
+
+          <Col span={6}>
+            <Form.Item label="Vehicle No" name="vehicleNo">
+              <Input disabled />
+            </Form.Item>
+          </Col>
+
+          <Col span={6}>
+            <Form.Item label="Driver Name" name="driverName">
+              <Input disabled />
+            </Form.Item>
+          </Col>
+
+          <Col span={6}>
+            <Form.Item label="Driver Contact" name="driverContact">
+              <Input disabled />
+            </Form.Item>
+          </Col>
+
+          <Col span={6}>
+            <Form.Item label="Insurance Valid Upto" name="insuranceValidUpto">
+              <DatePicker className="w-full" format="DD-MM-YYYY" disabled />
+            </Form.Item>
+          </Col>
+
+          <Col span={6}>
+            <Form.Item label="PU Valid Upto" name="puValidUpto">
+              <DatePicker className="w-full" format="DD-MM-YYYY" disabled />
+            </Form.Item>
+          </Col>
+
+          <Col span={6}>
+            <Form.Item label="Fitness Valid Upto" name="fitnessValidUpto">
+              <DatePicker className="w-full" format="DD-MM-YYYY" disabled />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        {/* Loading Details */}
+        <Row gutter={24} className="mt-2">
+          <Col span={24}>
+            <h6 className="text-amber-600 "> Loading Details</h6>
+          </Col>
+
+          <Col span={6}>
+            <Form.Item label="Vehicle In Time" name="vehicleInTime">
+              <Input disabled />
+            </Form.Item>
+          </Col>
+
+          <Col span={6}>
+            <Form.Item label="Vehicle Out Time" name="vehicleOutTime">
+              <Input disabled />
+            </Form.Item>
+          </Col>
+
+          <Col span={6}>
+            <Form.Item label="Tare Weight (KG)" name="tareWeight">
+              <Input type="number" disabled />
+            </Form.Item>
+          </Col>
+
+          <Col span={6}>
+            <Form.Item label="Net Weight (KG)" name="netWeight">
+              <Input type="number" disabled />
+            </Form.Item>
+          </Col>
+        </Row>
+      </>
+    );
+  };
 
   return (
     <div>
@@ -922,7 +980,11 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
             value={searchText}
             onChange={(e) => handleSearch(e.target.value)}
           />
-          <Button icon={<FilterOutlined />} className="border-amber-400! text-amber-700! hover:bg-amber-100!" onClick={() => handleSearch("")}>
+          <Button
+            icon={<FilterOutlined />}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            onClick={() => handleSearch("")}
+          >
             Reset
           </Button>
         </div>
@@ -941,18 +1003,41 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
       </div>
 
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
-        <h2 className="text-lg font-semibold text-amber-700 mb-0">Loading Advice</h2>
-        <p className="text-amber-600 mb-3">Incoming loading advice; transporter details come from Purchase Indent</p>
+        <h2 className="text-lg font-semibold text-amber-700 mb-0">
+          Loading Advice
+        </h2>
+        <p className="text-amber-600 mb-3">
+          Incoming loading advice; transporter details come from Purchase Indent
+        </p>
 
-        <Table columns={columns} dataSource={data} pagination={false} scroll={{ y: 300 }} rowKey="key" />
+        <Table
+          columns={columns}
+          dataSource={data}
+          pagination={false}
+          scroll={{ y: 300 }}
+          rowKey="key"
+        />
       </div>
 
       {/* Edit Modal (admin can view/edit admin-level fields incl. approve status) */}
-      <Modal title={<span className="text-amber-700 text-2xl font-semibold">Edit Loading Advice</span>} open={isEditModalOpen} onCancel={() => setIsEditModalOpen(false)} footer={null} width={1200}>
+      <Modal
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Edit Loading Advice
+          </span>
+        }
+        open={isEditModalOpen}
+        onCancel={() => setIsEditModalOpen(false)}
+        footer={null}
+        width={1200}
+      >
         <Form layout="vertical" form={form} onFinish={handleEdit}>
           {renderFormFields(false, form)}
           <div className="flex justify-end mt-4">
-            <Button htmlType="submit" className="bg-amber-500 hover:bg-amber-600 text-white border-none">
+            <Button
+              htmlType="submit"
+              className="bg-amber-500 hover:bg-amber-600 text-white border-none"
+            >
               Update
             </Button>
           </div>
@@ -960,7 +1045,17 @@ const getSaleOrderAllowedStatus = (currentStatus) => {
       </Modal>
 
       {/* View Modal */}
-      <Modal title={<span className="text-amber-700 text-2xl font-semibold">View Loading Advice</span>} open={isViewModalOpen} onCancel={() => setIsViewModalOpen(false)} footer={null} width={1200}>
+      <Modal
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            View Loading Advice
+          </span>
+        }
+        open={isViewModalOpen}
+        onCancel={() => setIsViewModalOpen(false)}
+        footer={null}
+        width={1200}
+      >
         <Form layout="vertical" form={viewForm}>
           {renderFormFields(true, viewForm)}
         </Form>
