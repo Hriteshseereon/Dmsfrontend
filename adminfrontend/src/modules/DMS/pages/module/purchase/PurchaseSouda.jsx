@@ -159,30 +159,37 @@ export default function PurchaseSouda() {
       setPlants(plantRes || []);
 
       const items =
-        res.items?.map((it) => ({
-          product_id: it.product,
-          item_name: it.item_name || "",
-          base_unit: it.uom_details?.unit_name || "",
-          hsn_id: it.hsn_id || null,
-          hsn_code: it.hsn_code || "",
+        (res.items || [])
+          .filter(
+            (it) =>
+              it.item_name &&
+              Number(it.qty || 0) > 0 &&
+              Number(it.rate || 0) > 0,
+          )
+          .map((it) => ({
+            product_id: it.product,
+            item_name: it.item_name || "",
+            base_unit: it.uom_details?.unit_name || "",
+            hsn_id: it.hsn_id || null,
+            hsn_code: it.hsn_code || "",
 
-          qty: Number(it.qty),
-          //  freeQty: Number(it.free_qty),
-          totalQty: Number(it.total_qty),
+            qty: Number(it.qty),
+            //  freeQty: Number(it.free_qty),
+            totalQty: Number(it.total_qty),
+            netWt: Number(it.net_weight),
+            rate: Number(it.rate),
+            discountPercent: Number(it.discount_percent),
+            discountAmt: Number(it.discount_amount),
 
-          rate: Number(it.rate),
-          discountPercent: Number(it.discount_percent),
-          discountAmt: Number(it.discount_amount),
+            grossAmount: Number(it.gross_amount),
 
-          grossAmount: Number(it.gross_amount),
+            sgstPercent: Number(it.sgst_percent),
+            cgstPercent: Number(it.cgst_percent),
+            igstPercent: Number(it.igst_percent),
 
-          sgstPercent: Number(it.sgst_percent),
-          cgstPercent: Number(it.cgst_percent),
-          igstPercent: Number(it.igst_percent),
-
-          totalGST: Number(it.total_gst_amount),
-          totalAmt: Number(it.total_amount),
-        })) || [];
+            totalGST: Number(it.total_gst_amount),
+            totalAmt: Number(it.total_amount),
+          })) || [];
 
       // ✅ COMPUTE TOTALS HERE
       const computed = computeAllFromFormValues({ items });
@@ -217,7 +224,10 @@ export default function PurchaseSouda() {
   const handleEditSubmit = async (values) => {
     try {
       const orderTotals = values.orderTotals || {};
-
+      const validItems = (values.items || []).filter(
+        (it) =>
+          it?.item_name && Number(it.qty || 0) > 0 && Number(it.rate || 0) > 0,
+      );
       const payload = {
         vendor: values.vendor,
         company_group_id: selectedCompanyGroupId,
@@ -238,9 +248,10 @@ export default function PurchaseSouda() {
         gross_amount: round2(orderTotals.totalGrossAmount),
         total_discount: 0,
         total_gst_amount: 0,
-        total_amount: round2(orderTotals.grandTotal),
+        total_amount: round2(orderTotals.totalGrossAmount),
         grand_total: round2(orderTotals.totalGrossAmount),
-        items: values.items.map((it) => ({
+        totalNetWt: round2(orderTotals.totalNetWt),
+        items: validItems.map((it) => ({
           product: it.product_id,
           uom: it.base_unit,
           hsn_id: it.hsn_id || null,
@@ -249,7 +260,7 @@ export default function PurchaseSouda() {
           qty: round2(it.qty),
           //  free_qty: round2(it.freeQty),
           total_qty: round2(it.totalQty),
-
+          net_weight: round2(it.netWt),
           rate: round2(it.rate),
 
           discount_percent: round2(it.discountPercent),
@@ -283,30 +294,37 @@ export default function PurchaseSouda() {
       const res = await getPurchaseContractById(record.key);
 
       const items =
-        res.items?.map((it) => ({
-          product_id: it.product,
-          item_name: it.item_name || "",
-          base_unit: it.uom_details?.unit_name || "",
-          hsn_id: it.hsn_id || null,
-          hsn_code: it.hsn_code || "",
+        (res.items || [])
+          .filter(
+            (it) =>
+              it.item_name &&
+              Number(it.qty || 0) > 0 &&
+              Number(it.rate || 0) > 0,
+          )
+          .map((it) => ({
+            product_id: it.product,
+            item_name: it.item_name || "",
+            base_unit: it.uom_details?.unit_name || "",
+            hsn_id: it.hsn_id || null,
+            hsn_code: it.hsn_code || "",
 
-          qty: Number(it.qty),
-          //  freeQty: Number(it.free_qty),
-          totalQty: Number(it.total_qty),
+            qty: Number(it.qty),
+            //  freeQty: Number(it.free_qty),
+            totalQty: Number(it.total_qty),
+            netWt: Number(it.net_weight),
+            rate: Number(it.rate),
+            discountPercent: Number(it.discount_percent),
+            discountAmt: Number(it.discount_amount),
 
-          rate: Number(it.rate),
-          discountPercent: Number(it.discount_percent),
-          discountAmt: Number(it.discount_amount),
+            grossAmount: Number(it.gross_amount),
 
-          grossAmount: Number(it.gross_amount),
+            sgstPercent: Number(it.sgst_percent),
+            cgstPercent: Number(it.cgst_percent),
+            igstPercent: Number(it.igst_percent),
 
-          sgstPercent: Number(it.sgst_percent),
-          cgstPercent: Number(it.cgst_percent),
-          igstPercent: Number(it.igst_percent),
-
-          totalGST: Number(it.total_gst_amount),
-          totalAmt: Number(it.total_amount),
-        })) || [];
+            totalGST: Number(it.total_gst_amount),
+            totalAmt: Number(it.total_amount),
+          })) || [];
 
       // ✅ ADD THIS BLOCK HERE
       const computed = computeAllFromFormValues({ items });
@@ -423,6 +441,9 @@ export default function PurchaseSouda() {
     const items = (values.items || []).map((it = {}, idx) => {
       const qty = Number(it.qty || 0);
       const rate = Number(it.rate || 0);
+
+      const gstPercent = Number(it.igstPercent || 0);
+      const netWt = Number(it.netWt || 0);
       const discountPercent = Number(it.discountPercent || 0);
 
       const totalQty = round2(qty);
@@ -430,11 +451,18 @@ export default function PurchaseSouda() {
       // Amount
       const grossAmount = round2(qty * rate);
 
-      // Discount Amount
+      // Discount
       const discountAmt = round2((grossAmount * discountPercent) / 100);
 
+      const taxableAmount = round2(grossAmount - discountAmt);
+
+      // GST Amount
+      const gstAmount = round2((taxableAmount * gstPercent) / 100);
+
+      // Final Amount
+      const totalAmt = round2(taxableAmount + gstAmount);
+
       // Final Total Amount
-      const totalAmt = round2(grossAmount - discountAmt);
 
       return {
         ...it,
@@ -443,7 +471,9 @@ export default function PurchaseSouda() {
         totalQty,
         grossAmount,
         discountAmt,
+        gstAmount,
         totalAmt,
+        totalNetWt: round2(netWt * qty),
       };
     });
 
@@ -452,7 +482,15 @@ export default function PurchaseSouda() {
       totalQty: round2(
         items.reduce((sum, item) => sum + Number(item.qty || 0), 0),
       ),
-
+      totalNetWt: round2(
+        items.reduce((sum, item) => sum + Number(item.totalNetWt || 0), 0),
+      ),
+      totalAmount: round2(
+        items.reduce((sum, item) => sum + Number(item.grossAmount || 0), 0),
+      ),
+      totalGSTAmount: round2(
+        items.reduce((sum, item) => sum + Number(item.gstAmount || 0), 0),
+      ),
       // Total Gross Amount = Sum of all item Total Amounts
       totalGrossAmount: round2(
         items.reduce((sum, item) => sum + Number(item.totalAmt || 0), 0),
@@ -520,6 +558,10 @@ export default function PurchaseSouda() {
   const handleFormSubmit = async (values) => {
     console.log("FORM VALUES", JSON.stringify(values, null, 2));
     const orderTotals = values.orderTotals || {};
+    const validItems = (values.items || []).filter(
+      (it) =>
+        it?.item_name && Number(it.qty || 0) > 0 && Number(it.rate || 0) > 0,
+    );
 
     const payload = {
       organisation: currentOrgId,
@@ -536,10 +578,10 @@ export default function PurchaseSouda() {
       gross_amount: round2(orderTotals.totalGrossAmount),
       total_discount: 0,
       total_gst_amount: 0,
-      total_amount: round2(orderTotals.grandTotal),
-      grand_total: round2(orderTotals.grandTotal),
-
-      items: values.items.map((it) => ({
+      total_amount: round2(orderTotals.totalGrossAmount),
+      grand_total: round2(orderTotals.totalGrossAmount),
+      totalNetWt: round2(orderTotals.totalNetWt),
+      items: validItems.map((it) => ({
         product: it.product_id,
         uom: it.base_unit || null,
 
@@ -556,7 +598,7 @@ export default function PurchaseSouda() {
         discount_amount: round2(it.discountAmt),
 
         gross_amount: round2(it.grossAmount),
-
+        net_weight: round2(it.netWt),
         sgst_percent: round2(it.sgstPercent),
         cgst_percent: round2(it.cgstPercent),
         igst_percent: round2(it.igstPercent),
@@ -575,152 +617,176 @@ export default function PurchaseSouda() {
 
   const ItemsList = ({ form, disabled = false }) => (
     <Form.List name="items">
-      {(fields, { add, remove }) => (
-        <>
-          <div className="mb-2 flex justify-between items-center">
-            <h6 className="text-amber-500">Items</h6>
-            {!disabled && (
-              <Button
-                type="dashed"
-                icon={<PlusOutlined />}
-                onClick={() =>
-                  add({
-                    lineKey: new Date().getTime(),
-                    item: undefined,
+      {(fields, { add, remove }) => {
+        const handleAutoAddRow = () => {
+          const items = form.getFieldValue("items") || [];
 
-                    qty: 0,
-                    // freeQty: 0,
-                    totalQty: 0,
-                    rate: 0,
-                    discountPercent: 0,
-                    discountAmt: 0,
-                    grossAmount: 0,
-                    base_unit: null,
-                  })
+          const lastItem = items[items.length - 1];
+
+          if (
+            lastItem?.item_name &&
+            Number(lastItem?.qty) > 0 &&
+            Number(lastItem?.rate) > 0 &&
+            items.filter((i) => !i?.item_name && !i?.qty && !i?.rate).length ===
+              0
+          ) {
+            add({
+              lineKey: Date.now(),
+
+              qty: 0,
+              rate: 0,
+
+              grossAmount: 0,
+              gstAmount: 0,
+              totalAmt: 0,
+            });
+          }
+        };
+        return (
+          <>
+            <div className="mb-2 flex justify-between items-center">
+              <h6 className="text-amber-500">Items</h6>
+              {!disabled && (
+                <Button
+                  type="dashed"
+                  icon={<PlusOutlined />}
+                  onClick={() =>
+                    add({
+                      lineKey: new Date().getTime(),
+                      item: undefined,
+
+                      qty: 0,
+                      // freeQty: 0,
+                      totalQty: 0,
+                      rate: 0,
+                      discountPercent: 0,
+                      discountAmt: 0,
+                      grossAmount: 0,
+                      base_unit: null,
+                    })
+                  }
+                >
+                  Add Item
+                </Button>
+              )}
+            </div>
+
+            {fields.map((field, index) => (
+              <div
+                key={field.key}
+                className="border-b border-gray-200 pb-2 mb-2"
+                bodyStyle={{ padding: 12 }}
+                extra={
+                  !disabled && (
+                    <Button
+                      type="text"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => remove(field.name)}
+                    />
+                  )
                 }
               >
-                Add Item
-              </Button>
-            )}
-          </div>
-
-          {fields.map((field, index) => (
-            <Card
-              key={field.key}
-              size="small"
-              style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-              bodyStyle={{ padding: 12 }}
-              extra={
-                !disabled && (
-                  <Button
-                    type="text"
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={() => remove(field.name)}
-                  />
-                )
-              }
-            >
-              <Row gutter={12} align="middle">
-                <Col span={7}>
-                  <Form.Item
-                    {...field}
-                    label="Item Name"
-                    name={[field.name, "item_name"]}
-                    rules={[{ required: true, message: "Item is required" }]}
-                  >
-                    <Select
-                      placeholder={
-                        !selectedVendor ? "Select vendor first" : "Select Item"
-                      }
-                      disabled={
-                        !selectedVendor || products.length === 0 || disabled
-                      }
-                      onChange={(productId) => {
-                        const selected = products.find(
-                          (p) => p.id === productId,
-                        );
-                        const gstPercent =
-                          Number(selected?.cgst || 0) +
-                          Number(selected?.sgst || 0);
-                        form.setFields([
-                          {
-                            name: ["items", field.name, "product_id"],
-                            value: selected?.id,
-                          },
-                          {
-                            name: ["items", field.name, "item_name"],
-                            value: selected?.name || "",
-                          },
-                          {
-                            name: ["items", field.name, "base_unit"],
-                            value: selected?.base_unit || "",
-                          },
-                          {
-                            name: ["items", field.name, "igstPercent"],
-                            value: gstPercent,
-                          },
-
-                          // optional
-                          {
-                            name: ["items", field.name, "netWt"],
-                            value: selected?.net_weight || 0,
-                          },
-
-                          {
-                            name: ["items", field.name, "hsn_code"],
-                            value: selected?.hsn_code_value || "",
-                          },
-                          {
-                            name: ["items", field.name, "hsn_id"],
-                            value: selected?.hsn_code || null,
-                          },
-                        ]);
-                      }}
+                <Row gutter={12} align="middle">
+                  <Col span={7}>
+                    <Form.Item
+                      {...field}
+                      label="Item Name"
+                      name={[field.name, "item_name"]}
                     >
-                      {products.map((p) => (
-                        <Select.Option key={p.id} value={p.id}>
-                          {p.name}
-                        </Select.Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                </Col>
+                      <Select
+                        placeholder={
+                          !selectedVendor
+                            ? "Select vendor first"
+                            : "Select Item"
+                        }
+                        disabled={
+                          !selectedVendor || products.length === 0 || disabled
+                        }
+                        onChange={(productId) => {
+                          const selected = products.find(
+                            (p) => p.id === productId,
+                          );
+                          const gstPercent =
+                            Number(selected?.cgst || 0) +
+                            Number(selected?.sgst || 0);
+                          form.setFields([
+                            {
+                              name: ["items", field.name, "product_id"],
+                              value: selected?.id,
+                            },
+                            {
+                              name: ["items", field.name, "item_name"],
+                              value: selected?.name || "",
+                            },
+                            {
+                              name: ["items", field.name, "base_unit"],
+                              value: selected?.base_unit || "",
+                            },
+                            {
+                              name: ["items", field.name, "igstPercent"],
+                              value: gstPercent,
+                            },
 
-                {/* FIX: Qty with proper validation */}
-                <Col span={2}>
-                  <Form.Item
-                    {...field}
-                    label="Qty"
-                    name={[field.name, "qty"]}
-                    rules={[
-                      { required: true, message: "Quantity is required" },
-                      {
-                        validator: (_, value) =>
-                          value >= 0
-                            ? Promise.resolve()
-                            : Promise.reject("Enter valid positive number"),
-                      },
-                    ]}
-                  >
-                    <Input
-                      disabled={disabled}
-                      onChange={() => {
-                        const all = form.getFieldsValue();
+                            // optional
+                            {
+                              name: ["items", field.name, "netWt"],
+                              value: selected?.net_weight || 0,
+                            },
 
-                        const computed = computeAllFromFormValues(all || {});
+                            {
+                              name: ["items", field.name, "hsn_code"],
+                              value: selected?.hsn_code_value || "",
+                            },
+                            {
+                              name: ["items", field.name, "hsn_id"],
+                              value: selected?.hsn_code || null,
+                            },
+                          ]);
+                        }}
+                      >
+                        {products.map((p) => (
+                          <Select.Option key={p.id} value={p.id}>
+                            {p.name}
+                          </Select.Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  </Col>
 
-                        form.setFieldsValue({
-                          items: computed.items,
-                          orderTotals: computed.orderTotals,
-                        });
-                      }}
-                      className="w-full!"
-                    />
-                  </Form.Item>
-                </Col>
-                {/* FIX: Free Qty with proper validation */}
-                {/* <Col span={4}>
+                  {/* FIX: Qty with proper validation */}
+                  <Col span={2}>
+                    <Form.Item
+                      {...field}
+                      label="Qty"
+                      name={[field.name, "qty"]}
+                      rules={[
+                        {
+                          validator: (_, value) =>
+                            value >= 0
+                              ? Promise.resolve()
+                              : Promise.reject("Enter valid positive number"),
+                        },
+                      ]}
+                    >
+                      <Input
+                        disabled={disabled}
+                        onChange={() => {
+                          const all = form.getFieldsValue();
+
+                          const computed = computeAllFromFormValues(all || {});
+
+                          form.setFieldsValue({
+                            items: computed.items,
+                            orderTotals: computed.orderTotals,
+                          });
+                        }}
+                        className="w-full!"
+                      />
+                    </Form.Item>
+                  </Col>
+                  {/* FIX: Free Qty with proper validation */}
+                  {/* <Col span={4}>
                   <Form.Item
                     {...field}
                     label="Free Qty"
@@ -749,54 +815,56 @@ export default function PurchaseSouda() {
                   </Form.Item>
                 </Col> */}
 
-                <Col span={2}>
-                  <Form.Item
-                    {...field}
-                    label="Unit"
-                    name={[field.name, "base_unit"]}
-                  >
-                    <Input disabled />
-                  </Form.Item>
-                </Col>
-                <Col span={1}>
-                  <Form.Item label="GST" name={[field.name, "igstPercent"]}>
-                    <Input disabled />
-                  </Form.Item>
-                </Col>
-                <Col span={2}>
-                  <Form.Item name={[field.name, "netWt"]} label="Net Wt">
-                    <InputNumber className="w-full" disabled />
-                  </Form.Item>
-                </Col>
-                {/* FIX: Rate with proper validation */}
-                <Col span={2}>
-                  <Form.Item
-                    {...field}
-                    label="Rate"
-                    name={[field.name, "rate"]}
-                    fieldKey={[field.fieldKey, "rate"]}
-                    rules={requiredPositiveNumber("Rate")}
-                  >
-                    <InputNumber
-                      {...positiveNumberInputProps}
-                      disabled={disabled}
-                      onChange={() => {
-                        const all = form.getFieldsValue();
+                  <Col span={2}>
+                    <Form.Item
+                      {...field}
+                      label="Unit"
+                      name={[field.name, "base_unit"]}
+                    >
+                      <Input disabled />
+                    </Form.Item>
+                  </Col>
+                  <Col span={2}>
+                    <Form.Item name={[field.name, "netWt"]} label="Net Wt">
+                      <InputNumber className="w-full" disabled />
+                    </Form.Item>
+                  </Col>
+                  <Col span={2}>
+                    <Form.Item label="GST %" name={[field.name, "igstPercent"]}>
+                      <Input disabled />
+                    </Form.Item>
+                  </Col>
 
-                        const computed = computeAllFromFormValues(all || {});
+                  {/* FIX: Rate with proper validation */}
+                  <Col span={2}>
+                    <Form.Item
+                      {...field}
+                      label="Rate"
+                      name={[field.name, "rate"]}
+                      fieldKey={[field.fieldKey, "rate"]}
+                    >
+                      <InputNumber
+                        {...positiveNumberInputProps}
+                        disabled={disabled}
+                        onChange={() => {
+                          const all = form.getFieldsValue();
 
-                        form.setFieldsValue({
-                          items: computed.items,
-                          orderTotals: computed.orderTotals,
-                        });
-                      }}
-                      className="w-full!"
-                    />
-                  </Form.Item>
-                </Col>
+                          const computed = computeAllFromFormValues(all || {});
 
-                {/* FIX: Discount% with proper validation */}
-                <Col span={2}>
+                          form.setFieldsValue({
+                            items: computed.items,
+                            orderTotals: computed.orderTotals,
+                          });
+
+                          handleAutoAddRow();
+                        }}
+                        className="w-full!"
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  {/* FIX: Discount% with proper validation */}
+                  {/* <Col span={2}>
                   <Form.Item
                     {...field}
                     label="Dis%"
@@ -827,8 +895,8 @@ export default function PurchaseSouda() {
                       className="w-full!"
                     />
                   </Form.Item>
-                </Col>
-                <Col span={2}>
+                </Col> */}
+                  {/* <Col span={2}>
                   <Form.Item
                     {...field}
                     label="Discount(₹)"
@@ -837,40 +905,50 @@ export default function PurchaseSouda() {
                   >
                     <InputNumber className="w-full!" disabled />
                   </Form.Item>
-                </Col>
+                </Col> */}
 
-                {/* FIX: SGST% with proper validation */}
+                  {/* FIX: SGST% with proper validation */}
 
-                {/* FIX: CGST% with proper validation */}
+                  {/* FIX: CGST% with proper validation */}
 
-                {/* FIX: IGST% with proper validation */}
+                  {/* FIX: IGST% with proper validation */}
 
-                <Col span={2}>
-                  <Form.Item
-                    {...field}
-                    label="Amount"
-                    name={[field.name, "grossAmount"]}
-                    fieldKey={[field.fieldKey, "grossAmount"]}
-                  >
-                    <InputNumber className="w-full!" disabled />
-                  </Form.Item>
-                </Col>
-
-                <Col span={2}>
-                  <Form.Item
-                    {...field}
-                    label="Total Amt"
-                    name={[field.name, "totalAmt"]}
-                    fieldKey={[field.fieldKey, "totalAmt"]}
-                  >
-                    <InputNumber className="w-full!" disabled />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </Card>
-          ))}
-        </>
-      )}
+                  <Col span={2}>
+                    <Form.Item
+                      {...field}
+                      label="Amount"
+                      name={[field.name, "grossAmount"]}
+                      fieldKey={[field.fieldKey, "grossAmount"]}
+                    >
+                      <InputNumber className="w-full!" disabled />
+                    </Form.Item>
+                  </Col>
+                  <Col span={2}>
+                    <Form.Item
+                      {...field}
+                      label="GST Amt"
+                      name={[field.name, "gstAmount"]}
+                      fieldKey={[field.fieldKey, "gstAmount"]}
+                    >
+                      <InputNumber className="w-full!" disabled />
+                    </Form.Item>
+                  </Col>
+                  <Col span={3}>
+                    <Form.Item
+                      {...field}
+                      label="Total Amt"
+                      name={[field.name, "totalAmt"]}
+                      fieldKey={[field.fieldKey, "totalAmt"]}
+                    >
+                      <InputNumber className="w-full!" disabled />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </div>
+            ))}
+          </>
+        );
+      }}
     </Form.List>
   );
   // ---------- Combined form content (Basic Info, Items, Tax) ----------
@@ -883,7 +961,7 @@ export default function PurchaseSouda() {
       >
         <h6 className="text-amber-500">Basic Information</h6>
         <Row gutter={16}>
-          <Col span={7}>
+          <Col span={6}>
             <Form.Item
               label="Supplier Name"
               name="vendor"
@@ -987,6 +1065,24 @@ export default function PurchaseSouda() {
               />
             </Form.Item>
           </Col>
+          <Col span={3}>
+            <Form.Item
+              label="Status"
+              name="status"
+              rules={[{ required: true }]}
+            >
+              <Select
+                placeholder="Select Status"
+                disabled={disabled || isAddModalOpen}
+              >
+                {statusOptions.map((opt) => (
+                  <Option key={opt} value={opt}>
+                    {opt}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+          </Col>
         </Row>
       </Card>
 
@@ -1006,50 +1102,39 @@ export default function PurchaseSouda() {
       >
         <h6 className="text-amber-500">Order Totals</h6>
         <Row gutter={12}>
-          <Col span={7}>
-            <Form.Item
-              label="Status"
-              name="status"
-              rules={[{ required: true }]}
-            >
-              <Select
-                placeholder="Select Status"
-                disabled={disabled || isAddModalOpen}
-              >
-                {statusOptions.map((opt) => (
-                  <Option key={opt} value={opt}>
-                    {opt}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Col>
-          <Col span={3}>
+          <Col span={7}></Col>
+          <Col span={4}>
             <Form.Item label="Total Qty" name={["orderTotals", "totalQty"]}>
               <InputNumber disabled className="w-full!" />
             </Form.Item>
           </Col>
-          <Col span={8}>
-            {/* <Form.Item
-              label="Total Discount (₹)"
-              name={["orderTotals", "totalDiscount"]}
+          <Col span={4}>
+            <Form.Item
+              label="Total Net Wt"
+              name={["orderTotals", "totalNetWt"]}
             >
               <InputNumber className="w-full!" disabled />
             </Form.Item>
           </Col>
-          <Col span={4}>
-            <Form.Item label="Total GST (₹)" name={["orderTotals", "totalGST"]}>
+          <Col span={3}>
+            <Form.Item
+              label="Total Amount"
+              name={["orderTotals", "totalAmount"]}
+            >
               <InputNumber className="w-full!" disabled />
-            </Form.Item> */}
+            </Form.Item>
           </Col>
 
-          {/* <Col span={6}>
-            <Form.Item label="Grand Total (₹)" name={["orderTotals", "grandTotal"]}>
-              <InputNumber className="w-full" disabled />
+          <Col span={3}>
+            <Form.Item
+              label="Total GST Amt"
+              name={["orderTotals", "totalGSTAmount"]}
+            >
+              <InputNumber className="w-full!" disabled />
             </Form.Item>
-          </Col> */}
+          </Col>
 
-          <Col span={6}>
+          <Col span={3}>
             <Form.Item
               label="Total Gross Amount"
               name={["orderTotals", "totalGrossAmount"]}
