@@ -646,7 +646,7 @@ export default function PurchaseSouda() {
           <>
             <div className="mb-2 flex justify-between items-center">
               <h6 className="text-amber-500">Items</h6>
-              {!disabled && (
+              {/* {!disabled && (
                 <Button
                   type="dashed"
                   icon={<PlusOutlined />}
@@ -668,7 +668,7 @@ export default function PurchaseSouda() {
                 >
                   Add Item
                 </Button>
-              )}
+              )} */}
             </div>
 
             {fields.map((field, index) => (
@@ -1304,7 +1304,7 @@ export default function PurchaseSouda() {
             <Button
               type="primary"
               htmlType="submit"
-              className="bg-amber-500 border-none"
+              className="bg-amber-500! border-none"
             >
               Update
             </Button>
