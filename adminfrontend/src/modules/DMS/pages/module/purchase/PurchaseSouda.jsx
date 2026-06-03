@@ -670,11 +670,21 @@ export default function PurchaseSouda() {
                 </Button>
               )} */}
             </div>
-
+            <Row gutter={12} className=" pb-2 mb-2">
+              <Col span={7}>Item Name</Col>
+              <Col span={2}>Qty</Col>
+              <Col span={2}>Unit</Col>
+              <Col span={2}>Net Wt</Col>
+              <Col span={2}>GST %</Col>
+              <Col span={2}>Rate</Col>
+              <Col span={2}>Amount</Col>
+              <Col span={2}>GST Amt</Col>
+              <Col span={3}>Total Amt</Col>
+            </Row>
             {fields.map((field, index) => (
               <div
                 key={field.key}
-                className="border-b border-gray-200 pb-2 mb-2"
+                className=""
                 bodyStyle={{ padding: 12 }}
                 extra={
                   !disabled && (
@@ -689,11 +699,7 @@ export default function PurchaseSouda() {
               >
                 <Row gutter={12} align="middle">
                   <Col span={7}>
-                    <Form.Item
-                      {...field}
-                      label="Item Name"
-                      name={[field.name, "item_name"]}
-                    >
+                    <Form.Item {...field} name={[field.name, "item_name"]}>
                       <Select
                         placeholder={
                           !selectedVendor
@@ -758,7 +764,6 @@ export default function PurchaseSouda() {
                   <Col span={2}>
                     <Form.Item
                       {...field}
-                      label="Qty"
                       name={[field.name, "qty"]}
                       rules={[
                         {
@@ -816,21 +821,17 @@ export default function PurchaseSouda() {
                 </Col> */}
 
                   <Col span={2}>
-                    <Form.Item
-                      {...field}
-                      label="Unit"
-                      name={[field.name, "base_unit"]}
-                    >
+                    <Form.Item {...field} name={[field.name, "base_unit"]}>
                       <Input disabled />
                     </Form.Item>
                   </Col>
                   <Col span={2}>
-                    <Form.Item name={[field.name, "netWt"]} label="Net Wt">
+                    <Form.Item name={[field.name, "netWt"]}>
                       <InputNumber className="w-full" disabled />
                     </Form.Item>
                   </Col>
                   <Col span={2}>
-                    <Form.Item label="GST %" name={[field.name, "igstPercent"]}>
+                    <Form.Item name={[field.name, "igstPercent"]}>
                       <Input disabled />
                     </Form.Item>
                   </Col>
@@ -839,7 +840,6 @@ export default function PurchaseSouda() {
                   <Col span={2}>
                     <Form.Item
                       {...field}
-                      label="Rate"
                       name={[field.name, "rate"]}
                       fieldKey={[field.fieldKey, "rate"]}
                     >
@@ -916,7 +916,6 @@ export default function PurchaseSouda() {
                   <Col span={2}>
                     <Form.Item
                       {...field}
-                      label="Amount"
                       name={[field.name, "grossAmount"]}
                       fieldKey={[field.fieldKey, "grossAmount"]}
                     >
@@ -926,7 +925,6 @@ export default function PurchaseSouda() {
                   <Col span={2}>
                     <Form.Item
                       {...field}
-                      label="GST Amt"
                       name={[field.name, "gstAmount"]}
                       fieldKey={[field.fieldKey, "gstAmount"]}
                     >
@@ -936,7 +934,6 @@ export default function PurchaseSouda() {
                   <Col span={3}>
                     <Form.Item
                       {...field}
-                      label="Total Amt"
                       name={[field.name, "totalAmt"]}
                       fieldKey={[field.fieldKey, "totalAmt"]}
                     >
