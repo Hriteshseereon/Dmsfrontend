@@ -545,7 +545,7 @@ export default function BrokerTab() {
             className="text-blue-500! cursor-pointer! text-base! hover:text-blue-600!"
             onClick={() => openBroker(record, false)}
           />
-          <popconfirm
+          <Popconfirm
             title="Are you sure to delete this broker?"
             onConfirm={() => handleDeleteBroker(record.id)}
             okText="Yes"
@@ -553,7 +553,7 @@ export default function BrokerTab() {
             okButtonProps={{ danger: true }}
           >
             <DeleteOutlined className="text-gray-500! cursor-pointer! text-base! hover:text-gray-700!" />
-          </popconfirm>
+          </Popconfirm>
         </div>
       ),
     },

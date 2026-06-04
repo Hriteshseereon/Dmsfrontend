@@ -92,6 +92,14 @@ export const addPurchaseContract = async (payload) => {
   return res.data;
 };
 
+// delete purchase contract
+export const deletePurchaseContract = async (contractId) => {
+  const {currentOrgId,selectedFY} = useSessionStore.getState();
+  const res = await api.delete(`/purchase/contracts/${contractId}/`, {
+    params: { organisation: currentOrgId, financial_year: selectedFY }
+  });
+  return res.data;
+};
  //update purchase contract
 export const updatePurchaseContract = async (contractId, payload) => {
   const {currentOrgId,selectedFY} = useSessionStore.getState();
