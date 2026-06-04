@@ -85,7 +85,9 @@ export default function ItemMasterTab({ items, setItems }) {
     cgstPercent: 0,
     sgstPercent: 0,
     net_weight: 0,
+    net_weight_gram: 0,
     gross_weight: 0,
+    gross_weight_gram: 0,
     base_unit: null,
     lower_unit: null,
     upper_unit: null,
@@ -285,7 +287,12 @@ export default function ItemMasterTab({ items, setItems }) {
         sgstPercent: Number(data.gst_percentage) / 2,
         currentStock: Number(data.current_stock),
         net_weight: Number(data.net_weight) || 0,
+        net_weight_gram:
+          Number(data.net_weight_gram) || Number(data.net_weight || 0) * 1000,
         gross_weight: Number(data.gross_weight) || 0,
+        gross_weight_gram:
+          Number(data.gross_weight_gram) ||
+          Number(data.gross_weight || 0) * 1000,
       });
 
       setViewMode(view);
@@ -331,7 +338,9 @@ export default function ItemMasterTab({ items, setItems }) {
       // vendor: formData.company,
       company_group: formData.company,
       net_weight: formData.net_weight,
+      net_weight_gram: formData.net_weight_gram,
       gross_weight: formData.gross_weight,
+      gross_weight_gram: formData.gross_weight_gram,
       is_active: formData.is_active,
     };
 
@@ -978,33 +987,76 @@ export default function ItemMasterTab({ items, setItems }) {
                 />
               </FormField>
             </Col>
-            <Col span={12}>
-              <FormField label="Net Weight">
+            <Col span={6}>
+              <FormField label="Net Weight (Gram)">
+                <InputNumber
+                  disabled={viewMode}
+                  min={0}
+                  style={{ width: "100%" }}
+                  value={formData.net_weight_gram}
+                  onChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      net_weight_gram: value || 0,
+                      net_weight: (value || 0) / 1000,
+                    }))
+                  }
+                />
+              </FormField>
+            </Col>
+            <Col span={6}>
+              <FormField label="Net Weight (KG)">
                 <InputNumber
                   disabled={viewMode}
                   min={0}
                   style={{ width: "100%" }}
                   value={formData.net_weight}
                   onChange={(value) =>
-                    setFormData({ ...formData, net_weight: value || 0 })
+                    setFormData((prev) => ({
+                      ...prev,
+                      net_weight: value || 0,
+                      net_weight_gram: (value || 0) * 1000,
+                    }))
                   }
                 />
               </FormField>
             </Col>
 
-            <Col span={12}>
-              <FormField label="Gross Weight">
+            <Col span={6}>
+              <FormField label="Gross Weight (Gram)">
+                <InputNumber
+                  disabled={viewMode}
+                  min={0}
+                  style={{ width: "100%" }}
+                  value={formData.gross_weight_gram}
+                  onChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      gross_weight_gram: value || 0,
+                      gross_weight: (value || 0) / 1000,
+                    }))
+                  }
+                />
+              </FormField>
+            </Col>
+            <Col span={6}>
+              <FormField label="Gross Weight (KG)">
                 <InputNumber
                   disabled={viewMode}
                   min={0}
                   style={{ width: "100%" }}
                   value={formData.gross_weight}
                   onChange={(value) =>
-                    setFormData({ ...formData, gross_weight: value || 0 })
+                    setFormData((prev) => ({
+                      ...prev,
+                      gross_weight: value || 0,
+                      gross_weight_gram: (value || 0) * 1000,
+                    }))
                   }
                 />
               </FormField>
             </Col>
+
             <Col span={12}>
               <FormField label="Status">
                 <Select

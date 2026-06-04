@@ -24,6 +24,7 @@ import {
   updatePurchaseContract,
   getVendorDetails,
   getVendors,
+  deletePurchaseContract,
 } from "../../../../../api/purchase";
 import {
   Table,
@@ -38,6 +39,8 @@ import {
   Col,
   Card,
   Divider,
+  Popconfirm,
+  message,
 } from "antd";
 import {
   SearchOutlined,
@@ -287,6 +290,17 @@ export default function PurchaseSouda() {
       console.error("Update failed:", error);
     }
   };
+  // handle delete
+  const handleDelete = async (record) => {
+    try {
+      await deletePurchaseContract(record.key);
+      message.success("Purchase Contract deleted successfully");
+      await fetchPurchaseContracts();
+    } catch {
+      message.error("Failed to delete purchase contract");
+      alert(`Purchase Contract is linked with other model Status: ${status}`);
+    }
+  };
   const handleViewClick = async (record) => {
     try {
       setLoading(true);
@@ -425,10 +439,22 @@ export default function PurchaseSouda() {
             onClick={() => handleViewClick(record)}
           />
           {record.status !== "Approved" && (
-            <EditOutlined
-              className="cursor-pointer! text-red-500!"
-              onClick={() => handleEditClick(record)}
-            />
+            <>
+              <EditOutlined
+                className="cursor-pointer!  text-red-500!"
+                onClick={() => handleEditClick(record)}
+              />
+
+              <Popconfirm
+                title="Are you sure to delete this broker?"
+                onConfirm={() => handleDelete(record)}
+                okText="Yes"
+                cancelText="No"
+                okButtonProps={{ danger: true }}
+              >
+                <DeleteOutlined className="text-gray-500! cursor-pointer! text-base! hover:text-gray-700!" />
+              </Popconfirm>
+            </>
           )}
         </div>
       ),
@@ -679,7 +705,8 @@ export default function PurchaseSouda() {
               <Col span={2}>Rate</Col>
               <Col span={2}>Amount</Col>
               <Col span={2}>GST Amt</Col>
-              <Col span={3}>Total Amt</Col>
+              <Col span={2}>Total Amt</Col>
+              <Col span={1}></Col>
             </Row>
             {fields.map((field, index) => (
               <div
@@ -826,7 +853,7 @@ export default function PurchaseSouda() {
                     </Form.Item>
                   </Col>
                   <Col span={2}>
-                    <Form.Item name={[field.name, "netWt"]}>
+                    <Form.Item name={[field.name, "totalNetWt"]}>
                       <InputNumber className="w-full" disabled />
                     </Form.Item>
                   </Col>
@@ -931,13 +958,24 @@ export default function PurchaseSouda() {
                       <InputNumber className="w-full!" disabled />
                     </Form.Item>
                   </Col>
-                  <Col span={3}>
+                  <Col span={2}>
                     <Form.Item
                       {...field}
                       name={[field.name, "totalAmt"]}
                       fieldKey={[field.fieldKey, "totalAmt"]}
                     >
                       <InputNumber className="w-full!" disabled />
+                    </Form.Item>
+                  </Col>
+                  <Col span={1}>
+                    <Form.Item>
+                      <Button
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => remove(field.name)}
+                        disabled={disabled}
+                      />
                     </Form.Item>
                   </Col>
                 </Row>
@@ -1030,6 +1068,8 @@ export default function PurchaseSouda() {
               <DatePicker
                 className="w-full"
                 format="DD-MM-YYYY"
+                inputReadOnly={false}
+                allowClear
                 disabled={disabled}
                 disabledDate={createFinancialYearDisabledDate(selectedFY)}
               />
@@ -1046,6 +1086,8 @@ export default function PurchaseSouda() {
               <DatePicker
                 className="w-full"
                 format="DD-MM-YYYY"
+                inputReadOnly={false}
+                allowClear
                 disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 disabled={disabled}
               />
@@ -1057,6 +1099,8 @@ export default function PurchaseSouda() {
               <DatePicker
                 className="w-full"
                 format="DD-MM-YYYY"
+                inputReadOnly={false}
+                allowClear
                 disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 disabled={disabled}
               />
