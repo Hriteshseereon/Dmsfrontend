@@ -1100,31 +1100,29 @@ export default function PurchaseSouda() {
         <h6 className="text-amber-500">Order Totals</h6>
         <Row gutter={12}>
           <Col span={7}></Col>
-          <Col span={4}>
+          <Col span={2}>
             <Form.Item label="Total Qty" name={["orderTotals", "totalQty"]}>
               <InputNumber disabled className="w-full!" />
             </Form.Item>
           </Col>
-          <Col span={4}>
-            <Form.Item
-              label="Total Net Wt"
-              name={["orderTotals", "totalNetWt"]}
-            >
+          <Col span={2}></Col>
+          <Col span={2}>
+            <Form.Item label="Total Wt" name={["orderTotals", "totalNetWt"]}>
               <InputNumber className="w-full!" disabled />
             </Form.Item>
           </Col>
-          <Col span={3}>
-            <Form.Item
-              label="Total Amount"
-              name={["orderTotals", "totalAmount"]}
-            >
+          <Col span={2}></Col>
+          <Col span={2}></Col>
+
+          <Col span={2}>
+            <Form.Item label="Total Amt" name={["orderTotals", "totalAmount"]}>
               <InputNumber className="w-full!" disabled />
             </Form.Item>
           </Col>
 
-          <Col span={3}>
+          <Col span={2}>
             <Form.Item
-              label="Total GST Amt"
+              label="Total GST"
               name={["orderTotals", "totalGSTAmount"]}
             >
               <InputNumber className="w-full!" disabled />
