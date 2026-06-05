@@ -499,7 +499,7 @@ export default function PurchaseSouda() {
         discountAmt,
         gstAmount,
         totalAmt,
-        totalNetWt: round2(netWt * qty),
+        totalNetWt: round2((netWt * qty) / 1000),
       };
     });
 
@@ -700,7 +700,7 @@ export default function PurchaseSouda() {
               <Col span={7}>Item Name</Col>
               <Col span={2}>Qty</Col>
               <Col span={2}>Unit</Col>
-              <Col span={2}>Net Wt</Col>
+              <Col span={2}>Wt in Ton</Col>
               <Col span={2}>GST %</Col>
               <Col span={2}>Rate</Col>
               <Col span={2}>Amount</Col>
@@ -873,6 +873,13 @@ export default function PurchaseSouda() {
                       <InputNumber
                         {...positiveNumberInputProps}
                         disabled={disabled}
+                        precision={2}
+                        formatter={(value) =>
+                          value !== undefined && value !== null
+                            ? Number(value).toFixed(2)
+                            : ""
+                        }
+                        parser={(value) => value?.replace(/[^\d.]/g, "")}
                         onChange={() => {
                           const all = form.getFieldsValue();
 
@@ -946,7 +953,15 @@ export default function PurchaseSouda() {
                       name={[field.name, "grossAmount"]}
                       fieldKey={[field.fieldKey, "grossAmount"]}
                     >
-                      <InputNumber className="w-full!" disabled />
+                      <InputNumber
+                        className="w-full!"
+                        disabled
+                        formatter={(value) =>
+                          value !== undefined
+                            ? Number(value).toFixed(2)
+                            : "0.00"
+                        }
+                      />
                     </Form.Item>
                   </Col>
                   <Col span={2}>
@@ -955,7 +970,15 @@ export default function PurchaseSouda() {
                       name={[field.name, "gstAmount"]}
                       fieldKey={[field.fieldKey, "gstAmount"]}
                     >
-                      <InputNumber className="w-full!" disabled />
+                      <InputNumber
+                        className="w-full!"
+                        disabled
+                        formatter={(value) =>
+                          value !== undefined
+                            ? Number(value).toFixed(2)
+                            : "0.00"
+                        }
+                      />
                     </Form.Item>
                   </Col>
                   <Col span={2}>
@@ -964,7 +987,15 @@ export default function PurchaseSouda() {
                       name={[field.name, "totalAmt"]}
                       fieldKey={[field.fieldKey, "totalAmt"]}
                     >
-                      <InputNumber className="w-full!" disabled />
+                      <InputNumber
+                        className="w-full!"
+                        disabled
+                        formatter={(value) =>
+                          value !== undefined
+                            ? Number(value).toFixed(2)
+                            : "0.00"
+                        }
+                      />
                     </Form.Item>
                   </Col>
                   <Col span={1}>
@@ -1144,7 +1175,7 @@ export default function PurchaseSouda() {
         {/* <h6 className="text-amber-500">Totals</h6> */}
         <Row gutter={12}>
           <Col span={7}>
-            <span className="text-amber-700 font-bold text-3xl">
+            <span className="text-amber-700 font-bold text-2xl">
               Gross Total
             </span>
           </Col>
@@ -1164,19 +1195,37 @@ export default function PurchaseSouda() {
 
           <Col span={2}>
             <Form.Item name={["orderTotals", "totalAmount"]}>
-              <InputNumber className="w-full!" disabled />
+              <InputNumber
+                className="w-full!"
+                disabled
+                formatter={(value) =>
+                  value !== undefined ? Number(value).toFixed(2) : "0.00"
+                }
+              />
             </Form.Item>
           </Col>
 
           <Col span={2}>
             <Form.Item name={["orderTotals", "totalGSTAmount"]}>
-              <InputNumber className="w-full!" disabled />
+              <InputNumber
+                className="w-full!"
+                disabled
+                formatter={(value) =>
+                  value !== undefined ? Number(value).toFixed(2) : "0.00"
+                }
+              />
             </Form.Item>
           </Col>
 
           <Col span={2}>
             <Form.Item name={["orderTotals", "totalGrossAmount"]}>
-              <InputNumber disabled className="w-full!" />
+              <InputNumber
+                className="w-full!"
+                disabled
+                formatter={(value) =>
+                  value !== undefined ? Number(value).toFixed(2) : "0.00"
+                }
+              />
             </Form.Item>
           </Col>
         </Row>
