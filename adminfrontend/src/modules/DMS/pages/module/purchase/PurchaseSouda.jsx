@@ -1141,17 +1141,20 @@ export default function PurchaseSouda() {
         style={{ border: "1px solid #FDE68A" }}
         bodyStyle={{ padding: 12 }}
       >
-        <h6 className="text-amber-500">Order Totals</h6>
         <Row gutter={12}>
-          <Col span={7}></Col>
+          <Col span={7}>
+            <span className="text-amber-700 font-bold text-lg">
+              Gross Total
+            </span>
+          </Col>
           <Col span={2}>
-            <Form.Item label="Total Qty" name={["orderTotals", "totalQty"]}>
+            <Form.Item name={["orderTotals", "totalQty"]}>
               <InputNumber disabled className="w-full!" />
             </Form.Item>
           </Col>
           <Col span={2}></Col>
           <Col span={2}>
-            <Form.Item label="Total Wt" name={["orderTotals", "totalNetWt"]}>
+            <Form.Item name={["orderTotals", "totalNetWt"]}>
               <InputNumber className="w-full!" disabled />
             </Form.Item>
           </Col>
@@ -1159,25 +1162,19 @@ export default function PurchaseSouda() {
           <Col span={2}></Col>
 
           <Col span={2}>
-            <Form.Item label="Total Amt" name={["orderTotals", "totalAmount"]}>
+            <Form.Item name={["orderTotals", "totalAmount"]}>
               <InputNumber className="w-full!" disabled />
             </Form.Item>
           </Col>
 
           <Col span={2}>
-            <Form.Item
-              label="Total GST"
-              name={["orderTotals", "totalGSTAmount"]}
-            >
+            <Form.Item name={["orderTotals", "totalGSTAmount"]}>
               <InputNumber className="w-full!" disabled />
             </Form.Item>
           </Col>
 
-          <Col span={3}>
-            <Form.Item
-              label="Total Gross Amount"
-              name={["orderTotals", "totalGrossAmount"]}
-            >
+          <Col span={2}>
+            <Form.Item name={["orderTotals", "totalGrossAmount"]}>
               <InputNumber disabled className="w-full!" />
             </Form.Item>
           </Col>
