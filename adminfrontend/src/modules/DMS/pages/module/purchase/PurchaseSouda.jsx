@@ -1141,9 +1141,10 @@ export default function PurchaseSouda() {
         style={{ border: "1px solid #FDE68A" }}
         bodyStyle={{ padding: 12 }}
       >
+        {/* <h6 className="text-amber-500">Totals</h6> */}
         <Row gutter={12}>
           <Col span={7}>
-            <span className="text-amber-700 font-bold text-lg">
+            <span className="text-amber-700 font-bold text-3xl">
               Gross Total
             </span>
           </Col>
