@@ -1,17 +1,12 @@
 // SalesSouda.jsx
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import useSessionStore from "../../../../../store/sessionStore";
 import {
   createFinancialYearDisabledDate,
   useSelectedFinancialYear,
 } from "../../../../../utils/financialYearValidation";
 import { exportToExcel } from "../../../../../utils/exportToExcel";
-import {
-  saveSalesDraft,
-  loadSalesDraft,
-  deleteSalesDraft,
-  getAllSalesDrafts,
-} from "../../../../../utils/salesDraftUtils";
+
 import {
   Table,
   Input,
@@ -86,150 +81,9 @@ export default function SalesSouda() {
   const { currentOrgId } = useSessionStore.getState();
   const selectedFY = useSelectedFinancialYear();
 
-  // Draft state
-  const [showDrafts, setShowDrafts] = useState(false);
-  const [drafts, setDrafts] = useState([]);
-  const [activeDraftId, setActiveDraftId] = useState(null);
-  const autoSaveTimeoutRef = useRef(null);
-
   // Draft functions
-  const handleAutoSave = (form, draftId) => {
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current);
-    }
 
-    autoSaveTimeoutRef.current = setTimeout(() => {
-      const values = form.getFieldsValue();
-      if (values && Object.keys(values).length > 0) {
-        saveSalesDraft(draftId, values, "souda");
-        setActiveDraftId(draftId);
-      }
-    }, 1500); // Auto-save after 1.5 seconds of inactivity
-  };
-
-  const handleManualSave = (form) => {
-    const values = form.getFieldsValue();
-    if (values && Object.keys(values).length > 0) {
-      const draftId = `sales-${Date.now()}`;
-      saveSalesDraft(draftId, values, "souda");
-      setActiveDraftId(draftId);
-      loadDraftsList();
-    }
-  };
-
-  const loadDraftsList = () => {
-    const allDrafts = getAllSalesDrafts("souda");
-    setDrafts(allDrafts);
-  };
-
-  const handleContinueDraft = (draft) => {
-    addForm.setFieldsValue(draft);
-    setActiveDraftId(draft.id);
-    setIsAddModalOpen(true);
-    setShowDrafts(false);
-  };
-
-  const handleDeleteDraft = (draftId) => {
-    deleteSalesDraft(draftId, "souda");
-    if (activeDraftId === draftId) {
-      setActiveDraftId(null);
-    }
-    loadDraftsList();
-  };
-
-  const handleFormValuesChange = (changedValues, allValues, form) => {
-    // Auto-calculation for add form
-    if (form === addForm) {
-      const computed = computeFromFormValues(allValues || {});
-      form.setFieldsValue({
-        items: computed.items,
-        orderTaxAndTotals: {
-          ...allValues.orderTaxAndTotals,
-          ...computed.orderTaxAndTotals,
-        },
-        orderTotals: computed.orderTotals,
-      });
-    }
-
-    // Auto-save on form changes
-    const draftId = activeDraftId || `sales-${Date.now()}`;
-    handleAutoSave(form, draftId);
-  };
-
-  // Load drafts on component mount
-  useEffect(() => {
-    loadDraftsList();
-  }, []);
-
-  // Clean up auto-save timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Draft Table Component
-  const DraftTable = () => (
-    <div className="mb-4">
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="text-lg font-semibold text-amber-700">Saved Drafts</h3>
-        <Button
-          type="primary"
-          onClick={() => setShowDrafts(!showDrafts)}
-          className="!bg-amber-500 !hover:bg-amber-600"
-        >
-          {showDrafts ? "Hide Drafts" : "Show Drafts"}
-        </Button>
-      </div>
-
-      {showDrafts && (
-        <div className="border border-amber-300 rounded-lg p-4 bg-white">
-          {drafts.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">No drafts found</p>
-          ) : (
-            <div className="space-y-2">
-              {drafts.map((draft) => (
-                <div
-                  key={draft.id}
-                  className="flex justify-between items-center p-3 border border-gray-200 rounded hover:bg-gray-50"
-                >
-                  <div className="flex-1">
-                    <div className="font-medium">
-                      {draft.customerName || "Sales Draft"}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {draft.savedAt
-                        ? new Date(draft.savedAt).toLocaleString()
-                        : "Unknown time"}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="small"
-                      type="primary"
-                      onClick={() => handleContinueDraft(draft)}
-                      className="bg-amber-500! hover:bg-amber-600!"
-                    >
-                      Continue
-                    </Button>
-                    <Button
-                      size="small"
-                      danger
-                      onClick={() => handleDeleteDraft(draft.id)}
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+  // Auto-save on form changes
 
   // get the all customer data
   useEffect(() => {
@@ -449,17 +303,39 @@ export default function SalesSouda() {
       const discountPercent = Number(it.discountPercent || 0);
       const grossWt = Number(it.grossWt || 0);
 
-      const totalQty = qty + freeQty;
-      const grossAmount = qty * rate;
-      const discountAmt = (grossAmount * discountPercent) / 100;
+      const totalQty = items.reduce(
+        (sum, item) => sum + Number(item.qty || 0),
+        0,
+      );
+
+      const totalWeightTon = items.reduce(
+        (sum, item) => sum + Number(item.weightTon || 0),
+        0,
+      );
+
+      const totalAmount = items.reduce(
+        (sum, item) => sum + Number(item.amount || 0),
+        0,
+      );
+
+      const totalGSTAmount = items.reduce(
+        (sum, item) => sum + Number(item.gstAmount || 0),
+        0,
+      );
+
+      const grossAmount = items.reduce(
+        (sum, item) => sum + Number(item.totalAmount || 0),
+        0,
+      );
 
       return {
         ...it,
         lineKey: it.lineKey || idx + 1,
         totalQty,
+        totalWeightTon,
+        totalAmount,
+        totalGSTAmount,
         grossAmount,
-        discountAmt,
-        totalGrossWt: grossWt,
       };
     });
 
@@ -851,342 +727,200 @@ export default function SalesSouda() {
   ];
 
   // ItemsTable (Form.List) — moved company selection into each item row
-  const ItemsTable = ({ form, allowRemove = true, allowAdd = true }) => {
+  const ItemsTable = ({ form, allowRemove = true }) => {
+    const handleAutoAddRow = (add) => {
+      const items = form.getFieldValue("items") || [];
+
+      const lastItem = items[items.length - 1];
+
+      const hasEmptyRow = items.some(
+        (item) => !item?.item && !item?.qty && !item?.contractRate,
+      );
+
+      if (
+        lastItem?.item &&
+        Number(lastItem?.qty || 0) > 0 &&
+        Number(lastItem?.contractRate || 0) > 0 &&
+        !hasEmptyRow
+      ) {
+        add({
+          lineKey: Date.now(),
+          item: undefined,
+          qty: null,
+          freeQty: null,
+          uom: "",
+          weightTon: null,
+          gstPercent: null,
+          contractRate: null,
+          rate: null,
+          amount: null,
+          gstAmount: null,
+          totalAmount: null,
+        });
+      }
+    };
+
     return (
       <Form.List name="items">
         {(fields, { add, remove }) => (
           <>
-            <div className="mb-2 flex justify-between items-center">
+            <div className="mb-2">
               <h6 className="text-amber-500">Items</h6>
-              {allowAdd && (
-                <Button
-                  type="dashed"
-                  icon={<PlusOutlined />}
-                  onClick={() =>
-                    add({
-                      lineKey: Date.now(),
-                      vendorId: undefined,
-                      item: undefined,
-                      itemCode: undefined,
-                      uom: undefined,
-                      qty: 0,
-                      freeQty: 0,
-                      totalQty: 0,
-                      rate: 0,
-                      discountPercent: 0,
-                      discountAmt: 0,
-                      grossWt: 0,
-                      totalGrossWt: 0,
-                      grossAmount: 0,
-                    })
-                  }
-                >
-                  Add Item
-                </Button>
-              )}
             </div>
 
-            {fields.map((field, idx) => {
-              // ✅ vendorId PER ROW
+            {/* Header Row */}
+            <Row gutter={4} className="pb-2 mb-2 text-amber-800">
+              <Col span={4}>Item Name</Col>
+              <Col span={2}>Qty</Col>
+              <Col span={1}>F. Qty</Col>
+              <Col span={2}>Unit</Col>
+              <Col span={2}>Wt In Ton</Col>
+              <Col span={2}>GST %</Col>
+              <Col span={2}>Con. Rate</Col>
+              <Col span={2}>Rate</Col>
+              <Col span={2}>Amount</Col>
+              <Col span={2}>GST Amt</Col>
+              <Col span={2}>Total Amt</Col>
+              <Col span={1}></Col>
+            </Row>
+
+            {fields.map((field) => {
               const vendorId = form.getFieldValue([
                 "items",
                 field.name,
                 "vendorId",
               ]);
 
-              // ✅ products PER ROW
               const productList = Array.isArray(vendorProductsMap[vendorId])
                 ? vendorProductsMap[vendorId]
                 : [];
 
               return (
-                <div
-                  key={field.key}
-                  className="mb-4 p-4 border rounded-lg bg-white shadow-sm"
-                >
-                  <div className="flex justify-between items-center mb-3">
-                    <div className="text-amber-700 font-semibold">
-                      Item #{idx + 1}
-                    </div>
+                <Row key={field.key} gutter={4} align="middle" className="mb-2">
+                  <Col span={4}>
+                    <Form.Item
+                      name={[field.name, "item"]}
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Select
+                        placeholder="Select Item"
+                        showSearch
+                        optionFilterProp="children"
+                      >
+                        {productList.map((item) => (
+                          <Select.Option key={item.id} value={item.id}>
+                            {item.name}
+                          </Select.Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={2}>
+                    <Form.Item
+                      name={[field.name, "qty"]}
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Input />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={1}>
+                    <Form.Item
+                      name={[field.name, "freeQty"]}
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Input />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={2}>
+                    <Form.Item
+                      name={[field.name, "uom"]}
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Input disabled />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={2}>
+                    <Form.Item
+                      name={[field.name, "weightTon"]}
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Input />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={2}>
+                    <Form.Item
+                      name={[field.name, "gstPercent"]}
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Input />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={2}>
+                    <Form.Item
+                      name={[field.name, "contractRate"]}
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Input
+                        onBlur={() => {
+                          handleAutoAddRow(add);
+                        }}
+                      />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={2}>
+                    <Form.Item
+                      name={[field.name, "rate"]}
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Input />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={2}>
+                    <Form.Item
+                      name={[field.name, "amount"]}
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Input disabled />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={2}>
+                    <Form.Item
+                      name={[field.name, "gstAmount"]}
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Input disabled />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={2}>
+                    <Form.Item
+                      name={[field.name, "totalAmount"]}
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Input disabled />
+                    </Form.Item>
+                  </Col>
+
+                  <Col span={1}>
                     {allowRemove && (
                       <Button
+                        type="text"
                         danger
                         icon={<DeleteOutlined />}
                         onClick={() => remove(field.name)}
                       />
                     )}
-                  </div>
-
-                  <Row gutter={16}>
-                    {/* COMPANY / VENDOR */}
-                    <Col span={6}>
-                      <Form.Item
-                        label={<span className="text-amber-700">Supplier</span>}
-                        name={[field.name, "vendorId"]}
-                        rules={[{ required: true, message: "Select supplier" }]}
-                      >
-                        <Select
-                          placeholder="Select Supplier"
-                          onChange={async (vendorId) => {
-                            if (!vendorProductsMap[vendorId]) {
-                              const res = await getProductsByCompany(vendorId);
-
-                              setVendorProductsMap((prev) => ({
-                                ...prev,
-                                [vendorId]: Array.isArray(res?.products)
-                                  ? res.products
-                                  : [],
-                              }));
-                            }
-
-                            // reset dependent fields
-                            form.setFields([
-                              {
-                                name: ["items", field.name, "item"],
-                                value: undefined,
-                              },
-                              {
-                                name: ["items", field.name, "itemCode"],
-                                value: undefined,
-                              },
-                              {
-                                name: ["items", field.name, "uom"],
-                                value: undefined,
-                              },
-                            ]);
-                          }}
-                        >
-                          {vendors.map((v) => (
-                            <Select.Option key={v.id} value={v.id}>
-                              {v.name}
-                            </Select.Option>
-                          ))}
-                        </Select>
-                      </Form.Item>
-                    </Col>
-
-                    {/* ITEM */}
-                    <Col span={6}>
-                      <Form.Item
-                        label={<span className="text-amber-700">Item</span>}
-                        name={[field.name, "item"]}
-                        rules={[{ required: true, message: "Select item" }]}
-                      >
-                        <Select
-                          placeholder="Select Item"
-                          disabled={!vendorId}
-                          onChange={(productId) => {
-                            const selected = productList.find(
-                              (p) => p.id === productId,
-                            );
-
-                            form.setFields([
-                              {
-                                name: ["items", field.name, "itemCode"],
-                                value: selected?.hsn_code_value,
-                              },
-                              {
-                                name: ["items", field.name, "uom"],
-                                value: selected?.base_unit,
-                              },
-                              {
-                                name: ["items", field.name, "rate"],
-                                value: Number(selected.default_rate), // ✅ Auto fill Rate
-                              },
-                            ]);
-                          }}
-                        >
-                          {productList.map((p) => (
-                            <Select.Option key={p.id} value={p.id}>
-                              {p.name}
-                            </Select.Option>
-                          ))}
-                        </Select>
-                      </Form.Item>
-                    </Col>
-
-                    {/* CODE */}
-                    <Col span={4}>
-                      <Form.Item
-                        label={<span className="text-amber-700">Code</span>}
-                        name={[field.name, "itemCode"]}
-                      >
-                        <Input disabled />
-                      </Form.Item>
-                    </Col>
-
-                    {/* UOM */}
-                    <Col span={4}>
-                      <Form.Item
-                        label={<span className="text-amber-700">UOM</span>}
-                        name={[field.name, "uom"]}
-                      >
-                        <Input disabled />
-                      </Form.Item>
-                    </Col>
-
-                    {/* QTY */}
-                    <Col span={4}>
-                      <Form.Item
-                        label={<span className="text-amber-700">Qty</span>}
-                        name={[field.name, "qty"]}
-                        rules={[
-                          { required: true, message: "Quantity is required" },
-                          {
-                            validator: (_, value) => {
-                              if (value === undefined || value === null) {
-                                return Promise.resolve();
-                              }
-                              if (isNaN(value)) {
-                                return Promise.reject(
-                                  new Error("Enter a valid number"),
-                                );
-                              }
-                              if (value > 0) {
-                                return Promise.resolve();
-                              }
-                              return Promise.reject(
-                                new Error("Quantity must be greater than 0"),
-                              );
-                            },
-                          },
-                        ]}
-                      >
-                        <Input min={0} className="w-full" />
-                      </Form.Item>
-                    </Col>
-
-                    {/* FREE QTY */}
-                    <Col span={4}>
-                      <Form.Item
-                        label={<span className="text-amber-700">Free Qty</span>}
-                        name={[field.name, "freeQty"]}
-                        rules={[
-                          {
-                            validator: (_, value) => {
-                              if (value === undefined || value === null) {
-                                return Promise.resolve();
-                              }
-                              if (value >= 0) {
-                                return Promise.resolve();
-                              }
-                              if (isNaN(value)) {
-                                return Promise.reject(
-                                  new Error("Enter a valid number"),
-                                );
-                              }
-                            },
-                          },
-                        ]}
-                      >
-                        <Input min={0} className="w-full" />
-                      </Form.Item>
-                    </Col>
-
-                    {/* TOTAL QTY */}
-                    <Col span={4}>
-                      <Form.Item
-                        label={
-                          <span className="text-amber-700">Total Qty</span>
-                        }
-                        name={[field.name, "totalQty"]}
-                      >
-                        <InputNumber disabled className="w-full" />
-                      </Form.Item>
-                    </Col>
-
-                    {/* RATE */}
-                    <Col span={4}>
-                      <Form.Item
-                        label={<span className="text-amber-700">Rate (₹)</span>}
-                        name={[field.name, "rate"]}
-                        rules={[{ required: true }]}
-                      >
-                        <InputNumber min={0} className="w-full" disabled />
-                      </Form.Item>
-                    </Col>
-
-                    {/* DISCOUNT */}
-                    <Col span={4}>
-                      <Form.Item
-                        label={
-                          <span className="text-amber-700">Discount %</span>
-                        }
-                        name={[field.name, "discountPercent"]}
-                        rules={[
-                          {
-                            validator: (_, value) => {
-                              if (value === undefined || value === null) {
-                                return Promise.resolve();
-                              }
-                              if (value >= 0) {
-                                return Promise.resolve();
-                              }
-                              if (isNaN(value)) {
-                                return Promise.reject(
-                                  new Error("Enter a valid number"),
-                                );
-                              }
-                            },
-                          },
-                        ]}
-                      >
-                        <Input min={0} max={100} className="w-full" />
-                      </Form.Item>
-                    </Col>
-
-                    {/* GROSS */}
-                    <Col span={4}>
-                      <Form.Item
-                        label={
-                          <span className="text-amber-700">Gross Amount</span>
-                        }
-                        name={[field.name, "grossAmount"]}
-                      >
-                        <InputNumber disabled className="w-full" />
-                      </Form.Item>
-                    </Col>
-
-                    {/* GROSS WT */}
-                    <Col span={6}>
-                      <Form.Item
-                        label={<span className="text-amber-700">Gross Wt</span>}
-                        name={[field.name, "grossWt"]}
-                        rules={[
-                          {
-                            validator: (_, value) => {
-                              if (value === undefined || value === null) {
-                                return Promise.resolve();
-                              }
-                              if (value >= 0) {
-                                return Promise.resolve();
-                              }
-                              if (isNaN(value)) {
-                                return Promise.reject(
-                                  new Error("Enter a valid number"),
-                                );
-                              }
-                            },
-                          },
-                        ]}
-                      >
-                        <Input min={0} className="w-full" />
-                      </Form.Item>
-                    </Col>
-
-                    {/* TOTAL GROSS WT */}
-                    <Col span={6}>
-                      <Form.Item
-                        label={
-                          <span className="text-amber-700">Total Gross Wt</span>
-                        }
-                        name={[field.name, "totalGrossWt"]}
-                      >
-                        <InputNumber disabled className="w-full" />
-                      </Form.Item>
-                    </Col>
-                  </Row>
-                </div>
+                  </Col>
+                </Row>
               );
             })}
           </>
@@ -1232,13 +966,6 @@ export default function SalesSouda() {
       setData((prev) => [row, ...prev]);
       setIsAddModalOpen(false);
       addForm.resetFields();
-
-      // Delete active draft after successful submission
-      if (activeDraftId) {
-        deleteSalesDraft(activeDraftId, "souda");
-        setActiveDraftId(null);
-        loadDraftsList();
-      }
 
       // ✅ Optional: Show success message
       console.log("Sales contract created successfully:", row);
@@ -1435,9 +1162,6 @@ export default function SalesSouda() {
         </div>
       </div>
 
-      {/* Draft Table */}
-      <DraftTable />
-
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
           Sales Contract Records
@@ -1456,18 +1180,8 @@ export default function SalesSouda() {
         title={
           <div className="flex justify-between items-center">
             <span className="text-amber-700 text-2xl font-semibold">
-              Add Sales Contract{" "}
-              {activeDraftId && (
-                <span className="text-sm text-blue-500">(Draft)</span>
-              )}
+              Add Sales Contract
             </span>
-            <Button
-              size="small"
-              onClick={() => handleManualSave(addForm)}
-              className="bg-green-500 hover:bg-green-600 text-white"
-            >
-              Save Draft
-            </Button>
           </div>
         }
         open={isAddModalOpen}
@@ -1476,58 +1190,17 @@ export default function SalesSouda() {
           addForm.resetFields();
         }}
         footer={null}
-        width={920}
+        width={1400}
       >
         <Form
           form={addForm}
           layout="vertical"
           onFinish={handleAddFinish}
-          onValuesChange={(changedValues, allValues) =>
-            handleFormValuesChange(changedValues, allValues, addForm)
-          }
+          onValuesChange={handleAddValuesChange}
         >
           <h6 className="text-amber-500">Basic Information</h6>
-          <Row gutter={16}>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Contract Date</span>}
-                name="soudaDate"
-                rules={[{ required: true }]}
-                initialValue={dayjs()}
-              >
-                <DatePicker
-                  className="w-full"
-                  disabled
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Start Date</span>}
-                name="startDate"
-              >
-                <DatePicker
-                  className="w-full"
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">End Date</span>}
-                name="endDate"
-              >
-                <DatePicker
-                  className="w-full"
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
+          <Row gutter={4}>
+            <Col span={4}>
               <Form.Item
                 label={<span className="text-amber-700">Customer Name</span>}
                 name="customerId"
@@ -1543,15 +1216,17 @@ export default function SalesSouda() {
 
                     if (selectedCustomer) {
                       addForm.setFieldsValue({
-                        customerEmail:
-                          selectedCustomer.email_address ||
-                          selectedCustomer.email ||
-                          "",
-                        customerMobile:
-                          selectedCustomer.mobile_number ||
-                          selectedCustomer.mobile ||
-                          selectedCustomer.phone_number ||
-                          "",
+                        customerAddress: [
+                          details.address,
+                          details.address_line1,
+                          details.city,
+                          details.district,
+                          details.state,
+                          details.country,
+                          details.pin_code,
+                        ]
+                          .filter(Boolean)
+                          .join(", "),
                       });
                     }
 
@@ -1561,13 +1236,17 @@ export default function SalesSouda() {
 
                       if (details) {
                         addForm.setFieldsValue({
-                          customerEmail:
-                            details.email_address || details.email || "",
-                          customerMobile:
-                            details.mobile_number ||
-                            details.mobile ||
-                            details.phone_number ||
-                            "",
+                          customerAddress: [
+                            details.address,
+                            details.address_line1,
+                            details.city,
+                            details.district,
+                            details.state,
+                            details.country,
+                            details.pin_code,
+                          ]
+                            .filter(Boolean)
+                            .join(", "),
                         });
                       }
                     } catch (err) {
@@ -1588,23 +1267,76 @@ export default function SalesSouda() {
               </Form.Item>
             </Col>
 
-            <Col span={6}>
+            <Col span={3}>
               <Form.Item
-                label={<span className="text-amber-700">Customer Email</span>}
-                name="customerEmail"
+                label={<span className="text-amber-700">Customer Address</span>}
+                name="customerAddress"
               >
-                <Input placeholder="Customer Email" disabled />
+                <Input disabled />
               </Form.Item>
             </Col>
-            <Col span={6}>
+            <Col span={3}>
               <Form.Item
-                label={<span className="text-amber-700">Customer Mobile</span>}
-                name="customerMobile"
+                label={<span className="text-amber-700">Plant Name</span>}
+                name="plantName"
+                rules={[{ required: true, message: "Enter Plant Name" }]}
               >
-                <Input placeholder="Customer Mobile" disabled />
+                <Input placeholder="Enter Plant Name" />
               </Form.Item>
             </Col>
-            <Col span={6}>
+
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Broker Name</span>}
+                name="brokerName"
+                rules={[{ required: true, message: "Enter Broker Name" }]}
+              >
+                <Input placeholder="Enter Broker Name" />
+              </Form.Item>
+            </Col>
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Contract Date</span>}
+                name="soudaDate"
+                rules={[{ required: true }]}
+                initialValue={dayjs()}
+              >
+                <DatePicker
+                  className="w-full"
+                  disabled
+                  format="DD-MM-YYYY"
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Valid From</span>}
+                name="startDate"
+              >
+                <DatePicker
+                  className="w-full"
+                  format="DD-MM-YYYY"
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Valid To</span>}
+                name="endDate"
+              >
+                <DatePicker
+                  className="w-full"
+                  format="DD-MM-YYYY"
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col span={2}>
               <Form.Item
                 label={<span className="text-amber-700">Status</span>}
                 name="status"
@@ -1620,7 +1352,7 @@ export default function SalesSouda() {
               </Form.Item>
             </Col>
 
-            <Col span={6}>
+            {/* <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">Type</span>}
                 name="type"
@@ -1633,180 +1365,52 @@ export default function SalesSouda() {
                   ))}
                 </Select>
               </Form.Item>
-            </Col>
+            </Col> */}
           </Row>
-
-          <Divider />
 
           {/* Items */}
           <ItemsTable form={addForm} allowRemove={true} allowAdd={true} />
 
-          <Divider />
-
           {/* Tax & totals */}
-          <h6 className="text-amber-500">Tax, Charges & Others</h6>
-          <Row gutter={16}>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">GST %</span>}
-                name={["orderTaxAndTotals", "igstPercent"]}
-                rules={[
-                  {
-                    required: true,
-                    message: "GST % is required",
-                  },
-                  {
-                    validator: (_, value) => {
-                      if (value === undefined || value === null) {
-                        return Promise.resolve();
-                      }
-                      if (value >= 0) {
-                        return Promise.resolve();
-                      }
-                      if (isNaN(value)) {
-                        return Promise.reject(
-                          new Error("Enter a valid number"),
-                        );
-                      }
-                    },
-                  },
-                ]}
-              >
-                <Input
-                  className="w-full"
-                  min={0}
-                  max={100}
-                  onChange={(e) => {
-                    const igst = parseFloat(e.target.value) || 0;
-                    const split = (igst / 2).toFixed(2);
+          <h6 className="text-amber-500">Summary</h6>
 
-                    addForm.setFieldsValue({
-                      orderTaxAndTotals: {
-                        cgstPercent: split,
-                        sgstPercent: split,
-                      },
-                    });
-                  }}
-                />
+          <Row gutter={8}>
+            <Col span={4}>
+              <span className="text-amber-700 font-bold text-2xl">
+                Gross Total
+              </span>
+            </Col>
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalQty"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">SGST %</span>}
-                name={["orderTaxAndTotals", "sgstPercent"]}
-                rules={[
-                  {
-                    validator: (_, value) => {
-                      if (value === undefined || value === null) {
-                        return Promise.resolve();
-                      }
-                      if (value >= 0) {
-                        return Promise.resolve();
-                      }
-                      if (isNaN(value)) {
-                        return Promise.reject(
-                          new Error("Enter a valid number"),
-                        );
-                      }
-                    },
-                  },
-                ]}
-              >
-                <Input className="w-full" min={0} max={100} disabled />
+            <Col span={3}></Col>
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalWeightTon"]}>
+                <Input disabled />
+              </Form.Item>
+            </Col>
+            <Col span={6}></Col>
+
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalAmount"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
 
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">CGST %</span>}
-                name={["orderTaxAndTotals", "cgstPercent"]}
-                rules={[
-                  {
-                    validator: (_, value) => {
-                      if (value === undefined || value === null) {
-                        return Promise.resolve();
-                      }
-                      if (value >= 0) {
-                        return Promise.resolve();
-                      }
-                      if (isNaN(value)) {
-                        return Promise.reject(
-                          new Error("Enter a valid number"),
-                        );
-                      }
-                    },
-                  },
-                ]}
-              >
-                <Input className="w-full" min={0} max={100} disabled />
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalGSTAmount"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
 
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">TCS Amt (₹)</span>}
-                name={["orderTaxAndTotals", "tcsAmt"]}
-                rules={[
-                  {
-                    validator: (_, value) => {
-                      if (value === undefined || value === null) {
-                        return Promise.resolve();
-                      }
-                      if (value >= 0) {
-                        return Promise.resolve();
-                      }
-                      if (isNaN(value)) {
-                        return Promise.reject(
-                          new Error("Enter a valid number"),
-                        );
-                      }
-                    },
-                  },
-                ]}
-              >
-                <Input className="w-full" min={0} />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Gross Total (₹)</span>}
-                name={["orderTaxAndTotals", "grossAmountTotal"]}
-              >
-                <InputNumber className="w-full" disabled />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={
-                  <span className="text-amber-700">Discount Total (₹)</span>
-                }
-                name={["orderTaxAndTotals", "discountTotal"]}
-              >
-                <InputNumber className="w-full" disabled />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Total GST (₹)</span>}
-                name={["orderTaxAndTotals", "totalGST"]}
-              >
-                <InputNumber className="w-full" disabled />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Grand Total (₹)</span>}
-                name={["orderTaxAndTotals", "grandTotal"]}
-              >
-                <InputNumber className="w-full" disabled />
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "grossAmount"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
           </Row>
-
           <div className="flex justify-end gap-2 mt-4">
             <Button
               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
@@ -1838,7 +1442,7 @@ export default function SalesSouda() {
           setSelectedRecord(null);
         }}
         footer={null}
-        width={920}
+        width={1400}
       >
         <Form
           form={editForm}
@@ -1847,48 +1451,8 @@ export default function SalesSouda() {
           onValuesChange={handleEditValuesChange}
         >
           <h6 className="text-amber-500">Basic Information</h6>
-          <Row gutter={16}>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Souda Date</span>}
-                name="soudaDate"
-                rules={[{ required: true }]}
-              >
-                <DatePicker
-                  className="w-full"
-                  disabled
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Start Date</span>}
-                name="startDate"
-              >
-                <DatePicker
-                  className="w-full"
-                  disabled
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">End Date</span>}
-                name="endDate"
-              >
-                <DatePicker
-                  className="w-full"
-                  disabled
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
+          <Row gutter={4}>
+            <Col span={4}>
               <Form.Item
                 label={<span className="text-amber-700">Customer Name</span>}
                 name="customerId"
@@ -1947,24 +1511,77 @@ export default function SalesSouda() {
                 </Select>
               </Form.Item>
             </Col>
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Customer Address</span>}
+                name="customerAddress"
+              >
+                <Input disabled />
+              </Form.Item>
+            </Col>
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Plant Name</span>}
+                name="plantName"
+                rules={[{ required: true, message: "Enter Plant Name" }]}
+              >
+                <Input placeholder="Enter Plant Name" />
+              </Form.Item>
+            </Col>
 
-            <Col span={6}>
+            <Col span={3}>
               <Form.Item
-                label={<span className="text-amber-700">Customer Email</span>}
-                name="customerEmail"
+                label={<span className="text-amber-700">Broker Name</span>}
+                name="brokerName"
+                rules={[{ required: true, message: "Enter Broker Name" }]}
               >
-                <Input disabled />
+                <Input placeholder="Enter Broker Name" />
               </Form.Item>
             </Col>
-            <Col span={6}>
+            <Col span={3}>
               <Form.Item
-                label={<span className="text-amber-700">Customer Mobile</span>}
-                name="customerMobile"
+                label={<span className="text-amber-700">Contract Date</span>}
+                name="soudaDate"
+                rules={[{ required: true }]}
               >
-                <Input disabled />
+                <DatePicker
+                  className="w-full"
+                  disabled
+                  format="DD-MM-YYYY"
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
               </Form.Item>
             </Col>
-            <Col span={6}>
+
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Valid From</span>}
+                name="startDate"
+              >
+                <DatePicker
+                  className="w-full"
+                  format="DD-MM-YYYY"
+                  disabled
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Valid To</span>}
+                name="endDate"
+              >
+                <DatePicker
+                  className="w-full"
+                  disabled
+                  format="DD-MM-YYYY"
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col span={2}>
               <Form.Item
                 label={<span className="text-amber-700">Status</span>}
                 name="status"
@@ -1981,98 +1598,44 @@ export default function SalesSouda() {
             </Col>
           </Row>
 
-          <Divider />
-
           <ItemsTable form={editForm} allowRemove={false} allowAdd={false} />
 
-          <Divider />
+          <h6 className="text-amber-500">Summary</h6>
 
-          <h6 className="text-amber-500">Tax, Charges & Others</h6>
-          <Row gutter={16}>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">GST %</span>}
-                name={["orderTaxAndTotals", "igstPercent"]}
-              >
-                <InputNumber
-                  className="w-full"
-                  min={0}
-                  max={100}
-                  onChange={(val) => {
-                    const gst = parseFloat(val) || 0;
-                    const split = parseFloat((gst / 2).toFixed(2));
-                    editForm.setFieldsValue({
-                      orderTaxAndTotals: {
-                        sgstPercent: split,
-                        cgstPercent: split,
-                      },
-                    });
-                  }}
-                />
+          <Row gutter={8}>
+            <Col span={4}>
+              <span className="text-amber-700 font-bold text-2xl">
+                Gross Total
+              </span>
+            </Col>
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalQty"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">SGST %</span>}
-                name={["orderTaxAndTotals", "sgstPercent"]}
-              >
-                <InputNumber className="w-full" min={0} max={100} disabled />
+            <Col span={3}></Col>
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalWeightTon"]}>
+                <Input disabled />
+              </Form.Item>
+            </Col>
+            <Col span={6}></Col>
+
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalAmount"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
 
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">CGST %</span>}
-                name={["orderTaxAndTotals", "cgstPercent"]}
-              >
-                <InputNumber className="w-full" min={0} max={100} disabled />
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalGSTAmount"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
 
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">TCS Amt (₹)</span>}
-                name={["orderTaxAndTotals", "tcsAmt"]}
-              >
-                <InputNumber className="w-full" min={0} />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Gross Total (₹)</span>}
-                name={["orderTaxAndTotals", "grossAmountTotal"]}
-              >
-                <InputNumber className="w-full" disabled />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={
-                  <span className="text-amber-700">Discount Total (₹)</span>
-                }
-                name={["orderTaxAndTotals", "discountTotal"]}
-              >
-                <InputNumber className="w-full" disabled />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Total GST (₹)</span>}
-                name={["orderTaxAndTotals", "totalGST"]}
-              >
-                <InputNumber className="w-full" disabled />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Grand Total (₹)</span>}
-                name={["orderTaxAndTotals", "grandTotal"]}
-              >
-                <InputNumber className="w-full" disabled />
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "grossAmount"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
           </Row>
@@ -2108,51 +1671,13 @@ export default function SalesSouda() {
           viewForm.resetFields();
         }}
         footer={null}
-        width={920}
+        width={1400}
       >
         <Form layout="vertical" form={viewForm} initialValues={{}}>
           <h6 className="text-amber-500">Basic Information</h6>
-          <Row gutter={16}>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Souda Date</span>}
-                name="soudaDate"
-              >
-                <DatePicker
-                  className="w-full"
-                  disabled
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
-              </Form.Item>
-            </Col>
 
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Start Date</span>}
-                name="startDate"
-              >
-                <DatePicker
-                  className="w-full"
-                  disabled
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">End Date</span>}
-                name="endDate"
-              >
-                <DatePicker
-                  className="w-full"
-                  disabled
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
+          <Row gutter={4}>
+            <Col span={4}>
               <Form.Item
                 label={<span className="text-amber-700">Customer Name</span>}
                 name="customer"
@@ -2160,25 +1685,76 @@ export default function SalesSouda() {
                 <Input disabled />
               </Form.Item>
             </Col>
-
-            <Col span={6}>
+            <Col span={3}>
               <Form.Item
-                label={<span className="text-amber-700">Customer Email</span>}
-                name="customerEmail"
+                label={<span className="text-amber-700">Customer Address</span>}
+                name="customerAddress"
               >
                 <Input disabled />
               </Form.Item>
             </Col>
-            <Col span={6}>
+            <Col span={3}>
               <Form.Item
-                label={<span className="text-amber-700">Customer Mobile</span>}
-                name="customerMobile"
+                label={<span className="text-amber-700">Plant Name</span>}
+                name="plantName"
+                rules={[{ required: true, message: "Enter Plant Name" }]}
               >
-                <Input disabled />
+                <Input placeholder="Enter Plant Name" />
               </Form.Item>
             </Col>
 
-            <Col span={6}>
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Broker Name</span>}
+                name="brokerName"
+                rules={[{ required: true, message: "Enter Broker Name" }]}
+              >
+                <Input placeholder="Enter Broker Name" />
+              </Form.Item>
+            </Col>
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Contract Date</span>}
+                name="soudaDate"
+              >
+                <DatePicker
+                  className="w-full"
+                  format="DD-MM-YYYY"
+                  disabled
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Valid From</span>}
+                name="startDate"
+              >
+                <DatePicker
+                  className="w-full"
+                  format="DD-MM-YYYY"
+                  disabled
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Valid to</span>}
+                name="endDate"
+              >
+                <DatePicker
+                  className="w-full"
+                  format="DD-MM-YYYY"
+                  disabled
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col span={2}>
               <Form.Item
                 label={<span className="text-amber-700">Status</span>}
                 name="status"
@@ -2224,102 +1800,42 @@ export default function SalesSouda() {
 
           <Divider />
 
-          <h6 className="text-amber-500">Tax, Charges & Others</h6>
-          <Row gutter={16}>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">GST %</span>}
-                name={["orderTaxAndTotals", "igstPercent"]}
-              >
-                <Input
-                  disabled
-                  value={selectedRecord?.orderTaxAndTotals?.igstPercent}
-                />
+          <h6 className="text-amber-500">Summary</h6>
+
+          <Row gutter={8}>
+            <Col span={4}>
+              <span className="text-amber-700 font-bold text-2xl">
+                Gross Total
+              </span>
+            </Col>
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalQty"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">SGST %</span>}
-                name={["orderTaxAndTotals", "sgstPercent"]}
-              >
-                <Input
-                  disabled
-                  value={selectedRecord?.orderTaxAndTotals?.sgstPercent}
-                />
+            <Col span={3}></Col>
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalWeightTon"]}>
+                <Input disabled />
+              </Form.Item>
+            </Col>
+            <Col span={6}></Col>
+
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalAmount"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
 
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">CGST %</span>}
-                name={["orderTaxAndTotals", "cgstPercent"]}
-              >
-                <Input
-                  disabled
-                  value={selectedRecord?.orderTaxAndTotals?.cgstPercent}
-                />
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalGSTAmount"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
 
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">TCS Amt (₹)</span>}
-                name={["orderTaxAndTotals", "tcsAmt"]}
-              >
-                <Input
-                  disabled
-                  value={selectedRecord?.orderTaxAndTotals?.tcsAmt}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Gross Total (₹)</span>}
-                name={["orderTaxAndTotals", "grossAmountTotal"]}
-              >
-                <Input
-                  disabled
-                  value={selectedRecord?.orderTaxAndTotals?.grossAmountTotal}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={
-                  <span className="text-amber-700">Discount Total (₹)</span>
-                }
-                name={["orderTaxAndTotals", "discountTotal"]}
-              >
-                <Input
-                  disabled
-                  value={selectedRecord?.orderTaxAndTotals?.discountTotal}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Total GST (₹)</span>}
-                name={["orderTaxAndTotals", "totalGST"]}
-              >
-                <Input
-                  disabled
-                  value={selectedRecord?.orderTaxAndTotals?.totalGST}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Grand Total (₹)</span>}
-                name={["orderTaxAndTotals", "grandTotal"]}
-              >
-                <Input
-                  disabled
-                  value={selectedRecord?.orderTaxAndTotals?.grandTotal}
-                />
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "grossAmount"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
           </Row>
