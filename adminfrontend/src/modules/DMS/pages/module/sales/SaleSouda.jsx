@@ -1,17 +1,12 @@
 // SalesSouda.jsx
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import useSessionStore from "../../../../../store/sessionStore";
 import {
   createFinancialYearDisabledDate,
   useSelectedFinancialYear,
 } from "../../../../../utils/financialYearValidation";
 import { exportToExcel } from "../../../../../utils/exportToExcel";
-import {
-  saveSalesDraft,
-  loadSalesDraft,
-  deleteSalesDraft,
-  getAllSalesDrafts,
-} from "../../../../../utils/salesDraftUtils";
+
 import {
   Table,
   Input,
@@ -47,6 +42,9 @@ import {
   getCustomersByOrganisation,
   getSalesContractById,
   updateSalesContract,
+  getAllBrokerName,
+  getAllPlantsName,
+  getProductByplant,
 } from "../../../../../api/sales";
 import { getAdminCustomerDetails } from "../../../../../api/customer";
 
@@ -74,7 +72,10 @@ export default function SalesSouda() {
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [customers, setCustomers] = useState([]);
   const [vendors, setVendors] = useState([]);
+  const [brokers, setBrokers] = useState([]);
+  const [plants, setPlants] = useState([]);
   const [selectedVendorId, setSelectedVendorId] = useState(null);
+  const [selectedCustomerMobile, setSelectedCustomerMobile] = useState("");
   // const [vendorItems, setVendorItems] = useState([]);
   const [vendorProductsMap, setVendorProductsMap] = useState({});
   const [addForm] = Form.useForm();
@@ -83,153 +84,13 @@ export default function SalesSouda() {
   const [allSalesGroups, setAllSalesGroups] = useState([]);
   const [searchText, setSearchText] = useState("");
   const [data, setData] = useState(salesSoudaJSONModified2.initialData);
+  const [selectedPlantId, setSelectedPlantId] = useState(null);
   const { currentOrgId } = useSessionStore.getState();
   const selectedFY = useSelectedFinancialYear();
 
-  // Draft state
-  const [showDrafts, setShowDrafts] = useState(false);
-  const [drafts, setDrafts] = useState([]);
-  const [activeDraftId, setActiveDraftId] = useState(null);
-  const autoSaveTimeoutRef = useRef(null);
-
   // Draft functions
-  const handleAutoSave = (form, draftId) => {
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current);
-    }
 
-    autoSaveTimeoutRef.current = setTimeout(() => {
-      const values = form.getFieldsValue();
-      if (values && Object.keys(values).length > 0) {
-        saveSalesDraft(draftId, values, "souda");
-        setActiveDraftId(draftId);
-      }
-    }, 1500); // Auto-save after 1.5 seconds of inactivity
-  };
-
-  const handleManualSave = (form) => {
-    const values = form.getFieldsValue();
-    if (values && Object.keys(values).length > 0) {
-      const draftId = `sales-${Date.now()}`;
-      saveSalesDraft(draftId, values, "souda");
-      setActiveDraftId(draftId);
-      loadDraftsList();
-    }
-  };
-
-  const loadDraftsList = () => {
-    const allDrafts = getAllSalesDrafts("souda");
-    setDrafts(allDrafts);
-  };
-
-  const handleContinueDraft = (draft) => {
-    addForm.setFieldsValue(draft);
-    setActiveDraftId(draft.id);
-    setIsAddModalOpen(true);
-    setShowDrafts(false);
-  };
-
-  const handleDeleteDraft = (draftId) => {
-    deleteSalesDraft(draftId, "souda");
-    if (activeDraftId === draftId) {
-      setActiveDraftId(null);
-    }
-    loadDraftsList();
-  };
-
-  const handleFormValuesChange = (changedValues, allValues, form) => {
-    // Auto-calculation for add form
-    if (form === addForm) {
-      const computed = computeFromFormValues(allValues || {});
-      form.setFieldsValue({
-        items: computed.items,
-        orderTaxAndTotals: {
-          ...allValues.orderTaxAndTotals,
-          ...computed.orderTaxAndTotals,
-        },
-        orderTotals: computed.orderTotals,
-      });
-    }
-
-    // Auto-save on form changes
-    const draftId = activeDraftId || `sales-${Date.now()}`;
-    handleAutoSave(form, draftId);
-  };
-
-  // Load drafts on component mount
-  useEffect(() => {
-    loadDraftsList();
-  }, []);
-
-  // Clean up auto-save timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Draft Table Component
-  const DraftTable = () => (
-    <div className="mb-4">
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="text-lg font-semibold text-amber-700">Saved Drafts</h3>
-        <Button
-          type="primary"
-          onClick={() => setShowDrafts(!showDrafts)}
-          className="!bg-amber-500 !hover:bg-amber-600"
-        >
-          {showDrafts ? "Hide Drafts" : "Show Drafts"}
-        </Button>
-      </div>
-
-      {showDrafts && (
-        <div className="border border-amber-300 rounded-lg p-4 bg-white">
-          {drafts.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">No drafts found</p>
-          ) : (
-            <div className="space-y-2">
-              {drafts.map((draft) => (
-                <div
-                  key={draft.id}
-                  className="flex justify-between items-center p-3 border border-gray-200 rounded hover:bg-gray-50"
-                >
-                  <div className="flex-1">
-                    <div className="font-medium">
-                      {draft.customerName || "Sales Draft"}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {draft.savedAt
-                        ? new Date(draft.savedAt).toLocaleString()
-                        : "Unknown time"}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="small"
-                      type="primary"
-                      onClick={() => handleContinueDraft(draft)}
-                      className="bg-amber-500! hover:bg-amber-600!"
-                    >
-                      Continue
-                    </Button>
-                    <Button
-                      size="small"
-                      danger
-                      onClick={() => handleDeleteDraft(draft.id)}
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+  // Auto-save on form changes
 
   // get the all customer data
   useEffect(() => {
@@ -247,6 +108,32 @@ export default function SalesSouda() {
     fetchCustomers();
   }, []);
 
+  useEffect(() => {
+    const fetchBrokerDetails = async () => {
+      try {
+        const res = await getAllBrokerName();
+        console.log("Fetched Brokers:", res);
+        setBrokers(res || []);
+      } catch (err) {
+        console.log("Failed to fetch brokers", err);
+      }
+    };
+
+    fetchBrokerDetails();
+  }, []);
+  useEffect(() => {
+    const fetchPlantDetails = async () => {
+      try {
+        const res = await getAllPlantsName();
+        console.log("Fetched Plants:", res);
+        setPlants(res || []);
+      } catch (err) {
+        console.log("Failed to fetch plants", err);
+      }
+    };
+
+    fetchPlantDetails();
+  }, []);
   // get all product by vendor id
   useEffect(() => {
     if (!selectedVendorId) return;
@@ -284,6 +171,115 @@ export default function SalesSouda() {
   useEffect(() => {
     fetchSalesContracts();
   }, []);
+
+  //
+  // Helper to map contract API response → form values (reuse in both openView & openEdit)
+
+  const mapContractToForm = (contract) => {
+    const calculatedTotalQty = (contract.items || []).reduce(
+      (sum, item) =>
+        sum + Number(item.net_qty || 0) + Number(item.free_qty || 0),
+      0,
+    );
+
+    const calculatedTotalWeightTon = (contract.items || []).reduce(
+      (sum, item) => sum + Number(item.total_net_wt_in_ton || 0),
+      0,
+    );
+    return {
+      key: contract.sale_contract_id,
+      saleContractNumber: contract.sale_contract_number,
+      customer: contract.customer_name,
+      customerId: contract.customer_business_id || contract.customer_id,
+      customerEmail: contract.customer_email,
+      customerMobile: contract.customer_mobile,
+      customerAddress: contract.customer_address || "",
+
+      status: contract.status,
+      status: contract.status,
+
+      // ✅ NEW: map location, plant, broker
+      location: contract.location || "",
+      plantId: contract.plant_id || "",
+      plantName: contract.plant_name || "",
+      brokerId: contract.broker_id || "",
+      brokerName: contract.broker_name || "",
+
+      soudaDate: contract.created_at
+        ? dayjs(contract.created_at, "DD-MM-YYYY HH:mm:ss")
+        : undefined,
+      startDate: contract.from_date
+        ? dayjs(contract.from_date, "DD-MM-YYYY")
+        : undefined,
+      endDate: contract.to_date
+        ? dayjs(contract.to_date, "DD-MM-YYYY")
+        : undefined,
+
+      items: (contract.items || []).map((it, idx) => ({
+        lineKey: it.id || idx + 1,
+        vendorId: it.company_group_id,
+        vendorName: it.company_group_name,
+        item: it.product?.product_id,
+        itemName: it.product?.product_name,
+        itemCode: it.hsn_code,
+        uom: it.uom?.unit_name || "",
+
+        qty: Number(it.net_qty || 0),
+        freeQty: Number(it.free_qty || 0),
+        totalQty: Number(it.gross_qty || 0),
+
+        // ✅ NEW: correct field mappings
+        contractRate: Number(it.contract_rate || it.contractRate || 0),
+        rate: Number(it.mrp || 0),
+        weightTon: Number(it.total_net_wt_in_ton || it.totalnetWtinTon || 0),
+        gstPercent: Number(
+          it.product?.gst_percentage || it.gst_percentage || 0,
+        ),
+        gstAmount: Number(it.gst_amount || it.gstAmount || 0),
+        amount: Number(it.line_total || 0), // ex-GST amount
+        totalAmount: Number(it.gross_amount || it.GrossAmount || 0), // total inc GST
+
+        discountPercent: Number(it.discount_percent || 0),
+        discountAmt: Number(it.discount_amount || 0),
+        grossWt: 0,
+      })),
+
+      orderTaxAndTotals: {
+        sgstPercent: Number(contract.sgst || 0),
+        cgstPercent: Number(contract.cgst || 0),
+        igstPercent: Number(contract.igst || 0),
+        tcsAmt: Number(contract.tcs_amount || 0),
+
+        // ✅ NEW: correct summary field mappings
+        totalGST: Number(
+          contract.total_gst_amount || contract.totalGSTAmount || 0,
+        ),
+        grossAmountTotal: Number(
+          contract.total_amount || contract.totalAmount || 0,
+        ),
+        grandTotal: Number(
+          contract.grand_total || contract.totalGrossAmount || 0,
+        ),
+      },
+
+      orderTotals: {
+        totalQty: Number(contract.total_qty) || calculatedTotalQty,
+
+        totalWeightTon:
+          Number(contract.total_net_weight) || calculatedTotalWeightTon,
+
+        totalAmount: Number(contract.total_amount || contract.totalAmount || 0),
+
+        totalGSTAmount: Number(
+          contract.total_gst_amount || contract.totalGSTAmount || 0,
+        ),
+
+        grossAmount: Number(
+          contract.grand_total || contract.totalGrossAmount || 0,
+        ),
+      },
+    };
+  };
   const fetchSalesContracts = async () => {
     try {
       const res = await getSalescontractGroups(); // or whatever API fetches all contracts
@@ -314,48 +310,61 @@ export default function SalesSouda() {
   };
   // payload for create sales contract
   const buildCreateContractPayload = (values) => {
-    // First, build items to calculate taxable amount
-    const items = (values.items || []).map((it) => {
-      const netQty = Number(it.qty || 0);
-      const freeQty = Number(it.freeQty || 0);
-      const grossQty = netQty + freeQty;
-      const mrp = Number(it.rate || 0);
-      const discountPercent = Number(it.discountPercent || 0);
-      const grossAmount = netQty * mrp;
-      const discountAmount = (grossAmount * discountPercent) / 100;
+    const items = (values.items || [])
+      .filter(
+        (it) =>
+          it?.item &&
+          Number(it?.qty || 0) > 0 &&
+          Number(it?.contractRate || 0) > 0,
+      )
+      .map((it) => {
+        const netQty = Number(it.qty || 0);
+        const freeQty = Number(it.freeQty || 0);
+        const grossQty = netQty + freeQty;
+        const mrp = Number(it.rate || 0);
+        const contractRate = Number(it.contractRate || 0);
+        const discountPercent = Number(it.discountPercent || 0);
+        const grossAmount = netQty * mrp;
+        const discountAmount = (grossAmount * discountPercent) / 100;
 
-      return {
-        // vendor_id: it.vendorId,
-        company_group_id: it.vendorId, // assuming company group is same as vendor for now
-        product_id: it.item,
-        uom: it.uom ? it.uom.toLowerCase() : null,
-        net_qty: netQty,
-        gross_qty: grossQty,
-        free_qty: freeQty,
-        mrp,
-        discount_percent: discountPercent,
-        discount_amount: Number(discountAmount.toFixed(2)), // ✅ Round to 2 decimals
-        line_total: Number((grossAmount - discountAmount).toFixed(2)), // ✅ Round to 2 decimals
-      };
-    });
+        return {
+          company_group_id: it.vendorId,
+          product_id: it.item,
+          uom: it.uom ? it.uom.toLowerCase() : null,
+          net_qty: netQty,
+          gross_qty: grossQty,
+          free_qty: freeQty,
+          mrp,
+          contract_rate: contractRate, // ✅ was missing
+          gst_percentage: Number(it.gstPercent || 0),
+          discount_percent: discountPercent,
+          discount_amount: Number(discountAmount.toFixed(2)),
+          line_total: Number((grossAmount - discountAmount).toFixed(2)),
+          gst_amount: Number(it.gstAmount || 0), // ✅ was missing
+          gross_amount: Number(it.totalAmount || 0), // ✅ was missing
+          total_net_wt_in_ton: Number(it.weightTon || 0), // ✅ was missing
+        };
+      });
 
     return {
       organisation: currentOrgId,
       customer_id: values.customerId,
+      location: values.customerAddress || null, // ✅ NEW
+      plant_id: values.plantId || null, // ✅ NEW
+      broker_id: values.brokerId || null, // ✅ NEW (if you store broker id)
+      broker_name: values.brokerName || null, // ✅ NEW
       from_date: values.startDate
         ? dayjs(values.startDate).format("YYYY-MM-DD")
         : null,
       to_date: values.endDate
         ? dayjs(values.endDate).format("YYYY-MM-DD")
         : null,
-      customer_mobile: values.customerMobile || "",
+      customer_mobile: selectedCustomerMobile || values.customerMobile || "",
       customer_email: values.customerEmail || "",
       narration: "Admin created contract",
-
       sgst: Number(values.orderTaxAndTotals?.sgstPercent || 0),
       cgst: Number(values.orderTaxAndTotals?.cgstPercent || 0),
       igst: Number(values.orderTaxAndTotals?.igstPercent || 0),
-
       tcs_amount: Number(values.orderTaxAndTotals?.tcsAmt || 0),
       cash_discount: 0,
       round_off_amount: 0,
@@ -442,49 +451,12 @@ export default function SalesSouda() {
 
   // compute per-item + order totals
   const computeFromFormValues = (values) => {
-    const items = (values.items || []).map((it, idx) => {
-      const qty = Number(it.qty || 0);
-      const freeQty = Number(it.freeQty || 0);
-      const rate = Number(it.rate || 0);
-      const discountPercent = Number(it.discountPercent || 0);
-      const grossWt = Number(it.grossWt || 0);
+    const items = (values.items || []).map((it, idx) => ({
+      ...it,
+      lineKey: it.lineKey || idx + 1,
+    }));
 
-      const totalQty = qty + freeQty;
-      const grossAmount = qty * rate;
-      const discountAmt = (grossAmount * discountPercent) / 100;
-
-      return {
-        ...it,
-        lineKey: it.lineKey || idx + 1,
-        totalQty,
-        grossAmount,
-        discountAmt,
-        totalGrossWt: grossWt,
-      };
-    });
-
-    const grossAmountTotal = items.reduce(
-      (s, it) => s + Number(it.grossAmount || 0),
-      0,
-    );
-    const discountTotal = items.reduce(
-      (s, it) => s + Number(it.discountAmt || 0),
-      0,
-    );
-    const taxableAmount = grossAmountTotal - discountTotal;
-
-    const sgstPercent = Number(values.orderTaxAndTotals?.sgstPercent || 0);
-    const cgstPercent = Number(values.orderTaxAndTotals?.cgstPercent || 0);
-    const igstPercent = Number(values.orderTaxAndTotals?.igstPercent || 0);
-    const tcsAmt = Number(values.orderTaxAndTotals?.tcsAmt || 0);
-
-    const sgst = (taxableAmount * sgstPercent) / 100;
-    const cgst = (taxableAmount * cgstPercent) / 100;
-    const igst = (taxableAmount * igstPercent) / 100;
-    const totalGST = igst;
-
-    const grandTotal = taxableAmount + totalGST + tcsAmt;
-
+    // Read directly from what recalculateRow already set on each item
     const qtyTotal = items.reduce((s, it) => s + Number(it.qty || 0), 0);
     const freeQtyTotal = items.reduce(
       (s, it) => s + Number(it.freeQty || 0),
@@ -492,30 +464,50 @@ export default function SalesSouda() {
     );
     const totalQty = qtyTotal + freeQtyTotal;
 
+    const totalWeightTon = items.reduce(
+      (s, it) => s + Number(it.weightTon || 0),
+      0,
+    );
+    const totalAmount = items.reduce((s, it) => s + Number(it.amount || 0), 0); // ex-GST amount
+    const totalGSTAmount = items.reduce(
+      (s, it) => s + Number(it.gstAmount || 0),
+      0,
+    ); // GST portion
+    const grossAmountTotal = items.reduce(
+      (s, it) => s + Number(it.totalAmount || 0),
+      0,
+    ); // amount + gst
+
+    const sgstPercent = Number(values.orderTaxAndTotals?.sgstPercent || 0);
+    const cgstPercent = Number(values.orderTaxAndTotals?.cgstPercent || 0);
+    const igstPercent = Number(values.orderTaxAndTotals?.igstPercent || 0);
+    const tcsAmt = Number(values.orderTaxAndTotals?.tcsAmt || 0);
+
+    // Grand total = sum of all item totals + TCS
+    const grandTotal = grossAmountTotal + tcsAmt;
+
     return {
       items,
       orderTaxAndTotals: {
-        grossAmountTotal,
-        discountTotal,
-        taxableAmount,
         sgstPercent,
         cgstPercent,
         igstPercent,
-        sgst,
-        cgst,
-        igst,
-        totalGST,
         tcsAmt,
+        grossAmountTotal,
+        totalGST: totalGSTAmount,
         grandTotal,
       },
       orderTotals: {
         qtyTotal,
         freeQtyTotal,
         totalQty,
+        totalWeightTon,
+        totalAmount, // ← ex-GST sum
+        totalGSTAmount, // ← GST sum
+        grossAmount: grossAmountTotal, // ← grand total of items
       },
     };
   };
-
   // Add these functions before the return statement
   const mapApiRecordToForm = (record) => {
     return {
@@ -575,68 +567,7 @@ export default function SalesSouda() {
   const openView = async (record) => {
     try {
       const contract = await getSalesContractById(record.key);
-      const mapped = {
-        saleContractNumber: contract.sale_contract_number,
-        customer: contract.customer_name,
-        customerEmail: contract.customer_email,
-        customerMobile: contract.customer_mobile,
-        status: contract.status,
-
-        soudaDate: contract.created_at ? dayjs(contract.created_at) : undefined,
-        startDate: contract.from_date ? dayjs(contract.from_date) : undefined,
-        endDate: contract.to_date ? dayjs(contract.to_date) : undefined,
-
-        items: (contract.items || []).map((it, idx) => ({
-          lineKey: it.id || idx + 1,
-
-          // vendorId: it.vendor_id,
-          vendorId: it.company_group_id,
-          vendorName: it.company_group_name,
-
-          // item: it.product?.product_id || it.product_id,
-          item: it.product?.product_id,
-          // itemName: it.product?.product_name || it.product_name,
-          itemName: it.product?.product_name,
-          itemCode: it.hsn_code,
-
-          uom: it.uom?.unit_name || "",
-          qty: Number(it.net_qty),
-          freeQty: Number(it.free_qty),
-          totalQty: Number(it.gross_qty),
-
-          rate: Number(it.mrp),
-          discountPercent: Number(it.discount_percent),
-          discountAmt: Number(it.discount_amount),
-
-          grossAmount: Number(it.line_total),
-          grossWt: 0,
-          totalGrossWt: 0,
-        })),
-
-        orderTaxAndTotals: {
-          sgstPercent: Number(contract.sgst),
-          cgstPercent: Number(contract.cgst),
-          igstPercent: Number(contract.igst),
-          tcsAmt: Number(contract.tcs_amount),
-
-          grossAmountTotal: Number(contract.total_amount),
-          discountTotal: Number(
-            (contract.items || []).reduce(
-              (s, i) => s + Number(i.discount_amount || 0),
-              0,
-            ),
-          ),
-          totalGST:
-            Number(contract.sgst) +
-            Number(contract.cgst) +
-            Number(contract.igst),
-
-          grandTotal: Number(contract.grand_total),
-        },
-      };
-
-      mapped.key = contract.sale_contract_id;
-
+      const mapped = mapContractToForm(contract);
       setSelectedRecord(mapped);
       viewForm.setFieldsValue(mapped);
       setIsViewModalOpen(true);
@@ -644,109 +575,32 @@ export default function SalesSouda() {
       console.error("Failed to fetch contract details", err);
     }
   };
-
   const openEdit = async (record) => {
     try {
       const contract = await getSalesContractById(record.key);
-      const mapped = {
-        key: contract.sale_contract_id,
-        saleContractNumber: contract.sale_contract_number,
-        customer: contract.customer_name,
-        customerId: contract.customer_business_id || contract.customer_id,
-        customerEmail: contract.customer_email,
-        customerMobile: contract.customer_mobile,
-        status: contract.status,
 
-        soudaDate: contract.created_at ? dayjs(contract.created_at) : undefined,
-        startDate: contract.from_date ? dayjs(contract.from_date) : undefined,
-        endDate: contract.to_date ? dayjs(contract.to_date) : undefined,
+      const mapped = mapContractToForm(contract);
 
-        items: (contract.items || []).map((it, idx) => ({
-          lineKey: it.id || idx + 1,
-          // vendorId: it.vendor_id,
-          // vendorName: it.company_group_name,
-          vendorId: it.company_group_id,
-          vendorName: it.company_group_name,
-          // item: it.product?.product_id || it.product_id,
-          // itemName: it.product?.product_name || it.product_name,
-          item: it.product?.product_id,
-          itemName: it.product?.product_name,
-          itemCode: it.hsn_code,
+      // Load products for selected plant
+      if (contract.plant_id) {
+        const products = await getProductByplant(contract.plant_id);
 
-          uom: it.uom?.unit_name || "",
-          qty: Number(it.net_qty),
-          freeQty: Number(it.free_qty),
-          totalQty: Number(it.gross_qty),
-          rate: Number(it.mrp),
-          discountPercent: Number(it.discount_percent),
-          discountAmt: Number(it.discount_amount),
-          grossAmount: Number(it.line_total),
-          grossWt: 0,
-          totalGrossWt: 0,
-        })),
+        setSelectedPlantId(contract.plant_id);
 
-        orderTaxAndTotals: {
-          igstPercent: Number(contract.igst), // GST from API
-          sgstPercent: Number(contract.igst) / 2, // auto 50%
-          cgstPercent: Number(contract.igst) / 2, // auto 50%
-          tcsAmt: Number(contract.tcs_amount),
-          grossAmountTotal: Number(contract.total_amount),
-          discountTotal: Number(
-            (contract.items || []).reduce(
-              (s, i) => s + Number(i.discount_amount || 0),
-              0,
-            ),
-          ),
-          totalGST:
-            Number(contract.sgst) +
-            Number(contract.cgst) +
-            Number(contract.igst),
-          grandTotal: Number(contract.grand_total),
-        },
-      };
-
-      // Fetch products for all vendors in the items to populate Select options
-      // const uniqueVendorIds = [
-      //   ...new Set(
-      //     (contract.items || []).map((it) => it.vendor_id).filter(Boolean),
-      //   ),
-      // ];
-      const uniqueVendorIds = [
-        ...new Set(
-          (contract.items || [])
-            .map((it) => it.company_group_id)
-            .filter(Boolean),
-        ),
-      ];
-
-      if (uniqueVendorIds.length > 0) {
-        try {
-          // Fetch all simultaneously
-          const responses = await Promise.all(
-            uniqueVendorIds.map((vid) => getProductsByCompany(vid)),
-          );
-
-          setVendorProductsMap((prev) => {
-            const newMap = { ...prev };
-            uniqueVendorIds.forEach((vid, index) => {
-              const res = responses[index];
-              newMap[vid] = Array.isArray(res?.products) ? res.products : [];
-            });
-            return newMap;
-          });
-        } catch (vendorErr) {
-          console.error("Failed to fetch products for vendors", vendorErr);
-        }
+        setVendorProductsMap({
+          [contract.plant_id]: Array.isArray(products) ? products : [],
+        });
       }
 
       setSelectedRecord(mapped);
+
       editForm.setFieldsValue(mapped);
+
       setIsEditModalOpen(true);
     } catch (err) {
       console.error("Failed to fetch contract details", err);
     }
   };
-
   // table columns: replace deliveryDate / company with startDate / endDate
   const columns = [
     // 🆕 Contract Number
@@ -851,344 +705,282 @@ export default function SalesSouda() {
   ];
 
   // ItemsTable (Form.List) — moved company selection into each item row
-  const ItemsTable = ({ form, allowRemove = true, allowAdd = true }) => {
+  const ItemsTable = ({ form, allowRemove = true, productList = [] }) => {
+    const handleItemSelect = (productId, fieldName) => {
+      const product = productList.find((p) => p.product_id === productId);
+      if (!product) return;
+
+      const items = form.getFieldValue("items") || [];
+      const updatedItems = [...items];
+
+      updatedItems[fieldName] = {
+        ...updatedItems[fieldName],
+        item: productId,
+        uom: product.base_unit || "",
+        gstPercent: product.gst_percentage || 0,
+        grossWt: product.gross_weight || 0, // kg per unit
+      };
+
+      form.setFieldsValue({ items: updatedItems });
+
+      // Trigger recalculation
+      recalculateRow(fieldName, updatedItems);
+    };
+
+    const recalculateRow = (index, itemsOverride) => {
+      const items = itemsOverride || form.getFieldValue("items") || [];
+      const it = items[index];
+      if (!it) return;
+
+      const qty = Number(it.qty || 0);
+      const freeQty = Number(it.freeQty || 0);
+      const grossWtPerUnit = Number(it.grossWt || 0); // in kg
+      const gstPercent = Number(it.gstPercent || 0);
+      const contractRate = Number(it.contractRate || 0);
+
+      // Weight in ton: qty * gross_weight(kg) / 1000
+      const weightTon = ((qty + freeQty) * grossWtPerUnit) / 1000;
+
+      // Rate = contractRate - GST portion
+      // contractRate is inclusive of GST, so: rate = contractRate / (1 + gst/100)
+      const rate =
+        gstPercent > 0 ? contractRate / (1 + gstPercent / 100) : contractRate;
+
+      // Amount = qty * rate (excluding GST)
+      const amount = qty * rate;
+
+      // GST Amount = amount * gstPercent / 100
+      const gstAmount = (amount * gstPercent) / 100;
+
+      // Total Amount = amount + gstAmount
+      const totalAmount = amount + gstAmount;
+
+      const updatedItems = [...items];
+      updatedItems[index] = {
+        ...updatedItems[index],
+        weightTon: Number(weightTon.toFixed(4)),
+        rate: Number(rate.toFixed(2)),
+        amount: Number(amount.toFixed(2)),
+        gstAmount: Number(gstAmount.toFixed(2)),
+        totalAmount: Number(totalAmount.toFixed(2)),
+      };
+
+      form.setFieldsValue({ items: updatedItems });
+    };
+
+    const handleAutoAddRow = (add) => {
+      const items = form.getFieldValue("items") || [];
+      const lastItem = items[items.length - 1];
+      const hasEmptyRow = items.some(
+        (item) => !item?.item && !item?.qty && !item?.contractRate,
+      );
+
+      if (
+        lastItem?.item &&
+        Number(lastItem?.qty || 0) > 0 &&
+        Number(lastItem?.contractRate || 0) > 0 &&
+        !hasEmptyRow
+      ) {
+        add({
+          lineKey: Date.now(),
+          item: undefined,
+          qty: null,
+          freeQty: null,
+          uom: "",
+          weightTon: null,
+          gstPercent: null,
+          contractRate: null,
+          rate: null,
+          amount: null,
+          gstAmount: null,
+          totalAmount: null,
+          grossWt: 0,
+        });
+      }
+    };
+
     return (
       <Form.List name="items">
         {(fields, { add, remove }) => (
           <>
-            <div className="mb-2 flex justify-between items-center">
+            <div className="mb-2">
               <h6 className="text-amber-500">Items</h6>
-              {allowAdd && (
-                <Button
-                  type="dashed"
-                  icon={<PlusOutlined />}
-                  onClick={() =>
-                    add({
-                      lineKey: Date.now(),
-                      vendorId: undefined,
-                      item: undefined,
-                      itemCode: undefined,
-                      uom: undefined,
-                      qty: 0,
-                      freeQty: 0,
-                      totalQty: 0,
-                      rate: 0,
-                      discountPercent: 0,
-                      discountAmt: 0,
-                      grossWt: 0,
-                      totalGrossWt: 0,
-                      grossAmount: 0,
-                    })
-                  }
-                >
-                  Add Item
-                </Button>
-              )}
             </div>
 
-            {fields.map((field, idx) => {
-              // ✅ vendorId PER ROW
-              const vendorId = form.getFieldValue([
-                "items",
-                field.name,
-                "vendorId",
-              ]);
+            {/* Header Row */}
+            <Row
+              gutter={4}
+              className="pb-2 mb-2 text-amber-800 font-semibold text-xs"
+            >
+              <Col span={4}>Item Name</Col>
+              <Col span={2}>Qty</Col>
+              <Col span={2}>F.Qty</Col>
+              <Col span={2}>Unit</Col>
+              <Col span={2}>Wt (Ton)</Col>
+              <Col span={1}>GST %</Col>
+              <Col span={2}>Con. Rate</Col>
+              <Col span={2}>Rate</Col>
+              <Col span={2}>Amount</Col>
+              <Col span={2}>GST Amt</Col>
+              <Col span={2}>Total Amt</Col>
+              <Col span={1}></Col>
+            </Row>
 
-              // ✅ products PER ROW
-              const productList = Array.isArray(vendorProductsMap[vendorId])
-                ? vendorProductsMap[vendorId]
-                : [];
-
-              return (
-                <div
-                  key={field.key}
-                  className="mb-4 p-4 border rounded-lg bg-white shadow-sm"
-                >
-                  <div className="flex justify-between items-center mb-3">
-                    <div className="text-amber-700 font-semibold">
-                      Item #{idx + 1}
-                    </div>
-                    {allowRemove && (
-                      <Button
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={() => remove(field.name)}
-                      />
-                    )}
-                  </div>
-
-                  <Row gutter={16}>
-                    {/* COMPANY / VENDOR */}
-                    <Col span={6}>
-                      <Form.Item
-                        label={<span className="text-amber-700">Supplier</span>}
-                        name={[field.name, "vendorId"]}
-                        rules={[{ required: true, message: "Select supplier" }]}
-                      >
-                        <Select
-                          placeholder="Select Supplier"
-                          onChange={async (vendorId) => {
-                            if (!vendorProductsMap[vendorId]) {
-                              const res = await getProductsByCompany(vendorId);
-
-                              setVendorProductsMap((prev) => ({
-                                ...prev,
-                                [vendorId]: Array.isArray(res?.products)
-                                  ? res.products
-                                  : [],
-                              }));
-                            }
-
-                            // reset dependent fields
-                            form.setFields([
-                              {
-                                name: ["items", field.name, "item"],
-                                value: undefined,
-                              },
-                              {
-                                name: ["items", field.name, "itemCode"],
-                                value: undefined,
-                              },
-                              {
-                                name: ["items", field.name, "uom"],
-                                value: undefined,
-                              },
-                            ]);
-                          }}
+            {fields.map((field) => (
+              <Row key={field.key} gutter={4} align="middle" className="mb-2">
+                {/* Item Select — auto fills UOM + GST */}
+                <Col span={4}>
+                  <Form.Item
+                    name={[field.name, "item"]}
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Select
+                      placeholder="Select Item"
+                      showSearch
+                      optionFilterProp="children"
+                      onChange={(productId) =>
+                        handleItemSelect(productId, field.name)
+                      }
+                    >
+                      {productList.map((item) => (
+                        <Select.Option
+                          key={item.product_id}
+                          value={item.product_id}
                         >
-                          {vendors.map((v) => (
-                            <Select.Option key={v.id} value={v.id}>
-                              {v.name}
-                            </Select.Option>
-                          ))}
-                        </Select>
-                      </Form.Item>
-                    </Col>
+                          {item.product_name}
+                        </Select.Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
 
-                    {/* ITEM */}
-                    <Col span={6}>
-                      <Form.Item
-                        label={<span className="text-amber-700">Item</span>}
-                        name={[field.name, "item"]}
-                        rules={[{ required: true, message: "Select item" }]}
-                      >
-                        <Select
-                          placeholder="Select Item"
-                          disabled={!vendorId}
-                          onChange={(productId) => {
-                            const selected = productList.find(
-                              (p) => p.id === productId,
-                            );
+                {/* Qty — recalculate on change */}
+                <Col span={2}>
+                  <Form.Item
+                    name={[field.name, "qty"]}
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Input
+                      type="number"
+                      onChange={() => {
+                        setTimeout(() => recalculateRow(field.name), 0);
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
 
-                            form.setFields([
-                              {
-                                name: ["items", field.name, "itemCode"],
-                                value: selected?.hsn_code_value,
-                              },
-                              {
-                                name: ["items", field.name, "uom"],
-                                value: selected?.base_unit,
-                              },
-                              {
-                                name: ["items", field.name, "rate"],
-                                value: Number(selected.default_rate), // ✅ Auto fill Rate
-                              },
-                            ]);
-                          }}
-                        >
-                          {productList.map((p) => (
-                            <Select.Option key={p.id} value={p.id}>
-                              {p.name}
-                            </Select.Option>
-                          ))}
-                        </Select>
-                      </Form.Item>
-                    </Col>
+                {/* Free Qty */}
+                <Col span={2}>
+                  <Form.Item
+                    name={[field.name, "freeQty"]}
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Input
+                      type="number"
+                      onChange={() => {
+                        setTimeout(() => recalculateRow(field.name), 0); // ✅ was missing this
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
+                {/* UOM — auto filled */}
+                <Col span={2}>
+                  <Form.Item
+                    name={[field.name, "uom"]}
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Input disabled />
+                  </Form.Item>
+                </Col>
 
-                    {/* CODE */}
-                    <Col span={4}>
-                      <Form.Item
-                        label={<span className="text-amber-700">Code</span>}
-                        name={[field.name, "itemCode"]}
-                      >
-                        <Input disabled />
-                      </Form.Item>
-                    </Col>
+                {/* Weight in Ton — auto calculated */}
+                <Col span={2}>
+                  <Form.Item
+                    name={[field.name, "weightTon"]}
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Input disabled />
+                  </Form.Item>
+                </Col>
 
-                    {/* UOM */}
-                    <Col span={4}>
-                      <Form.Item
-                        label={<span className="text-amber-700">UOM</span>}
-                        name={[field.name, "uom"]}
-                      >
-                        <Input disabled />
-                      </Form.Item>
-                    </Col>
+                {/* GST % — auto filled */}
+                <Col span={1}>
+                  <Form.Item
+                    name={[field.name, "gstPercent"]}
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Input disabled />
+                  </Form.Item>
+                </Col>
 
-                    {/* QTY */}
-                    <Col span={4}>
-                      <Form.Item
-                        label={<span className="text-amber-700">Qty</span>}
-                        name={[field.name, "qty"]}
-                        rules={[
-                          { required: true, message: "Quantity is required" },
-                          {
-                            validator: (_, value) => {
-                              if (value === undefined || value === null) {
-                                return Promise.resolve();
-                              }
-                              if (isNaN(value)) {
-                                return Promise.reject(
-                                  new Error("Enter a valid number"),
-                                );
-                              }
-                              if (value > 0) {
-                                return Promise.resolve();
-                              }
-                              return Promise.reject(
-                                new Error("Quantity must be greater than 0"),
-                              );
-                            },
-                          },
-                        ]}
-                      >
-                        <Input min={0} className="w-full" />
-                      </Form.Item>
-                    </Col>
+                {/* Contract Rate — user inputs this, triggers calculation */}
+                <Col span={2}>
+                  <Form.Item
+                    name={[field.name, "contractRate"]}
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Input
+                      type="number"
+                      onChange={() => {
+                        setTimeout(() => recalculateRow(field.name), 0);
+                      }}
+                      onBlur={() => handleAutoAddRow(add)}
+                    />
+                  </Form.Item>
+                </Col>
 
-                    {/* FREE QTY */}
-                    <Col span={4}>
-                      <Form.Item
-                        label={<span className="text-amber-700">Free Qty</span>}
-                        name={[field.name, "freeQty"]}
-                        rules={[
-                          {
-                            validator: (_, value) => {
-                              if (value === undefined || value === null) {
-                                return Promise.resolve();
-                              }
-                              if (value >= 0) {
-                                return Promise.resolve();
-                              }
-                              if (isNaN(value)) {
-                                return Promise.reject(
-                                  new Error("Enter a valid number"),
-                                );
-                              }
-                            },
-                          },
-                        ]}
-                      >
-                        <Input min={0} className="w-full" />
-                      </Form.Item>
-                    </Col>
+                {/* Rate — auto calculated (con.rate ex-GST) */}
+                <Col span={2}>
+                  <Form.Item
+                    name={[field.name, "rate"]}
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Input disabled />
+                  </Form.Item>
+                </Col>
 
-                    {/* TOTAL QTY */}
-                    <Col span={4}>
-                      <Form.Item
-                        label={
-                          <span className="text-amber-700">Total Qty</span>
-                        }
-                        name={[field.name, "totalQty"]}
-                      >
-                        <InputNumber disabled className="w-full" />
-                      </Form.Item>
-                    </Col>
+                {/* Amount — auto calculated */}
+                <Col span={2}>
+                  <Form.Item
+                    name={[field.name, "amount"]}
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Input disabled />
+                  </Form.Item>
+                </Col>
 
-                    {/* RATE */}
-                    <Col span={4}>
-                      <Form.Item
-                        label={<span className="text-amber-700">Rate (₹)</span>}
-                        name={[field.name, "rate"]}
-                        rules={[{ required: true }]}
-                      >
-                        <InputNumber min={0} className="w-full" disabled />
-                      </Form.Item>
-                    </Col>
+                {/* GST Amount — auto calculated */}
+                <Col span={2}>
+                  <Form.Item
+                    name={[field.name, "gstAmount"]}
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Input disabled />
+                  </Form.Item>
+                </Col>
 
-                    {/* DISCOUNT */}
-                    <Col span={4}>
-                      <Form.Item
-                        label={
-                          <span className="text-amber-700">Discount %</span>
-                        }
-                        name={[field.name, "discountPercent"]}
-                        rules={[
-                          {
-                            validator: (_, value) => {
-                              if (value === undefined || value === null) {
-                                return Promise.resolve();
-                              }
-                              if (value >= 0) {
-                                return Promise.resolve();
-                              }
-                              if (isNaN(value)) {
-                                return Promise.reject(
-                                  new Error("Enter a valid number"),
-                                );
-                              }
-                            },
-                          },
-                        ]}
-                      >
-                        <Input min={0} max={100} className="w-full" />
-                      </Form.Item>
-                    </Col>
+                {/* Total Amount — auto calculated */}
+                <Col span={2}>
+                  <Form.Item
+                    name={[field.name, "totalAmount"]}
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Input disabled />
+                  </Form.Item>
+                </Col>
 
-                    {/* GROSS */}
-                    <Col span={4}>
-                      <Form.Item
-                        label={
-                          <span className="text-amber-700">Gross Amount</span>
-                        }
-                        name={[field.name, "grossAmount"]}
-                      >
-                        <InputNumber disabled className="w-full" />
-                      </Form.Item>
-                    </Col>
-
-                    {/* GROSS WT */}
-                    <Col span={6}>
-                      <Form.Item
-                        label={<span className="text-amber-700">Gross Wt</span>}
-                        name={[field.name, "grossWt"]}
-                        rules={[
-                          {
-                            validator: (_, value) => {
-                              if (value === undefined || value === null) {
-                                return Promise.resolve();
-                              }
-                              if (value >= 0) {
-                                return Promise.resolve();
-                              }
-                              if (isNaN(value)) {
-                                return Promise.reject(
-                                  new Error("Enter a valid number"),
-                                );
-                              }
-                            },
-                          },
-                        ]}
-                      >
-                        <Input min={0} className="w-full" />
-                      </Form.Item>
-                    </Col>
-
-                    {/* TOTAL GROSS WT */}
-                    <Col span={6}>
-                      <Form.Item
-                        label={
-                          <span className="text-amber-700">Total Gross Wt</span>
-                        }
-                        name={[field.name, "totalGrossWt"]}
-                      >
-                        <InputNumber disabled className="w-full" />
-                      </Form.Item>
-                    </Col>
-                  </Row>
-                </div>
-              );
-            })}
+                <Col span={1}>
+                  {allowRemove && (
+                    <Button
+                      type="text"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => remove(field.name)}
+                    />
+                  )}
+                </Col>
+              </Row>
+            ))}
           </>
         )}
       </Form.List>
@@ -1233,13 +1025,6 @@ export default function SalesSouda() {
       setIsAddModalOpen(false);
       addForm.resetFields();
 
-      // Delete active draft after successful submission
-      if (activeDraftId) {
-        deleteSalesDraft(activeDraftId, "souda");
-        setActiveDraftId(null);
-        loadDraftsList();
-      }
-
       // ✅ Optional: Show success message
       console.log("Sales contract created successfully:", row);
     } catch (error) {
@@ -1253,36 +1038,47 @@ export default function SalesSouda() {
   const handleEditFinish = async (values) => {
     try {
       // Re-calculate item totals to be safe
-      const items = (values.items || []).map((it) => {
-        const netQty = Number(it.qty || 0);
-        const freeQty = Number(it.freeQty || 0);
-        const grossQty = netQty + freeQty;
-        const mrp = Number(it.rate || 0); // rate is MRP
-        const discountPercent = Number(it.discountPercent || 0);
+      const items = (values.items || [])
+        .filter(
+          (it) =>
+            it?.item &&
+            Number(it?.qty || 0) > 0 &&
+            Number(it?.contractRate || 0) > 0,
+        )
+        .map((it) => {
+          const netQty = Number(it.qty || 0);
+          const freeQty = Number(it.freeQty || 0);
+          const grossQty = netQty + freeQty;
+          const mrp = Number(it.rate || 0);
+          const contractRate = Number(it.contractRate || 0);
+          const discountPercent = Number(it.discountPercent || 0);
+          const grossAmount = netQty * mrp;
+          const discountAmount = (grossAmount * discountPercent) / 100;
 
-        const grossAmount = netQty * mrp;
-        const discountAmount = (grossAmount * discountPercent) / 100;
-        const lineTotal = grossAmount - discountAmount;
-
-        return {
-          // vendor_id: it.vendorId,
-          company_group_id: it.vendorId,
-          product_id: it.item, // Using item as product_id
-          uom: it.uom ? it.uom.toLowerCase() : null,
-          mrp,
-          gross_qty: grossQty,
-          free_qty: freeQty,
-          net_qty: netQty,
-          discount_percent: discountPercent,
-          discount_amount: Number(discountAmount.toFixed(2)),
-          line_total: Number(lineTotal.toFixed(2)),
-        };
-      });
-
+          return {
+            company_group_id: it.vendorId,
+            product_id: it.item,
+            uom: it.uom ? it.uom.toLowerCase() : null,
+            mrp,
+            contract_rate: contractRate, // ✅
+            gross_qty: grossQty,
+            free_qty: freeQty,
+            net_qty: netQty,
+            discount_percent: discountPercent,
+            discount_amount: Number(discountAmount.toFixed(2)),
+            line_total: Number((grossAmount - discountAmount).toFixed(2)),
+            gst_amount: Number(it.gstAmount || 0), // ✅
+            gross_amount: Number(it.totalAmount || 0), // ✅
+            total_net_wt_in_ton: Number(it.weightTon || 0), // ✅
+          };
+        });
       const payload = {
         customer_id: selectedRecord.customerId, // Use ID from record
         customer_email: values.customerEmail,
-        customer_mobile: values.customerMobile,
+        customer_mobile: values.customerMobile || 123456789,
+        location: values.location || null, // ✅
+        plant_id: values.plantId || null, // ✅
+        broker_name: values.brokerName || null,
         status: values.status,
         from_date: values.startDate
           ? dayjs(values.startDate).format("YYYY-MM-DD")
@@ -1435,9 +1231,6 @@ export default function SalesSouda() {
         </div>
       </div>
 
-      {/* Draft Table */}
-      <DraftTable />
-
       <div className="border border-amber-300 rounded-lg p-4 shadow-md">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
           Sales Contract Records
@@ -1456,18 +1249,8 @@ export default function SalesSouda() {
         title={
           <div className="flex justify-between items-center">
             <span className="text-amber-700 text-2xl font-semibold">
-              Add Sales Contract{" "}
-              {activeDraftId && (
-                <span className="text-sm text-blue-500">(Draft)</span>
-              )}
+              Add Sales Contract
             </span>
-            <Button
-              size="small"
-              onClick={() => handleManualSave(addForm)}
-              className="bg-green-500 hover:bg-green-600 text-white"
-            >
-              Save Draft
-            </Button>
           </div>
         }
         open={isAddModalOpen}
@@ -1476,58 +1259,17 @@ export default function SalesSouda() {
           addForm.resetFields();
         }}
         footer={null}
-        width={920}
+        width={1400}
       >
         <Form
           form={addForm}
           layout="vertical"
           onFinish={handleAddFinish}
-          onValuesChange={(changedValues, allValues) =>
-            handleFormValuesChange(changedValues, allValues, addForm)
-          }
+          onValuesChange={handleAddValuesChange}
         >
           <h6 className="text-amber-500">Basic Information</h6>
-          <Row gutter={16}>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Contract Date</span>}
-                name="soudaDate"
-                rules={[{ required: true }]}
-                initialValue={dayjs()}
-              >
-                <DatePicker
-                  className="w-full"
-                  disabled
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Start Date</span>}
-                name="startDate"
-              >
-                <DatePicker
-                  className="w-full"
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">End Date</span>}
-                name="endDate"
-              >
-                <DatePicker
-                  className="w-full"
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
+          <Row gutter={4}>
+            <Col span={4}>
               <Form.Item
                 label={<span className="text-amber-700">Customer Name</span>}
                 name="customerId"
@@ -1535,43 +1277,31 @@ export default function SalesSouda() {
               >
                 <Select
                   placeholder="Select Customer"
-                  onChange={async (customerId) => {
-                    // ✅ 1. Instant fill from already loaded list
+                  showSearch
+                  optionFilterProp="children"
+                  onChange={(customerId) => {
                     const selectedCustomer = customers.find(
                       (c) => c.customer_id === customerId,
                     );
 
                     if (selectedCustomer) {
-                      addForm.setFieldsValue({
-                        customerEmail:
-                          selectedCustomer.email_address ||
-                          selectedCustomer.email ||
-                          "",
-                        customerMobile:
-                          selectedCustomer.mobile_number ||
-                          selectedCustomer.mobile ||
+                      // ✅ store mobile silently
+                      setSelectedCustomerMobile(
+                        selectedCustomer.mobile_number ||
                           selectedCustomer.phone_number ||
+                          selectedCustomer.whatsapp_number ||
                           "",
+                      );
+
+                      addForm.setFieldsValue({
+                        customerAddress: [
+                          selectedCustomer.address ||
+                            selectedCustomer.address_line1,
+                          selectedCustomer.city,
+                        ]
+                          .filter(Boolean)
+                          .join(", "),
                       });
-                    }
-
-                    // ✅ 2. Fetch latest details (optional but best practice)
-                    try {
-                      const details = await getAdminCustomerDetails(customerId);
-
-                      if (details) {
-                        addForm.setFieldsValue({
-                          customerEmail:
-                            details.email_address || details.email || "",
-                          customerMobile:
-                            details.mobile_number ||
-                            details.mobile ||
-                            details.phone_number ||
-                            "",
-                        });
-                      }
-                    } catch (err) {
-                      console.error("Customer auto-fill failed", err);
                     }
                   }}
                 >
@@ -1588,23 +1318,114 @@ export default function SalesSouda() {
               </Form.Item>
             </Col>
 
-            <Col span={6}>
+            <Col span={3}>
               <Form.Item
-                label={<span className="text-amber-700">Customer Email</span>}
-                name="customerEmail"
+                label={<span className="text-amber-700">Customer Address</span>}
+                name="customerAddress"
               >
-                <Input placeholder="Customer Email" disabled />
+                <Input disabled />
               </Form.Item>
             </Col>
-            <Col span={6}>
+            <Col span={3}>
               <Form.Item
-                label={<span className="text-amber-700">Customer Mobile</span>}
-                name="customerMobile"
+                label="Plant Name"
+                name="plantId"
+                rules={[
+                  {
+                    required: true,
+                    message: "Select Plant",
+                  },
+                ]}
               >
-                <Input placeholder="Customer Mobile" disabled />
+                <Select
+                  placeholder="Select Plant"
+                  onChange={async (plantId) => {
+                    setSelectedPlantId(plantId); // ← add this
+                    try {
+                      const products = await getProductByplant(plantId);
+                      setVendorProductsMap({ [plantId]: products || [] });
+                      addForm.setFieldsValue({ selectedPlantId: plantId });
+                    } catch (err) {
+                      console.error("Product API Error:", err);
+                    }
+                  }}
+                >
+                  {plants.map((plant) => (
+                    <Select.Option key={plant.plant_id} value={plant.plant_id}>
+                      {plant.plant_name}
+                    </Select.Option>
+                  ))}
+                </Select>
               </Form.Item>
             </Col>
-            <Col span={6}>
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Broker Name</span>}
+                name="brokerName"
+              >
+                <Select
+                  labelInValue
+                  onChange={(option) => {
+                    addForm.setFieldsValue({
+                      brokerId: option.value,
+                      brokerName: option.label,
+                    });
+                  }}
+                >
+                  {brokers.map((broker) => (
+                    <Select.Option key={broker.id} value={broker.id}>
+                      {broker.name}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+              <Form.Item name="brokerId" hidden>
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Contract Date</span>}
+                name="soudaDate"
+                rules={[{ required: true }]}
+                initialValue={dayjs()}
+              >
+                <DatePicker
+                  className="w-full"
+                  disabled
+                  format="DD-MM-YYYY"
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Valid From</span>}
+                name="startDate"
+              >
+                <DatePicker
+                  className="w-full"
+                  format="DD-MM-YYYY"
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Valid To</span>}
+                name="endDate"
+              >
+                <DatePicker
+                  className="w-full"
+                  format="DD-MM-YYYY"
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col span={2}>
               <Form.Item
                 label={<span className="text-amber-700">Status</span>}
                 name="status"
@@ -1620,7 +1441,7 @@ export default function SalesSouda() {
               </Form.Item>
             </Col>
 
-            <Col span={6}>
+            {/* <Col span={6}>
               <Form.Item
                 label={<span className="text-amber-700">Type</span>}
                 name="type"
@@ -1633,180 +1454,57 @@ export default function SalesSouda() {
                   ))}
                 </Select>
               </Form.Item>
-            </Col>
+            </Col> */}
           </Row>
-
-          <Divider />
 
           {/* Items */}
-          <ItemsTable form={addForm} allowRemove={true} allowAdd={true} />
-
-          <Divider />
+          <ItemsTable
+            form={addForm}
+            allowRemove={true}
+            allowAdd={true}
+            productList={vendorProductsMap[selectedPlantId] || []}
+          />
 
           {/* Tax & totals */}
-          <h6 className="text-amber-500">Tax, Charges & Others</h6>
-          <Row gutter={16}>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">GST %</span>}
-                name={["orderTaxAndTotals", "igstPercent"]}
-                rules={[
-                  {
-                    required: true,
-                    message: "GST % is required",
-                  },
-                  {
-                    validator: (_, value) => {
-                      if (value === undefined || value === null) {
-                        return Promise.resolve();
-                      }
-                      if (value >= 0) {
-                        return Promise.resolve();
-                      }
-                      if (isNaN(value)) {
-                        return Promise.reject(
-                          new Error("Enter a valid number"),
-                        );
-                      }
-                    },
-                  },
-                ]}
-              >
-                <Input
-                  className="w-full"
-                  min={0}
-                  max={100}
-                  onChange={(e) => {
-                    const igst = parseFloat(e.target.value) || 0;
-                    const split = (igst / 2).toFixed(2);
+          <h6 className="text-amber-500">Summary</h6>
 
-                    addForm.setFieldsValue({
-                      orderTaxAndTotals: {
-                        cgstPercent: split,
-                        sgstPercent: split,
-                      },
-                    });
-                  }}
-                />
+          <Row gutter={8}>
+            <Col span={4}>
+              <span className="text-amber-700 font-bold text-2xl">
+                Gross Total
+              </span>
+            </Col>
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalQty"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">SGST %</span>}
-                name={["orderTaxAndTotals", "sgstPercent"]}
-                rules={[
-                  {
-                    validator: (_, value) => {
-                      if (value === undefined || value === null) {
-                        return Promise.resolve();
-                      }
-                      if (value >= 0) {
-                        return Promise.resolve();
-                      }
-                      if (isNaN(value)) {
-                        return Promise.reject(
-                          new Error("Enter a valid number"),
-                        );
-                      }
-                    },
-                  },
-                ]}
-              >
-                <Input className="w-full" min={0} max={100} disabled />
+            <Col span={4}></Col>
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalWeightTon"]}>
+                <Input disabled />
+              </Form.Item>
+            </Col>
+            <Col span={5}></Col>
+
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalAmount"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
 
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">CGST %</span>}
-                name={["orderTaxAndTotals", "cgstPercent"]}
-                rules={[
-                  {
-                    validator: (_, value) => {
-                      if (value === undefined || value === null) {
-                        return Promise.resolve();
-                      }
-                      if (value >= 0) {
-                        return Promise.resolve();
-                      }
-                      if (isNaN(value)) {
-                        return Promise.reject(
-                          new Error("Enter a valid number"),
-                        );
-                      }
-                    },
-                  },
-                ]}
-              >
-                <Input className="w-full" min={0} max={100} disabled />
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalGSTAmount"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
 
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">TCS Amt (₹)</span>}
-                name={["orderTaxAndTotals", "tcsAmt"]}
-                rules={[
-                  {
-                    validator: (_, value) => {
-                      if (value === undefined || value === null) {
-                        return Promise.resolve();
-                      }
-                      if (value >= 0) {
-                        return Promise.resolve();
-                      }
-                      if (isNaN(value)) {
-                        return Promise.reject(
-                          new Error("Enter a valid number"),
-                        );
-                      }
-                    },
-                  },
-                ]}
-              >
-                <Input className="w-full" min={0} />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Gross Total (₹)</span>}
-                name={["orderTaxAndTotals", "grossAmountTotal"]}
-              >
-                <InputNumber className="w-full" disabled />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={
-                  <span className="text-amber-700">Discount Total (₹)</span>
-                }
-                name={["orderTaxAndTotals", "discountTotal"]}
-              >
-                <InputNumber className="w-full" disabled />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Total GST (₹)</span>}
-                name={["orderTaxAndTotals", "totalGST"]}
-              >
-                <InputNumber className="w-full" disabled />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Grand Total (₹)</span>}
-                name={["orderTaxAndTotals", "grandTotal"]}
-              >
-                <InputNumber className="w-full" disabled />
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "grossAmount"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
           </Row>
-
           <div className="flex justify-end gap-2 mt-4">
             <Button
               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
@@ -1838,7 +1536,7 @@ export default function SalesSouda() {
           setSelectedRecord(null);
         }}
         footer={null}
-        width={920}
+        width={1400}
       >
         <Form
           form={editForm}
@@ -1847,48 +1545,8 @@ export default function SalesSouda() {
           onValuesChange={handleEditValuesChange}
         >
           <h6 className="text-amber-500">Basic Information</h6>
-          <Row gutter={16}>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Souda Date</span>}
-                name="soudaDate"
-                rules={[{ required: true }]}
-              >
-                <DatePicker
-                  className="w-full"
-                  disabled
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Start Date</span>}
-                name="startDate"
-              >
-                <DatePicker
-                  className="w-full"
-                  disabled
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">End Date</span>}
-                name="endDate"
-              >
-                <DatePicker
-                  className="w-full"
-                  disabled
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
+          <Row gutter={4}>
+            <Col span={4}>
               <Form.Item
                 label={<span className="text-amber-700">Customer Name</span>}
                 name="customerId"
@@ -1896,75 +1554,125 @@ export default function SalesSouda() {
               >
                 <Select
                   placeholder="Select Customer"
-                  onChange={async (value) => {
-                    // ✅ 1. Instant fill from local list
+                  showSearch
+                  optionFilterProp="children"
+                  onChange={(customerId) => {
                     const selectedCustomer = customers.find(
-                      (c) => c.customer_id === value,
+                      (c) => c.customer_id === customerId,
                     );
 
                     if (selectedCustomer) {
-                      editForm.setFieldsValue({
-                        customerId: value,
-                        customerEmail:
-                          selectedCustomer.email_address ||
-                          selectedCustomer.email ||
-                          "",
-                        customerMobile:
-                          selectedCustomer.mobile_number ||
-                          selectedCustomer.mobile ||
-                          selectedCustomer.phone_number ||
-                          "",
+                      addForm.setFieldsValue({
+                        customerAddress: [
+                          selectedCustomer.address ||
+                            selectedCustomer.address_line1,
+                          selectedCustomer.city,
+                        ]
+                          .filter(Boolean)
+                          .join(", "),
                       });
-                    }
-
-                    // ✅ 2. Fetch latest data from API (optional but recommended)
-                    try {
-                      const details = await getAdminCustomerDetails(value);
-
-                      if (details) {
-                        editForm.setFieldsValue({
-                          customerId: value,
-                          customerEmail:
-                            details.email_address || details.email || "",
-                          customerMobile:
-                            details.mobile_number ||
-                            details.mobile ||
-                            details.phone_number ||
-                            "",
-                        });
-                      }
-                    } catch (err) {
-                      console.error("Auto-fill failed", err);
                     }
                   }}
                 >
                   {customers.map((c) => (
-                    <Select.Option key={c.customer_id} value={c.customer_id}>
-                      {" "}
+                    <Select.Option
+                      key={c.customer_id}
+                      value={c.customer_id}
+                      label={c.customer_name}
+                    >
                       {c.customer_name}
                     </Select.Option>
                   ))}
                 </Select>
               </Form.Item>
             </Col>
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Customer Address</span>}
+                name="customerAddress"
+              >
+                <Input disabled />
+              </Form.Item>
+            </Col>
+            <Form.Item
+              label={<span className="text-amber-700">Plant Name</span>}
+              name="plantId"
+              rules={[{ required: true, message: "Select Plant Name" }]}
+            >
+              <Select
+                placeholder="Select Plant"
+                showSearch
+                optionFilterProp="children"
+              >
+                {plants.map((plant) => (
+                  <Select.Option key={plant.plant_id} value={plant.plant_id}>
+                    {plant.plant_name}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
 
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Customer Email</span>}
-                name="customerEmail"
+            <Form.Item
+              label={<span className="text-amber-700">Broker Name</span>}
+              name="brokerId"
+              rules={[{ required: true, message: "Select Broker Name" }]}
+            >
+              <Select
+                placeholder="Select Broker"
+                showSearch
+                optionFilterProp="children"
               >
-                <Input disabled />
+                {brokers.map((broker) => (
+                  <Select.Option key={broker.id} value={broker.id}>
+                    {broker.name}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Contract Date</span>}
+                name="soudaDate"
+                rules={[{ required: true }]}
+              >
+                <DatePicker
+                  className="w-full"
+                  disabled
+                  format="DD-MM-YYYY"
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
               </Form.Item>
             </Col>
-            <Col span={6}>
+
+            <Col span={3}>
               <Form.Item
-                label={<span className="text-amber-700">Customer Mobile</span>}
-                name="customerMobile"
+                label={<span className="text-amber-700">Valid From</span>}
+                name="startDate"
               >
-                <Input disabled />
+                <DatePicker
+                  className="w-full"
+                  format="DD-MM-YYYY"
+                  disabled
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
               </Form.Item>
             </Col>
-            <Col span={6}>
+
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Valid To</span>}
+                name="endDate"
+              >
+                <DatePicker
+                  className="w-full"
+                  disabled
+                  format="DD-MM-YYYY"
+                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                />
+              </Form.Item>
+            </Col>
+
+            <Col span={2}>
               <Form.Item
                 label={<span className="text-amber-700">Status</span>}
                 name="status"
@@ -1981,98 +1689,49 @@ export default function SalesSouda() {
             </Col>
           </Row>
 
-          <Divider />
+          <ItemsTable
+            form={editForm}
+            allowRemove={false}
+            allowAdd={false}
+            productList={vendorProductsMap[selectedPlantId] || []}
+          />
 
-          <ItemsTable form={editForm} allowRemove={false} allowAdd={false} />
+          <h6 className="text-amber-500">Summary</h6>
 
-          <Divider />
-
-          <h6 className="text-amber-500">Tax, Charges & Others</h6>
-          <Row gutter={16}>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">GST %</span>}
-                name={["orderTaxAndTotals", "igstPercent"]}
-              >
-                <InputNumber
-                  className="w-full"
-                  min={0}
-                  max={100}
-                  onChange={(val) => {
-                    const gst = parseFloat(val) || 0;
-                    const split = parseFloat((gst / 2).toFixed(2));
-                    editForm.setFieldsValue({
-                      orderTaxAndTotals: {
-                        sgstPercent: split,
-                        cgstPercent: split,
-                      },
-                    });
-                  }}
-                />
+          <Row gutter={8}>
+            <Col span={4}>
+              <span className="text-amber-700 font-bold text-2xl">
+                Gross Total
+              </span>
+            </Col>
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalQty"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">SGST %</span>}
-                name={["orderTaxAndTotals", "sgstPercent"]}
-              >
-                <InputNumber className="w-full" min={0} max={100} disabled />
+            <Col span={3}></Col>
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalWeightTon"]}>
+                <Input disabled />
+              </Form.Item>
+            </Col>
+            <Col span={6}></Col>
+
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalAmount"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
 
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">CGST %</span>}
-                name={["orderTaxAndTotals", "cgstPercent"]}
-              >
-                <InputNumber className="w-full" min={0} max={100} disabled />
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalGSTAmount"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
 
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">TCS Amt (₹)</span>}
-                name={["orderTaxAndTotals", "tcsAmt"]}
-              >
-                <InputNumber className="w-full" min={0} />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Gross Total (₹)</span>}
-                name={["orderTaxAndTotals", "grossAmountTotal"]}
-              >
-                <InputNumber className="w-full" disabled />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={
-                  <span className="text-amber-700">Discount Total (₹)</span>
-                }
-                name={["orderTaxAndTotals", "discountTotal"]}
-              >
-                <InputNumber className="w-full" disabled />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Total GST (₹)</span>}
-                name={["orderTaxAndTotals", "totalGST"]}
-              >
-                <InputNumber className="w-full" disabled />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Grand Total (₹)</span>}
-                name={["orderTaxAndTotals", "grandTotal"]}
-              >
-                <InputNumber className="w-full" disabled />
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "grossAmount"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
           </Row>
@@ -2101,58 +1760,25 @@ export default function SalesSouda() {
 
       {/* View Modal */}
       <Modal
-        title="View Sales Souda"
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            View Sales Contract
+          </span>
+        }
         open={isViewModalOpen}
         onCancel={() => {
           setIsViewModalOpen(false);
           viewForm.resetFields();
+          setSelectedRecord(null);
         }}
         footer={null}
-        width={920}
+        width={1400}
       >
-        <Form layout="vertical" form={viewForm} initialValues={{}}>
+        <Form layout="vertical" form={viewForm}>
+          {/* Basic Information */}
           <h6 className="text-amber-500">Basic Information</h6>
-          <Row gutter={16}>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Souda Date</span>}
-                name="soudaDate"
-              >
-                <DatePicker
-                  className="w-full"
-                  disabled
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Start Date</span>}
-                name="startDate"
-              >
-                <DatePicker
-                  className="w-full"
-                  disabled
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">End Date</span>}
-                name="endDate"
-              >
-                <DatePicker
-                  className="w-full"
-                  disabled
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
+          <Row gutter={4}>
+            <Col span={4}>
               <Form.Item
                 label={<span className="text-amber-700">Customer Name</span>}
                 name="customer"
@@ -2161,24 +1787,73 @@ export default function SalesSouda() {
               </Form.Item>
             </Col>
 
-            <Col span={6}>
+            <Col span={3}>
               <Form.Item
-                label={<span className="text-amber-700">Customer Email</span>}
-                name="customerEmail"
-              >
-                <Input disabled />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Customer Mobile</span>}
-                name="customerMobile"
+                label={<span className="text-amber-700">Customer Address</span>}
+                name="customerAddress"
               >
                 <Input disabled />
               </Form.Item>
             </Col>
 
-            <Col span={6}>
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Plant Name</span>}
+                name="plantId"
+              >
+                <Select disabled placeholder="Plant">
+                  {plants.map((plant) => (
+                    <Select.Option key={plant.plant_id} value={plant.plant_id}>
+                      {plant.plant_name}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Broker Name</span>}
+                name="brokerId"
+              >
+                <Select disabled placeholder="Broker">
+                  {brokers.map((broker) => (
+                    <Select.Option key={broker.id} value={broker.id}>
+                      {broker.name}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Contract Date</span>}
+                name="soudaDate"
+              >
+                <DatePicker className="w-full" format="DD-MM-YYYY" disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Valid From</span>}
+                name="startDate"
+              >
+                <DatePicker className="w-full" format="DD-MM-YYYY" disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={3}>
+              <Form.Item
+                label={<span className="text-amber-700">Valid To</span>}
+                name="endDate"
+              >
+                <DatePicker className="w-full" format="DD-MM-YYYY" disabled />
+              </Form.Item>
+            </Col>
+
+            <Col span={2}>
               <Form.Item
                 label={<span className="text-amber-700">Status</span>}
                 name="status"
@@ -2188,138 +1863,103 @@ export default function SalesSouda() {
             </Col>
           </Row>
 
-          <Divider />
-
+          {/* Items Section — same header + rows as ItemsTable */}
           <h6 className="text-amber-500">Items</h6>
-          <div className="mb-2 text-sm font-semibold text-amber-700 grid grid-cols-12 gap-2">
-            <div className="col-span-2">Supplier</div>
-            <div className="col-span-3">Item</div>
-            <div className="col-span-1">Code</div>
-            <div className="col-span-1">UOM</div>
-            <div className="col-span-1">Qty</div>
-            <div className="col-span-1">Free</div>
-            <div className="col-span-1">Total</div>
-            <div className="col-span-1">Rate</div>
-            <div className="col-span-1">Gross</div>
-          </div>
+          <Row
+            gutter={4}
+            className="pb-2 mb-2 text-amber-800 font-semibold text-xs"
+          >
+            <Col span={4}>Item Name</Col>
+            <Col span={2}>Qty</Col>
+            <Col span={2}>F.Qty</Col>
+            <Col span={2}>Unit</Col>
+            <Col span={2}>Wt (Ton)</Col>
+            <Col span={1}>GST %</Col>
+            <Col span={2}>Con. Rate</Col>
+            <Col span={2}>Rate</Col>
+            <Col span={2}>Amount</Col>
+            <Col span={2}>GST Amt</Col>
+            <Col span={2}>Total Amt</Col>
+            <Col span={1}></Col>
+          </Row>
 
-          {(selectedRecord?.items || []).map((it) => (
-            <div
-              key={it.lineKey}
-              className="grid grid-cols-12 gap-2 items-center py-2 border-b"
+          {(selectedRecord?.items || []).map((it, idx) => (
+            <Row
+              key={it.lineKey || idx}
+              gutter={4}
+              align="middle"
+              className="mb-2"
             >
-              <div className="col-span-2 text-amber-800">{it.vendorName}</div>
-              <div className="col-span-3 text-amber-800">{it.itemName}</div>
-              <div className="col-span-1 text-amber-800">
-                {it.itemCode || "-"}
-              </div>
-              <div className="col-span-1 text-amber-800">{it.uom || "-"}</div>
-              <div className="col-span-1 text-amber-800">{it.qty}</div>
-              <div className="col-span-1 text-amber-800">{it.freeQty}</div>
-              <div className="col-span-1 text-amber-800">{it.totalQty}</div>
-              <div className="col-span-1 text-amber-800">{it.rate}</div>
-              <div className="col-span-1 text-amber-800">{it.grossAmount}</div>
-            </div>
+              <Col span={4}>
+                <Input disabled value={it.itemName || "-"} />
+              </Col>
+              <Col span={2}>
+                <Input disabled value={it.qty} />
+              </Col>
+              <Col span={2}>
+                <Input disabled value={it.freeQty} />
+              </Col>
+              <Col span={2}>
+                <Input disabled value={it.uom || "-"} />
+              </Col>
+              <Col span={2}>
+                <Input disabled value={it.weightTon} />
+              </Col>
+              <Col span={1}>
+                <Input disabled value={it.gstPercent} />
+              </Col>
+              <Col span={2}>
+                <Input disabled value={it.contractRate} />
+              </Col>
+              <Col span={2}>
+                <Input disabled value={it.rate} />
+              </Col>
+              <Col span={2}>
+                <Input disabled value={it.amount} />
+              </Col>
+              <Col span={2}>
+                <Input disabled value={it.gstAmount} />
+              </Col>
+              <Col span={2}>
+                <Input disabled value={it.totalAmount} />
+              </Col>
+              <Col span={1}></Col>
+            </Row>
           ))}
 
-          <Divider />
-
-          <h6 className="text-amber-500">Tax, Charges & Others</h6>
-          <Row gutter={16}>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">GST %</span>}
-                name={["orderTaxAndTotals", "igstPercent"]}
-              >
-                <Input
-                  disabled
-                  value={selectedRecord?.orderTaxAndTotals?.igstPercent}
-                />
+          {/* Summary — identical to Add/Edit */}
+          <h6 className="text-amber-500 mt-2">Summary</h6>
+          <Row gutter={8}>
+            <Col span={4}>
+              <span className="text-amber-700 font-bold text-2xl">
+                Gross Total
+              </span>
+            </Col>
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalQty"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">SGST %</span>}
-                name={["orderTaxAndTotals", "sgstPercent"]}
-              >
-                <Input
-                  disabled
-                  value={selectedRecord?.orderTaxAndTotals?.sgstPercent}
-                />
+            <Col span={4}></Col>
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalWeightTon"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">CGST %</span>}
-                name={["orderTaxAndTotals", "cgstPercent"]}
-              >
-                <Input
-                  disabled
-                  value={selectedRecord?.orderTaxAndTotals?.cgstPercent}
-                />
+            <Col span={5}></Col>
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalAmount"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">TCS Amt (₹)</span>}
-                name={["orderTaxAndTotals", "tcsAmt"]}
-              >
-                <Input
-                  disabled
-                  value={selectedRecord?.orderTaxAndTotals?.tcsAmt}
-                />
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "totalGSTAmount"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Gross Total (₹)</span>}
-                name={["orderTaxAndTotals", "grossAmountTotal"]}
-              >
-                <Input
-                  disabled
-                  value={selectedRecord?.orderTaxAndTotals?.grossAmountTotal}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={
-                  <span className="text-amber-700">Discount Total (₹)</span>
-                }
-                name={["orderTaxAndTotals", "discountTotal"]}
-              >
-                <Input
-                  disabled
-                  value={selectedRecord?.orderTaxAndTotals?.discountTotal}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Total GST (₹)</span>}
-                name={["orderTaxAndTotals", "totalGST"]}
-              >
-                <Input
-                  disabled
-                  value={selectedRecord?.orderTaxAndTotals?.totalGST}
-                />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item
-                label={<span className="text-amber-700">Grand Total (₹)</span>}
-                name={["orderTaxAndTotals", "grandTotal"]}
-              >
-                <Input
-                  disabled
-                  value={selectedRecord?.orderTaxAndTotals?.grandTotal}
-                />
+            <Col span={2}>
+              <Form.Item name={["orderTotals", "grossAmount"]}>
+                <Input disabled />
               </Form.Item>
             </Col>
           </Row>
