@@ -56,7 +56,46 @@ export const getSalesContractById = async (contractId) => {
   });
   return res.data;
 }
+// get all broker name 
 
+export const getAllBrokerName  =  async () => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get('/sales/contracts/all-brokers/',{
+        params: { organisation: currentOrgId }
+  });
+  return res.data;
+}
+
+
+// get all  plants 
+  export const getAllPlantsName = async () =>{
+  const { currentOrgId } = useSessionStore.getState();
+
+    const res  = await api.get('/sales/contracts/all-plants/',{
+      params: { organisation: currentOrgId }
+    });
+    return res.data;
+  }
+
+
+// get all product by plan id
+export const getProductByplant = async (plantId) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get(
+    "/sales/contracts/plant-all-products/",
+    {
+      params: {
+        organisation: currentOrgId,
+        plant_id: plantId,
+      },
+    }
+  );
+
+  return res.data;
+};
+  // get product group
 export const getproductbyVendor = async (vendorId) => {
   const res = await api.get(`/product/products/by-vendor`, {
     params: { vendor: vendorId }
