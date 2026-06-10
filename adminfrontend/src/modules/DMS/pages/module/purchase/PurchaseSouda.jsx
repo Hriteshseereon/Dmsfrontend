@@ -700,7 +700,7 @@ export default function PurchaseSouda() {
               <Col span={7}>Item Name</Col>
               <Col span={2}>Qty</Col>
               <Col span={2}>Unit</Col>
-              <Col span={2}>Wt in Ton</Col>
+              <Col span={2}>N. Wt(Ton)</Col>
               <Col span={2}>GST %</Col>
               <Col span={2}>Rate</Col>
               <Col span={2}>Amount</Col>
@@ -728,9 +728,17 @@ export default function PurchaseSouda() {
                   <Col span={7}>
                     <Form.Item {...field} name={[field.name, "item_name"]}>
                       <Select
+                        showSearch
+                        allowClear
+                        optionFilterProp="children"
+                        filterOption={(input, option) =>
+                          (option?.children ?? "")
+                            .toLowerCase()
+                            .includes(input.toLowerCase())
+                        }
                         placeholder={
                           !selectedVendor
-                            ? "Select vendor first"
+                            ? "Select supplier first"
                             : "Select Item"
                         }
                         disabled={
@@ -854,7 +862,16 @@ export default function PurchaseSouda() {
                   </Col>
                   <Col span={2}>
                     <Form.Item name={[field.name, "totalNetWt"]}>
-                      <InputNumber className="w-full" disabled />
+                      <InputNumber
+                        className="w-full"
+                        disabled
+                        precision={3}
+                        formatter={(value) =>
+                          value !== undefined
+                            ? Number(value).toFixed(3)
+                            : "0.000"
+                        }
+                      />
                     </Form.Item>
                   </Col>
                   <Col span={2}>
@@ -1110,13 +1127,13 @@ export default function PurchaseSouda() {
           {/* REMOVED Delivery Date; ADDED Start / End */}
           <Col span={3}>
             <Form.Item
-              label="Start Date"
+              label="Valid From"
               name="from_date"
               initialValue={dayjs()}
             >
               <DatePicker
                 className="w-full"
-                format="DD-MM-YYYY"
+                format={["DD-MM-YYYY", "DDMMYYYY"]}
                 inputReadOnly={false}
                 allowClear
                 disabledDate={createFinancialYearDisabledDate(selectedFY)}
@@ -1126,10 +1143,10 @@ export default function PurchaseSouda() {
           </Col>
 
           <Col span={3}>
-            <Form.Item label="End Date" name="to_date" initialValue={dayjs()}>
+            <Form.Item label="Valid To" name="to_date" initialValue={dayjs()}>
               <DatePicker
                 className="w-full"
-                format="DD-MM-YYYY"
+                format={["DD-MM-YYYY", "DDMMYYYY"]}
                 inputReadOnly={false}
                 allowClear
                 disabledDate={createFinancialYearDisabledDate(selectedFY)}
@@ -1187,7 +1204,14 @@ export default function PurchaseSouda() {
           <Col span={2}></Col>
           <Col span={2}>
             <Form.Item name={["orderTotals", "totalNetWt"]}>
-              <InputNumber className="w-full!" disabled />
+              <InputNumber
+                className="w-full!"
+                disabled
+                precision={3}
+                formatter={(value) =>
+                  value !== undefined ? Number(value).toFixed(3) : "0.000"
+                }
+              />
             </Form.Item>
           </Col>
           <Col span={2}></Col>
