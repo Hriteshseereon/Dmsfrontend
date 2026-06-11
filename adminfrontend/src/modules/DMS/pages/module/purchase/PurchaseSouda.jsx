@@ -394,13 +394,13 @@ export default function PurchaseSouda() {
     },
 
     {
-      title: <span className="text-amber-700 font-semibold">Start Date</span>,
+      title: <span className="text-amber-700 font-semibold">Valid From</span>,
       dataIndex: "from_date",
       width: 100,
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">End Date</span>,
+      title: <span className="text-amber-700 font-semibold">Valid To</span>,
       dataIndex: "to_date",
       width: 100,
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
