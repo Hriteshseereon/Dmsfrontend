@@ -196,7 +196,6 @@ export default function SalesSouda() {
       customerAddress: contract.customer_address || "",
 
       status: contract.status,
-      status: contract.status,
 
       // ✅ NEW: map location, plant, broker
       location: contract.location || "",
@@ -241,7 +240,7 @@ export default function SalesSouda() {
 
         discountPercent: Number(it.discount_percent || 0),
         discountAmt: Number(it.discount_amount || 0),
-        grossWt: 0,
+        grossWt: Number(it.gross_weight || 0),
       })),
 
       orderTaxAndTotals: {
@@ -601,6 +600,17 @@ export default function SalesSouda() {
       console.error("Failed to fetch contract details", err);
     }
   };
+
+  // reusalbe data format
+  const parseShortDate = (value) => {
+    if (!value || value.length !== 6) return null;
+
+    const day = value.substring(0, 2);
+    const month = value.substring(2, 4);
+    const year = `20${value.substring(4, 6)}`;
+
+    return dayjs(`${day}-${month}-${year}`, "DD-MM-YYYY");
+  };
   // table columns: replace deliveryDate / company with startDate / endDate
   const columns = [
     // 🆕 Contract Number
@@ -612,12 +622,12 @@ export default function SalesSouda() {
     },
 
     {
-      title: <span className="text-amber-700 font-semibold">Start Date</span>,
+      title: <span className="text-amber-700 font-semibold">Valid From</span>,
       dataIndex: "startDate",
       width: 110,
       render: (date) => (
         <span className="text-amber-800">
-          {date ? dayjs(date).format("YYYY-MM-DD") : "-"}
+          {date ? dayjs(date, "DD-MM-YYYY").format("DD-MM-YYYY") : "-"}
         </span>
       ),
     },
@@ -1070,6 +1080,7 @@ export default function SalesSouda() {
             gst_amount: Number(it.gstAmount || 0), // ✅
             gross_amount: Number(it.totalAmount || 0), // ✅
             total_net_wt_in_ton: Number(it.weightTon || 0), // ✅
+            gst_percentage: Number(it.gstPercent || 0),
           };
         });
       const payload = {
@@ -1219,8 +1230,8 @@ export default function SalesSouda() {
                   tcsAmt: 0,
                 },
                 // make start/end visible in add form
-                startDate: dayjs().startOf("month"),
-                endDate: dayjs().endOf("month"),
+                startDate: dayjs(),
+                endDate: dayjs(),
                 soudaDate: dayjs(),
               });
               setIsAddModalOpen(true);
@@ -1652,7 +1663,6 @@ export default function SalesSouda() {
                 <DatePicker
                   className="w-full"
                   format="DD-MM-YYYY"
-                  disabled
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 />
               </Form.Item>
@@ -1665,7 +1675,6 @@ export default function SalesSouda() {
               >
                 <DatePicker
                   className="w-full"
-                  disabled
                   format="DD-MM-YYYY"
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 />
@@ -1709,13 +1718,13 @@ export default function SalesSouda() {
                 <Input disabled />
               </Form.Item>
             </Col>
-            <Col span={3}></Col>
+            <Col span={4}></Col>
             <Col span={2}>
               <Form.Item name={["orderTotals", "totalWeightTon"]}>
                 <Input disabled />
               </Form.Item>
             </Col>
-            <Col span={6}></Col>
+            <Col span={5}></Col>
 
             <Col span={2}>
               <Form.Item name={["orderTotals", "totalAmount"]}>
