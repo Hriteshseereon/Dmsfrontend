@@ -355,10 +355,10 @@ export default function SalesSouda() {
       broker_id: values.brokerId || null, // ✅ NEW (if you store broker id)
       broker_name: values.brokerName || null, // ✅ NEW
       from_date: values.startDate
-        ? dayjs(values.startDate).format("YYYY-MM-DD")
+        ? dayjs(values.startDate).format("DD-MM-YYYY")
         : null,
       to_date: values.endDate
-        ? dayjs(values.endDate).format("YYYY-MM-DD")
+        ? dayjs(values.endDate).format("DD-MM-YYYY")
         : null,
       customer_mobile: selectedCustomerMobile || values.customerMobile || "",
       customer_email: values.customerEmail || "",
@@ -770,7 +770,7 @@ export default function SalesSouda() {
       const updatedItems = [...items];
       updatedItems[index] = {
         ...updatedItems[index],
-        weightTon: Number(weightTon.toFixed(4)),
+        weightTon: Number(weightTon.toFixed(3)),
         rate: Number(rate.toFixed(2)),
         amount: Number(amount.toFixed(2)),
         gstAmount: Number(gstAmount.toFixed(2)),
@@ -951,7 +951,6 @@ export default function SalesSouda() {
                       className="w-full!"
                       controls={false}
                       min={0}
-                      precision={2}
                       formatter={(value) =>
                         value !== undefined && value !== null
                           ? Number(value).toFixed(2)
@@ -1344,7 +1343,7 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: "2px 12px" } }}
           >
             <h6 className="text-amber-500">Basic Information</h6>
             <Row gutter={4}>
@@ -1544,7 +1543,7 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: "0px 12px" } }}
           >
             <ItemsTable
               form={addForm}
@@ -1556,7 +1555,7 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: "0px 12px" } }}
           >
             {/* Tax & totals */}
             <h6 className="text-amber-500">Summary</h6>
@@ -1668,7 +1667,7 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: "2px 12px" } }}
           >
             <h6 className="text-amber-500">Basic Information</h6>
             <Row gutter={4}>
@@ -1821,7 +1820,7 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: "0px 12px" } }}
           >
             <ItemsTable
               form={editForm}
@@ -1833,7 +1832,7 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: "0px 12px" } }}
           >
             <h6 className="text-amber-500">Summary</h6>
 
@@ -1945,7 +1944,7 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: "0px 12px" } }}
           >
             <h6 className="text-amber-500">Basic Information</h6>
             <Row gutter={4}>
@@ -2043,7 +2042,7 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: "0px 12px" } }}
           >
             <h6 className="text-amber-500">Items</h6>
             <Row
@@ -2112,7 +2111,7 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: "0px 12px" } }}
           >
             <h6 className="text-amber-500 mt-2">Summary</h6>
             <Row gutter={8}>
