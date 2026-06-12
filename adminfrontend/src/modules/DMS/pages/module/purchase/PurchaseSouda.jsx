@@ -704,8 +704,8 @@ export default function PurchaseSouda() {
               <Col span={2}>GST %</Col>
               <Col span={2}>Rate</Col>
               <Col span={2}>Amount</Col>
-              <Col span={2}>GST Amt</Col>
-              <Col span={2}>Total Amt</Col>
+              <Col span={2}>GST Amount</Col>
+              <Col span={2}>Total Amount</Col>
               <Col span={1}></Col>
             </Row>
             {fields.map((field, index) => (
