@@ -53,6 +53,8 @@ import {
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 
+import AppDatePicker from "../../../../../components/AppDatePicker";
+
 const { Option } = Select;
 
 export default function PurchaseSouda() {
@@ -205,9 +207,8 @@ export default function PurchaseSouda() {
         plant: res.plant,
         plant_name: res.plant_name,
 
-        from_date: res.from_date ? dayjs(res.from_date) : null,
-
-        to_date: res.to_date ? dayjs(res.to_date) : null,
+        from_date: res.from_date ? dayjs(res.from_date, "DD-MM-YYYY") : null,
+        to_date: res.to_date ? dayjs(res.to_date, "DD-MM-YYYY") : null,
 
         status: res.status,
 
@@ -351,9 +352,8 @@ export default function PurchaseSouda() {
         plant: res.plant,
         plant_name: res.plant_name,
 
-        from_date: res.from_date ? dayjs(res.from_date) : null,
-
-        to_date: res.to_date ? dayjs(res.to_date) : null,
+        from_date: res.from_date ? dayjs(res.from_date, "DD-MM-YYYY") : null,
+        to_date: res.to_date ? dayjs(res.to_date, "DD-MM-YYYY") : null,
 
         status: res.status,
 
@@ -700,12 +700,12 @@ export default function PurchaseSouda() {
               <Col span={7}>Item Name</Col>
               <Col span={2}>Qty</Col>
               <Col span={2}>Unit</Col>
-              <Col span={2}>N. Wt(Ton)</Col>
+              <Col span={2}>Net Wet(Ton)</Col>
               <Col span={2}>GST %</Col>
               <Col span={2}>Rate</Col>
               <Col span={2}>Amount</Col>
-              <Col span={2}>GST Amt</Col>
-              <Col span={2}>Total Amt</Col>
+              <Col span={2}>GST Amount</Col>
+              <Col span={2}>Total Amount</Col>
               <Col span={1}></Col>
             </Row>
             {fields.map((field, index) => (
@@ -863,7 +863,7 @@ export default function PurchaseSouda() {
                   <Col span={2}>
                     <Form.Item name={[field.name, "totalNetWt"]}>
                       <InputNumber
-                        className="w-full"
+                        className="w-full!"
                         disabled
                         precision={3}
                         formatter={(value) =>
@@ -1113,14 +1113,7 @@ export default function PurchaseSouda() {
               name="soudaDate"
               initialValue={dayjs()}
             >
-              <DatePicker
-                className="w-full"
-                format="DD-MM-YYYY"
-                inputReadOnly={false}
-                allowClear
-                disabled={disabled}
-                disabledDate={createFinancialYearDisabledDate(selectedFY)}
-              />
+              <AppDatePicker />
             </Form.Item>
           </Col>
 
@@ -1131,27 +1124,13 @@ export default function PurchaseSouda() {
               name="from_date"
               initialValue={dayjs()}
             >
-              <DatePicker
-                className="w-full"
-                format={["DD-MM-YYYY", "DDMMYYYY"]}
-                inputReadOnly={false}
-                allowClear
-                disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                disabled={disabled}
-              />
+              <AppDatePicker />
             </Form.Item>
           </Col>
 
           <Col span={3}>
             <Form.Item label="Valid To" name="to_date" initialValue={dayjs()}>
-              <DatePicker
-                className="w-full"
-                format={["DD-MM-YYYY", "DDMMYYYY"]}
-                inputReadOnly={false}
-                allowClear
-                disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                disabled={disabled}
-              />
+              <AppDatePicker />
             </Form.Item>
           </Col>
           <Col span={3}>
