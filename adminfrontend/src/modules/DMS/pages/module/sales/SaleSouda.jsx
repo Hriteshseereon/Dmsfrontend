@@ -355,10 +355,10 @@ export default function SalesSouda() {
       broker_id: values.brokerId || null, // ✅ NEW (if you store broker id)
       broker_name: values.brokerName || null, // ✅ NEW
       from_date: values.startDate
-        ? dayjs(values.startDate).format("DD-MM-YYYY")
+        ? dayjs(values.startDate).format("YYYY-MM-DD")
         : null,
       to_date: values.endDate
-        ? dayjs(values.endDate).format("DD-MM-YYYY")
+        ? dayjs(values.endDate).format("YYYY-MM-DD")
         : null,
       customer_mobile: selectedCustomerMobile || values.customerMobile || "",
       customer_email: values.customerEmail || "",
