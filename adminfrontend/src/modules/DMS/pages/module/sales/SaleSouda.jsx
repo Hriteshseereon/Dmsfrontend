@@ -951,7 +951,6 @@ export default function SalesSouda() {
                       className="w-full!"
                       controls={false}
                       min={0}
-                      precision={2}
                       formatter={(value) =>
                         value !== undefined && value !== null
                           ? Number(value).toFixed(2)
@@ -1344,7 +1343,7 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: "2px 12px" } }}
           >
             <h6 className="text-amber-500">Basic Information</h6>
             <Row gutter={4}>
@@ -1544,7 +1543,7 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: "0px 12px" } }}
           >
             <ItemsTable
               form={addForm}
@@ -1556,7 +1555,7 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: "0px 12px" } }}
           >
             {/* Tax & totals */}
             <h6 className="text-amber-500">Summary</h6>
@@ -1668,7 +1667,7 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: "2px 12px" } }}
           >
             <h6 className="text-amber-500">Basic Information</h6>
             <Row gutter={4}>
@@ -1821,7 +1820,7 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: "0px 12px" } }}
           >
             <ItemsTable
               form={editForm}
@@ -1833,7 +1832,7 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: "0px 12px" } }}
           >
             <h6 className="text-amber-500">Summary</h6>
 
@@ -1945,7 +1944,7 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: "0px 12px" } }}
           >
             <h6 className="text-amber-500">Basic Information</h6>
             <Row gutter={4}>
@@ -2043,7 +2042,7 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: "0px 12px" } }}
           >
             <h6 className="text-amber-500">Items</h6>
             <Row
@@ -2112,7 +2111,7 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            bodyStyle={{ padding: 12 }}
+            styles={{ body: { padding: "0px 12px" } }}
           >
             <h6 className="text-amber-500 mt-2">Summary</h6>
             <Row gutter={8}>
