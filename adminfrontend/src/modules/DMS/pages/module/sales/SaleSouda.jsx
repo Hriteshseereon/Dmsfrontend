@@ -355,10 +355,10 @@ export default function SalesSouda() {
       broker_id: values.brokerId || null, // ✅ NEW (if you store broker id)
       broker_name: values.brokerName || null, // ✅ NEW
       from_date: values.startDate
-        ? dayjs(values.startDate).format("YYYY-MM-DD")
+        ? dayjs(values.startDate).format("DD-MM-YYYY")
         : null,
       to_date: values.endDate
-        ? dayjs(values.endDate).format("YYYY-MM-DD")
+        ? dayjs(values.endDate).format("DD-MM-YYYY")
         : null,
       customer_mobile: selectedCustomerMobile || values.customerMobile || "",
       customer_email: values.customerEmail || "",
@@ -770,7 +770,7 @@ export default function SalesSouda() {
       const updatedItems = [...items];
       updatedItems[index] = {
         ...updatedItems[index],
-        weightTon: Number(weightTon.toFixed(4)),
+        weightTon: Number(weightTon.toFixed(3)),
         rate: Number(rate.toFixed(2)),
         amount: Number(amount.toFixed(2)),
         gstAmount: Number(gstAmount.toFixed(2)),
