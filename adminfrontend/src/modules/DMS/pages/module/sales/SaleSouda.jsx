@@ -47,6 +47,7 @@ import {
   getProductByplant,
 } from "../../../../../api/sales";
 import { getAdminCustomerDetails } from "../../../../../api/customer";
+import AppDatePicker from "../../../../../components/AppDatePicker";
 
 /** trimmed/embedded seed data (same as you provided) */
 const salesSoudaJSONModified2 = {
@@ -1270,7 +1271,7 @@ export default function SalesSouda() {
           addForm.resetFields();
         }}
         footer={null}
-        width={1400}
+        width={1600}
       >
         <Form
           form={addForm}
@@ -1401,12 +1402,13 @@ export default function SalesSouda() {
                 rules={[{ required: true }]}
                 initialValue={dayjs()}
               >
-                <DatePicker
+                {/* <DatePicker
                   className="w-full"
                   disabled
                   format="DD-MM-YYYY"
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
+                /> */}
+                <AppDatePicker />
               </Form.Item>
             </Col>
 
@@ -1415,11 +1417,12 @@ export default function SalesSouda() {
                 label={<span className="text-amber-700">Valid From</span>}
                 name="startDate"
               >
-                <DatePicker
+                {/* <DatePicker
                   className="w-full"
                   format="DD-MM-YYYY"
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
+                /> */}
+                <AppDatePicker />
               </Form.Item>
             </Col>
 
@@ -1428,11 +1431,12 @@ export default function SalesSouda() {
                 label={<span className="text-amber-700">Valid To</span>}
                 name="endDate"
               >
-                <DatePicker
+                {/* <DatePicker
                   className="w-full"
                   format="DD-MM-YYYY"
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
+                /> */}
+                <AppDatePicker />
               </Form.Item>
             </Col>
 
@@ -1547,7 +1551,7 @@ export default function SalesSouda() {
           setSelectedRecord(null);
         }}
         footer={null}
-        width={1400}
+        width={1600}
       >
         <Form
           form={editForm}
@@ -1646,12 +1650,13 @@ export default function SalesSouda() {
                 name="soudaDate"
                 rules={[{ required: true }]}
               >
-                <DatePicker
+                {/* <DatePicker
                   className="w-full"
                   disabled
                   format="DD-MM-YYYY"
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
+                /> */}
+                <AppDatePicker />
               </Form.Item>
             </Col>
 
@@ -1660,11 +1665,12 @@ export default function SalesSouda() {
                 label={<span className="text-amber-700">Valid From</span>}
                 name="startDate"
               >
-                <DatePicker
+                {/* <DatePicker
                   className="w-full"
                   format="DD-MM-YYYY"
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
+                /> */}
+                <AppDatePicker />
               </Form.Item>
             </Col>
 
@@ -1673,11 +1679,12 @@ export default function SalesSouda() {
                 label={<span className="text-amber-700">Valid To</span>}
                 name="endDate"
               >
-                <DatePicker
+                {/* <DatePicker
                   className="w-full"
                   format="DD-MM-YYYY"
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                />
+                /> */}
+                <AppDatePicker />
               </Form.Item>
             </Col>
 
@@ -1781,7 +1788,7 @@ export default function SalesSouda() {
           setSelectedRecord(null);
         }}
         footer={null}
-        width={1400}
+        width={1600}
       >
         <Form layout="vertical" form={viewForm}>
           {/* Basic Information */}
