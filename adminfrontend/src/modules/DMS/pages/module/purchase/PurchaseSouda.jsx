@@ -77,7 +77,11 @@ export default function PurchaseSouda() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
-
+  const contractDateRef = useRef(null);
+  const validFromRef = useRef(null);
+  const validToRef = useRef(null);
+  const qtyRefs = useRef({});
+  const rateRefs = useRef({});
   const statusOptions = ["Pending", "Approved", "Rejected"];
 
   useEffect(() => {
@@ -784,6 +788,10 @@ export default function PurchaseSouda() {
                               value: selected?.hsn_code || null,
                             },
                           ]);
+                          setTimeout(
+                            () => qtyRefs.current[field.name]?.focus(),
+                            100,
+                          );
                         }}
                       >
                         {products.map((p) => (
@@ -820,6 +828,12 @@ export default function PurchaseSouda() {
                             items: computed.items,
                             orderTotals: computed.orderTotals,
                           });
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === "Tab") {
+                            e.preventDefault();
+                            rateRefs.current[field.name]?.focus();
+                          }
                         }}
                         className="w-full!"
                       />
@@ -888,6 +902,7 @@ export default function PurchaseSouda() {
                       fieldKey={[field.fieldKey, "rate"]}
                     >
                       <InputNumber
+                        ref={(el) => (rateRefs.current[field.name] = el)}
                         {...positiveNumberInputProps}
                         disabled={disabled}
                         precision={2}
@@ -1080,6 +1095,9 @@ export default function PurchaseSouda() {
                     console.log("PRODUCT RESPONSE", productRes);
 
                     setProducts(productRes?.products || []);
+                    setTimeout(() => {
+                      contractDateRef.current?.focus();
+                    }, 100);
                   } catch (error) {
                     console.error(error);
                   }
@@ -1113,7 +1131,12 @@ export default function PurchaseSouda() {
               name="soudaDate"
               initialValue={dayjs()}
             >
-              <AppDatePicker />
+              <AppDatePicker
+                ref={contractDateRef}
+                onChange={() => {
+                  setTimeout(() => validFromRef.current?.focus(), 100);
+                }}
+              />
             </Form.Item>
           </Col>
 
@@ -1124,13 +1147,18 @@ export default function PurchaseSouda() {
               name="from_date"
               initialValue={dayjs()}
             >
-              <AppDatePicker />
+              <AppDatePicker
+                ref={validFromRef}
+                onChange={() => {
+                  setTimeout(() => validToRef.current?.focus(), 100);
+                }}
+              />
             </Form.Item>
           </Col>
 
           <Col span={3}>
             <Form.Item label="Valid To" name="to_date" initialValue={dayjs()}>
-              <AppDatePicker />
+              <AppDatePicker ref={validToRef} />
             </Form.Item>
           </Col>
           <Col span={3}>

@@ -1,5 +1,5 @@
 // SalesSouda.jsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import useSessionStore from "../../../../../store/sessionStore";
 import {
   createFinancialYearDisabledDate,
@@ -20,6 +20,8 @@ import {
   Col,
   Divider,
   Card,
+  message,
+  Popconfirm,
 } from "antd";
 import {
   SearchOutlined,
@@ -46,6 +48,7 @@ import {
   getAllBrokerName,
   getAllPlantsName,
   getProductByplant,
+  deleteSalesContract,
 } from "../../../../../api/sales";
 import { getAdminCustomerDetails } from "../../../../../api/customer";
 import AppDatePicker from "../../../../../components/AppDatePicker";
@@ -89,7 +92,15 @@ export default function SalesSouda() {
   const [selectedPlantId, setSelectedPlantId] = useState(null);
   const { currentOrgId } = useSessionStore.getState();
   const selectedFY = useSelectedFinancialYear();
-
+  const plantRef = useRef(null);
+  const brokerRef = useRef(null);
+  const contractDateRef = useRef(null);
+  const validFromRef = useRef();
+  const validToRef = useRef();
+  const [plantDropdownOpen, setPlantDropdownOpen] = useState(false);
+  const [brokerDropdownOpen, setBrokerDropdownOpen] = useState(false);
+  const qtyRefs = useRef({});
+  const contractRateRefs = useRef({});
   // Draft functions
 
   // Auto-save on form changes
@@ -174,9 +185,24 @@ export default function SalesSouda() {
     fetchSalesContracts();
   }, []);
 
-  //
-  // Helper to map contract API response → form values (reuse in both openView & openEdit)
+  //delete function
+  const handleDelete = async (record) => {
+    try {
+      await deleteSalesContract(record.key);
 
+      setData((prev) => prev.filter((item) => item.key !== record.key));
+
+      message.success("Sales Contract deleted successfully");
+    } catch (error) {
+      console.error("Delete Error:", error);
+
+      message.error(
+        error?.response?.data?.message || "Failed to delete Sales Contract",
+      );
+    }
+  };
+  // Helper to map contract API response → form values (reuse in both openView & openEdit)
+  //
   const mapContractToForm = (contract) => {
     const calculatedTotalQty = (contract.items || []).reduce(
       (sum, item) =>
@@ -191,11 +217,11 @@ export default function SalesSouda() {
     return {
       key: contract.sale_contract_id,
       saleContractNumber: contract.sale_contract_number,
-      customer: contract.customer_name,
+      customer: contract.customer_business_name,
       customerId: contract.customer_business_id || contract.customer_id,
       customerEmail: contract.customer_email,
       customerMobile: contract.customer_mobile,
-      customerAddress: contract.customer_address || "",
+      customerAddress: contract.location || "",
 
       status: contract.status,
 
@@ -290,7 +316,7 @@ export default function SalesSouda() {
       const mappedData = (res || []).map((contract) => ({
         key: contract.sale_contract_id,
         saleContractNumber: contract.sale_contract_number,
-        customer: contract.customer_name,
+        customer: contract.customer_business_name,
         customerEmail: contract.customer_email, // Map email
         customerMobile: contract.customer_mobile, // Map mobile
         startDate: contract.from_date,
@@ -706,10 +732,22 @@ export default function SalesSouda() {
             onClick={() => openView(record)}
           />
           {record.status !== "Approved" && (
-            <EditOutlined
-              className="cursor-pointer! text-red-500!"
-              onClick={() => openEdit(record)}
-            />
+            <>
+              <EditOutlined
+                className="cursor-pointer! text-red-500!"
+                onClick={() => openEdit(record)}
+              />
+
+              <Popconfirm
+                title="Are you sure to delete this Sales Contract?"
+                onConfirm={() => handleDelete(record)}
+                okText="Yes"
+                cancelText="No"
+                okButtonProps={{ danger: true }}
+              >
+                <DeleteOutlined className="text-grey-500! cursor-pointer! text-base! hover:text-grey-700!" />
+              </Popconfirm>
+            </>
           )}
         </div>
       ),
@@ -737,6 +775,7 @@ export default function SalesSouda() {
 
       // Trigger recalculation
       recalculateRow(fieldName, updatedItems);
+      setTimeout(() => qtyRefs.current[fieldName]?.focus(), 100);
     };
 
     const recalculateRow = (index, itemsOverride) => {
@@ -873,6 +912,7 @@ export default function SalesSouda() {
                     style={{ marginBottom: 0 }}
                   >
                     <InputNumber
+                      ref={(el) => (qtyRefs.current[field.name] = el)}
                       className="w-full!"
                       type="number"
                       controls={false}
@@ -882,8 +922,11 @@ export default function SalesSouda() {
                           .replace(/\D/g, "")
                           .slice(0, 5);
                       }}
-                      onChange={() => {
-                        setTimeout(() => recalculateRow(field.name), 0);
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === "Tab") {
+                          e.preventDefault();
+                          contractRateRefs.current[field.name]?.focus();
+                        }
                       }}
                     />
                   </Form.Item>
@@ -948,6 +991,7 @@ export default function SalesSouda() {
                     style={{ marginBottom: 0 }}
                   >
                     <InputNumber
+                      ref={(el) => (contractRateRefs.current[field.name] = el)}
                       className="w-full!"
                       controls={false}
                       min={0}
@@ -1375,6 +1419,10 @@ export default function SalesSouda() {
                           customerAddress: selectedCustomer.city || "",
                         });
                       }
+                      setTimeout(() => {
+                        plantRef.current?.focus();
+                        setPlantDropdownOpen(true);
+                      }, 100);
                     }}
                   >
                     {customers.map((c) => (
@@ -1412,6 +1460,11 @@ export default function SalesSouda() {
                   ]}
                 >
                   <Select
+                    ref={plantRef}
+                    open={plantDropdownOpen}
+                    onDropdownVisibleChange={(visible) =>
+                      setPlantDropdownOpen(visible)
+                    }
                     placeholder="Select Plant"
                     onChange={async (plantId) => {
                       setSelectedPlantId(plantId); // ← add this
@@ -1422,6 +1475,11 @@ export default function SalesSouda() {
                       } catch (err) {
                         console.error("Product API Error:", err);
                       }
+                      setPlantDropdownOpen(false);
+                      setTimeout(() => {
+                        brokerRef.current?.focus();
+                        setBrokerDropdownOpen(true);
+                      }, 100);
                     }}
                   >
                     {plants.map((plant) => (
@@ -1441,6 +1499,11 @@ export default function SalesSouda() {
                   name="brokerName"
                 >
                   <Select
+                    ref={brokerRef}
+                    open={brokerDropdownOpen}
+                    onDropdownVisibleChange={(visible) =>
+                      setBrokerDropdownOpen(visible)
+                    }
                     labelInValue
                     onChange={(option) => {
                       const firstWord = option.label?.split(" ")[0] || "";
@@ -1449,6 +1512,10 @@ export default function SalesSouda() {
                         brokerId: option.value,
                         brokerName: firstWord,
                       });
+                      setBrokerDropdownOpen(false);
+                      setTimeout(() => {
+                        contractDateRef.current?.focus();
+                      }, 100);
                     }}
                   >
                     {brokers.map((broker) => (
@@ -1475,7 +1542,12 @@ export default function SalesSouda() {
                   format="DD-MM-YYYY"
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 /> */}
-                  <AppDatePicker />
+                  <AppDatePicker
+                    ref={contractDateRef}
+                    onChange={() => {
+                      setTimeout(() => validFromRef.current?.focus(), 100);
+                    }}
+                  />
                 </Form.Item>
               </Col>
 
@@ -1489,7 +1561,12 @@ export default function SalesSouda() {
                   format="DD-MM-YYYY"
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 /> */}
-                  <AppDatePicker />
+                  <AppDatePicker
+                    ref={validFromRef}
+                    onChange={() => {
+                      setTimeout(() => validToRef.current?.focus(), 100);
+                    }}
+                  />
                 </Form.Item>
               </Col>
 
@@ -1503,7 +1580,7 @@ export default function SalesSouda() {
                   format="DD-MM-YYYY"
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 /> */}
-                  <AppDatePicker />
+                  <AppDatePicker ref={validToRef} />
                 </Form.Item>
               </Col>
 
@@ -1582,7 +1659,7 @@ export default function SalesSouda() {
               <Col span={2}>
                 <Form.Item name={["orderTotals", "totalAmount"]}>
                   <InputNumber
-                    className="w-full"
+                    className="w-full!"
                     disabled
                     precision={2}
                     formatter={(v) =>
@@ -1597,7 +1674,7 @@ export default function SalesSouda() {
               <Col span={2}>
                 <Form.Item name={["orderTotals", "totalGSTAmount"]}>
                   <InputNumber
-                    className="w-full"
+                    className="w-full!"
                     disabled
                     precision={2}
                     formatter={(v) =>
@@ -1612,7 +1689,7 @@ export default function SalesSouda() {
               <Col span={2}>
                 <Form.Item name={["orderTotals", "grossAmount"]}>
                   <InputNumber
-                    className="w-full"
+                    className="w-full!"
                     disabled
                     precision={2}
                     formatter={(v) =>
@@ -1858,7 +1935,7 @@ export default function SalesSouda() {
               <Col span={2}>
                 <Form.Item name={["orderTotals", "totalAmount"]}>
                   <InputNumber
-                    className="w-full"
+                    className="w-full!"
                     disabled
                     precision={2}
                     formatter={(v) =>
@@ -1873,7 +1950,7 @@ export default function SalesSouda() {
               <Col span={2}>
                 <Form.Item name={["orderTotals", "totalGSTAmount"]}>
                   <InputNumber
-                    className="w-full"
+                    className="w-full!"
                     disabled
                     precision={2}
                     formatter={(v) =>
@@ -1888,7 +1965,7 @@ export default function SalesSouda() {
               <Col span={2}>
                 <Form.Item name={["orderTotals", "grossAmount"]}>
                   <InputNumber
-                    className="w-full"
+                    className="w-full!"
                     disabled
                     precision={2}
                     formatter={(v) =>
