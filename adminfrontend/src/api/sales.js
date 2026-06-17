@@ -40,7 +40,15 @@ export const createsalesContract = async (payload) => {
   });
   return res.data;
 }
+// delete the sales contract
+export const deleteSalesContract =  async (id) => {
+  const { currentOrgId, selectedFY } = useSessionStore.getState();
+const res = await api.delete(`/sales/contracts/${id}`,{
+    params: { organisation: currentOrgId, financial_year: selectedFY }
 
+});
+return res.data;
+}
 export const updateSalesContract = async (id, payload) => {
   const { currentOrgId, selectedFY } = useSessionStore.getState();
   const res = await api.patch(`/sales/contracts/${id}/`, payload, {

@@ -1,36 +1,42 @@
-import React from "react";
+import React, { forwardRef, useRef } from "react";
 import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import { formatDateInput } from "../utils/dateInputFormatter";
 
-const AppDatePicker = ({ value, onChange, ...props }) => {
+const AppDatePicker = forwardRef(({ value, onChange, ...props }, ref) => {
+  const isFreshFocus = useRef(false);
+
   const handleChange = (date) => {
     onChange?.(date);
   };
 
+  const handleFocus = (e) => {
+    isFreshFocus.current = true;
+    e.target.select();
+  };
+
   const handleKeyDown = (e) => {
-    const key = e.key;
     const input = e.target;
+    if (input.tagName !== "INPUT") return;
 
-    if (!input.tagName === "INPUT") return;
-
-    // Allow control keys
     if (
-      ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(key)
+      ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(e.key)
     ) {
       return;
     }
 
-    // Block non-digit keys
-    if (!/^\d$/.test(key)) {
+    if (!/^\d$/.test(e.key)) {
       e.preventDefault();
       return;
     }
 
-    // Block typing beyond full date
+    if (isFreshFocus.current) {
+      input.value = "";
+      isFreshFocus.current = false;
+    }
+
     if (input.value.replace(/\D/g, "").length >= 8) {
       e.preventDefault();
-      return;
     }
   };
 
@@ -53,9 +59,9 @@ const AppDatePicker = ({ value, onChange, ...props }) => {
   };
 
   return (
-    // Catch bubbled events from AntD's internal input
-    <div onKeyDown={handleKeyDown} onKeyUp={handleKeyUp}>
+    <div onFocus={handleFocus} onKeyDown={handleKeyDown} onKeyUp={handleKeyUp}>
       <DatePicker
+        ref={ref}
         {...props}
         value={value}
         format="DD-MM-YYYY"
@@ -66,6 +72,6 @@ const AppDatePicker = ({ value, onChange, ...props }) => {
       />
     </div>
   );
-};
+});
 
 export default AppDatePicker;
