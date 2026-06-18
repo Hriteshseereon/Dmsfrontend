@@ -94,11 +94,14 @@ export default function SalesSouda() {
   const selectedFY = useSelectedFinancialYear();
   const plantRef = useRef(null);
   const brokerRef = useRef(null);
+  const itemRefs = useRef({});
   const contractDateRef = useRef(null);
   const validFromRef = useRef();
   const validToRef = useRef();
   const [plantDropdownOpen, setPlantDropdownOpen] = useState(false);
   const [brokerDropdownOpen, setBrokerDropdownOpen] = useState(false);
+  const [addItemDropdownIndex, setAddItemDropdownIndex] = useState(null);
+  const [editItemDropdownIndex, setEditItemDropdownIndex] = useState(null);
   const qtyRefs = useRef({});
   const contractRateRefs = useRef({});
   // Draft functions
@@ -755,7 +758,14 @@ export default function SalesSouda() {
   ];
 
   // ItemsTable (Form.List) — moved company selection into each item row
-  const ItemsTable = ({ form, allowRemove = true, productList = [] }) => {
+  const ItemsTable = ({
+    form,
+    allowRemove = true,
+    allowAdd = true,
+    productList = [],
+    openItemIndex,
+    setOpenItemIndex,
+  }) => {
     const handleItemSelect = (productId, fieldName) => {
       const product = productList.find((p) => p.product_id === productId);
       if (!product) return;
@@ -775,7 +785,12 @@ export default function SalesSouda() {
 
       // Trigger recalculation
       recalculateRow(fieldName, updatedItems);
-      setTimeout(() => qtyRefs.current[fieldName]?.focus(), 100);
+
+      // Close this row's item dropdown, then jump to Quantity and select its value
+      setOpenItemIndex?.(null);
+      setTimeout(() => {
+        qtyRefs.current[fieldName]?.focus();
+      }, 100);
     };
 
     const recalculateRow = (index, itemsOverride) => {
@@ -820,6 +835,8 @@ export default function SalesSouda() {
     };
 
     const handleAutoAddRow = (add) => {
+      if (!allowAdd) return;
+
       const items = form.getFieldValue("items") || [];
       const lastItem = items[items.length - 1];
       const hasEmptyRow = items.some(
@@ -832,6 +849,8 @@ export default function SalesSouda() {
         Number(lastItem?.contractRate || 0) > 0 &&
         !hasEmptyRow
       ) {
+        const newIndex = items.length;
+
         add({
           lineKey: Date.now(),
           item: undefined,
@@ -847,6 +866,13 @@ export default function SalesSouda() {
           totalAmount: null,
           grossWt: 0,
         });
+
+        // Give Form.List a tick to render the new row, then open its item
+        // list and put keyboard focus on it.
+        setTimeout(() => {
+          setOpenItemIndex?.(newIndex);
+          itemRefs.current[newIndex]?.focus();
+        }, 150);
       }
     };
 
@@ -886,9 +912,14 @@ export default function SalesSouda() {
                     style={{ marginBottom: 0 }}
                   >
                     <Select
+                      ref={(el) => (itemRefs.current[field.name] = el)}
                       placeholder="Select Item"
                       showSearch
                       optionFilterProp="children"
+                      open={openItemIndex === field.name}
+                      onDropdownVisibleChange={(visible) =>
+                        setOpenItemIndex?.(visible ? field.name : null)
+                      }
                       onChange={(productId) =>
                         handleItemSelect(productId, field.name)
                       }
@@ -917,6 +948,7 @@ export default function SalesSouda() {
                       type="number"
                       controls={false}
                       maxLength={5}
+                      onFocus={(e) => e.target.select()}
                       onInput={(e) => {
                         e.target.value = e.target.value
                           .replace(/\D/g, "")
@@ -949,7 +981,15 @@ export default function SalesSouda() {
                           .slice(0, 5);
                       }}
                       onChange={() => {
-                        setTimeout(() => recalculateRow(field.name), 0); // ✅ was missing this
+                        setTimeout(() => {
+                          const qtyInput =
+                            qtyRefs.current[
+                              field.name
+                            ]?.nativeElement?.querySelector("input");
+
+                          qtyInput?.focus();
+                          qtyInput?.select();
+                        }, 100);
                       }}
                     />
                   </Form.Item>
@@ -1001,8 +1041,15 @@ export default function SalesSouda() {
                           : "0.00"
                       }
                       parser={(value) => value?.replace(/[^\d.]/g, "")}
+                      onFocus={(e) => e.target.select()}
                       onChange={() => {
                         setTimeout(() => recalculateRow(field.name), 0);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === "Tab") {
+                          e.preventDefault();
+                          handleAutoAddRow(add);
+                        }
                       }}
                       onBlur={() => handleAutoAddRow(add)}
                     />
@@ -1312,6 +1359,7 @@ export default function SalesSouda() {
             className="bg-amber-500! hover:bg-amber-600! border-none!"
             onClick={() => {
               addForm.resetFields();
+              setAddItemDropdownIndex(null);
               addForm.setFieldsValue({
                 status: "Pending",
                 items: [
@@ -1374,6 +1422,7 @@ export default function SalesSouda() {
         onCancel={() => {
           setIsAddModalOpen(false);
           addForm.resetFields();
+          setAddItemDropdownIndex(null);
         }}
         footer={null}
         width={1600}
@@ -1563,9 +1612,9 @@ export default function SalesSouda() {
                 /> */}
                   <AppDatePicker
                     ref={validFromRef}
-                    onChange={() => {
-                      setTimeout(() => validToRef.current?.focus(), 100);
-                    }}
+                    // onChange={() => {
+                    //   setTimeout(() => validToRef.current?.focus(), 100);
+                    // }}
                   />
                 </Form.Item>
               </Col>
@@ -1580,7 +1629,20 @@ export default function SalesSouda() {
                   format="DD-MM-YYYY"
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 /> */}
-                  <AppDatePicker ref={validToRef} />
+                  <AppDatePicker
+                    ref={validToRef}
+                    onKeyDown={(e) => {
+                      if (e.key === "Tab") {
+                        e.preventDefault();
+
+                        setAddItemDropdownIndex(0);
+
+                        setTimeout(() => {
+                          itemRefs.current[0]?.focus();
+                        }, 50);
+                      }
+                    }}
+                  />
                 </Form.Item>
               </Col>
 
@@ -1627,6 +1689,8 @@ export default function SalesSouda() {
               allowRemove={true}
               allowAdd={true}
               productList={vendorProductsMap[selectedPlantId] || []}
+              openItemIndex={addItemDropdownIndex}
+              setOpenItemIndex={setAddItemDropdownIndex}
             />
           </Card>
           <Card
@@ -1708,6 +1772,7 @@ export default function SalesSouda() {
               onClick={() => {
                 setIsAddModalOpen(false);
                 addForm.resetFields();
+                setAddItemDropdownIndex(null);
               }}
             >
               Cancel
@@ -1731,6 +1796,7 @@ export default function SalesSouda() {
           setIsEditModalOpen(false);
           editForm.resetFields();
           setSelectedRecord(null);
+          setEditItemDropdownIndex(null);
         }}
         footer={null}
         width={1600}
@@ -1904,6 +1970,8 @@ export default function SalesSouda() {
               allowRemove={false}
               allowAdd={false}
               productList={vendorProductsMap[selectedPlantId] || []}
+              openItemIndex={editItemDropdownIndex}
+              setOpenItemIndex={setEditItemDropdownIndex}
             />
           </Card>
           <Card
@@ -1985,6 +2053,7 @@ export default function SalesSouda() {
                 setIsEditModalOpen(false);
                 editForm.resetFields();
                 setSelectedRecord(null);
+                setEditItemDropdownIndex(null);
               }}
             >
               Cancel
