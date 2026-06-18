@@ -1612,9 +1612,9 @@ export default function SalesSouda() {
                 /> */}
                   <AppDatePicker
                     ref={validFromRef}
-                    onChange={() => {
-                      setTimeout(() => validToRef.current?.focus(), 100);
-                    }}
+                    // onChange={() => {
+                    //   setTimeout(() => validToRef.current?.focus(), 100);
+                    // }}
                   />
                 </Form.Item>
               </Col>
