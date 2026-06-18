@@ -83,7 +83,8 @@ export default function PurchaseSouda() {
   const qtyRefs = useRef({});
   const rateRefs = useRef({});
   const statusOptions = ["Pending", "Approved", "Rejected"];
-
+  const itemRefs = useRef({});
+  const [itemDropdownIndex, setItemDropdownIndex] = useState(null);
   useEffect(() => {
     fetchDropdownData();
     fetchPurchaseContracts();
@@ -652,7 +653,7 @@ export default function PurchaseSouda() {
           const items = form.getFieldValue("items") || [];
 
           const lastItem = items[items.length - 1];
-
+          const nextIndex = items.length;
           if (
             lastItem?.item_name &&
             Number(lastItem?.qty) > 0 &&
@@ -670,6 +671,10 @@ export default function PurchaseSouda() {
               gstAmount: 0,
               totalAmt: 0,
             });
+            setTimeout(() => {
+              setItemDropdownIndex(nextIndex);
+              itemRefs.current[nextIndex]?.focus();
+            }, 150);
           }
         };
         return (
@@ -732,7 +737,12 @@ export default function PurchaseSouda() {
                   <Col span={7}>
                     <Form.Item {...field} name={[field.name, "item_name"]}>
                       <Select
+                        ref={(el) => (itemRefs.current[field.name] = el)}
                         showSearch
+                        open={itemDropdownIndex === field.name}
+                        onDropdownVisibleChange={(visible) =>
+                          setItemDropdownIndex(visible ? field.name : null)
+                        }
                         allowClear
                         optionFilterProp="children"
                         filterOption={(input, option) =>
@@ -788,10 +798,17 @@ export default function PurchaseSouda() {
                               value: selected?.hsn_code || null,
                             },
                           ]);
-                          setTimeout(
-                            () => qtyRefs.current[field.name]?.focus(),
-                            100,
-                          );
+                          setTimeout(() => {
+                            const qtyInput =
+                              qtyRefs.current[field.name]?.input ||
+                              qtyRefs.current[field.name];
+
+                            qtyInput?.focus();
+
+                            if (qtyInput?.select) {
+                              qtyInput.select();
+                            }
+                          }, 100);
                         }}
                       >
                         {products.map((p) => (
@@ -818,6 +835,7 @@ export default function PurchaseSouda() {
                       ]}
                     >
                       <Input
+                        ref={(el) => (qtyRefs.current[field.name] = el)}
                         disabled={disabled}
                         onChange={() => {
                           const all = form.getFieldsValue();
@@ -832,7 +850,14 @@ export default function PurchaseSouda() {
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === "Tab") {
                             e.preventDefault();
-                            rateRefs.current[field.name]?.focus();
+
+                            const rateInput =
+                              rateRefs.current[
+                                field.name
+                              ]?.nativeElement?.querySelector("input");
+
+                            rateInput?.focus();
+                            rateInput?.select();
                           }
                         }}
                         className="w-full!"
@@ -903,6 +928,7 @@ export default function PurchaseSouda() {
                     >
                       <InputNumber
                         ref={(el) => (rateRefs.current[field.name] = el)}
+                        onFocus={(e) => e.target.select()}
                         {...positiveNumberInputProps}
                         disabled={disabled}
                         precision={2}
@@ -1098,11 +1124,24 @@ export default function PurchaseSouda() {
                     setTimeout(() => {
                       contractDateRef.current?.focus();
                     }, 100);
+                    form.setFieldsValue({
+                      company_group_name: detail?.company_group_name || "",
+                      plant: detail?.plants?.[0]?.id || null,
+                      plant_name: detail?.plants?.[0]?.plant_name || "",
+
+                      items: [
+                        {
+                          lineKey: Date.now(),
+                          qty: 0,
+                          rate: 0,
+                        },
+                      ],
+                    });
                   } catch (error) {
                     console.error(error);
                   }
                 }}
-                disabled={disabled || isEditModalOpen || isViewModalOpen}
+                disabled={isViewModalOpen}
               >
                 {vendors.map((v) => (
                   <Select.Option key={v.id} value={v.id} label={v.name}>
@@ -1158,7 +1197,20 @@ export default function PurchaseSouda() {
 
           <Col span={3}>
             <Form.Item label="Valid To" name="to_date" initialValue={dayjs()}>
-              <AppDatePicker ref={validToRef} />
+              <AppDatePicker
+                ref={validToRef}
+                onKeyDown={(e) => {
+                  if (e.key === "Tab") {
+                    e.preventDefault();
+
+                    setItemDropdownIndex(0);
+
+                    setTimeout(() => {
+                      itemRefs.current[0]?.focus();
+                    }, 50);
+                  }
+                }}
+              />
             </Form.Item>
           </Col>
           <Col span={3}>
