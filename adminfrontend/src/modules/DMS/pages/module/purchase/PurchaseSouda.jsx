@@ -1211,6 +1211,7 @@ export default function PurchaseSouda() {
             >
               <AppDatePicker
                 ref={contractDateRef}
+                disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 onChange={() => {
                   setTimeout(() => validFromRef.current?.focus(), 100);
                 }}
@@ -1227,6 +1228,8 @@ export default function PurchaseSouda() {
             >
               <AppDatePicker
                 ref={validFromRef}
+                disabledDate={createFinancialYearDisabledDate(selectedFY)}
+
                 // onChange={() => {
                 //   setTimeout(() => validToRef.current?.focus(), 100);
                 // }}
@@ -1238,6 +1241,7 @@ export default function PurchaseSouda() {
             <Form.Item label="Valid To" name="to_date" initialValue={dayjs()}>
               <AppDatePicker
                 ref={validToRef}
+                disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 onKeyDown={(e) => {
                   if (e.key === "Tab") {
                     e.preventDefault();
