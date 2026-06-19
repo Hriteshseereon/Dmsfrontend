@@ -917,9 +917,10 @@ export default function SalesSouda() {
                       showSearch
                       optionFilterProp="children"
                       open={openItemIndex === field.name}
-                      onDropdownVisibleChange={(visible) =>
-                        setOpenItemIndex?.(visible ? field.name : null)
-                      }
+                      onFocus={() => setOpenItemIndex?.(field.name)}
+                      onDropdownVisibleChange={(visible) => {
+                        if (!visible) setOpenItemIndex?.(null);
+                      }}
                       onChange={(productId) =>
                         handleItemSelect(productId, field.name)
                       }
@@ -1790,7 +1791,7 @@ export default function SalesSouda() {
 
       {/* Edit Modal */}
       <Modal
-        title="Edit Sales Souda"
+        title="Edit Sales Contract"
         open={isEditModalOpen}
         onCancel={() => {
           setIsEditModalOpen(false);
@@ -1939,7 +1940,17 @@ export default function SalesSouda() {
                   format="DD-MM-YYYY"
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 /> */}
-                  <AppDatePicker />
+                  <AppDatePicker
+                    onKeyDown={(e) => {
+                      if (e.key === "Tab") {
+                        e.preventDefault();
+                        setEditItemDropdownIndex(0);
+                        setTimeout(() => {
+                          itemRefs.current[0]?.focus();
+                        }, 50);
+                      }
+                    }}
+                  />
                 </Form.Item>
               </Col>
 
