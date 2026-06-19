@@ -136,9 +136,12 @@ export default function PurchaseSouda() {
         company_group_name: res.company_group,
         name: item.name,
         souda_number: item.souda_number,
+        contractDate: item.created_date,
         vendor_name: item.company_group || item.vendor_name,
         plant: res.plant,
         plant_name: item.plant_name,
+        quantity: Number(item.total_qty || 0),
+        netWeightTon: Number(item.totalNetWt || item.net_weight || 0),
         startDate: item.startDate,
         to_date: item.to_date,
         from_date: item.from_date,
@@ -211,7 +214,7 @@ export default function PurchaseSouda() {
 
         plant: res.plant,
         plant_name: res.plant_name,
-
+        soudaDate: res.created_at ? dayjs(res.created_at, "DD-MM-YYYY") : null,
         from_date: res.from_date ? dayjs(res.from_date, "DD-MM-YYYY") : null,
         to_date: res.to_date ? dayjs(res.to_date, "DD-MM-YYYY") : null,
 
@@ -244,7 +247,9 @@ export default function PurchaseSouda() {
         plant: values.plant,
         plant_name: values.plant_name,
         status: values.status,
-
+        created_date: values.soudaDate
+          ? dayjs(values.soudaDate).format("YYYY-MM-DD")
+          : null,
         from_date: values.from_date
           ? dayjs(values.from_date).format("YYYY-MM-DD")
           : null,
@@ -356,6 +361,7 @@ export default function PurchaseSouda() {
 
         plant: res.plant,
         plant_name: res.plant_name,
+        soudaDate: res.created_at ? dayjs(res.created_at, "DD-MM-YYYY") : null,
 
         from_date: res.from_date ? dayjs(res.from_date, "DD-MM-YYYY") : null,
         to_date: res.to_date ? dayjs(res.to_date, "DD-MM-YYYY") : null,
@@ -397,7 +403,14 @@ export default function PurchaseSouda() {
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
       width: 100,
     },
-
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Contract Date</span>
+      ),
+      dataIndex: "contractDate",
+      width: 100,
+      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+    },
     {
       title: <span className="text-amber-700 font-semibold">Valid From</span>,
       dataIndex: "from_date",
@@ -410,7 +423,24 @@ export default function PurchaseSouda() {
       width: 100,
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
-
+    {
+      title: <span className="text-amber-700 font-semibold">Quantity</span>,
+      dataIndex: "quantity",
+      render: (t) => (
+        <span className="text-amber-800">{Number(t || 0).toFixed(2)}</span>
+      ),
+      width: 100,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Net Weight (Ton)</span>
+      ),
+      dataIndex: "netWeightTon",
+      render: (t) => (
+        <span className="text-amber-800">{Number(t || 0).toFixed(3)}</span>
+      ),
+      width: 100,
+    },
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
@@ -601,6 +631,9 @@ export default function PurchaseSouda() {
       vendor_name: values.vendor_name,
       plant: values.plant,
       plant_name: values.plant_name,
+      created_date: values.soudaDate
+        ? dayjs(values.soudaDate).format("YYYY-MM-DD")
+        : null,
 
       from_date: dayjs(values.from_date).format("YYYY-MM-DD"),
       to_date: dayjs(values.to_date).format("YYYY-MM-DD"),
@@ -740,9 +773,10 @@ export default function PurchaseSouda() {
                         ref={(el) => (itemRefs.current[field.name] = el)}
                         showSearch
                         open={itemDropdownIndex === field.name}
-                        onDropdownVisibleChange={(visible) =>
-                          setItemDropdownIndex(visible ? field.name : null)
-                        }
+                        onFocus={() => setItemDropdownIndex(field.name)}
+                        onDropdownVisibleChange={(visible) => {
+                          if (!visible) setItemDropdownIndex(null);
+                        }}
                         allowClear
                         optionFilterProp="children"
                         filterOption={(input, option) =>
@@ -947,8 +981,13 @@ export default function PurchaseSouda() {
                             items: computed.items,
                             orderTotals: computed.orderTotals,
                           });
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Tab" || e.key === "Enter") {
+                            e.preventDefault();
 
-                          handleAutoAddRow();
+                            handleAutoAddRow();
+                          }
                         }}
                         className="w-full!"
                       />
@@ -1172,6 +1211,7 @@ export default function PurchaseSouda() {
             >
               <AppDatePicker
                 ref={contractDateRef}
+                disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 onChange={() => {
                   setTimeout(() => validFromRef.current?.focus(), 100);
                 }}
@@ -1188,6 +1228,8 @@ export default function PurchaseSouda() {
             >
               <AppDatePicker
                 ref={validFromRef}
+                disabledDate={createFinancialYearDisabledDate(selectedFY)}
+
                 // onChange={() => {
                 //   setTimeout(() => validToRef.current?.focus(), 100);
                 // }}
@@ -1199,6 +1241,7 @@ export default function PurchaseSouda() {
             <Form.Item label="Valid To" name="to_date" initialValue={dayjs()}>
               <AppDatePicker
                 ref={validToRef}
+                disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 onKeyDown={(e) => {
                   if (e.key === "Tab") {
                     e.preventDefault();

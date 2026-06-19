@@ -322,6 +322,18 @@ export default function SalesSouda() {
         customer: contract.customer_business_name,
         customerEmail: contract.customer_email, // Map email
         customerMobile: contract.customer_mobile, // Map mobile
+        plantName: contract.plant_name,
+        contractDate: contract.created_at,
+        brokerName: contract.broker_name,
+        quantity: (contract.items || []).reduce(
+          (sum, item) => sum + Number(item.gross_qty || 0),
+          0,
+        ),
+
+        grossWeightTon: (contract.items || []).reduce(
+          (sum, item) => sum + Number(item.total_net_wt_in_ton || 0),
+          0,
+        ),
         startDate: contract.from_date,
         endDate: contract.to_date,
         status: contract.status,
@@ -648,14 +660,47 @@ export default function SalesSouda() {
     {
       title: <span className="text-amber-700 font-semibold">Contract No</span>,
       dataIndex: "saleContractNumber",
-      width: 160,
+      width: 100,
       render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
-
+    {
+      title: <span className="text-amber-700 font-semibold">Plant Name</span>,
+      dataIndex: "plantName",
+      width: 100,
+      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Broker Name</span>,
+      dataIndex: "brokerName",
+      width: 100,
+      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Contract Date</span>
+      ),
+      dataIndex: "contractDate",
+      width: 100,
+      render: (date) => (
+        <span className="text-amber-800">
+          {date ? dayjs(date, "DD-MM-YYYY").format("DD-MM-YYYY") : "-"}
+        </span>
+      ),
+    },
     {
       title: <span className="text-amber-700 font-semibold">Valid From</span>,
       dataIndex: "startDate",
-      width: 110,
+      width: 100,
+      render: (date) => (
+        <span className="text-amber-800">
+          {date ? dayjs(date, "DD-MM-YYYY").format("DD-MM-YYYY") : "-"}
+        </span>
+      ),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Valid To</span>,
+      dataIndex: "endDate",
+      width: 100,
       render: (date) => (
         <span className="text-amber-800">
           {date ? dayjs(date, "DD-MM-YYYY").format("DD-MM-YYYY") : "-"}
@@ -666,24 +711,41 @@ export default function SalesSouda() {
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
       dataIndex: "customer",
-      width: 160,
+      width: 100,
       render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
-
     {
-      title: <span className="text-amber-700 font-semibold">Items</span>,
-      dataIndex: "items",
+      title: <span className="text-amber-700 font-semibold">Quantity</span>,
+      dataIndex: "quantity",
       width: 100,
-      render: (items = []) => (
-        <span className="text-amber-800">
-          {items.length
-            ? items
-                .map((i) => i.product?.product_name || i.product_name)
-                .join(" • ")
-            : "-"}
-        </span>
+      render: (value) => (
+        <span className="text-amber-800">{Number(value || 0).toFixed(3)}</span>
       ),
     },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Gross Weight (Ton)</span>
+      ),
+      dataIndex: "grossWeightTon",
+      width: 100,
+      render: (value) => (
+        <span className="text-amber-800">{Number(value || 0).toFixed(3)}</span>
+      ),
+    },
+    // {
+    //   title: <span className="text-amber-700 font-semibold">Items</span>,
+    //   dataIndex: "items",
+    //   width: 100,
+    //   render: (items = []) => (
+    //     <span className="text-amber-800">
+    //       {items.length
+    //         ? items
+    //             .map((i) => i.product?.product_name || i.product_name)
+    //             .join(" • ")
+    //         : "-"}
+    //     </span>
+    //   ),
+    // },
 
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
@@ -917,9 +979,10 @@ export default function SalesSouda() {
                       showSearch
                       optionFilterProp="children"
                       open={openItemIndex === field.name}
-                      onDropdownVisibleChange={(visible) =>
-                        setOpenItemIndex?.(visible ? field.name : null)
-                      }
+                      onFocus={() => setOpenItemIndex?.(field.name)}
+                      onDropdownVisibleChange={(visible) => {
+                        if (!visible) setOpenItemIndex?.(null);
+                      }}
                       onChange={(productId) =>
                         handleItemSelect(productId, field.name)
                       }
@@ -1593,6 +1656,7 @@ export default function SalesSouda() {
                 /> */}
                   <AppDatePicker
                     ref={contractDateRef}
+                    disabledDate={createFinancialYearDisabledDate(selectedFY)}
                     onChange={() => {
                       setTimeout(() => validFromRef.current?.focus(), 100);
                     }}
@@ -1612,6 +1676,7 @@ export default function SalesSouda() {
                 /> */}
                   <AppDatePicker
                     ref={validFromRef}
+                    disabledDate={createFinancialYearDisabledDate(selectedFY)}
                     // onChange={() => {
                     //   setTimeout(() => validToRef.current?.focus(), 100);
                     // }}
@@ -1631,6 +1696,7 @@ export default function SalesSouda() {
                 /> */}
                   <AppDatePicker
                     ref={validToRef}
+                    disabledDate={createFinancialYearDisabledDate(selectedFY)}
                     onKeyDown={(e) => {
                       if (e.key === "Tab") {
                         e.preventDefault();
@@ -1790,7 +1856,7 @@ export default function SalesSouda() {
 
       {/* Edit Modal */}
       <Modal
-        title="Edit Sales Souda"
+        title="Edit Sales Contract"
         open={isEditModalOpen}
         onCancel={() => {
           setIsEditModalOpen(false);
@@ -1939,7 +2005,17 @@ export default function SalesSouda() {
                   format="DD-MM-YYYY"
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 /> */}
-                  <AppDatePicker />
+                  <AppDatePicker
+                    onKeyDown={(e) => {
+                      if (e.key === "Tab") {
+                        e.preventDefault();
+                        setEditItemDropdownIndex(0);
+                        setTimeout(() => {
+                          itemRefs.current[0]?.focus();
+                        }, 50);
+                      }
+                    }}
+                  />
                 </Form.Item>
               </Col>
 

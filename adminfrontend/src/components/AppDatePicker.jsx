@@ -3,75 +3,91 @@ import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import { formatDateInput } from "../utils/dateInputFormatter";
 
-const AppDatePicker = forwardRef(({ value, onChange, ...props }, ref) => {
-  const isFreshFocus = useRef(false);
+const AppDatePicker = forwardRef(
+  ({ value, onChange, disabledDate, ...props }, ref) => {
+    const isFreshFocus = useRef(false);
 
-  const handleChange = (date) => {
-    onChange?.(date);
-  };
+    const handleChange = (date) => {
+      onChange?.(date);
+    };
 
-  const handleFocus = (e) => {
-    isFreshFocus.current = true;
-    e.target.select();
-  };
+    const handleFocus = (e) => {
+      isFreshFocus.current = true;
+      e.target.select();
+    };
 
-  const handleKeyDown = (e) => {
-    const input = e.target;
-    if (input.tagName !== "INPUT") return;
+    const handleKeyDown = (e) => {
+      const input = e.target;
+      if (input.tagName !== "INPUT") return;
 
-    if (
-      ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(e.key)
-    ) {
-      return;
-    }
+      if (
+        ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(
+          e.key,
+        )
+      ) {
+        return;
+      }
 
-    if (!/^\d$/.test(e.key)) {
-      e.preventDefault();
-      return;
-    }
+      if (!/^\d$/.test(e.key)) {
+        e.preventDefault();
+        return;
+      }
 
-    if (isFreshFocus.current) {
-      input.value = "";
-      isFreshFocus.current = false;
-    }
+      if (isFreshFocus.current) {
+        input.value = "";
+        isFreshFocus.current = false;
+      }
 
-    if (input.value.replace(/\D/g, "").length >= 8) {
-      e.preventDefault();
-    }
-  };
+      if (input.value.replace(/\D/g, "").length >= 8) {
+        e.preventDefault();
+      }
+    };
 
-  const handleKeyUp = (e) => {
-    const input = e.target;
-    if (input.tagName !== "INPUT") return;
+    const handleKeyUp = (e) => {
+      const input = e.target;
+      if (input.tagName !== "INPUT") return;
 
-    const formatted = formatDateInput(input.value);
+      const formatted = formatDateInput(input.value);
 
-    if (formatted !== input.value) {
-      input.value = formatted;
-    }
+      if (formatted !== input.value) {
+        input.value = formatted;
+      }
 
-    if (formatted.length === 10) {
-      const parsed = dayjs(formatted, "DD-MM-YYYY", true);
-      if (parsed.isValid()) {
+      if (formatted.length === 10) {
+        const parsed = dayjs(formatted, "DD-MM-YYYY", true);
+
+        if (!parsed.isValid()) return;
+
+        // ✅ enforce the same restriction typed input would get from the calendar
+        if (disabledDate && disabledDate(parsed)) {
+          input.value = "";
+          return; // reject silently, or surface a message in the parent's onChange
+        }
+
         onChange?.(parsed);
       }
-    }
-  };
+    };
 
-  return (
-    <div onFocus={handleFocus} onKeyDown={handleKeyDown} onKeyUp={handleKeyUp}>
-      <DatePicker
-        ref={ref}
-        {...props}
-        value={value}
-        format="DD-MM-YYYY"
-        inputReadOnly={false}
-        allowClear
-        onChange={handleChange}
-        className="w-full"
-      />
-    </div>
-  );
-});
+    return (
+      <div
+        onFocus={handleFocus}
+        onKeyDown={handleKeyDown}
+        onKeyUp={handleKeyUp}
+      >
+        <DatePicker
+          ref={ref}
+          {...props}
+          disabledDate={disabledDate}
+          value={value}
+          format="DD-MM-YYYY"
+          inputReadOnly={false}
+          allowClear
+          onChange={handleChange}
+          className="w-full"
+        />
+      </div>
+    );
+  },
+);
 
 export default AppDatePicker;
