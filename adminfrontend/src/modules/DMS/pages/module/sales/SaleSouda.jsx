@@ -105,7 +105,16 @@ export default function SalesSouda() {
   const qtyRefs = useRef({});
   const contractRateRefs = useRef({});
   // Draft functions
-
+  // date helper
+  const parseApiDate = (value) => {
+    if (!value) return null;
+    // Try native parsing first - handles "YYYY-MM-DD" and full ISO timestamps
+    let d = dayjs(value);
+    if (d.isValid()) return d;
+    // Fallback - handles "DD-MM-YYYY" if some environment ever sends that shape
+    d = dayjs(value, "DD-MM-YYYY");
+    return d.isValid() ? d : null;
+  };
   // Auto-save on form changes
 
   // get the all customer data
@@ -235,15 +244,9 @@ export default function SalesSouda() {
       brokerId: contract.broker_id || "",
       brokerName: contract.broker_name || "",
 
-      soudaDate: contract.created_at
-        ? dayjs(contract.created_at, "DD-MM-YYYY HH:mm:ss")
-        : undefined,
-      startDate: contract.from_date
-        ? dayjs(contract.from_date, "DD-MM-YYYY")
-        : undefined,
-      endDate: contract.to_date
-        ? dayjs(contract.to_date, "DD-MM-YYYY")
-        : undefined,
+      soudaDate: parseApiDate(contract.created_at),
+      startDate: parseApiDate(contract.from_date),
+      endDate: parseApiDate(contract.to_date),
 
       items: (contract.items || []).map((it, idx) => ({
         lineKey: it.id || idx + 1,
