@@ -740,9 +740,10 @@ export default function PurchaseSouda() {
                         ref={(el) => (itemRefs.current[field.name] = el)}
                         showSearch
                         open={itemDropdownIndex === field.name}
-                        onDropdownVisibleChange={(visible) =>
-                          setItemDropdownIndex(visible ? field.name : null)
-                        }
+                        onFocus={() => setItemDropdownIndex(field.name)}
+                        onDropdownVisibleChange={(visible) => {
+                          if (!visible) setItemDropdownIndex(null);
+                        }}
                         allowClear
                         optionFilterProp="children"
                         filterOption={(input, option) =>
@@ -947,8 +948,13 @@ export default function PurchaseSouda() {
                             items: computed.items,
                             orderTotals: computed.orderTotals,
                           });
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Tab" || e.key === "Enter") {
+                            e.preventDefault();
 
-                          handleAutoAddRow();
+                            handleAutoAddRow();
+                          }
                         }}
                         className="w-full!"
                       />
