@@ -112,6 +112,24 @@ export const updatePurchaseContract = async (contractId, payload) => {
 };
 
 // PURCHASE ORDERS
+
+
+// create purchase order api
+export const createpurchaseOrder = async (payload) => {
+    const {currentOrgId,selectedFY} = useSessionStore.getState();
+    const res =  await api.post("/purchase/sales-contract-orders/",payload,{
+      params: { organisation: currentOrgId, financial_year: selectedFY }  
+    });
+    return res.data;
+}
+
+export const filterPurchaseContracOrder = async (data) => {
+    const {currentOrgId,selectedFY} = useSessionStore.getState();
+  const res = await api.get(`/purchase/sales-contract-orders/available-contracts/`,{
+    params: { organisation: currentOrgId, financial_year: selectedFY,start_date:data.startdate,end_date:data.enddate }  
+  });
+  return res.data; 
+}
 //fetch all purchase orders
 export const getPurchaseOrder = async () => {
   const {currentOrgId,selectedFY} = useSessionStore.getState();

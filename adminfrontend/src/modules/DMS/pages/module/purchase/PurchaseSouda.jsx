@@ -90,7 +90,16 @@ export default function PurchaseSouda() {
     fetchPurchaseContracts();
     getPurchaseContract();
   }, []);
-
+  // date helper
+  const parseApiDate = (value) => {
+    if (!value) return null;
+    // Try native parsing first - handles "YYYY-MM-DD" and full ISO timestamps
+    let d = dayjs(value);
+    if (d.isValid()) return d;
+    // Fallback - handles "DD-MM-YYYY" if some environment ever sends that shape
+    d = dayjs(value, "DD-MM-YYYY");
+    return d.isValid() ? d : null;
+  };
   // keep max 3 decimals, no trailing junk
   const round2 = (num) => {
     if (num === null || num === undefined || isNaN(num)) return 0;
@@ -214,9 +223,9 @@ export default function PurchaseSouda() {
 
         plant: res.plant,
         plant_name: res.plant_name,
-        soudaDate: res.created_at ? dayjs(res.created_at, "DD-MM-YYYY") : null,
-        from_date: res.from_date ? dayjs(res.from_date, "DD-MM-YYYY") : null,
-        to_date: res.to_date ? dayjs(res.to_date, "DD-MM-YYYY") : null,
+        soudaDate: parseApiDate(res.created_date || res.created_at),
+        from_date: parseApiDate(res.from_date),
+        to_date: parseApiDate(res.to_date),
 
         status: res.status,
 
@@ -361,10 +370,9 @@ export default function PurchaseSouda() {
 
         plant: res.plant,
         plant_name: res.plant_name,
-        soudaDate: res.created_at ? dayjs(res.created_at, "DD-MM-YYYY") : null,
-
-        from_date: res.from_date ? dayjs(res.from_date, "DD-MM-YYYY") : null,
-        to_date: res.to_date ? dayjs(res.to_date, "DD-MM-YYYY") : null,
+        soudaDate: parseApiDate(res.created_date || res.created_at),
+        from_date: parseApiDate(res.from_date),
+        to_date: parseApiDate(res.to_date),
 
         status: res.status,
 
