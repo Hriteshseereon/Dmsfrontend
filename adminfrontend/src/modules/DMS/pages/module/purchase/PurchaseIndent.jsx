@@ -460,19 +460,34 @@ export default function PurchaseIndent() {
       ),
       dataIndex: "contractDate",
       width: 110,
-      render: (t) => <span className="text-amber-800">{fmtDate(t)}</span>,
+      render: (t) => (
+        <span className="text-amber-800">
+          {" "}
+          {t ? dayjs(t).format("DD-MM-YYYY") : "-"}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Valid From</span>,
       dataIndex: "startDate",
       width: 110,
-      render: (t) => <span className="text-amber-800">{fmtDate(t)}</span>,
+      render: (t) => (
+        <span className="text-amber-800">
+          {" "}
+          {t ? dayjs(t).format("DD-MM-YYYY") : "-"}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Valid To</span>,
       dataIndex: "endDate",
       width: 110,
-      render: (t) => <span className="text-amber-800">{fmtDate(t)}</span>,
+      render: (t) => (
+        <span className="text-amber-800">
+          {" "}
+          {t ? dayjs(t).format("DD-MM-YYYY") : "-"}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,

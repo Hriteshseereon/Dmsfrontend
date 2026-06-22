@@ -115,6 +115,10 @@ export default function SalesSouda() {
     d = dayjs(value, "DD-MM-YYYY");
     return d.isValid() ? d : null;
   };
+  const renderDate = (value) => {
+    const date = parseApiDate(value);
+    return date ? date.format("DD-MM-YYYY") : "-";
+  };
   // Auto-save on form changes
 
   // get the all customer data
@@ -685,9 +689,7 @@ export default function SalesSouda() {
       dataIndex: "contractDate",
       width: 100,
       render: (date) => (
-        <span className="text-amber-800">
-          {date ? dayjs(date, "DD-MM-YYYY").format("DD-MM-YYYY") : "-"}
-        </span>
+        <span className="text-amber-800">{renderDate(date)}</span>
       ),
     },
     {
@@ -695,9 +697,7 @@ export default function SalesSouda() {
       dataIndex: "startDate",
       width: 100,
       render: (date) => (
-        <span className="text-amber-800">
-          {date ? dayjs(date, "DD-MM-YYYY").format("DD-MM-YYYY") : "-"}
-        </span>
+        <span className="text-amber-800">{renderDate(date)}</span>
       ),
     },
     {
@@ -705,9 +705,7 @@ export default function SalesSouda() {
       dataIndex: "endDate",
       width: 100,
       render: (date) => (
-        <span className="text-amber-800">
-          {date ? dayjs(date, "DD-MM-YYYY").format("DD-MM-YYYY") : "-"}
-        </span>
+        <span className="text-amber-800">{renderDate(date)}</span>
       ),
     },
 
