@@ -1658,8 +1658,8 @@ export default function SalesSouda() {
                   <AppDatePicker
                     ref={contractDateRef}
                     disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                    onChange={() => {
-                      setTimeout(() => validFromRef.current?.focus(), 100);
+                    onTabComplete={() => {
+                      setTimeout(() => validFromRef.current?.focus(), 50);
                     }}
                   />
                 </Form.Item>
@@ -1678,9 +1678,9 @@ export default function SalesSouda() {
                   <AppDatePicker
                     ref={validFromRef}
                     disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                    // onChange={() => {
-                    //   setTimeout(() => validToRef.current?.focus(), 100);
-                    // }}
+                    onTabComplete={() => {
+                      setTimeout(() => validToRef.current?.focus(), 50);
+                    }}
                   />
                 </Form.Item>
               </Col>
@@ -1689,25 +1689,44 @@ export default function SalesSouda() {
                 <Form.Item
                   label={<span className="text-amber-700">Valid To</span>}
                   name="endDate"
+                  rules={[
+                    {
+                      validator: (_, value) => {
+                        const fromDate = addForm.getFieldValue("startDate");
+                        if (
+                          value &&
+                          fromDate &&
+                          dayjs(value).isBefore(dayjs(fromDate), "day")
+                        ) {
+                          return Promise.reject(
+                            "Valid To, Valid From se pehle nahi ho sakta!",
+                          );
+                        }
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
                 >
-                  {/* <DatePicker
-                  className="w-full"
-                  format="DD-MM-YYYY"
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                /> */}
                   <AppDatePicker
                     ref={validToRef}
-                    disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Tab") {
-                        e.preventDefault();
-
-                        setAddItemDropdownIndex(0);
-
-                        setTimeout(() => {
-                          itemRefs.current[0]?.focus();
-                        }, 50);
+                    disabledDate={(current) => {
+                      const fromDate = addForm.getFieldValue("startDate");
+                      if (
+                        fromDate &&
+                        current &&
+                        current.isBefore(dayjs(fromDate), "day")
+                      ) {
+                        return true;
                       }
+                      return createFinancialYearDisabledDate(selectedFY)(
+                        current,
+                      );
+                    }}
+                    onTabComplete={() => {
+                      setTimeout(() => {
+                        setAddItemDropdownIndex(0);
+                        itemRefs.current[0]?.focus();
+                      }, 50);
                     }}
                   />
                 </Form.Item>
@@ -1763,10 +1782,10 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ border: "1px solid #FDE68A" }}
-            styles={{ body: { padding: "0px 12px" } }}
+            styles={{ body: { padding: "4px 12px 0px 12px" } }}
           >
             {/* Tax & totals */}
-            <h6 className="text-amber-500">Summary</h6>
+            {/* <h6 className="text-amber-500">Summary</h6> */}
 
             <Row gutter={8}>
               <Col span={6}>
@@ -1978,7 +1997,13 @@ export default function SalesSouda() {
                   format="DD-MM-YYYY"
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 /> */}
-                  <AppDatePicker />
+                  <AppDatePicker
+                    ref={contractDateRef}
+                    disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                    onTabComplete={() => {
+                      setTimeout(() => validFromRef.current?.focus(), 50);
+                    }}
+                  />
                 </Form.Item>
               </Col>
 
@@ -1992,7 +2017,13 @@ export default function SalesSouda() {
                   format="DD-MM-YYYY"
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 /> */}
-                  <AppDatePicker />
+                  <AppDatePicker
+                    ref={validFromRef}
+                    disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                    onTabComplete={() => {
+                      setTimeout(() => validToRef.current?.focus(), 50);
+                    }}
+                  />
                 </Form.Item>
               </Col>
 
@@ -2000,21 +2031,44 @@ export default function SalesSouda() {
                 <Form.Item
                   label={<span className="text-amber-700">Valid To</span>}
                   name="endDate"
+                  rules={[
+                    {
+                      validator: (_, value) => {
+                        const fromDate = editForm.getFieldValue("startDate");
+                        if (
+                          value &&
+                          fromDate &&
+                          dayjs(value).isBefore(dayjs(fromDate), "day")
+                        ) {
+                          return Promise.reject(
+                            "Valid To, Valid From se pehle nahi ho sakta!",
+                          );
+                        }
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
                 >
-                  {/* <DatePicker
-                  className="w-full"
-                  format="DD-MM-YYYY"
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                /> */}
                   <AppDatePicker
-                    onKeyDown={(e) => {
-                      if (e.key === "Tab") {
-                        e.preventDefault();
-                        setEditItemDropdownIndex(0);
-                        setTimeout(() => {
-                          itemRefs.current[0]?.focus();
-                        }, 50);
+                    ref={validToRef}
+                    disabledDate={(current) => {
+                      const fromDate = editForm.getFieldValue("startDate");
+                      if (
+                        fromDate &&
+                        current &&
+                        current.isBefore(dayjs(fromDate), "day")
+                      ) {
+                        return true;
                       }
+                      return createFinancialYearDisabledDate(selectedFY)(
+                        current,
+                      );
+                    }}
+                    onTabComplete={() => {
+                      setTimeout(() => {
+                        setEditItemDropdownIndex(0);
+                        itemRefs.current[0]?.focus();
+                      }, 50);
                     }}
                   />
                 </Form.Item>
