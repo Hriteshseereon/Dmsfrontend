@@ -100,6 +100,10 @@ export default function PurchaseSouda() {
     d = dayjs(value, "DD-MM-YYYY");
     return d.isValid() ? d : null;
   };
+  const renderDate = (value) => {
+    const date = parseApiDate(value);
+    return date ? date.format("DD-MM-YYYY") : "-";
+  };
   // keep max 3 decimals, no trailing junk
   const round2 = (num) => {
     if (num === null || num === undefined || isNaN(num)) return 0;
@@ -417,19 +421,19 @@ export default function PurchaseSouda() {
       ),
       dataIndex: "contractDate",
       width: 100,
-      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+      render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Valid From</span>,
       dataIndex: "from_date",
       width: 100,
-      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+      render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Valid To</span>,
       dataIndex: "to_date",
       width: 100,
-      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+      render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Quantity</span>,
