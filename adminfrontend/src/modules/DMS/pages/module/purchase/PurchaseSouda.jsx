@@ -1224,8 +1224,8 @@ export default function PurchaseSouda() {
               <AppDatePicker
                 ref={contractDateRef}
                 disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                onChange={() => {
-                  setTimeout(() => validFromRef.current?.focus(), 100);
+                onTabComplete={() => {
+                  setTimeout(() => validFromRef.current?.focus(), 50);
                 }}
               />
             </Form.Item>
@@ -1241,29 +1241,54 @@ export default function PurchaseSouda() {
               <AppDatePicker
                 ref={validFromRef}
                 disabledDate={createFinancialYearDisabledDate(selectedFY)}
-
-                // onChange={() => {
-                //   setTimeout(() => validToRef.current?.focus(), 100);
-                // }}
+                onTabComplete={() => {
+                  setTimeout(() => validToRef.current?.focus(), 50); // ← was validFromRef
+                }}
               />
             </Form.Item>
           </Col>
 
           <Col span={3}>
-            <Form.Item label="Valid To" name="to_date" initialValue={dayjs()}>
+            <Form.Item
+              label="Valid To"
+              name="to_date"
+              initialValue={dayjs()}
+              rules={[
+                {
+                  validator: (_, value) => {
+                    const fromDate = form.getFieldValue("from_date");
+                    if (
+                      value &&
+                      fromDate &&
+                      dayjs(value).isBefore(dayjs(fromDate), "day")
+                    ) {
+                      return Promise.reject(
+                        "Valid To, Valid From se pehle nahi ho sakta!",
+                      );
+                    }
+                    return Promise.resolve();
+                  },
+                },
+              ]}
+            >
               <AppDatePicker
                 ref={validToRef}
-                disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                onKeyDown={(e) => {
-                  if (e.key === "Tab") {
-                    e.preventDefault();
-
-                    setItemDropdownIndex(0);
-
-                    setTimeout(() => {
-                      itemRefs.current[0]?.focus();
-                    }, 50);
+                disabledDate={(current) => {
+                  const fromDate = form.getFieldValue("from_date");
+                  if (
+                    fromDate &&
+                    current &&
+                    current.isBefore(dayjs(fromDate), "day")
+                  ) {
+                    return true;
                   }
+                  return createFinancialYearDisabledDate(selectedFY)(current);
+                }}
+                onTabComplete={() => {
+                  setTimeout(() => {
+                    setItemDropdownIndex(0);
+                    itemRefs.current[0]?.focus();
+                  }, 50);
                 }}
               />
             </Form.Item>
