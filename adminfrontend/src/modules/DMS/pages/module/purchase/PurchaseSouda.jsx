@@ -402,6 +402,14 @@ export default function PurchaseSouda() {
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
     {
+      title: (
+        <span className="text-amber-700 font-semibold">Contract Date</span>
+      ),
+      dataIndex: "contractDate",
+      width: 100,
+      render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
+    },
+    {
       title: <span className="text-amber-700 font-semibold">Plant Name</span>,
       dataIndex: "plant_name",
       width: 100,
@@ -414,26 +422,6 @@ export default function PurchaseSouda() {
       dataIndex: "vendor_name",
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
       width: 100,
-    },
-    {
-      title: (
-        <span className="text-amber-700 font-semibold">Contract Date</span>
-      ),
-      dataIndex: "contractDate",
-      width: 100,
-      render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Valid From</span>,
-      dataIndex: "from_date",
-      width: 100,
-      render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Valid To</span>,
-      dataIndex: "to_date",
-      width: 100,
-      render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Quantity</span>,
@@ -453,6 +441,19 @@ export default function PurchaseSouda() {
       ),
       width: 100,
     },
+    {
+      title: <span className="text-amber-700 font-semibold">Valid From</span>,
+      dataIndex: "from_date",
+      width: 100,
+      render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Valid To</span>,
+      dataIndex: "to_date",
+      width: 100,
+      render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
+    },
+
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",

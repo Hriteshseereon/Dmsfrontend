@@ -671,6 +671,16 @@ export default function SalesSouda() {
       render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
     {
+      title: (
+        <span className="text-amber-700 font-semibold">Contract Date</span>
+      ),
+      dataIndex: "contractDate",
+      width: 100,
+      render: (date) => (
+        <span className="text-amber-800">{renderDate(date)}</span>
+      ),
+    },
+    {
       title: <span className="text-amber-700 font-semibold">Plant Name</span>,
       dataIndex: "plantName",
       width: 100,
@@ -682,33 +692,6 @@ export default function SalesSouda() {
       width: 100,
       render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
-    {
-      title: (
-        <span className="text-amber-700 font-semibold">Contract Date</span>
-      ),
-      dataIndex: "contractDate",
-      width: 100,
-      render: (date) => (
-        <span className="text-amber-800">{renderDate(date)}</span>
-      ),
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Valid From</span>,
-      dataIndex: "startDate",
-      width: 100,
-      render: (date) => (
-        <span className="text-amber-800">{renderDate(date)}</span>
-      ),
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Valid To</span>,
-      dataIndex: "endDate",
-      width: 100,
-      render: (date) => (
-        <span className="text-amber-800">{renderDate(date)}</span>
-      ),
-    },
-
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
       dataIndex: "customer",
@@ -733,6 +716,23 @@ export default function SalesSouda() {
         <span className="text-amber-800">{Number(value || 0).toFixed(3)}</span>
       ),
     },
+    {
+      title: <span className="text-amber-700 font-semibold">Valid From</span>,
+      dataIndex: "startDate",
+      width: 100,
+      render: (date) => (
+        <span className="text-amber-800">{renderDate(date)}</span>
+      ),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Valid To</span>,
+      dataIndex: "endDate",
+      width: 100,
+      render: (date) => (
+        <span className="text-amber-800">{renderDate(date)}</span>
+      ),
+    },
+
     // {
     //   title: <span className="text-amber-700 font-semibold">Items</span>,
     //   dataIndex: "items",
