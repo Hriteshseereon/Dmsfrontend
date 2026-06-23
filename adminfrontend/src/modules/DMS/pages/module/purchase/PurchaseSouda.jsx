@@ -214,6 +214,8 @@ export default function PurchaseSouda() {
             igstPercent: Number(it.igst_percent),
 
             totalGST: Number(it.total_gst_amount),
+            gstAmount: Number(it.gstAmount || 0),
+            roundOff: Number(it.roundoff || 0),
             totalAmt: Number(it.total_amount),
           })) || [];
 
@@ -300,6 +302,7 @@ export default function PurchaseSouda() {
           igst_percent: round2(it.igstPercent),
 
           total_gst_amount: round2(it.totalGST),
+          roundoff: round2(it.roundOff),
           total_amount: round2(it.totalAmt),
         })),
       };
@@ -361,6 +364,7 @@ export default function PurchaseSouda() {
             igstPercent: Number(it.igst_percent),
 
             totalGST: Number(it.total_gst_amount),
+            roundOff: Number(it.roundoff || 0),
             totalAmt: Number(it.total_amount),
           })) || [];
 
@@ -533,8 +537,13 @@ export default function PurchaseSouda() {
       // GST Amount
       const gstAmount = round2((taxableAmount * gstPercent) / 100);
 
-      // Final Amount
-      const totalAmt = round2(taxableAmount + gstAmount);
+      const subTotal = round2(taxableAmount + gstAmount);
+
+      const roundedTotal = Math.round(subTotal);
+
+      const roundOff = round2(roundedTotal - subTotal);
+
+      const totalAmt = round2(subTotal + roundOff);
 
       // Final Total Amount
 
@@ -547,6 +556,7 @@ export default function PurchaseSouda() {
         discountAmt,
         gstAmount,
         totalAmt,
+        roundOff,
         totalNetWt: round2((netWt * qty) / 1000),
       };
     });
@@ -681,6 +691,7 @@ export default function PurchaseSouda() {
         igst_percent: round2(it.igstPercent),
 
         total_gst_amount: round2(it.totalGST),
+        roundoff: round2(it.roundOff),
         total_amount: round2(it.totalAmt),
       })),
     };
@@ -752,7 +763,7 @@ export default function PurchaseSouda() {
               )} */}
             </div>
             <Row gutter={12} className=" pb-2 mb-2">
-              <Col span={7}>Item Name</Col>
+              <Col span={6}>Item Name</Col>
               <Col span={2}>Qty</Col>
               <Col span={2}>Unit</Col>
               <Col span={2}>Net Wet(Ton)</Col>
@@ -760,6 +771,7 @@ export default function PurchaseSouda() {
               <Col span={2}>Rate</Col>
               <Col span={2}>Amount</Col>
               <Col span={2}>GST Amount</Col>
+              <Col span={1}>Ro. Off</Col>
               <Col span={2}>Total Amount</Col>
               <Col span={1}></Col>
             </Row>
@@ -780,7 +792,7 @@ export default function PurchaseSouda() {
                 }
               >
                 <Row gutter={12} align="middle">
-                  <Col span={7}>
+                  <Col span={6}>
                     <Form.Item {...field} name={[field.name, "item_name"]}>
                       <Select
                         ref={(el) => (itemRefs.current[field.name] = el)}
@@ -1091,6 +1103,19 @@ export default function PurchaseSouda() {
                       />
                     </Form.Item>
                   </Col>
+                  <Col span={1}>
+                    <Form.Item {...field} name={[field.name, "roundOff"]}>
+                      <InputNumber
+                        className="w-full!"
+                        disabled
+                        formatter={(value) =>
+                          value !== undefined
+                            ? Number(value).toFixed(2)
+                            : "0.00"
+                        }
+                      />
+                    </Form.Item>
+                  </Col>
                   <Col span={2}>
                     <Form.Item
                       {...field}
@@ -1331,7 +1356,7 @@ export default function PurchaseSouda() {
       >
         {/* <h6 className="text-amber-500">Totals</h6> */}
         <Row gutter={12}>
-          <Col span={7}>
+          <Col span={6}>
             <span className="text-amber-700 font-bold text-2xl">
               Gross Total
             </span>
@@ -1380,6 +1405,7 @@ export default function PurchaseSouda() {
               />
             </Form.Item>
           </Col>
+          <Col span={1}></Col>
 
           <Col span={2}>
             <Form.Item name={["orderTotals", "totalGrossAmount"]}>
