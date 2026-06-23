@@ -274,6 +274,7 @@ export default function SalesSouda() {
         ),
         gstAmount: Number(it.gst_amount || it.gstAmount || 0),
         amount: Number(it.line_total || 0), // ex-GST amount
+        roundOff: Number(it.roundoff || 0),
         totalAmount: Number(it.gross_amount || it.GrossAmount || 0), // total inc GST
 
         discountPercent: Number(it.discount_percent || 0),
@@ -391,6 +392,7 @@ export default function SalesSouda() {
           line_total: Number((grossAmount - discountAmount).toFixed(2)),
           gst_amount: Number(it.gstAmount || 0), // ✅ was missing
           gross_amount: Number(it.totalAmount || 0), // ✅ was missing
+          roundoff: Number(it.roundOff || 0),
           total_net_wt_in_ton: Number(it.weightTon || 0), // ✅ was missing
         };
       });
@@ -416,7 +418,10 @@ export default function SalesSouda() {
       igst: Number(values.orderTaxAndTotals?.igstPercent || 0),
       tcs_amount: Number(values.orderTaxAndTotals?.tcsAmt || 0),
       cash_discount: 0,
-      round_off_amount: 0,
+      round_off_amount: (values.items || []).reduce(
+        (sum, it) => sum + Number(it.roundOff || 0),
+        0,
+      ),
 
       items,
     };
@@ -878,11 +883,15 @@ export default function SalesSouda() {
       // Amount = qty * rate (excluding GST)
       const amount = qty * rate;
 
-      // GST Amount = amount * gstPercent / 100
       const gstAmount = (amount * gstPercent) / 100;
 
-      // Total Amount = amount + gstAmount
-      const totalAmount = amount + gstAmount;
+      const subTotal = amount + gstAmount;
+
+      const roundedTotal = Math.round(subTotal);
+
+      const roundOff = roundedTotal - subTotal;
+
+      const totalAmount = subTotal + roundOff;
 
       const updatedItems = [...items];
       updatedItems[index] = {
@@ -891,6 +900,7 @@ export default function SalesSouda() {
         rate: Number(rate.toFixed(2)),
         amount: Number(amount.toFixed(2)),
         gstAmount: Number(gstAmount.toFixed(2)),
+        roundOff: Number(roundOff.toFixed(2)),
         totalAmount: Number(totalAmount.toFixed(2)),
       };
 
@@ -952,7 +962,7 @@ export default function SalesSouda() {
               gutter={4}
               className="pb-2 mb-2 text-amber-800 font-semibold text-xs"
             >
-              <Col span={6}>Item Name</Col>
+              <Col span={5}>Item Name</Col>
               <Col span={2}>Quantity</Col>
               <Col span={1}>Free Qty</Col>
               <Col span={2}>Unit</Col>
@@ -962,6 +972,7 @@ export default function SalesSouda() {
               <Col span={2}>Rate</Col>
               <Col span={2}>Amount</Col>
               <Col span={2}>GST Amount</Col>
+              <Col span={1}>Ro. Off</Col>
               <Col span={2}>Total Amount</Col>
               <Col span={1}></Col>
             </Row>
@@ -969,7 +980,7 @@ export default function SalesSouda() {
             {fields.map((field) => (
               <Row key={field.key} gutter={4} align="middle" className="mb-5">
                 {/* Item Select — auto fills UOM + GST */}
-                <Col span={6}>
+                <Col span={5}>
                   <Form.Item
                     name={[field.name, "item"]}
                     style={{ marginBottom: 0 }}
@@ -1176,6 +1187,23 @@ export default function SalesSouda() {
                     />
                   </Form.Item>
                 </Col>
+                <Col span={1}>
+                  <Form.Item
+                    name={[field.name, "roundOff"]}
+                    style={{ marginBottom: 0 }}
+                  >
+                    <InputNumber
+                      className="w-full!"
+                      disabled
+                      precision={2}
+                      formatter={(value) =>
+                        value !== undefined && value !== null
+                          ? Number(value).toFixed(2)
+                          : "0.00"
+                      }
+                    />
+                  </Form.Item>
+                </Col>
 
                 {/* Total Amount — auto calculated */}
                 <Col span={2}>
@@ -1296,6 +1324,7 @@ export default function SalesSouda() {
             line_total: Number((grossAmount - discountAmount).toFixed(2)),
             gst_amount: Number(it.gstAmount || 0), // ✅
             gross_amount: Number(it.totalAmount || 0), // ✅
+            roundoff: Number(it.roundOff || 0),
             total_net_wt_in_ton: Number(it.weightTon || 0), // ✅
             gst_percentage: Number(it.gstPercent || 0),
           };
@@ -1316,7 +1345,10 @@ export default function SalesSouda() {
           : null,
 
         cash_discount: 0,
-        round_off_amount: 0,
+        round_off_amount: (values.items || []).reduce(
+          (sum, it) => sum + Number(it.roundOff || 0),
+          0,
+        ),
         narration: "Admin updated contract",
 
         cgst: Number(values.orderTaxAndTotals?.cgstPercent || 0),
@@ -1788,7 +1820,7 @@ export default function SalesSouda() {
             {/* <h6 className="text-amber-500">Summary</h6> */}
 
             <Row gutter={8}>
-              <Col span={6}>
+              <Col span={5}>
                 <span className="text-amber-700 font-bold text-2xl">
                   Gross Total
                 </span>
@@ -1835,7 +1867,7 @@ export default function SalesSouda() {
                   />
                 </Form.Item>
               </Col>
-
+              <Col span={1}></Col>
               <Col span={2}>
                 <Form.Item name={["orderTotals", "grossAmount"]}>
                   <InputNumber
@@ -2108,12 +2140,12 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            styles={{ body: { padding: "0px 12px" } }}
+            styles={{ body: { padding: "6px 12px 0px 12px" } }}
           >
-            <h6 className="text-amber-500">Summary</h6>
+            {/* <h6 className="text-amber-500">Summary</h6> */}
 
             <Row gutter={8}>
-              <Col span={6}>
+              <Col span={5}>
                 <span className="text-amber-700 font-bold text-2xl">
                   Gross Total
                 </span>
@@ -2145,7 +2177,6 @@ export default function SalesSouda() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={2}>
                 <Form.Item name={["orderTotals", "totalGSTAmount"]}>
                   <InputNumber
@@ -2160,6 +2191,7 @@ export default function SalesSouda() {
                   />
                 </Form.Item>
               </Col>
+              <Col span={1}></Col>
 
               <Col span={2}>
                 <Form.Item name={["orderTotals", "grossAmount"]}>
@@ -2336,6 +2368,7 @@ export default function SalesSouda() {
               <Col span={2}>Rate</Col>
               <Col span={2}>Amount</Col>
               <Col span={2}>GST Amt</Col>
+              <Col span={1}>Ro. Off</Col>
               <Col span={2}>Total Amt</Col>
               <Col span={1}></Col>
             </Row>
@@ -2377,6 +2410,9 @@ export default function SalesSouda() {
                 <Col span={2}>
                   <Input disabled value={it.gstAmount} />
                 </Col>
+                <Col span={1}>
+                  <Input disabled value={it.roundOff} />
+                </Col>
                 <Col span={2}>
                   <Input disabled value={it.totalAmount} />
                 </Col>
@@ -2388,9 +2424,9 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            styles={{ body: { padding: "0px 12px" } }}
+            styles={{ body: { padding: "6px 12px 0px 12px" } }}
           >
-            <h6 className="text-amber-500 mt-2">Summary</h6>
+            {/* <h6 className="text-amber-500 mt-2">Summary</h6> */}
             <Row gutter={8}>
               <Col span={4}>
                 <span className="text-amber-700 font-bold text-2xl">
@@ -2419,6 +2455,7 @@ export default function SalesSouda() {
                   <Input disabled />
                 </Form.Item>
               </Col>
+              <Col span={1}></Col>
               <Col span={2}>
                 <Form.Item name={["orderTotals", "grossAmount"]}>
                   <Input disabled />
