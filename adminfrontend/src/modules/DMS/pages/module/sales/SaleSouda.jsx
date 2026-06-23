@@ -115,6 +115,10 @@ export default function SalesSouda() {
     d = dayjs(value, "DD-MM-YYYY");
     return d.isValid() ? d : null;
   };
+  const renderDate = (value) => {
+    const date = parseApiDate(value);
+    return date ? date.format("DD-MM-YYYY") : "-";
+  };
   // Auto-save on form changes
 
   // get the all customer data
@@ -270,6 +274,7 @@ export default function SalesSouda() {
         ),
         gstAmount: Number(it.gst_amount || it.gstAmount || 0),
         amount: Number(it.line_total || 0), // ex-GST amount
+        roundOff: Number(it.roundoff || 0),
         totalAmount: Number(it.gross_amount || it.GrossAmount || 0), // total inc GST
 
         discountPercent: Number(it.discount_percent || 0),
@@ -387,6 +392,7 @@ export default function SalesSouda() {
           line_total: Number((grossAmount - discountAmount).toFixed(2)),
           gst_amount: Number(it.gstAmount || 0), // ✅ was missing
           gross_amount: Number(it.totalAmount || 0), // ✅ was missing
+          roundoff: Number(it.roundOff || 0),
           total_net_wt_in_ton: Number(it.weightTon || 0), // ✅ was missing
         };
       });
@@ -412,7 +418,10 @@ export default function SalesSouda() {
       igst: Number(values.orderTaxAndTotals?.igstPercent || 0),
       tcs_amount: Number(values.orderTaxAndTotals?.tcsAmt || 0),
       cash_discount: 0,
-      round_off_amount: 0,
+      round_off_amount: (values.items || []).reduce(
+        (sum, it) => sum + Number(it.roundOff || 0),
+        0,
+      ),
 
       items,
     };
@@ -667,6 +676,16 @@ export default function SalesSouda() {
       render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
     {
+      title: (
+        <span className="text-amber-700 font-semibold">Contract Date</span>
+      ),
+      dataIndex: "contractDate",
+      width: 100,
+      render: (date) => (
+        <span className="text-amber-800">{renderDate(date)}</span>
+      ),
+    },
+    {
       title: <span className="text-amber-700 font-semibold">Plant Name</span>,
       dataIndex: "plantName",
       width: 100,
@@ -678,39 +697,6 @@ export default function SalesSouda() {
       width: 100,
       render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
-    {
-      title: (
-        <span className="text-amber-700 font-semibold">Contract Date</span>
-      ),
-      dataIndex: "contractDate",
-      width: 100,
-      render: (date) => (
-        <span className="text-amber-800">
-          {date ? dayjs(date, "DD-MM-YYYY").format("DD-MM-YYYY") : "-"}
-        </span>
-      ),
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Valid From</span>,
-      dataIndex: "startDate",
-      width: 100,
-      render: (date) => (
-        <span className="text-amber-800">
-          {date ? dayjs(date, "DD-MM-YYYY").format("DD-MM-YYYY") : "-"}
-        </span>
-      ),
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Valid To</span>,
-      dataIndex: "endDate",
-      width: 100,
-      render: (date) => (
-        <span className="text-amber-800">
-          {date ? dayjs(date, "DD-MM-YYYY").format("DD-MM-YYYY") : "-"}
-        </span>
-      ),
-    },
-
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
       dataIndex: "customer",
@@ -735,6 +721,23 @@ export default function SalesSouda() {
         <span className="text-amber-800">{Number(value || 0).toFixed(3)}</span>
       ),
     },
+    {
+      title: <span className="text-amber-700 font-semibold">Valid From</span>,
+      dataIndex: "startDate",
+      width: 100,
+      render: (date) => (
+        <span className="text-amber-800">{renderDate(date)}</span>
+      ),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Valid To</span>,
+      dataIndex: "endDate",
+      width: 100,
+      render: (date) => (
+        <span className="text-amber-800">{renderDate(date)}</span>
+      ),
+    },
+
     // {
     //   title: <span className="text-amber-700 font-semibold">Items</span>,
     //   dataIndex: "items",
@@ -880,11 +883,15 @@ export default function SalesSouda() {
       // Amount = qty * rate (excluding GST)
       const amount = qty * rate;
 
-      // GST Amount = amount * gstPercent / 100
       const gstAmount = (amount * gstPercent) / 100;
 
-      // Total Amount = amount + gstAmount
-      const totalAmount = amount + gstAmount;
+      const subTotal = amount + gstAmount;
+
+      const roundedTotal = Math.round(subTotal);
+
+      const roundOff = roundedTotal - subTotal;
+
+      const totalAmount = subTotal + roundOff;
 
       const updatedItems = [...items];
       updatedItems[index] = {
@@ -893,6 +900,7 @@ export default function SalesSouda() {
         rate: Number(rate.toFixed(2)),
         amount: Number(amount.toFixed(2)),
         gstAmount: Number(gstAmount.toFixed(2)),
+        roundOff: Number(roundOff.toFixed(2)),
         totalAmount: Number(totalAmount.toFixed(2)),
       };
 
@@ -954,7 +962,7 @@ export default function SalesSouda() {
               gutter={4}
               className="pb-2 mb-2 text-amber-800 font-semibold text-xs"
             >
-              <Col span={6}>Item Name</Col>
+              <Col span={5}>Item Name</Col>
               <Col span={2}>Quantity</Col>
               <Col span={1}>Free Qty</Col>
               <Col span={2}>Unit</Col>
@@ -964,6 +972,7 @@ export default function SalesSouda() {
               <Col span={2}>Rate</Col>
               <Col span={2}>Amount</Col>
               <Col span={2}>GST Amount</Col>
+              <Col span={1}>Ro. Off</Col>
               <Col span={2}>Total Amount</Col>
               <Col span={1}></Col>
             </Row>
@@ -971,7 +980,7 @@ export default function SalesSouda() {
             {fields.map((field) => (
               <Row key={field.key} gutter={4} align="middle" className="mb-5">
                 {/* Item Select — auto fills UOM + GST */}
-                <Col span={6}>
+                <Col span={5}>
                   <Form.Item
                     name={[field.name, "item"]}
                     style={{ marginBottom: 0 }}
@@ -1178,6 +1187,23 @@ export default function SalesSouda() {
                     />
                   </Form.Item>
                 </Col>
+                <Col span={1}>
+                  <Form.Item
+                    name={[field.name, "roundOff"]}
+                    style={{ marginBottom: 0 }}
+                  >
+                    <InputNumber
+                      className="w-full!"
+                      disabled
+                      precision={2}
+                      formatter={(value) =>
+                        value !== undefined && value !== null
+                          ? Number(value).toFixed(2)
+                          : "0.00"
+                      }
+                    />
+                  </Form.Item>
+                </Col>
 
                 {/* Total Amount — auto calculated */}
                 <Col span={2}>
@@ -1238,15 +1264,31 @@ export default function SalesSouda() {
 
       // ✅ Map the API response to your table row format
       const row = {
-        key: contract.sale_contract_id, // AntD rowKey
+        key: contract.sale_contract_id,
         saleContractNumber: contract.sale_contract_number,
-        customer: contract.customer_name,
+        customer: contract.customer_business_name,
         customerEmail: contract.customer_email,
+        customerMobile: contract.customer_mobile,
+        plantName: contract.plant_name, // ✅ add
+        brokerName: contract.broker_name, // ✅ add
+        contractDate: contract.created_at, // ✅ add
         startDate: contract.from_date,
         endDate: contract.to_date,
+        quantity: (contract.items || []).reduce(
+          (sum, item) => sum + Number(item.gross_qty || 0),
+          0,
+        ), // ✅ add
+        grossWeightTon: (contract.items || []).reduce(
+          (sum, item) => sum + Number(item.total_net_wt_in_ton || 0),
+          0,
+        ), // ✅ add
         status: contract.status,
         items: contract.items,
         grandTotal: contract.grand_total,
+        sgst: contract.sgst,
+        cgst: contract.cgst,
+        igst: contract.igst,
+        tcs_amount: contract.tcs_amount,
       };
 
       // ✅ Add new row to the table data
@@ -1298,6 +1340,7 @@ export default function SalesSouda() {
             line_total: Number((grossAmount - discountAmount).toFixed(2)),
             gst_amount: Number(it.gstAmount || 0), // ✅
             gross_amount: Number(it.totalAmount || 0), // ✅
+            roundoff: Number(it.roundOff || 0),
             total_net_wt_in_ton: Number(it.weightTon || 0), // ✅
             gst_percentage: Number(it.gstPercent || 0),
           };
@@ -1318,7 +1361,10 @@ export default function SalesSouda() {
           : null,
 
         cash_discount: 0,
-        round_off_amount: 0,
+        round_off_amount: (values.items || []).reduce(
+          (sum, it) => sum + Number(it.roundOff || 0),
+          0,
+        ),
         narration: "Admin updated contract",
 
         cgst: Number(values.orderTaxAndTotals?.cgstPercent || 0),
@@ -1659,9 +1705,15 @@ export default function SalesSouda() {
                 /> */}
                   <AppDatePicker
                     ref={contractDateRef}
-                    disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                    onChange={() => {
-                      setTimeout(() => validFromRef.current?.focus(), 100);
+                    disabledDate={(current) => {
+                      if (current && current.isAfter(dayjs(), "day"))
+                        return true;
+                      return createFinancialYearDisabledDate(selectedFY)(
+                        current,
+                      );
+                    }}
+                    onTabComplete={() => {
+                      setTimeout(() => validFromRef.current?.focus(), 50);
                     }}
                   />
                 </Form.Item>
@@ -1680,9 +1732,9 @@ export default function SalesSouda() {
                   <AppDatePicker
                     ref={validFromRef}
                     disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                    // onChange={() => {
-                    //   setTimeout(() => validToRef.current?.focus(), 100);
-                    // }}
+                    onTabComplete={() => {
+                      setTimeout(() => validToRef.current?.focus(), 50);
+                    }}
                   />
                 </Form.Item>
               </Col>
@@ -1691,25 +1743,44 @@ export default function SalesSouda() {
                 <Form.Item
                   label={<span className="text-amber-700">Valid To</span>}
                   name="endDate"
+                  rules={[
+                    {
+                      validator: (_, value) => {
+                        const fromDate = addForm.getFieldValue("startDate");
+                        if (
+                          value &&
+                          fromDate &&
+                          dayjs(value).isBefore(dayjs(fromDate), "day")
+                        ) {
+                          return Promise.reject(
+                            "Valid To, Valid From se pehle nahi ho sakta!",
+                          );
+                        }
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
                 >
-                  {/* <DatePicker
-                  className="w-full"
-                  format="DD-MM-YYYY"
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                /> */}
                   <AppDatePicker
                     ref={validToRef}
-                    disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Tab") {
-                        e.preventDefault();
-
-                        setAddItemDropdownIndex(0);
-
-                        setTimeout(() => {
-                          itemRefs.current[0]?.focus();
-                        }, 50);
+                    disabledDate={(current) => {
+                      const fromDate = addForm.getFieldValue("startDate");
+                      if (
+                        fromDate &&
+                        current &&
+                        current.isBefore(dayjs(fromDate), "day")
+                      ) {
+                        return true;
                       }
+                      return createFinancialYearDisabledDate(selectedFY)(
+                        current,
+                      );
+                    }}
+                    onTabComplete={() => {
+                      setTimeout(() => {
+                        setAddItemDropdownIndex(0);
+                        itemRefs.current[0]?.focus();
+                      }, 50);
                     }}
                   />
                 </Form.Item>
@@ -1765,13 +1836,13 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ border: "1px solid #FDE68A" }}
-            styles={{ body: { padding: "0px 12px" } }}
+            styles={{ body: { padding: "4px 12px 0px 12px" } }}
           >
             {/* Tax & totals */}
-            <h6 className="text-amber-500">Summary</h6>
+            {/* <h6 className="text-amber-500">Summary</h6> */}
 
             <Row gutter={8}>
-              <Col span={6}>
+              <Col span={5}>
                 <span className="text-amber-700 font-bold text-2xl">
                   Gross Total
                 </span>
@@ -1818,7 +1889,7 @@ export default function SalesSouda() {
                   />
                 </Form.Item>
               </Col>
-
+              <Col span={1}></Col>
               <Col span={2}>
                 <Form.Item name={["orderTotals", "grossAmount"]}>
                   <InputNumber
@@ -1980,7 +2051,19 @@ export default function SalesSouda() {
                   format="DD-MM-YYYY"
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 /> */}
-                  <AppDatePicker />
+                  <AppDatePicker
+                    ref={contractDateRef}
+                    disabledDate={(current) => {
+                      if (current && current.isAfter(dayjs(), "day"))
+                        return true;
+                      return createFinancialYearDisabledDate(selectedFY)(
+                        current,
+                      );
+                    }}
+                    onTabComplete={() => {
+                      setTimeout(() => validFromRef.current?.focus(), 50);
+                    }}
+                  />
                 </Form.Item>
               </Col>
 
@@ -1994,7 +2077,13 @@ export default function SalesSouda() {
                   format="DD-MM-YYYY"
                   disabledDate={createFinancialYearDisabledDate(selectedFY)}
                 /> */}
-                  <AppDatePicker />
+                  <AppDatePicker
+                    ref={validFromRef}
+                    disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                    onTabComplete={() => {
+                      setTimeout(() => validToRef.current?.focus(), 50);
+                    }}
+                  />
                 </Form.Item>
               </Col>
 
@@ -2002,21 +2091,44 @@ export default function SalesSouda() {
                 <Form.Item
                   label={<span className="text-amber-700">Valid To</span>}
                   name="endDate"
+                  rules={[
+                    {
+                      validator: (_, value) => {
+                        const fromDate = editForm.getFieldValue("startDate");
+                        if (
+                          value &&
+                          fromDate &&
+                          dayjs(value).isBefore(dayjs(fromDate), "day")
+                        ) {
+                          return Promise.reject(
+                            "Valid To, Valid From se pehle nahi ho sakta!",
+                          );
+                        }
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
                 >
-                  {/* <DatePicker
-                  className="w-full"
-                  format="DD-MM-YYYY"
-                  disabledDate={createFinancialYearDisabledDate(selectedFY)}
-                /> */}
                   <AppDatePicker
-                    onKeyDown={(e) => {
-                      if (e.key === "Tab") {
-                        e.preventDefault();
-                        setEditItemDropdownIndex(0);
-                        setTimeout(() => {
-                          itemRefs.current[0]?.focus();
-                        }, 50);
+                    ref={validToRef}
+                    disabledDate={(current) => {
+                      const fromDate = editForm.getFieldValue("startDate");
+                      if (
+                        fromDate &&
+                        current &&
+                        current.isBefore(dayjs(fromDate), "day")
+                      ) {
+                        return true;
                       }
+                      return createFinancialYearDisabledDate(selectedFY)(
+                        current,
+                      );
+                    }}
+                    onTabComplete={() => {
+                      setTimeout(() => {
+                        setEditItemDropdownIndex(0);
+                        itemRefs.current[0]?.focus();
+                      }, 50);
                     }}
                   />
                 </Form.Item>
@@ -2056,12 +2168,12 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            styles={{ body: { padding: "0px 12px" } }}
+            styles={{ body: { padding: "6px 12px 0px 12px" } }}
           >
-            <h6 className="text-amber-500">Summary</h6>
+            {/* <h6 className="text-amber-500">Summary</h6> */}
 
             <Row gutter={8}>
-              <Col span={6}>
+              <Col span={5}>
                 <span className="text-amber-700 font-bold text-2xl">
                   Gross Total
                 </span>
@@ -2093,7 +2205,6 @@ export default function SalesSouda() {
                   />
                 </Form.Item>
               </Col>
-
               <Col span={2}>
                 <Form.Item name={["orderTotals", "totalGSTAmount"]}>
                   <InputNumber
@@ -2108,6 +2219,7 @@ export default function SalesSouda() {
                   />
                 </Form.Item>
               </Col>
+              <Col span={1}></Col>
 
               <Col span={2}>
                 <Form.Item name={["orderTotals", "grossAmount"]}>
@@ -2284,6 +2396,7 @@ export default function SalesSouda() {
               <Col span={2}>Rate</Col>
               <Col span={2}>Amount</Col>
               <Col span={2}>GST Amt</Col>
+              <Col span={1}>Ro. Off</Col>
               <Col span={2}>Total Amt</Col>
               <Col span={1}></Col>
             </Row>
@@ -2325,6 +2438,9 @@ export default function SalesSouda() {
                 <Col span={2}>
                   <Input disabled value={it.gstAmount} />
                 </Col>
+                <Col span={1}>
+                  <Input disabled value={it.roundOff} />
+                </Col>
                 <Col span={2}>
                   <Input disabled value={it.totalAmount} />
                 </Col>
@@ -2336,9 +2452,9 @@ export default function SalesSouda() {
           <Card
             size="small"
             style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-            styles={{ body: { padding: "0px 12px" } }}
+            styles={{ body: { padding: "6px 12px 0px 12px" } }}
           >
-            <h6 className="text-amber-500 mt-2">Summary</h6>
+            {/* <h6 className="text-amber-500 mt-2">Summary</h6> */}
             <Row gutter={8}>
               <Col span={4}>
                 <span className="text-amber-700 font-bold text-2xl">
@@ -2367,6 +2483,7 @@ export default function SalesSouda() {
                   <Input disabled />
                 </Form.Item>
               </Col>
+              <Col span={1}></Col>
               <Col span={2}>
                 <Form.Item name={["orderTotals", "grossAmount"]}>
                   <Input disabled />
