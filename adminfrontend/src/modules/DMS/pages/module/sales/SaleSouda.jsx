@@ -1264,15 +1264,31 @@ export default function SalesSouda() {
 
       // ✅ Map the API response to your table row format
       const row = {
-        key: contract.sale_contract_id, // AntD rowKey
+        key: contract.sale_contract_id,
         saleContractNumber: contract.sale_contract_number,
-        customer: contract.customer_name,
+        customer: contract.customer_business_name,
         customerEmail: contract.customer_email,
+        customerMobile: contract.customer_mobile,
+        plantName: contract.plant_name, // ✅ add
+        brokerName: contract.broker_name, // ✅ add
+        contractDate: contract.created_at, // ✅ add
         startDate: contract.from_date,
         endDate: contract.to_date,
+        quantity: (contract.items || []).reduce(
+          (sum, item) => sum + Number(item.gross_qty || 0),
+          0,
+        ), // ✅ add
+        grossWeightTon: (contract.items || []).reduce(
+          (sum, item) => sum + Number(item.total_net_wt_in_ton || 0),
+          0,
+        ), // ✅ add
         status: contract.status,
         items: contract.items,
         grandTotal: contract.grand_total,
+        sgst: contract.sgst,
+        cgst: contract.cgst,
+        igst: contract.igst,
+        tcs_amount: contract.tcs_amount,
       };
 
       // ✅ Add new row to the table data
@@ -1689,7 +1705,13 @@ export default function SalesSouda() {
                 /> */}
                   <AppDatePicker
                     ref={contractDateRef}
-                    disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                    disabledDate={(current) => {
+                      if (current && current.isAfter(dayjs(), "day"))
+                        return true;
+                      return createFinancialYearDisabledDate(selectedFY)(
+                        current,
+                      );
+                    }}
                     onTabComplete={() => {
                       setTimeout(() => validFromRef.current?.focus(), 50);
                     }}
@@ -2031,7 +2053,13 @@ export default function SalesSouda() {
                 /> */}
                   <AppDatePicker
                     ref={contractDateRef}
-                    disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                    disabledDate={(current) => {
+                      if (current && current.isAfter(dayjs(), "day"))
+                        return true;
+                      return createFinancialYearDisabledDate(selectedFY)(
+                        current,
+                      );
+                    }}
                     onTabComplete={() => {
                       setTimeout(() => validFromRef.current?.focus(), 50);
                     }}
