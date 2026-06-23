@@ -987,7 +987,9 @@ export default function PurchaseSouda() {
                     >
                       <InputNumber
                         ref={(el) => (rateRefs.current[field.name] = el)}
-                        onFocus={(e) => e.target.select()}
+                        onFocus={(e) => {
+                          setTimeout(() => e.target.select(), 0);
+                        }}
                         {...positiveNumberInputProps}
                         disabled={disabled}
                         precision={2}
