@@ -1116,7 +1116,10 @@ export default function SalesSouda() {
                           : "0.00"
                       }
                       parser={(value) => value?.replace(/[^\d.]/g, "")}
-                      onFocus={(e) => e.target.select()}
+                      onFocus={(e) => {
+                        // ✅ Pura value select karo focus pe
+                        setTimeout(() => e.target.select(), 0);
+                      }}
                       onChange={() => {
                         setTimeout(() => recalculateRow(field.name), 0);
                       }}
