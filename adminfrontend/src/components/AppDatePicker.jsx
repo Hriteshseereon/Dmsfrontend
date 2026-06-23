@@ -4,8 +4,9 @@ import dayjs from "dayjs";
 import { formatDateInput } from "../utils/dateInputFormatter";
 
 const AppDatePicker = forwardRef(
-  ({ value, onChange, disabledDate, ...props }, ref) => {
+  ({ value, onChange, disabledDate, onTabComplete, ...props }, ref) => {
     const isFreshFocus = useRef(false);
+    const hasAutoAdvanced = useRef(false); // ✅ NEW — double-fire rokne ke liye
 
     const handleChange = (date) => {
       onChange?.(date);
@@ -13,6 +14,7 @@ const AppDatePicker = forwardRef(
 
     const handleFocus = (e) => {
       isFreshFocus.current = true;
+      hasAutoAdvanced.current = false; // ✅ Reset on every fresh focus
       e.target.select();
     };
 
@@ -20,11 +22,18 @@ const AppDatePicker = forwardRef(
       const input = e.target;
       if (input.tagName !== "INPUT") return;
 
-      if (
-        ["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(
-          e.key,
-        )
-      ) {
+      if (e.key === "Tab") {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!hasAutoAdvanced.current) {
+          // ✅ Sirf ek baar
+          hasAutoAdvanced.current = true;
+          onTabComplete?.();
+        }
+        return;
+      }
+
+      if (["Backspace", "Delete", "ArrowLeft", "ArrowRight"].includes(e.key)) {
         return;
       }
 
@@ -47,24 +56,28 @@ const AppDatePicker = forwardRef(
       const input = e.target;
       if (input.tagName !== "INPUT") return;
 
-      const formatted = formatDateInput(input.value);
+      // Tab ka keyUp ignore karo — already handled in keyDown
+      if (e.key === "Tab") return; // ✅ NEW
 
+      const formatted = formatDateInput(input.value);
       if (formatted !== input.value) {
         input.value = formatted;
       }
 
       if (formatted.length === 10) {
         const parsed = dayjs(formatted, "DD-MM-YYYY", true);
-
         if (!parsed.isValid()) return;
-
-        // ✅ enforce the same restriction typed input would get from the calendar
         if (disabledDate && disabledDate(parsed)) {
           input.value = "";
-          return; // reject silently, or surface a message in the parent's onChange
+          return;
         }
-
         onChange?.(parsed);
+
+        // ✅ Auto-advance only once per fresh typing session
+        if (!hasAutoAdvanced.current) {
+          hasAutoAdvanced.current = true;
+          onTabComplete?.();
+        }
       }
     };
 
