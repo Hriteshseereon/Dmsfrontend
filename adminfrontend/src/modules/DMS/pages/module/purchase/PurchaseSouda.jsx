@@ -1249,7 +1249,14 @@ export default function PurchaseSouda() {
             >
               <AppDatePicker
                 ref={contractDateRef}
-                disabledDate={createFinancialYearDisabledDate(selectedFY)}
+                disabledDate={(current) => {
+                  // ✅ Aaj ke baad ki date disable
+                  if (current && current.isAfter(dayjs(), "day")) {
+                    return true;
+                  }
+                  // ✅ Financial year ke bahar ki date bhi disable
+                  return createFinancialYearDisabledDate(selectedFY)(current);
+                }}
                 onTabComplete={() => {
                   setTimeout(() => validFromRef.current?.focus(), 50);
                 }}
