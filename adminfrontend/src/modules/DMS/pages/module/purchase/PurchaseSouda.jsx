@@ -399,24 +399,23 @@ export default function PurchaseSouda() {
   // ---------- Table columns ----------
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Contract No</span>,
-      dataIndex: "souda_number",
-
-      width: 100,
-      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
-    },
-    {
-      title: (
-        <span className="text-amber-700 font-semibold">Contract Date</span>
-      ),
+      title: <span className="text-amber-700 font-semibold">Date</span>,
       dataIndex: "contractDate",
-      width: 100,
+      width: 70,
       render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
     },
     {
+      title: <span className="text-amber-700 font-semibold">Serial No</span>,
+      dataIndex: "souda_number",
+
+      width: 60,
+      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+    },
+
+    {
       title: <span className="text-amber-700 font-semibold">Plant Name</span>,
       dataIndex: "plant_name",
-      width: 100,
+      width: 60,
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
     {
@@ -425,7 +424,7 @@ export default function PurchaseSouda() {
       ),
       dataIndex: "vendor_name",
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
-      width: 100,
+      width: 60,
     },
     {
       title: <span className="text-amber-700 font-semibold">Quantity</span>,
@@ -433,7 +432,7 @@ export default function PurchaseSouda() {
       render: (t) => (
         <span className="text-amber-800">{Number(t || 0).toFixed(2)}</span>
       ),
-      width: 100,
+      width: 60,
     },
     {
       title: (
@@ -443,25 +442,50 @@ export default function PurchaseSouda() {
       render: (t) => (
         <span className="text-amber-800">{Number(t || 0).toFixed(3)}</span>
       ),
-      width: 100,
+      width: 60,
     },
     {
       title: <span className="text-amber-700 font-semibold">Valid From</span>,
       dataIndex: "from_date",
-      width: 100,
+      width: 70,
       render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Valid To</span>,
       dataIndex: "to_date",
-      width: 100,
+      width: 70,
       render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
     },
-
+    // {
+    //   title: (
+    //     <span className="text-amber-700 font-semibold">Extended Up To</span>
+    //   ),
+    //   // dataIndex: "to_date",
+    //   width: 60,
+    //   // render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
+    // },
     {
-      title: <span className="text-amber-700 font-semibold">Status</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Balance Quantity</span>
+      ),
+      // dataIndex: "to_date",
+      width: 60,
+      // render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Balance Weight(ton)
+        </span>
+      ),
+      // dataIndex: "to_date",
+      width: 60,
+      // render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Approval</span>,
       dataIndex: "status",
-      width: 100,
+      width: 75,
       render: (status) => {
         const base = "px-3 py-1 rounded-full text-sm font-semibold";
         if (status === "Approved")
@@ -480,6 +504,12 @@ export default function PurchaseSouda() {
           <span className={`${base} bg-red-200 text-red-700`}>{status}</span>
         );
       },
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Status</span>,
+      // dataIndex: "to_date",
+      width: 60,
+      // render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
