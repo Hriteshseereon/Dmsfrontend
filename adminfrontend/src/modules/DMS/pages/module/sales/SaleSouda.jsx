@@ -668,55 +668,62 @@ export default function SalesSouda() {
   };
   // table columns: replace deliveryDate / company with startDate / endDate
   const columns = [
-    // 🆕 Contract Number
-    {
-      title: <span className="text-amber-700 font-semibold">Contract No</span>,
-      dataIndex: "saleContractNumber",
-      width: 100,
-      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
-    },
     {
       title: (
         <span className="text-amber-700 font-semibold">Contract Date</span>
       ),
       dataIndex: "contractDate",
-      width: 100,
+      width: 80,
       render: (date) => (
         <span className="text-amber-800">{renderDate(date)}</span>
       ),
     },
+    // 🆕 Contract Number
+    {
+      title: <span className="text-amber-700 font-semibold">Contract No</span>,
+      dataIndex: "saleContractNumber",
+      width: 70,
+      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+    },
+
     {
       title: <span className="text-amber-700 font-semibold">Plant Name</span>,
       dataIndex: "plantName",
-      width: 100,
+      width: 60,
       render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Broker Name</span>,
       dataIndex: "brokerName",
-      width: 100,
+      width: 60,
       render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
       dataIndex: "customer",
-      width: 100,
+      width: 90,
       render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Quantity</span>,
+      title: <span className="text-amber-700 font-semibold">Place</span>,
+      // dataIndex: "customer",
+      width: 60,
+      // render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">QTY</span>,
       dataIndex: "quantity",
-      width: 100,
+      width: 60,
       render: (value) => (
         <span className="text-amber-800">{Number(value || 0).toFixed(3)}</span>
       ),
     },
     {
       title: (
-        <span className="text-amber-700 font-semibold">Gross Weight (Ton)</span>
+        <span className="text-amber-700 font-semibold">Gross Wt.(Ton)</span>
       ),
       dataIndex: "grossWeightTon",
-      width: 100,
+      width: 60,
       render: (value) => (
         <span className="text-amber-800">{Number(value || 0).toFixed(3)}</span>
       ),
@@ -724,7 +731,7 @@ export default function SalesSouda() {
     {
       title: <span className="text-amber-700 font-semibold">Valid From</span>,
       dataIndex: "startDate",
-      width: 100,
+      width: 80,
       render: (date) => (
         <span className="text-amber-800">{renderDate(date)}</span>
       ),
@@ -732,12 +739,27 @@ export default function SalesSouda() {
     {
       title: <span className="text-amber-700 font-semibold">Valid To</span>,
       dataIndex: "endDate",
-      width: 100,
+      width: 80,
       render: (date) => (
         <span className="text-amber-800">{renderDate(date)}</span>
       ),
     },
-
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Balance Qnty.</span>
+      ),
+      // dataIndex: "customer",
+      width: 70,
+      // render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Balance Weight</span>
+      ),
+      // dataIndex: "customer",
+      width: 70,
+      // render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+    },
     // {
     //   title: <span className="text-amber-700 font-semibold">Items</span>,
     //   dataIndex: "items",
@@ -754,9 +776,9 @@ export default function SalesSouda() {
     // },
 
     {
-      title: <span className="text-amber-700 font-semibold">Status</span>,
+      title: <span className="text-amber-700 font-semibold">Approval</span>,
       dataIndex: "status",
-      width: 120,
+      width: 85,
       render: (status) => {
         let colorClass = "";
 
@@ -779,19 +801,24 @@ export default function SalesSouda() {
         );
       },
     },
-
     {
-      title: <span className="text-amber-700 font-semibold">Total (₹)</span>,
-      dataIndex: "grandTotal",
-      width: 130,
-      render: (amt) => (
-        <span className="text-amber-800 font-semibold">
-          {amt !== undefined && amt !== null
-            ? `₹ ${Number(amt).toFixed(2)}`
-            : "-"}
-        </span>
-      ),
+      title: <span className="text-amber-700 font-semibold">Status</span>,
+      // dataIndex: "customer",
+      width: 70,
+      // render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
+    // {
+    //   title: <span className="text-amber-700 font-semibold">Total (₹)</span>,
+    //   dataIndex: "grandTotal",
+    //   width: 130,
+    //   render: (amt) => (
+    //     <span className="text-amber-800 font-semibold">
+    //       {amt !== undefined && amt !== null
+    //         ? `₹ ${Number(amt).toFixed(2)}`
+    //         : "-"}
+    //     </span>
+    //   ),
+    // },
 
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
