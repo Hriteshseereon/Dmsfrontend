@@ -418,6 +418,12 @@ export default function SalesSouda() {
       igst: Number(values.orderTaxAndTotals?.igstPercent || 0),
       tcs_amount: Number(values.orderTaxAndTotals?.tcsAmt || 0),
       cash_discount: 0,
+
+      total_qty: values.orderTotals.totalQty,
+      total_net_weight: values.orderTotals.totalWeightTon,
+      total_amount: values.orderTotals.totalAmount,
+      total_gst_amount: values.orderTotals.totalGSTAmount,
+      grand_total: values.orderTotals.grossAmount,
       round_off_amount: (values.items || []).reduce(
         (sum, it) => sum + Number(it.roundOff || 0),
         0,
