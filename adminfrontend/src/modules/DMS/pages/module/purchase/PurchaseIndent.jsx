@@ -21,24 +21,20 @@ import {
 } from "@ant-design/icons";
 
 import { exportToExcel } from "../../../../../utils/exportToExcel";
-import AppDatePicker from "../../../../../components/AppDatePicker";
-import {
-  createFinancialYearDisabledDate,
-  useSelectedFinancialYear,
-} from "../../../../../utils/financialYearValidation";
 import {
   getPurchaseOrder,
   getPurchaseOrderById,
   createpurchaseOrder,
   updatePurchaseOrder,
-  filterPurchaseContracOrder,
 } from "../../../../../api/purchase";
+import { getSalescontractGroups } from "../../../../../api/sales"; // ← use this instead
+import useSessionStore from "../../../../../store/sessionStore";
 
 const { Option } = Select;
 
 const statusOptions = ["Pending", "Approved", "Rejected"];
 
-// shared pill badge, same look used across Souda / Sales Contract tables
+// shared pill badge
 const renderStatusBadge = (status) => {
   const base = "px-3 py-1 rounded-full text-sm font-semibold";
   if (status === "Approved")
@@ -63,8 +59,7 @@ export default function PurchaseIndent() {
   const [searchText, setSearchText] = useState("");
 
   // ---------- modal control ----------
-  // "add" | "edit" | "view" | null
-  const [modalMode, setModalMode] = useState(null);
+  const [modalMode, setModalMode] = useState(null); // "add" | "edit" | "view" | null
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [statusValue, setStatusValue] = useState("Pending");
   const [submitting, setSubmitting] = useState(false);
@@ -73,10 +68,9 @@ export default function PurchaseIndent() {
   const [availableContracts, setAvailableContracts] = useState([]);
   const [contractsLoading, setContractsLoading] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
-  const [filterFrom, setFilterFrom] = useState(dayjs());
-  const [filterTo, setFilterTo] = useState(dayjs());
 
-  const selectedFY = useSelectedFinancialYear();
+  // ---------- search text for the contracts table inside modal ----------
+  const [contractSearch, setContractSearch] = useState("");
 
   useEffect(() => {
     fetchPurchaseOrder();
@@ -133,36 +127,36 @@ export default function PurchaseIndent() {
 
       for (const order of list) {
         const detailRes = await getPurchaseOrderById(order.id || order.key);
-        const data = detailRes?.data || detailRes;
+        const detail = detailRes?.data || detailRes;
 
-        const contracts = data.sales_contracts_details || data.contracts || [];
+        const contracts =
+          detail.sales_contracts_details || detail.contracts || [];
 
         if (contracts.length) {
           contracts.forEach((c) => {
             exportRows.push({
-              "Order No": data.order_number,
-              "Plant Name": data.plant_name,
-              "Supplier Name": data.vendor_name,
-              Status: data.status,
+              "Order No": detail.order_number,
+              "Plant Name": detail.plant_name,
+              "Supplier Name": detail.vendor_name,
+              Status: detail.status,
               "Sale Contract No":
                 c.sale_contract_number || c.saleContractNumber,
               Customer: c.customer_business_name || c.customer,
               Broker: c.broker_name || c.brokerName,
               "Contract Valid From": c.from_date || c.startDate,
               "Contract Valid To": c.to_date || c.endDate,
-              "Total Qty (All Contracts)": data.total_qty_all_items,
-              "Total Amount (₹)": data.grand_total || data.total_amount,
+              "Total Qty (All Contracts)": detail.total_qty_all_items,
+              "Total Amount (₹)": detail.grand_total || detail.total_amount,
             });
           });
         } else {
-          // fallback if backend doesn't expand contracts on this endpoint
           exportRows.push({
-            "Order No": data.order_number,
-            "Plant Name": data.plant_name,
-            "Supplier Name": data.vendor_name,
-            Status: data.status,
-            "Total Qty (All Contracts)": data.total_qty_all_items,
-            "Total Amount (₹)": data.grand_total || data.total_amount,
+            "Order No": detail.order_number,
+            "Plant Name": detail.plant_name,
+            "Supplier Name": detail.vendor_name,
+            Status: detail.status,
+            "Total Qty (All Contracts)": detail.total_qty_all_items,
+            "Total Amount (₹)": detail.grand_total || detail.total_amount,
           });
         }
       }
@@ -179,48 +173,57 @@ export default function PurchaseIndent() {
   };
 
   // ---------------------------------------------------------------
-  // Available sale contracts (date-range filtered)
-  // Shape mirrors SalesSouda.jsx -> fetchSalesContracts() exactly,
-  // since this IS the same sale contract record, just being picked
-  // here from the purchase side.
+  // Map a sales contract API record → row shape for the contracts table
+  // Matches the actual API response shape from GET /sales/contracts/
   // ---------------------------------------------------------------
-  const mapContractRecord = (contract, index) => ({
-    key: contract.sale_contract_id || contract.id || index + 1,
-    id: contract.sale_contract_id || contract.id,
-    saleContractNumber:
-      contract.sale_contract_number || contract.souda_number || "-",
-    customer: contract.customer_business_name || contract.customer_name || "-",
-    plantName: contract.plant_name,
-    brokerName: contract.broker_name,
-    contractDate: contract.created_at,
-    startDate: contract.from_date,
-    endDate: contract.to_date,
-    quantity: (contract.items || []).reduce(
+  const mapContractRecord = (contract, index) => {
+    const items = contract.items || [];
+
+    const quantity = items.reduce(
       (sum, item) => sum + Number(item.gross_qty || 0),
       0,
-    ),
-    grossWeightTon: (contract.items || []).reduce(
-      (sum, item) => sum + Number(item.total_net_wt_in_ton || 0),
-      0,
-    ),
-    status: contract.status,
-    grandTotal: contract.grand_total,
-  });
+    );
 
-  const fetchAvailableContracts = async (range) => {
+    const grossWeightTon = items.reduce(
+      (sum, item) =>
+        sum + Number(item.total_net_wt_in_ton || item.totalnetWtinTon || 0),
+      0,
+    );
+
+    return {
+      key: contract.sale_contract_id || contract.id || index + 1,
+      id: contract.sale_contract_id || contract.id,
+      saleContractNumber: contract.sale_contract_number || "-",
+      customer:
+        contract.customer_business_name || contract.customer_name || "-",
+      plantName: contract.plant_name || "-",
+      brokerName: contract.broker_name || "-",
+      contractDate: contract.created_at,
+      startDate: contract.from_date,
+      endDate: contract.to_date,
+      quantity,
+      grossWeightTon,
+      status: contract.status,
+      grandTotal: contract.grand_total,
+    };
+  };
+
+  // ---------------------------------------------------------------
+  // Fetch all sale contracts via getSalescontractGroups,
+  // then keep ONLY status === "Approved"
+  // ---------------------------------------------------------------
+  const fetchAvailableContracts = async () => {
     try {
       setContractsLoading(true);
-      const start = range?.from || dayjs();
-      const end = range?.to || dayjs();
-
-      const res = await filterPurchaseContracOrder({
-        startdate: start.format("YYYY-MM-DD"),
-        enddate: end.format("YYYY-MM-DD"),
-      });
-
+      const res = await getSalescontractGroups();
       const list = res?.data || res || [];
-      const formatted = list.map(mapContractRecord);
 
+      // Only show Approved contracts for purchase order creation
+      const approved = list.filter(
+        (c) => (c.status || "").toLowerCase() === "approved",
+      );
+
+      const formatted = approved.map(mapContractRecord);
       setAvailableContracts(formatted);
       return formatted;
     } catch (err) {
@@ -232,21 +235,6 @@ export default function PurchaseIndent() {
     }
   };
 
-  const handleFilterContracts = () => {
-    if (filterFrom && filterTo && filterTo.isBefore(filterFrom, "day")) {
-      message.warning("Valid To date cannot be before Valid From date");
-      return;
-    }
-    fetchAvailableContracts({ from: filterFrom, to: filterTo });
-  };
-
-  const handleResetFilter = () => {
-    const today = dayjs();
-    setFilterFrom(today);
-    setFilterTo(today);
-    fetchAvailableContracts({ from: today, to: today });
-  };
-
   // ---------------------------------------------------------------
   // Modal open/close
   // ---------------------------------------------------------------
@@ -255,6 +243,7 @@ export default function PurchaseIndent() {
     setSelectedRecord(null);
     setSelectedRowKeys([]);
     setAvailableContracts([]);
+    setContractSearch("");
   };
 
   const openAddModal = () => {
@@ -262,18 +251,16 @@ export default function PurchaseIndent() {
     setSelectedRecord(null);
     setSelectedRowKeys([]);
     setStatusValue("Pending");
-    const today = dayjs();
-    setFilterFrom(today);
-    setFilterTo(today);
-    fetchAvailableContracts({ from: today, to: today });
+    setContractSearch("");
+    fetchAvailableContracts();
   };
 
   const openViewModal = async (record) => {
     try {
       setLoading(true);
       const res = await getPurchaseOrderById(record.key);
-      const data = res?.data || res;
-      setSelectedRecord(data);
+      const detail = res?.data || res;
+      setSelectedRecord(detail);
       setModalMode("view");
     } catch (err) {
       console.error(err);
@@ -287,24 +274,22 @@ export default function PurchaseIndent() {
     try {
       setLoading(true);
       const res = await getPurchaseOrderById(record.key);
-      const data = res?.data || res;
-      setSelectedRecord(data);
-      setStatusValue(data.status || "Pending");
+      const detail = res?.data || res;
+      setSelectedRecord(detail);
+      setStatusValue(detail.status || "Pending");
+      setContractSearch("");
 
       const linkedContracts =
-        data.sales_contracts_details || data.contracts || [];
+        detail.sales_contracts_details || detail.contracts || [];
       const linkedIds = linkedContracts.map((c) =>
         typeof c === "object" ? c.sale_contract_id || c.id : c,
       );
       setSelectedRowKeys(linkedIds);
 
-      const today = dayjs();
-      setFilterFrom(today);
-      setFilterTo(today);
-      const fetched = await fetchAvailableContracts({ from: today, to: today });
+      // Fetch approved contracts, then merge in already-linked ones
+      // (they might be Approved or previously linked Pending/Expired)
+      const fetched = await fetchAvailableContracts();
 
-      // make sure already-linked contracts are visible even if they fall
-      // outside today's default filter window
       if (linkedContracts.length) {
         const existingIds = new Set(fetched.map((c) => c.id));
         const merged = [...fetched];
@@ -340,8 +325,6 @@ export default function PurchaseIndent() {
     try {
       setSubmitting(true);
 
-      // NOTE: confirm "sales_contracts" matches the field name your backend
-      // serializer actually expects for /purchase/sales-contract-orders/
       const payload = {
         sales_contracts: selectedRowKeys,
       };
@@ -366,7 +349,16 @@ export default function PurchaseIndent() {
   };
 
   // ---------------------------------------------------------------
-  // Columns
+  // Filtered contracts for in-modal search
+  // ---------------------------------------------------------------
+  const filteredContracts = contractSearch
+    ? availableContracts.filter((c) =>
+        JSON.stringify(c).toLowerCase().includes(contractSearch.toLowerCase()),
+      )
+    : availableContracts;
+
+  // ---------------------------------------------------------------
+  // Columns — purchase order list
   // ---------------------------------------------------------------
   const orderColumns = [
     {
@@ -420,15 +412,15 @@ export default function PurchaseIndent() {
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       width: 100,
-      render: (record) => (
+      render: (_, record) => (
         <div className="flex gap-3">
           <EyeOutlined
-            className="cursor-pointer! text-blue-500!"
+            className="cursor-pointer text-blue-500"
             onClick={() => openViewModal(record)}
           />
           {record.status !== "Approved" && (
             <EditOutlined
-              className="cursor-pointer! text-red-500!"
+              className="cursor-pointer text-red-500"
               onClick={() => openEditModal(record)}
             />
           )}
@@ -437,13 +429,14 @@ export default function PurchaseIndent() {
     },
   ];
 
-  // Mirrors SalesSouda.jsx's table columns exactly (minus Actions),
-  // since this IS the sale contract record, just being picked here.
+  // ---------------------------------------------------------------
+  // Columns — available sale contracts (mirrors SalesSouda table)
+  // ---------------------------------------------------------------
   const contractColumns = [
     {
       title: <span className="text-amber-700 font-semibold">Contract No</span>,
       dataIndex: "saleContractNumber",
-      width: 110,
+      width: 120,
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
     {
@@ -455,7 +448,7 @@ export default function PurchaseIndent() {
     {
       title: <span className="text-amber-700 font-semibold">Broker Name</span>,
       dataIndex: "brokerName",
-      width: 110,
+      width: 120,
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
     {
@@ -463,7 +456,7 @@ export default function PurchaseIndent() {
         <span className="text-amber-700 font-semibold">Contract Date</span>
       ),
       dataIndex: "contractDate",
-      width: 110,
+      width: 120,
       render: (t) => <span className="text-amber-800">{fmtDate(t)}</span>,
     },
     {
@@ -481,7 +474,7 @@ export default function PurchaseIndent() {
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
       dataIndex: "customer",
-      width: 130,
+      width: 150,
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
     {
@@ -497,7 +490,7 @@ export default function PurchaseIndent() {
         <span className="text-amber-700 font-semibold">Gross Weight (Ton)</span>
       ),
       dataIndex: "grossWeightTon",
-      width: 130,
+      width: 140,
       render: (t) => (
         <span className="text-amber-800">{Number(t || 0).toFixed(3)}</span>
       ),
@@ -534,16 +527,19 @@ export default function PurchaseIndent() {
       <div className="flex justify-between items-center mb-4">
         <div className="flex gap-2">
           <Input
-            prefix={<SearchOutlined className="text-amber-600!" />}
+            prefix={<SearchOutlined className="text-amber-600" />}
             placeholder="Search..."
-            className="w-64! border-amber-300!"
+            className="w-64 border-amber-300"
             value={searchText}
             onChange={(e) => handleSearch(e.target.value)}
           />
           <Button
             icon={<FilterOutlined />}
-            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-            onClick={() => handleSearch("")}
+            className="border-amber-400 text-amber-700 hover:bg-amber-100"
+            onClick={() => {
+              setSearchText("");
+              fetchPurchaseOrder();
+            }}
           >
             Reset
           </Button>
@@ -553,7 +549,7 @@ export default function PurchaseIndent() {
           <Button
             icon={<DownloadOutlined />}
             onClick={handleExport}
-            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            className="border-amber-400 text-amber-700 hover:bg-amber-100"
           >
             Export
           </Button>
@@ -561,7 +557,7 @@ export default function PurchaseIndent() {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            className="bg-amber-500! hover:bg-amber-600! border-none!"
+            className="!bg-amber-500 !hover:bg-amber-600 !border-none"
             onClick={openAddModal}
           >
             Add New
@@ -569,7 +565,7 @@ export default function PurchaseIndent() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Purchase Order Table */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
           Purchase Order Records
@@ -586,10 +582,10 @@ export default function PurchaseIndent() {
         />
       </div>
 
-      {/* Add / Edit Modal: filter + select sale contracts */}
+      {/* ── Add / Edit Modal ── */}
       <Modal
         title={
-          <span className="text-amber-700 text-2xl font-semibold">
+          <span className="!text-amber-700 !text-2xl !font-semibold">
             {modalMode === "edit"
               ? "Edit Purchase Order"
               : "Create Purchase Order"}
@@ -600,51 +596,14 @@ export default function PurchaseIndent() {
         footer={null}
         width={1600}
       >
-        <Card
-          size="small"
-          style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
-          bodyStyle={{ padding: 12 }}
-        >
-          <h6 className="text-amber-500 mb-2">Filter Sale Contracts</h6>
-          <Row gutter={16} align="bottom">
-            <Col span={5}>
-              <label className="block text-sm text-gray-600 mb-1">
-                Valid From
-              </label>
-              <AppDatePicker
-                value={filterFrom}
-                onChange={(d) => setFilterFrom(d)}
-                disabledDate={createFinancialYearDisabledDate(selectedFY)}
-              />
-            </Col>
-            <Col span={5}>
-              <label className="block text-sm text-gray-600 mb-1">
-                Valid To
-              </label>
-              <AppDatePicker
-                value={filterTo}
-                onChange={(d) => setFilterTo(d)}
-                disabledDate={createFinancialYearDisabledDate(selectedFY)}
-              />
-            </Col>
-            <Col span={4}>
-              <Button
-                type="primary"
-                className="bg-amber-500! hover:bg-amber-600! border-none!"
-                onClick={handleFilterContracts}
-              >
-                Filter
-              </Button>
-            </Col>
-            <Col span={4}>
-              <Button
-                className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-                onClick={handleResetFilter}
-              >
-                Reset to Today
-              </Button>
-            </Col>
-            {modalMode === "edit" && (
+        {/* Status selector (edit only) */}
+        {modalMode === "edit" && (
+          <Card
+            size="small"
+            style={{ marginBottom: 12, border: "1px solid #FDE68A" }}
+            bodyStyle={{ padding: 12 }}
+          >
+            <Row gutter={16} align="bottom">
               <Col span={6}>
                 <label className="block text-sm text-gray-600 mb-1">
                   Status
@@ -661,29 +620,41 @@ export default function PurchaseIndent() {
                   ))}
                 </Select>
               </Col>
-            )}
-          </Row>
-        </Card>
+            </Row>
+          </Card>
+        )}
 
+        {/* Available Approved Sale Contracts */}
         <Card
           size="small"
           style={{ border: "1px solid #FDE68A" }}
           bodyStyle={{ padding: 12 }}
         >
           <div className="flex justify-between items-center mb-2">
-            <h6 className="text-amber-500 mb-0">Available Sale Contracts</h6>
-            <span className="text-sm text-amber-700 font-semibold">
-              {selectedRowKeys.length} selected
-            </span>
+            <h6 className="text-amber-500 mb-0">Approved Sale Contracts</h6>
+            <div className="flex items-center gap-3">
+              {/* in-modal search */}
+              <Input
+                prefix={<SearchOutlined className="text-amber-600" />}
+                placeholder="Search contracts..."
+                className="w-52 border-amber-300"
+                value={contractSearch}
+                onChange={(e) => setContractSearch(e.target.value)}
+                allowClear
+              />
+              <span className="text-sm text-amber-700 font-semibold">
+                {selectedRowKeys.length} selected
+              </span>
+            </div>
           </div>
 
           <Table
             rowSelection={rowSelection}
             columns={contractColumns}
-            dataSource={availableContracts}
+            dataSource={filteredContracts}
             loading={contractsLoading}
             pagination={false}
-            scroll={{ y: 320, x: 1200 }}
+            scroll={{ y: 360, x: 1200 }}
             rowKey="key"
           />
         </Card>
@@ -691,7 +662,7 @@ export default function PurchaseIndent() {
         <div className="flex justify-end gap-2 mt-4">
           <Button
             onClick={closeModal}
-            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            className="border-amber-400 text-amber-700 hover:bg-amber-100"
           >
             Cancel
           </Button>
@@ -699,7 +670,7 @@ export default function PurchaseIndent() {
             type="primary"
             loading={submitting}
             disabled={selectedRowKeys.length === 0}
-            className="bg-amber-500! hover:bg-amber-600! border-none!"
+            className="!bg-amber-500 !hover:bg-amber-600 !border-none"
             onClick={handleSubmitSelection}
           >
             {modalMode === "edit"
@@ -709,7 +680,7 @@ export default function PurchaseIndent() {
         </div>
       </Modal>
 
-      {/* View Modal: read-only summary */}
+      {/* ── View Modal ── */}
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
