@@ -588,7 +588,7 @@ export const indiaLocations = [
             "Kalahandi",
             "Kandhamal",
             "Kendrapara",
-            "Kendujhar (Keonjhar)",
+            "Kendujhar",
             "Khordha",
             "Koraput",
             "Malkangiri",

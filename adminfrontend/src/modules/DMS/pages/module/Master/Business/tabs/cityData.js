@@ -5,8 +5,8 @@ export const cityData = {
     Puri: ["Puri", "Pipili", "Konark","Astaranga","Brahmagiri","Delanga","Gop","Kakat Pur","Kanas","Krushnaprasad","Nimapada","Sadar","Satyabadi"],
     Balasore: ["Bahanaga","Baleshwar","Baliapal","Basta","Bhograi","Jaleswar","Khaira","Nilgiri","Oupada","Remuna","Simulia","Soro"],
     Bhadrak: ["Basudevpur","Bhadrak","Bhandaripokhari","Bonth","Chandabali","Dhamanagar","Tihidi","Pirahat"],
-    Jajapur: ["Jajpur", "Vyasanagar", "Panikoili","Badchana","Bari","Binjharpur","Dahrmasala","Danagadi","Dasarathapur","Korei","Rasulpur","Sukinda"],
-    Jagatsinghpur: ["Balikuda","Biridi","Erasama","Jagatsinghpur","Kujang","Naugaon","Raghunathpur","Tirtol","Paradip"],
+    Jajpur: ["Jajpur", "Vyasanagar", "Panikoili","Badchana","Bari","Binjharpur","Dahrmasala","Danagadi","Dasarathapur","Korei","Rasulpur","Sukinda"],
+    Jagatsinghapur: ["Balikuda","Biridi","Erasama","Jagatsinghpur","Kujang","Naugaon","Raghunathpur","Tirtol","Paradip"],
     Kendrapara: ["Kendrapara", "Pattamundai", "Marshaghai","Aul","Derabish","Garadapur","Kendrapada","Mahakalapada","Marsaghai","Rajkanika","Rajnagar"],
     Dhenkanal: ["Bhuban","Dhenkanal Sadar","Gondia","Hindol","Kamakhyanagar","Kankada Had","Odapada","Parjang"],
     Angul: ["Angul", "Talcher", "Athmallik","Banarpal","Chhendipada","Kaniha","Kishorenagar","Palalahada"],
@@ -16,7 +16,7 @@ export const cityData = {
     Jharsuguda: ["Jharsuguda", "Brajrajnagar", "Belpahar","Kirmira","Kolabira","Laikera","Lakhanpur"],
     Bargarh: ["Ambabhona","Attabira","Bargarh","Barpali","Bhatli","Bheden","Bijepur","Gaisilet","Jharbandh","Padampur","Paikmal","Sohella"],
     Balangir: ["Agalpur","Balangir","Bangomunda","Belpara","Deogaon","Gudvella","Khaprakhol","Loisinga","Muribahal","Patnagarh","Puintala","Saintala","Titlagarh","Turekela","Kantabanji"],
-    Subarnapur: ["Binika","Birmaharajpur","Dunguripali","Sonepur","Tarbha","Ullunda"],
+    Sonepur: ["Binika","Birmaharajpur","Dunguripali","Sonepur","Tarbha","Ullunda"],
     Nuapada: ["Boden","Khariar","Komna","Nuapada","Sinapali"],
     Kalahandi: ["Bhawanipatna","Dharamagarh","Golamunda","Jayapatna","Junagarh","Kalampur","Karlamunda","Kesinga","Kokasara","Lanjigarh","Madanpur Rampur","Narala","Thuamul Ram Pur", "Dharamgarh"],
  
@@ -31,7 +31,7 @@ export const cityData = {
     Nayagarh: ["Nayagarh", "Daspalla", "Khandapada","Bhapur", "Gania","Khandapara","Nayagarh","Nuagaon","Odagaon","Ranapur"],
  
     Mayurbhanj: ["Badasahi","Bahalda","Bangriposi","Baripada","Betnoti","Bijatala","Bisoi","Gopabandhunagar","Jamda","Joshipur","Kaptipada","Karanjia","Khunta","Kuliana","Kusumi","Morada","Rairangpur","Raruan","Rasgovindpur","Samakhunta","Saraskana","Sukruli","Suliapada","Thakurmunda","Tiring","Udala"],
-    Keonjhar: ["Anandapur","Bansapal","Champua","Ghasipura","Ghatgaon","Harichadanpur","Hatadihi","Jhumpura","Joda","Kendujhar Sadar","Patana","Saharapada","Telkoi","Barbil"],
+    Kendujhar: ["Anandapur","Bansapal","Champua","Ghasipura","Ghatgaon","Harichadanpur","Hatadihi","Jhumpura","Joda","Kendujhar Sadar","Patana","Saharapada","Telkoi","Barbil"],
     Deogarh: ["Deogarh","Barkote","Reamal","Tileibani"],
   },
  
