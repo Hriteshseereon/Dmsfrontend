@@ -360,6 +360,7 @@ export default function SalesSouda() {
   };
   // payload for create sales contract
   const buildCreateContractPayload = (values) => {
+    const round2 = (value) => Number(Number(value || 0).toFixed(2));
     const items = (values.items || [])
       .filter(
         (it) =>
@@ -389,11 +390,11 @@ export default function SalesSouda() {
           gst_percentage: Number(it.gstPercent || 0),
           discount_percent: discountPercent,
           discount_amount: Number(discountAmount.toFixed(2)),
-          line_total: Number((grossAmount - discountAmount).toFixed(2)),
-          gst_amount: Number(it.gstAmount || 0), // ✅ was missing
-          gross_amount: Number(it.totalAmount || 0), // ✅ was missing
-          roundoff: Number(it.roundOff || 0),
-          total_net_wt_in_ton: Number(it.weightTon || 0), // ✅ was missing
+          line_total: round2(grossAmount - discountAmount),
+          gst_amount: round2(it.gstAmount),
+          gross_amount: round2(it.totalAmount),
+          roundoff: round2(it.roundOff),
+          total_net_wt_in_ton: round2(it.weightTon),
         };
       });
 
@@ -419,14 +420,21 @@ export default function SalesSouda() {
       tcs_amount: Number(values.orderTaxAndTotals?.tcsAmt || 0),
       cash_discount: 0,
 
-      total_qty: values.orderTotals.totalQty,
-      total_net_weight: values.orderTotals.totalWeightTon,
-      total_amount: values.orderTotals.totalAmount,
-      total_gst_amount: values.orderTotals.totalGSTAmount,
-      grand_total: values.orderTotals.grossAmount,
-      round_off_amount: (values.items || []).reduce(
-        (sum, it) => sum + Number(it.roundOff || 0),
-        0,
+      total_qty: Number(values.orderTotals.totalQty),
+
+      total_net_weight: round2(values.orderTotals.totalWeightTon),
+
+      total_amount: round2(values.orderTotals.totalAmount),
+
+      total_gst_amount: round2(values.orderTotals.totalGSTAmount),
+
+      grand_total: round2(values.orderTotals.grossAmount),
+
+      round_off_amount: round2(
+        (values.items || []).reduce(
+          (sum, it) => sum + Number(it.roundOff || 0),
+          0,
+        ),
       ),
 
       items,
@@ -1345,6 +1353,7 @@ export default function SalesSouda() {
   const handleEditFinish = async (values) => {
     try {
       // Re-calculate item totals to be safe
+      const round2 = (value) => Number(Number(value || 0).toFixed(2));
       const items = (values.items || [])
         .filter(
           (it) =>
@@ -1372,12 +1381,12 @@ export default function SalesSouda() {
             free_qty: freeQty,
             net_qty: netQty,
             discount_percent: discountPercent,
-            discount_amount: Number(discountAmount.toFixed(2)),
-            line_total: Number((grossAmount - discountAmount).toFixed(2)),
-            gst_amount: Number(it.gstAmount || 0), // ✅
-            gross_amount: Number(it.totalAmount || 0), // ✅
-            roundoff: Number(it.roundOff || 0),
-            total_net_wt_in_ton: Number(it.weightTon || 0), // ✅
+            discount_amount: round2(discountAmount),
+            line_total: round2(grossAmount - discountAmount),
+            gst_amount: round2(it.gstAmount),
+            gross_amount: round2(it.totalAmount),
+            roundoff: round2(it.roundOff),
+            total_net_wt_in_ton: round2(it.weightTon), // ✅
             gst_percentage: Number(it.gstPercent || 0),
           };
         });
@@ -1397,9 +1406,11 @@ export default function SalesSouda() {
           : null,
 
         cash_discount: 0,
-        round_off_amount: (values.items || []).reduce(
-          (sum, it) => sum + Number(it.roundOff || 0),
-          0,
+        round_off_amount: round2(
+          (values.items || []).reduce(
+            (sum, it) => sum + Number(it.roundOff || 0),
+            0,
+          ),
         ),
         narration: "Admin updated contract",
 
@@ -1407,7 +1418,10 @@ export default function SalesSouda() {
         sgst: Number(values.orderTaxAndTotals?.sgstPercent || 0),
         igst: Number(values.orderTaxAndTotals?.igstPercent || 0),
         tcs_amount: Number(values.orderTaxAndTotals?.tcsAmt || 0),
-
+        total_amount: round2(values.orderTotals.totalAmount),
+        total_gst_amount: round2(values.orderTotals.totalGSTAmount),
+        grand_total: round2(values.orderTotals.grossAmount),
+        total_net_weight: round2(values.orderTotals.totalWeightTon),
         items,
       };
 
