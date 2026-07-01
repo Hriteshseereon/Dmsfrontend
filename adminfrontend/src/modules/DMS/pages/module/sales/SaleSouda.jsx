@@ -261,8 +261,8 @@ export default function SalesSouda() {
       location: contract.location || "",
       plantId: contract.plant_id || "",
       plantName: contract.plant_name || "",
-      brokerId: contract.broker_id || "",
-      brokerName: contract.broker_name || "",
+      brokerId: contract.broker_id || "direct",
+      brokerName: contract.broker_name || "Direct",
 
       soudaDate: parseApiDate(contract.created_date),
       startDate: parseApiDate(contract.from_date),
@@ -348,7 +348,7 @@ export default function SalesSouda() {
         customerMobile: contract.customer_mobile, // Map mobile
         plantName: contract.plant_name,
         contractDate: contract.created_date,
-        brokerName: contract.broker_name,
+        brokerName: contract.broker_name || "Direct",
         location: contract.location,
         quantity: (contract.items || []).reduce(
           (sum, item) => sum + Number(item.gross_qty || 0),
@@ -421,8 +421,8 @@ export default function SalesSouda() {
       customer_id: values.customerId,
       location: values.customerAddress || null, // ✅ NEW
       plant_id: values.plantId || null, // ✅ NEW
-      broker_id: values.brokerId || null, // ✅ NEW (if you store broker id)
-      broker_name: values.brokerName || null, // ✅ NEW
+      broker_id: values.brokerId || null,
+      broker_name: values.brokerId ? values.brokerName?.label || null : null,
       created_date: values.soudaDate
         ? dayjs(values.soudaDate).format("DD-MM-YYYY")
         : null,
@@ -604,7 +604,8 @@ export default function SalesSouda() {
       customer: record.customer_name,
       customerEmail: record.customerEmail,
       status: record.status,
-
+      location: record.location, // 👈 add karo
+      brokerName: record.broker_name || "Direct", // 👈 add karo
       soudaDate: record.created_date ? dayjs(record.created_date) : undefined,
       startDate: record.startDate ? dayjs(record.startDate) : undefined,
       endDate: record.endDate ? dayjs(record.endDate) : undefined,
@@ -1434,7 +1435,7 @@ export default function SalesSouda() {
         customerEmail: contract.customer_email,
         customerMobile: contract.customer_mobile,
         plantName: contract.plant_name, // ✅ add
-        brokerName: contract.broker_name, // ✅ add
+        brokerName: contract.broker_name || "Direct",
         location: contract.location,
         contractDate: contract.created_date, // ✅ add
         startDate: contract.from_date,
@@ -1518,9 +1519,17 @@ export default function SalesSouda() {
         customer_id: selectedRecord.customerId, // Use ID from record
         customer_email: values.customerEmail,
         customer_mobile: values.customerMobile || 123456789,
-        location: values.location || null, // ✅
+        location: values.customerAddress || null, // ✅
         plant_id: values.plantId || null, // ✅
-        broker_name: values.brokerName || null,
+
+        broker_id:
+          values.brokerId?.value === "direct"
+            ? null
+            : values.brokerId?.value || null,
+        broker_name:
+          values.brokerId?.value === "direct"
+            ? null
+            : values.brokerId?.label || null,
         status: values.status,
         created_date: values.soudaDate
           ? dayjs(values.soudaDate).format("DD-MM-YYYY")
@@ -1567,6 +1576,8 @@ export default function SalesSouda() {
                 // Manually update core fields if mapper return structure differs slightly for table
                 saleContractNumber: res.sale_contract_number,
                 customer: res.customer_name,
+                location: res.location, // 👈 add karo
+                brokerName: res.broker_name || "Direct",
                 startDate: res.from_date,
                 endDate: res.to_date,
                 status: res.status,
@@ -1850,19 +1861,27 @@ export default function SalesSouda() {
                       setBrokerDropdownOpen(visible)
                     }
                     labelInValue
+                    placeholder="Select Broker"
                     onChange={(option) => {
-                      const firstWord = option.label?.split(" ")[0] || "";
-
-                      addForm.setFieldsValue({
-                        brokerId: option.value,
-                        brokerName: firstWord,
-                      });
+                      if (option?.value === "direct") {
+                        addForm.setFieldsValue({
+                          brokerId: null,
+                          brokerName: { value: "direct", label: "Direct" }, // 👈 display bana rahega
+                        });
+                      } else {
+                        const firstWord = option.label?.split(" ")[0] || "";
+                        addForm.setFieldsValue({
+                          brokerId: option.value,
+                          brokerName: { value: option.value, label: firstWord },
+                        });
+                      }
                       setBrokerDropdownOpen(false);
-                      setTimeout(() => {
-                        contractDateRef.current?.focus();
-                      }, 100);
+                      setTimeout(() => contractDateRef.current?.focus(), 100);
                     }}
                   >
+                    <Select.Option key="direct" value="direct">
+                      Direct
+                    </Select.Option>
                     {brokers.map((broker) => (
                       <Select.Option key={broker.id} value={broker.id}>
                         {broker.name}
@@ -2157,14 +2176,10 @@ export default function SalesSouda() {
                       const selectedCustomer = customers.find(
                         (c) => c.customer_id === customerId,
                       );
-
                       if (selectedCustomer) {
-                        addForm.setFieldsValue({
-                          customerAddress: [
-                            selectedCustomer.address ||
-                              selectedCustomer.address_line1,
-                            selectedCustomer.city,
-                          ]
+                        editForm.setFieldsValue({
+                          // 👈 sahi form
+                          customerAddress: [selectedCustomer.city]
                             .filter(Boolean)
                             .join(", "),
                         });
@@ -2220,7 +2235,23 @@ export default function SalesSouda() {
                   placeholder="Select Broker"
                   showSearch
                   optionFilterProp="children"
+                  labelInValue
+                  onChange={(option) => {
+                    if (option?.value === "direct") {
+                      editForm.setFieldsValue({
+                        brokerId: { value: "direct", label: "Direct" },
+                      });
+                    } else {
+                      const firstWord = option.label?.split(" ")[0] || "";
+                      editForm.setFieldsValue({
+                        brokerId: { value: option.value, label: firstWord },
+                      });
+                    }
+                  }}
                 >
+                  <Select.Option key="direct" value="direct">
+                    Direct
+                  </Select.Option>
                   {brokers.map((broker) => (
                     <Select.Option key={broker.id} value={broker.id}>
                       {broker.name}
