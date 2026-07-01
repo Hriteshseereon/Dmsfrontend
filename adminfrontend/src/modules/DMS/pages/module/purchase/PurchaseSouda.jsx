@@ -837,6 +837,16 @@ export default function PurchaseSouda() {
     <Form.List name="items">
       {(fields, { add, remove }) => {
         const handleAutoAddRow = () => {
+          const getAvailableProducts = (currentFieldName) => {
+            const allItems = form.getFieldValue("items") || [];
+            const selectedIds = allItems
+              .filter((_, idx) => idx !== currentFieldName)
+              .map((it) => it?.product_id)
+              .filter(Boolean);
+
+            return products.filter((p) => !selectedIds.includes(p.id));
+          };
+
           const items = form.getFieldValue("items") || [];
 
           const lastItem = items[items.length - 1];
@@ -860,7 +870,10 @@ export default function PurchaseSouda() {
             });
             setTimeout(() => {
               setItemDropdownIndex(nextIndex);
-              itemRefs.current[nextIndex]?.focus();
+              const selectEl = itemRefs.current[nextIndex];
+              selectEl?.focus();
+              const inputEl = selectEl?.nativeElement?.querySelector("input");
+              inputEl?.focus();
             }, 150);
           }
         };
@@ -1450,10 +1463,14 @@ export default function PurchaseSouda() {
                   return createFinancialYearDisabledDate(selectedFY)(current);
                 }}
                 onTabComplete={() => {
+                  setItemDropdownIndex(0);
                   setTimeout(() => {
-                    setItemDropdownIndex(0);
-                    itemRefs.current[0]?.focus();
-                  }, 50);
+                    const selectEl = itemRefs.current[0];
+                    selectEl?.focus();
+                    const inputEl =
+                      selectEl?.nativeElement?.querySelector("input");
+                    inputEl?.focus();
+                  }, 100); // 👈 50ms se 100ms — render ka time do
                 }}
               />
             </Form.Item>
