@@ -52,6 +52,9 @@ import {
   DeleteOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+
+dayjs.extend(customParseFormat);
 
 import AppDatePicker from "../../../../../components/AppDatePicker";
 
@@ -97,11 +100,17 @@ export default function PurchaseSouda() {
   // date helper
   const parseApiDate = (value) => {
     if (!value) return null;
-    // Try native parsing first - handles "YYYY-MM-DD" and full ISO timestamps
-    let d = dayjs(value);
+
+    let d = dayjs(value, "DD-MM-YYYY", true);
+
     if (d.isValid()) return d;
-    // Fallback - handles "DD-MM-YYYY" if some environment ever sends that shape
-    d = dayjs(value, "DD-MM-YYYY");
+
+    d = dayjs(value, "YYYY-MM-DD", true);
+
+    if (d.isValid()) return d;
+
+    d = dayjs(value);
+
     return d.isValid() ? d : null;
   };
   const renderDate = (value) => {

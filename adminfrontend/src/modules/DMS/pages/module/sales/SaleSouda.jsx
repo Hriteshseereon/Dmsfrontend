@@ -33,7 +33,11 @@ import {
   FilterOutlined,
   DeleteOutlined,
 } from "@ant-design/icons";
+
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+
+dayjs.extend(customParseFormat);
 import {
   getCustomers,
   createsalesContract,
@@ -114,11 +118,17 @@ export default function SalesSouda() {
   // date helper
   const parseApiDate = (value) => {
     if (!value) return null;
-    // Try native parsing first - handles "YYYY-MM-DD" and full ISO timestamps
-    let d = dayjs(value);
+
+    let d = dayjs(value, "DD-MM-YYYY", true);
+
     if (d.isValid()) return d;
-    // Fallback - handles "DD-MM-YYYY" if some environment ever sends that shape
-    d = dayjs(value, "DD-MM-YYYY");
+
+    d = dayjs(value, "YYYY-MM-DD", true);
+
+    if (d.isValid()) return d;
+
+    d = dayjs(value);
+
     return d.isValid() ? d : null;
   };
   const renderDate = (value) => {
@@ -254,7 +264,7 @@ export default function SalesSouda() {
       brokerId: contract.broker_id || "",
       brokerName: contract.broker_name || "",
 
-      soudaDate: parseApiDate(contract.created_at),
+      soudaDate: parseApiDate(contract.created_date),
       startDate: parseApiDate(contract.from_date),
       endDate: parseApiDate(contract.to_date),
 
@@ -337,7 +347,7 @@ export default function SalesSouda() {
         customerEmail: contract.customer_email, // Map email
         customerMobile: contract.customer_mobile, // Map mobile
         plantName: contract.plant_name,
-        contractDate: contract.created_at,
+        contractDate: contract.created_date,
         brokerName: contract.broker_name,
         location: contract.location,
         quantity: (contract.items || []).reduce(
@@ -351,6 +361,7 @@ export default function SalesSouda() {
         ),
         startDate: contract.from_date,
         endDate: contract.to_date,
+        extended_upto: contract.extended_upto,
         status: contract.status,
         items: contract.items,
         grandTotal: contract.grand_total,
@@ -412,6 +423,9 @@ export default function SalesSouda() {
       plant_id: values.plantId || null, // ✅ NEW
       broker_id: values.brokerId || null, // ✅ NEW (if you store broker id)
       broker_name: values.brokerName || null, // ✅ NEW
+      created_date: values.soudaDate
+        ? dayjs(values.soudaDate).format("DD-MM-YYYY")
+        : null,
       from_date: values.startDate
         ? dayjs(values.startDate).format("YYYY-MM-DD")
         : null,
@@ -591,7 +605,7 @@ export default function SalesSouda() {
       customerEmail: record.customerEmail,
       status: record.status,
 
-      soudaDate: record.created_at ? dayjs(record.created_at) : undefined,
+      soudaDate: record.created_date ? dayjs(record.created_date) : undefined,
       startDate: record.startDate ? dayjs(record.startDate) : undefined,
       endDate: record.endDate ? dayjs(record.endDate) : undefined,
 
@@ -780,7 +794,7 @@ export default function SalesSouda() {
       dataIndex: "quantity",
       width: 60,
       render: (value) => (
-        <span className="text-amber-800">{Number(value || 0).toFixed(3)}</span>
+        <span className="text-amber-800">{Number(value || 0)}</span>
       ),
     },
     {
@@ -807,6 +821,18 @@ export default function SalesSouda() {
       width: 80,
       render: (date) => (
         <span className="text-amber-800">{renderDate(date)}</span>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Extended Up To</span>
+      ),
+      dataIndex: "extended_upto",
+      width: 75,
+      render: (value) => (
+        <span className="text-amber-800">
+          {value ? renderDate(value) : "-"}
+        </span>
       ),
     },
     {
@@ -1492,6 +1518,9 @@ export default function SalesSouda() {
         plant_id: values.plantId || null, // ✅
         broker_name: values.brokerName || null,
         status: values.status,
+        created_date: values.soudaDate
+          ? dayjs(values.soudaDate).format("DD-MM-YYYY")
+          : null,
         from_date: values.startDate
           ? dayjs(values.startDate).format("YYYY-MM-DD")
           : null,
