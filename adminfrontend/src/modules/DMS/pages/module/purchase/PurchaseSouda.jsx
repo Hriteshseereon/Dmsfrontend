@@ -85,6 +85,10 @@ export default function PurchaseSouda() {
   const statusOptions = ["Pending", "Approved", "Rejected"];
   const itemRefs = useRef({});
   const [itemDropdownIndex, setItemDropdownIndex] = useState(null);
+  const [extendForm] = Form.useForm();
+  const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
+  const [selectedContract, setSelectedContract] = useState(null);
+
   useEffect(() => {
     fetchDropdownData();
     fetchPurchaseContracts();
@@ -152,6 +156,7 @@ export default function PurchaseSouda() {
         contractDate: item.created_date,
         vendor_name: item.company_group || item.vendor_name,
         plant: res.plant,
+        extended_upto: item.extended_upto,
         plant_name: item.plant_name,
         quantity: Number(item.total_qty || 0),
         netWeightTon: Number(item.totalNetWt || item.net_weight || 0),
@@ -395,7 +400,44 @@ export default function PurchaseSouda() {
       setLoading(false);
     }
   };
+  // satus to add in the table for direct status change button
+  const handleApprove = async (record) => {
+    await updatePurchaseContract(record.key, {
+      status: "Approved",
+    });
 
+    message.success("Approved Successfully");
+
+    fetchPurchaseContracts();
+  };
+
+  const handleCancel = async (record) => {
+    await updatePurchaseContract(record.key, {
+      status: "Cancelled",
+    });
+
+    message.success("Cancelled");
+
+    fetchPurchaseContracts();
+  };
+  const openExtendModal = (record) => {
+    setSelectedContract(record);
+    extendForm.resetFields();
+    setIsExtendModalOpen(true);
+  };
+  const handleExtendSubmit = async (values) => {
+    await updatePurchaseContract(selectedContract.key, {
+      extended_upto: dayjs(values.extended_upto).format("YYYY-MM-DD"),
+
+      status: "Approved",
+    });
+
+    message.success("Extended");
+
+    setIsExtendModalOpen(false);
+
+    fetchPurchaseContracts();
+  };
   // ---------- Table columns ----------
   const columns = [
     {
@@ -456,6 +498,14 @@ export default function PurchaseSouda() {
       width: 70,
       render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
     },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Extended Up To</span>
+      ),
+      dataIndex: "extended_upto",
+      width: 70,
+      render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
+    },
     // {
     //   title: (
     //     <span className="text-amber-700 font-semibold">Extended Up To</span>
@@ -483,7 +533,7 @@ export default function PurchaseSouda() {
       // render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Approval</span>,
+      title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
       width: 75,
       render: (status) => {
@@ -506,10 +556,51 @@ export default function PurchaseSouda() {
       },
     },
     {
-      title: <span className="text-amber-700 font-semibold">Status</span>,
-      // dataIndex: "to_date",
-      width: 60,
-      // render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
+      title: (
+        <span
+          style={{
+            whiteSpace: "nowrap",
+          }}
+          className="text-amber-700 font-semibold"
+        >
+          Button
+        </span>
+      ),
+      width: 100,
+      align: "center",
+      render: (_, record) => {
+        if (record.status === "Pending") {
+          return (
+            <Button
+              size="small"
+              type="primary"
+              onClick={() => handleApprove(record)}
+            >
+              Approve
+            </Button>
+          );
+        }
+
+        if (record.status === "Expired") {
+          return (
+            <div className="flex gap-2">
+              <Button
+                size="small"
+                type="primary"
+                onClick={() => openExtendModal(record)}
+              >
+                Extend
+              </Button>
+
+              <Button size="small" danger onClick={() => handleCancel(record)}>
+                Cancel
+              </Button>
+            </div>
+          );
+        }
+
+        return "-";
+      },
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
@@ -1545,7 +1636,11 @@ export default function PurchaseSouda() {
           loading={loading}
           pagination={false}
           rowKey="key"
-          scroll={{ y: 300 }}
+          size="small"
+          scroll={{
+            x: 1500,
+            y: 360,
+          }}
         />
       </div>
 
@@ -1585,7 +1680,7 @@ export default function PurchaseSouda() {
               htmlType="submit"
               className="bg-amber-500! border-none!"
             >
-              Add
+              Save
             </Button>
           </div>
         </Form>
@@ -1644,6 +1739,46 @@ export default function PurchaseSouda() {
       >
         <Form form={viewForm} layout="vertical">
           <RenderFormBody form={viewForm} disabled={true} />
+        </Form>
+      </Modal>
+      <Modal
+        title="Extend Purchase Contract"
+        open={isExtendModalOpen}
+        onCancel={() => {
+          setIsExtendModalOpen(false);
+          extendForm.resetFields();
+        }}
+        footer={null}
+        destroyOnClose
+      >
+        <Form form={extendForm} layout="vertical" onFinish={handleExtendSubmit}>
+          <Form.Item
+            label="Extend Up To"
+            name="extended_upto"
+            rules={[
+              {
+                required: true,
+                message: "Please select extend date",
+              },
+            ]}
+          >
+            <AppDatePicker />
+          </Form.Item>
+
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => {
+                setIsExtendModalOpen(false);
+                extendForm.resetFields();
+              }}
+            >
+              Cancel
+            </Button>
+
+            <Button type="primary" htmlType="submit">
+              Submit
+            </Button>
+          </div>
         </Form>
       </Modal>
     </div>

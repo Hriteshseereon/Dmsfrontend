@@ -22,6 +22,7 @@ import {
   Card,
   message,
   Popconfirm,
+  Space,
 } from "antd";
 import {
   SearchOutlined,
@@ -104,6 +105,11 @@ export default function SalesSouda() {
   const [editItemDropdownIndex, setEditItemDropdownIndex] = useState(null);
   const qtyRefs = useRef({});
   const contractRateRefs = useRef({});
+  const [extendForm] = Form.useForm();
+
+  const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
+
+  const [selectedContract, setSelectedContract] = useState(null);
   // Draft functions
   // date helper
   const parseApiDate = (value) => {
@@ -333,6 +339,7 @@ export default function SalesSouda() {
         plantName: contract.plant_name,
         contractDate: contract.created_at,
         brokerName: contract.broker_name,
+        location: contract.location,
         quantity: (contract.items || []).reduce(
           (sum, item) => sum + Number(item.gross_qty || 0),
           0,
@@ -670,6 +677,46 @@ export default function SalesSouda() {
     }
   };
 
+  const openExtendModal = (record) => {
+    console.log("Extend clicked", record);
+
+    setSelectedContract(record);
+
+    extendForm.resetFields();
+
+    setIsExtendModalOpen(true);
+  };
+  const handleApprove = async (record) => {
+    await updateSalesContract(record.key, {
+      status: "Approved",
+    });
+
+    message.success("Approved");
+
+    fetchSalesContracts();
+  };
+  const handleCancel = async (record) => {
+    await updateSalesContract(record.key, {
+      status: "Cancelled",
+    });
+
+    message.success("Cancelled");
+
+    fetchSalesContracts();
+  };
+  const handleExtendSubmit = async (values) => {
+    await updateSalesContract(selectedContract.key, {
+      extended_upto: dayjs(values.extended_upto).format("YYYY-MM-DD"),
+
+      // status: "Approved",
+    });
+
+    message.success("Extended");
+
+    setIsExtendModalOpen(false);
+
+    fetchSalesContracts();
+  };
   // reusalbe data format
   const parseShortDate = (value) => {
     if (!value || value.length !== 6) return null;
@@ -710,7 +757,11 @@ export default function SalesSouda() {
       title: <span className="text-amber-700 font-semibold">Broker Name</span>,
       dataIndex: "brokerName",
       width: 60,
-      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+      render: (text) => (
+        <span className="text-amber-800">
+          {text ? text.split(" ")[0] : "-"}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
@@ -720,9 +771,9 @@ export default function SalesSouda() {
     },
     {
       title: <span className="text-amber-700 font-semibold">Place</span>,
-      // dataIndex: "customer",
+      dataIndex: "location",
       width: 60,
-      // render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">QTY</span>,
@@ -790,7 +841,7 @@ export default function SalesSouda() {
     // },
 
     {
-      title: <span className="text-amber-700 font-semibold">Approval</span>,
+      title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
       width: 85,
       render: (status) => {
@@ -816,10 +867,53 @@ export default function SalesSouda() {
       },
     },
     {
-      title: <span className="text-amber-700 font-semibold">Status</span>,
-      // dataIndex: "customer",
-      width: 70,
-      // render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+      title: (
+        <span
+          style={{
+            whiteSpace: "nowrap",
+          }}
+          className="text-amber-700 font-semibold"
+        >
+          Button
+        </span>
+      ),
+      width: 100,
+      align: "center",
+      render: (_, record) => {
+        if (record.status === "Pending") {
+          return (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => handleApprove(record)}
+              className="bg-green-500! hover:bg-amber-600! border-none!"
+            >
+              Approve
+            </Button>
+          );
+        }
+
+        if (record.status === "Expired") {
+          return (
+            <Space>
+              <Button
+                type="primary"
+                size="small"
+                onClick={() => openExtendModal(record)}
+                className="bg-amber-500! hover:bg-amber-600! border-none!"
+              >
+                Extend
+              </Button>
+
+              <Button danger size="small" onClick={() => handleCancel(record)}>
+                Cancel
+              </Button>
+            </Space>
+          );
+        }
+
+        return "-";
+      },
     },
     // {
     //   title: <span className="text-amber-700 font-semibold">Total (₹)</span>,
@@ -1566,8 +1660,12 @@ export default function SalesSouda() {
           columns={columns}
           dataSource={data}
           pagination={false}
-          scroll={{ y: 220 }}
+          scroll={{
+            x: 1500,
+            y: 500,
+          }}
           rowKey="key"
+          size="small"
         />
       </div>
 
@@ -1972,7 +2070,7 @@ export default function SalesSouda() {
               type="primary"
               htmlType="submit"
             >
-              Add
+              Save
             </Button>
           </div>
         </Form>
@@ -2541,6 +2639,46 @@ export default function SalesSouda() {
               </Col>
             </Row>
           </Card>
+        </Form>
+      </Modal>
+      <Modal
+        title="Extend Sales Contract"
+        open={isExtendModalOpen}
+        onCancel={() => {
+          setIsExtendModalOpen(false);
+          extendForm.resetFields();
+        }}
+        footer={null}
+        destroyOnClose
+      >
+        <Form form={extendForm} layout="vertical" onFinish={handleExtendSubmit}>
+          <Form.Item
+            label="Extend Up To"
+            name="extended_upto"
+            rules={[
+              {
+                required: true,
+                message: "Please select extend date",
+              },
+            ]}
+          >
+            <AppDatePicker />
+          </Form.Item>
+
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => {
+                setIsExtendModalOpen(false);
+                extendForm.resetFields();
+              }}
+            >
+              Cancel
+            </Button>
+
+            <Button type="primary" htmlType="submit">
+              Submit
+            </Button>
+          </div>
         </Form>
       </Modal>
     </div>
