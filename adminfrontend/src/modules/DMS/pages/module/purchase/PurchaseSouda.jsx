@@ -877,6 +877,16 @@ export default function PurchaseSouda() {
             }, 150);
           }
         };
+        // 👇 Ye helper function add karo
+        const getAvailableProducts = (currentFieldName) => {
+          const allItems = form.getFieldValue("items") || [];
+          const selectedIds = allItems
+            .filter((_, idx) => idx !== currentFieldName)
+            .map((it) => it?.product_id)
+            .filter(Boolean);
+
+          return products.filter((p) => !selectedIds.includes(p.id));
+        };
         return (
           <>
             <div className="mb-2 flex justify-between items-center">
@@ -1013,11 +1023,15 @@ export default function PurchaseSouda() {
                           }, 100);
                         }}
                       >
-                        {products.map((p) => (
-                          <Select.Option key={p.id} value={p.id}>
-                            {p.name}
-                          </Select.Option>
-                        ))}
+                        {getAvailableProducts(field.name).map(
+                          (
+                            p, // 👈 change here
+                          ) => (
+                            <Select.Option key={p.id} value={p.id}>
+                              {p.name}
+                            </Select.Option>
+                          ),
+                        )}
                       </Select>
                     </Form.Item>
                   </Col>
