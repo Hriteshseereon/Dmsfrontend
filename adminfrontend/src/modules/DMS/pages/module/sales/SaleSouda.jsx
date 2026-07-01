@@ -1714,7 +1714,7 @@ export default function SalesSouda() {
           setAddItemDropdownIndex(null);
         }}
         footer={null}
-        width={1600}
+        width={1800}
       >
         <Form
           form={addForm}
@@ -2116,7 +2116,7 @@ export default function SalesSouda() {
           setEditItemDropdownIndex(null);
         }}
         footer={null}
-        width={1600}
+        width={1800}
       >
         <Form
           form={editForm}
@@ -2451,7 +2451,7 @@ export default function SalesSouda() {
           setSelectedRecord(null);
         }}
         footer={null}
-        width={1600}
+        width={1800}
       >
         <Form layout="vertical" form={viewForm}>
           {/* Basic Information */}
