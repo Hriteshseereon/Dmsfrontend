@@ -1275,14 +1275,10 @@ export default function SalesSouda() {
                       className="w-full!"
                       controls={false}
                       min={0}
-                      formatter={(value) =>
-                        value !== undefined && value !== null
-                          ? Number(value).toFixed(2)
-                          : "0.00"
-                      }
-                      parser={(value) => value?.replace(/[^\d.]/g, "")}
+                      precision={2} // 👈 decimal ko max 2 digit tak khud limit karega, typing ke time bhi
+                      step={0.01}
+                      defaultValue={0} // 👈 shuru me sirf "0" dikhega, "0.00" nahi
                       onFocus={(e) => {
-                        // ✅ Pura value select karo focus pe
                         setTimeout(() => e.target.select(), 0);
                       }}
                       onChange={() => {
@@ -1439,7 +1435,8 @@ export default function SalesSouda() {
         customerMobile: contract.customer_mobile,
         plantName: contract.plant_name, // ✅ add
         brokerName: contract.broker_name, // ✅ add
-        contractDate: contract.created_at, // ✅ add
+        location: contract.location,
+        contractDate: contract.created_date, // ✅ add
         startDate: contract.from_date,
         endDate: contract.to_date,
         quantity: (contract.items || []).reduce(
@@ -1463,13 +1460,16 @@ export default function SalesSouda() {
       setData((prev) => [row, ...prev]);
       setIsAddModalOpen(false);
       addForm.resetFields();
-
+      message.success("Sales Contract created successfully");
       // ✅ Optional: Show success message
       console.log("Sales contract created successfully:", row);
     } catch (error) {
       console.error("Failed to create sales contract", error);
       // 🔍 Log: error response
       console.error("Error response:", error.response?.data);
+      message.error(
+        error?.response?.data?.message || "Failed to create Sales Contract",
+      );
     }
   };
 
@@ -1580,9 +1580,12 @@ export default function SalesSouda() {
       setIsEditModalOpen(false);
       editForm.resetFields();
       setSelectedRecord(null);
-      // message.success("Contract updated successfully"); // Optional
+      message.success("Contract updated successfully"); // Optional
     } catch (err) {
       console.error("Failed to update contract", err);
+      message.error(
+        err?.response?.data?.message || "Failed to update Sales Contract",
+      );
     }
   };
 
