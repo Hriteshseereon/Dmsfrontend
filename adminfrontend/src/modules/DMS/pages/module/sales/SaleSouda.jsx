@@ -1105,7 +1105,11 @@ export default function SalesSouda() {
         // list and put keyboard focus on it.
         setTimeout(() => {
           setOpenItemIndex?.(newIndex);
-          itemRefs.current[newIndex]?.focus();
+          const selectEl = itemRefs.current[newIndex];
+          selectEl?.focus();
+          const inputEl = selectEl?.nativeElement?.querySelector("input");
+          inputEl?.focus();
+          // itemRefs.current[newIndex]?.focus();
         }, 150);
       }
     };
@@ -1954,10 +1958,15 @@ export default function SalesSouda() {
                       );
                     }}
                     onTabComplete={() => {
+                      setAddItemDropdownIndex(0);
                       setTimeout(() => {
-                        setAddItemDropdownIndex(0);
-                        itemRefs.current[0]?.focus();
-                      }, 50);
+                        const selectEl = itemRefs.current[0];
+                        selectEl?.focus();
+                        const inputEl =
+                          selectEl?.nativeElement?.querySelector("input");
+                        inputEl?.focus();
+                        // itemRefs.current[0]?.focus();
+                      }, 100);
                     }}
                   />
                 </Form.Item>
@@ -2302,10 +2311,15 @@ export default function SalesSouda() {
                       );
                     }}
                     onTabComplete={() => {
+                      setEditItemDropdownIndex(0);
                       setTimeout(() => {
-                        setEditItemDropdownIndex(0);
-                        itemRefs.current[0]?.focus();
-                      }, 50);
+                        const selectEl = itemRefs.current[0];
+                        selectEl?.focus();
+                        const inputEl =
+                          selectEl?.nativeElement?.querySelector("input");
+                        inputEl?.focus();
+                        // itemRefs.current[0]?.focus();
+                      }, 100);
                     }}
                   />
                 </Form.Item>
