@@ -1162,12 +1162,14 @@ export default function PurchaseSouda() {
                         {...positiveNumberInputProps}
                         disabled={disabled}
                         precision={2}
-                        formatter={(value) =>
-                          value !== undefined && value !== null
-                            ? Number(value).toFixed(2)
-                            : ""
-                        }
-                        parser={(value) => value?.replace(/[^\d.]/g, "")}
+                        step={0.01}
+                        defaultValue={0}
+                        // formatter={(value) =>
+                        //   value !== undefined && value !== null
+                        //     ? Number(value).toFixed(2)
+                        //     : ""
+                        // }
+                        // parser={(value) => value?.replace(/[^\d.]/g, "")}
                         onChange={() => {
                           const all = form.getFieldsValue();
 
