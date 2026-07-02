@@ -424,7 +424,7 @@ export default function SalesSouda() {
       broker_id: values.brokerId || null,
       broker_name: values.brokerId ? values.brokerName?.label || null : null,
       created_date: values.soudaDate
-        ? dayjs(values.soudaDate).format("DD-MM-YYYY")
+        ? dayjs(values.soudaDate).format("YYYY-MM-DD")
         : null,
       from_date: values.startDate
         ? dayjs(values.startDate).format("YYYY-MM-DD")
@@ -1532,7 +1532,7 @@ export default function SalesSouda() {
             : values.brokerId?.label || null,
         status: values.status,
         created_date: values.soudaDate
-          ? dayjs(values.soudaDate).format("DD-MM-YYYY")
+          ? dayjs(values.soudaDate).format("YYYY-MM-DD")
           : null,
         from_date: values.startDate
           ? dayjs(values.startDate).format("YYYY-MM-DD")
