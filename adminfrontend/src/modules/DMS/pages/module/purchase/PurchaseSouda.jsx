@@ -326,9 +326,14 @@ export default function PurchaseSouda() {
       await updatePurchaseContract(selectedRecord.id, payload);
 
       setIsEditModalOpen(false);
+      editForm.resetFields();
       fetchPurchaseContracts(); // refresh table
+      message.success("Purchase Contract updated successfully");
     } catch (error) {
       console.error("Update failed:", error);
+      message.error(
+        error?.response?.data?.message || "Failed to update Purchase Contract",
+      );
     }
   };
   // handle delete
@@ -687,7 +692,7 @@ export default function PurchaseSouda() {
         gstAmount,
         totalAmt,
         roundOff,
-        totalNetWt: round2((netWt * qty) / 1000),
+        totalNetWt: (netWt * qty) / 1000,
       };
     });
 
@@ -770,67 +775,74 @@ export default function PurchaseSouda() {
 
   // ---------- Form submit ----------
   const handleFormSubmit = async (values) => {
-    console.log("FORM VALUES", JSON.stringify(values, null, 2));
-    const orderTotals = values.orderTotals || {};
-    const validItems = (values.items || []).filter(
-      (it) =>
-        it?.item_name && Number(it.qty || 0) > 0 && Number(it.rate || 0) > 0,
-    );
+    try {
+      console.log("FORM VALUES", JSON.stringify(values, null, 2));
+      const orderTotals = values.orderTotals || {};
+      const validItems = (values.items || []).filter(
+        (it) =>
+          it?.item_name && Number(it.qty || 0) > 0 && Number(it.rate || 0) > 0,
+      );
 
-    const payload = {
-      organisation: currentOrgId,
-      vendor: values.vendor,
-      company_group_id: selectedCompanyGroupId, // assuming company group is same as vendor for now
-      vendor_name: values.vendor_name,
-      plant: values.plant,
-      plant_name: values.plant_name,
-      created_date: values.soudaDate
-        ? dayjs(values.soudaDate).format("YYYY-MM-DD")
-        : null,
+      const payload = {
+        organisation: currentOrgId,
+        vendor: values.vendor,
+        company_group_id: selectedCompanyGroupId, // assuming company group is same as vendor for now
+        vendor_name: values.vendor_name,
+        plant: values.plant,
+        plant_name: values.plant_name,
+        created_date: values.soudaDate
+          ? dayjs(values.soudaDate).format("YYYY-MM-DD")
+          : null,
 
-      from_date: dayjs(values.from_date).format("YYYY-MM-DD"),
-      to_date: dayjs(values.to_date).format("YYYY-MM-DD"),
+        from_date: dayjs(values.from_date).format("YYYY-MM-DD"),
+        to_date: dayjs(values.to_date).format("YYYY-MM-DD"),
 
-      total_qty: round2(orderTotals.totalQty),
-      gross_amount: round2(orderTotals.totalGrossAmount),
-      total_discount: 0,
-      total_gst_amount: 0,
-      total_amount: round2(orderTotals.totalGrossAmount),
-      grand_total: round2(orderTotals.totalGrossAmount),
-      totalNetWt: round2(orderTotals.totalNetWt),
-      items: validItems.map((it) => ({
-        product: it.product_id,
-        uom: it.base_unit || null,
+        total_qty: round2(orderTotals.totalQty),
+        gross_amount: round2(orderTotals.totalGrossAmount),
+        total_discount: 0,
+        total_gst_amount: 0,
+        total_amount: round2(orderTotals.totalGrossAmount),
+        grand_total: round2(orderTotals.totalGrossAmount),
+        totalNetWt: round2(orderTotals.totalNetWt),
+        items: validItems.map((it) => ({
+          product: it.product_id,
+          uom: it.base_unit || null,
 
-        qty: round2(it.qty),
-        // free_qty: round2(it.freeQty),
-        total_qty: round2(it.totalQty),
+          qty: round2(it.qty),
+          // free_qty: round2(it.freeQty),
+          total_qty: round2(it.totalQty),
 
-        rate: round2(it.rate),
-        item_name: it.item_name || "",
-        hsn_id: it.hsn_id || null,
-        hsn_code: it.hsn_code || "",
+          rate: round2(it.rate),
+          item_name: it.item_name || "",
+          hsn_id: it.hsn_id || null,
+          hsn_code: it.hsn_code || "",
 
-        discount_percent: round2(it.discountPercent),
-        discount_amount: round2(it.discountAmt),
+          discount_percent: round2(it.discountPercent),
+          discount_amount: round2(it.discountAmt),
 
-        gross_amount: round2(it.grossAmount),
-        net_weight: round2(it.netWt),
-        sgst_percent: round2(it.sgstPercent),
-        cgst_percent: round2(it.cgstPercent),
-        igst_percent: round2(it.igstPercent),
+          gross_amount: round2(it.grossAmount),
+          net_weight: round2(it.netWt),
+          sgst_percent: round2(it.sgstPercent),
+          cgst_percent: round2(it.cgstPercent),
+          igst_percent: round2(it.igstPercent),
 
-        total_gst_amount: round2(it.totalGST),
-        roundoff: round2(it.roundOff),
-        total_amount: round2(it.totalAmt),
-      })),
-    };
+          total_gst_amount: round2(it.totalGST),
+          roundoff: round2(it.roundOff),
+          total_amount: round2(it.totalAmt),
+        })),
+      };
 
-    console.log("FINAL PAYLOAD:", payload);
-    await addPurchaseContract(payload);
+      console.log("FINAL PAYLOAD:", payload);
+      await addPurchaseContract(payload);
 
-    await fetchPurchaseContracts();
-    setIsAddModalOpen(false);
+      await fetchPurchaseContracts();
+      setIsAddModalOpen(false);
+    } catch (error) {
+      console.error("Failed to create purchase contract", error);
+      message.error(
+        error?.response?.data?.message || "Failed to create Purchase Contract",
+      );
+    }
   };
 
   const ItemsList = ({ form, disabled = false }) => (
