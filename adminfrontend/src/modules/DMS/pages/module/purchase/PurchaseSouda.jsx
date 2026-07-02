@@ -52,6 +52,9 @@ import {
   DeleteOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+
+dayjs.extend(customParseFormat);
 
 import AppDatePicker from "../../../../../components/AppDatePicker";
 
@@ -85,6 +88,10 @@ export default function PurchaseSouda() {
   const statusOptions = ["Pending", "Approved", "Rejected"];
   const itemRefs = useRef({});
   const [itemDropdownIndex, setItemDropdownIndex] = useState(null);
+  const [extendForm] = Form.useForm();
+  const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
+  const [selectedContract, setSelectedContract] = useState(null);
+
   useEffect(() => {
     fetchDropdownData();
     fetchPurchaseContracts();
@@ -93,11 +100,17 @@ export default function PurchaseSouda() {
   // date helper
   const parseApiDate = (value) => {
     if (!value) return null;
-    // Try native parsing first - handles "YYYY-MM-DD" and full ISO timestamps
-    let d = dayjs(value);
+
+    let d = dayjs(value, "DD-MM-YYYY", true);
+
     if (d.isValid()) return d;
-    // Fallback - handles "DD-MM-YYYY" if some environment ever sends that shape
-    d = dayjs(value, "DD-MM-YYYY");
+
+    d = dayjs(value, "YYYY-MM-DD", true);
+
+    if (d.isValid()) return d;
+
+    d = dayjs(value);
+
     return d.isValid() ? d : null;
   };
   const renderDate = (value) => {
@@ -152,6 +165,7 @@ export default function PurchaseSouda() {
         contractDate: item.created_date,
         vendor_name: item.company_group || item.vendor_name,
         plant: res.plant,
+        extended_upto: item.extended_upto,
         plant_name: item.plant_name,
         quantity: Number(item.total_qty || 0),
         netWeightTon: Number(item.totalNetWt || item.net_weight || 0),
@@ -312,9 +326,14 @@ export default function PurchaseSouda() {
       await updatePurchaseContract(selectedRecord.id, payload);
 
       setIsEditModalOpen(false);
+      editForm.resetFields();
       fetchPurchaseContracts(); // refresh table
+      message.success("Purchase Contract updated successfully");
     } catch (error) {
       console.error("Update failed:", error);
+      message.error(
+        error?.response?.data?.message || "Failed to update Purchase Contract",
+      );
     }
   };
   // handle delete
@@ -395,7 +414,44 @@ export default function PurchaseSouda() {
       setLoading(false);
     }
   };
+  // satus to add in the table for direct status change button
+  const handleApprove = async (record) => {
+    await updatePurchaseContract(record.key, {
+      status: "Approved",
+    });
 
+    message.success("Approved Successfully");
+
+    fetchPurchaseContracts();
+  };
+
+  const handleCancel = async (record) => {
+    await updatePurchaseContract(record.key, {
+      status: "Cancelled",
+    });
+
+    message.success("Cancelled");
+
+    fetchPurchaseContracts();
+  };
+  const openExtendModal = (record) => {
+    setSelectedContract(record);
+    extendForm.resetFields();
+    setIsExtendModalOpen(true);
+  };
+  const handleExtendSubmit = async (values) => {
+    await updatePurchaseContract(selectedContract.key, {
+      extended_upto: dayjs(values.extended_upto).format("YYYY-MM-DD"),
+
+      status: "Approved",
+    });
+
+    message.success("Extended");
+
+    setIsExtendModalOpen(false);
+
+    fetchPurchaseContracts();
+  };
   // ---------- Table columns ----------
   const columns = [
     {
@@ -456,6 +512,14 @@ export default function PurchaseSouda() {
       width: 70,
       render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
     },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Extended Up To</span>
+      ),
+      dataIndex: "extended_upto",
+      width: 70,
+      render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
+    },
     // {
     //   title: (
     //     <span className="text-amber-700 font-semibold">Extended Up To</span>
@@ -483,7 +547,7 @@ export default function PurchaseSouda() {
       // render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Approval</span>,
+      title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
       width: 75,
       render: (status) => {
@@ -506,10 +570,51 @@ export default function PurchaseSouda() {
       },
     },
     {
-      title: <span className="text-amber-700 font-semibold">Status</span>,
-      // dataIndex: "to_date",
-      width: 60,
-      // render: (t) => <span className="text-amber-800">{renderDate(t)}</span>,
+      title: (
+        <span
+          style={{
+            whiteSpace: "nowrap",
+          }}
+          className="text-amber-700 font-semibold"
+        >
+          Button
+        </span>
+      ),
+      width: 100,
+      align: "center",
+      render: (_, record) => {
+        if (record.status === "Pending") {
+          return (
+            <Button
+              size="small"
+              type="primary"
+              onClick={() => handleApprove(record)}
+            >
+              Approve
+            </Button>
+          );
+        }
+
+        if (record.status === "Expired") {
+          return (
+            <div className="flex gap-2">
+              <Button
+                size="small"
+                type="primary"
+                onClick={() => openExtendModal(record)}
+              >
+                Extend
+              </Button>
+
+              <Button size="small" danger onClick={() => handleCancel(record)}>
+                Cancel
+              </Button>
+            </div>
+          );
+        }
+
+        return "-";
+      },
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
@@ -587,7 +692,7 @@ export default function PurchaseSouda() {
         gstAmount,
         totalAmt,
         roundOff,
-        totalNetWt: round2((netWt * qty) / 1000),
+        totalNetWt: (netWt * qty) / 1000,
       };
     });
 
@@ -670,73 +775,90 @@ export default function PurchaseSouda() {
 
   // ---------- Form submit ----------
   const handleFormSubmit = async (values) => {
-    console.log("FORM VALUES", JSON.stringify(values, null, 2));
-    const orderTotals = values.orderTotals || {};
-    const validItems = (values.items || []).filter(
-      (it) =>
-        it?.item_name && Number(it.qty || 0) > 0 && Number(it.rate || 0) > 0,
-    );
+    try {
+      console.log("FORM VALUES", JSON.stringify(values, null, 2));
+      const orderTotals = values.orderTotals || {};
+      const validItems = (values.items || []).filter(
+        (it) =>
+          it?.item_name && Number(it.qty || 0) > 0 && Number(it.rate || 0) > 0,
+      );
 
-    const payload = {
-      organisation: currentOrgId,
-      vendor: values.vendor,
-      company_group_id: selectedCompanyGroupId, // assuming company group is same as vendor for now
-      vendor_name: values.vendor_name,
-      plant: values.plant,
-      plant_name: values.plant_name,
-      created_date: values.soudaDate
-        ? dayjs(values.soudaDate).format("YYYY-MM-DD")
-        : null,
+      const payload = {
+        organisation: currentOrgId,
+        vendor: values.vendor,
+        company_group_id: selectedCompanyGroupId, // assuming company group is same as vendor for now
+        vendor_name: values.vendor_name,
+        plant: values.plant,
+        plant_name: values.plant_name,
+        created_date: values.soudaDate
+          ? dayjs(values.soudaDate).format("YYYY-MM-DD")
+          : null,
 
-      from_date: dayjs(values.from_date).format("YYYY-MM-DD"),
-      to_date: dayjs(values.to_date).format("YYYY-MM-DD"),
+        from_date: dayjs(values.from_date).format("YYYY-MM-DD"),
+        to_date: dayjs(values.to_date).format("YYYY-MM-DD"),
 
-      total_qty: round2(orderTotals.totalQty),
-      gross_amount: round2(orderTotals.totalGrossAmount),
-      total_discount: 0,
-      total_gst_amount: 0,
-      total_amount: round2(orderTotals.totalGrossAmount),
-      grand_total: round2(orderTotals.totalGrossAmount),
-      totalNetWt: round2(orderTotals.totalNetWt),
-      items: validItems.map((it) => ({
-        product: it.product_id,
-        uom: it.base_unit || null,
+        total_qty: round2(orderTotals.totalQty),
+        gross_amount: round2(orderTotals.totalGrossAmount),
+        total_discount: 0,
+        total_gst_amount: 0,
+        total_amount: round2(orderTotals.totalGrossAmount),
+        grand_total: round2(orderTotals.totalGrossAmount),
+        totalNetWt: round2(orderTotals.totalNetWt),
+        items: validItems.map((it) => ({
+          product: it.product_id,
+          uom: it.base_unit || null,
 
-        qty: round2(it.qty),
-        // free_qty: round2(it.freeQty),
-        total_qty: round2(it.totalQty),
+          qty: round2(it.qty),
+          // free_qty: round2(it.freeQty),
+          total_qty: round2(it.totalQty),
 
-        rate: round2(it.rate),
-        item_name: it.item_name || "",
-        hsn_id: it.hsn_id || null,
-        hsn_code: it.hsn_code || "",
+          rate: round2(it.rate),
+          item_name: it.item_name || "",
+          hsn_id: it.hsn_id || null,
+          hsn_code: it.hsn_code || "",
 
-        discount_percent: round2(it.discountPercent),
-        discount_amount: round2(it.discountAmt),
+          discount_percent: round2(it.discountPercent),
+          discount_amount: round2(it.discountAmt),
 
-        gross_amount: round2(it.grossAmount),
-        net_weight: round2(it.netWt),
-        sgst_percent: round2(it.sgstPercent),
-        cgst_percent: round2(it.cgstPercent),
-        igst_percent: round2(it.igstPercent),
+          gross_amount: round2(it.grossAmount),
+          net_weight: round2(it.netWt),
+          sgst_percent: round2(it.sgstPercent),
+          cgst_percent: round2(it.cgstPercent),
+          igst_percent: round2(it.igstPercent),
 
-        total_gst_amount: round2(it.totalGST),
-        roundoff: round2(it.roundOff),
-        total_amount: round2(it.totalAmt),
-      })),
-    };
+          total_gst_amount: round2(it.totalGST),
+          roundoff: round2(it.roundOff),
+          total_amount: round2(it.totalAmt),
+        })),
+      };
 
-    console.log("FINAL PAYLOAD:", payload);
-    await addPurchaseContract(payload);
+      console.log("FINAL PAYLOAD:", payload);
+      await addPurchaseContract(payload);
 
-    await fetchPurchaseContracts();
-    setIsAddModalOpen(false);
+      await fetchPurchaseContracts();
+      setIsAddModalOpen(false);
+    } catch (error) {
+      console.error("Failed to create purchase contract", error);
+      message.error(
+        error?.response?.data?.message || "Failed to create Purchase Contract",
+      );
+    }
   };
 
   const ItemsList = ({ form, disabled = false }) => (
     <Form.List name="items">
       {(fields, { add, remove }) => {
         const handleAutoAddRow = () => {
+          const getAvailableProducts = (currentFieldName) => {
+            const allItems = form.getFieldValue("items") || [];
+            const selectedIds = allItems
+              .filter((_, idx) => idx !== currentFieldName)
+              .map((it) => it?.product_id)
+              .filter(Boolean);
+
+            return products.filter((p) => !selectedIds.includes(p.id));
+          };
+
           const items = form.getFieldValue("items") || [];
 
           const lastItem = items[items.length - 1];
@@ -760,9 +882,22 @@ export default function PurchaseSouda() {
             });
             setTimeout(() => {
               setItemDropdownIndex(nextIndex);
-              itemRefs.current[nextIndex]?.focus();
+              const selectEl = itemRefs.current[nextIndex];
+              selectEl?.focus();
+              const inputEl = selectEl?.nativeElement?.querySelector("input");
+              inputEl?.focus();
             }, 150);
           }
+        };
+        // 👇 Ye helper function add karo
+        const getAvailableProducts = (currentFieldName) => {
+          const allItems = form.getFieldValue("items") || [];
+          const selectedIds = allItems
+            .filter((_, idx) => idx !== currentFieldName)
+            .map((it) => it?.product_id)
+            .filter(Boolean);
+
+          return products.filter((p) => !selectedIds.includes(p.id));
         };
         return (
           <>
@@ -900,11 +1035,15 @@ export default function PurchaseSouda() {
                           }, 100);
                         }}
                       >
-                        {products.map((p) => (
-                          <Select.Option key={p.id} value={p.id}>
-                            {p.name}
-                          </Select.Option>
-                        ))}
+                        {getAvailableProducts(field.name).map(
+                          (
+                            p, // 👈 change here
+                          ) => (
+                            <Select.Option key={p.id} value={p.id}>
+                              {p.name}
+                            </Select.Option>
+                          ),
+                        )}
                       </Select>
                     </Form.Item>
                   </Col>
@@ -1350,10 +1489,14 @@ export default function PurchaseSouda() {
                   return createFinancialYearDisabledDate(selectedFY)(current);
                 }}
                 onTabComplete={() => {
+                  setItemDropdownIndex(0);
                   setTimeout(() => {
-                    setItemDropdownIndex(0);
-                    itemRefs.current[0]?.focus();
-                  }, 50);
+                    const selectEl = itemRefs.current[0];
+                    selectEl?.focus();
+                    const inputEl =
+                      selectEl?.nativeElement?.querySelector("input");
+                    inputEl?.focus();
+                  }, 100); // 👈 50ms se 100ms — render ka time do
                 }}
               />
             </Form.Item>
@@ -1545,7 +1688,11 @@ export default function PurchaseSouda() {
           loading={loading}
           pagination={false}
           rowKey="key"
-          scroll={{ y: 300 }}
+          size="small"
+          scroll={{
+            x: 1500,
+            y: 360,
+          }}
         />
       </div>
 
@@ -1585,7 +1732,7 @@ export default function PurchaseSouda() {
               htmlType="submit"
               className="bg-amber-500! border-none!"
             >
-              Add
+              Save
             </Button>
           </div>
         </Form>
@@ -1644,6 +1791,46 @@ export default function PurchaseSouda() {
       >
         <Form form={viewForm} layout="vertical">
           <RenderFormBody form={viewForm} disabled={true} />
+        </Form>
+      </Modal>
+      <Modal
+        title="Extend Purchase Contract"
+        open={isExtendModalOpen}
+        onCancel={() => {
+          setIsExtendModalOpen(false);
+          extendForm.resetFields();
+        }}
+        footer={null}
+        destroyOnClose
+      >
+        <Form form={extendForm} layout="vertical" onFinish={handleExtendSubmit}>
+          <Form.Item
+            label="Extend Up To"
+            name="extended_upto"
+            rules={[
+              {
+                required: true,
+                message: "Please select extend date",
+              },
+            ]}
+          >
+            <AppDatePicker />
+          </Form.Item>
+
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => {
+                setIsExtendModalOpen(false);
+                extendForm.resetFields();
+              }}
+            >
+              Cancel
+            </Button>
+
+            <Button type="primary" htmlType="submit">
+              Submit
+            </Button>
+          </div>
         </Form>
       </Modal>
     </div>
