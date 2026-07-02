@@ -22,6 +22,7 @@ import {
   Card,
   message,
   Popconfirm,
+  Space,
 } from "antd";
 import {
   SearchOutlined,
@@ -32,7 +33,11 @@ import {
   FilterOutlined,
   DeleteOutlined,
 } from "@ant-design/icons";
+
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+
+dayjs.extend(customParseFormat);
 import {
   getCustomers,
   createsalesContract,
@@ -104,15 +109,26 @@ export default function SalesSouda() {
   const [editItemDropdownIndex, setEditItemDropdownIndex] = useState(null);
   const qtyRefs = useRef({});
   const contractRateRefs = useRef({});
+  const [extendForm] = Form.useForm();
+
+  const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
+
+  const [selectedContract, setSelectedContract] = useState(null);
   // Draft functions
   // date helper
   const parseApiDate = (value) => {
     if (!value) return null;
-    // Try native parsing first - handles "YYYY-MM-DD" and full ISO timestamps
-    let d = dayjs(value);
+
+    let d = dayjs(value, "DD-MM-YYYY", true);
+
     if (d.isValid()) return d;
-    // Fallback - handles "DD-MM-YYYY" if some environment ever sends that shape
-    d = dayjs(value, "DD-MM-YYYY");
+
+    d = dayjs(value, "YYYY-MM-DD", true);
+
+    if (d.isValid()) return d;
+
+    d = dayjs(value);
+
     return d.isValid() ? d : null;
   };
   const renderDate = (value) => {
@@ -245,10 +261,10 @@ export default function SalesSouda() {
       location: contract.location || "",
       plantId: contract.plant_id || "",
       plantName: contract.plant_name || "",
-      brokerId: contract.broker_id || "",
-      brokerName: contract.broker_name || "",
+      brokerId: contract.broker_id || "direct",
+      brokerName: contract.broker_name || "Direct",
 
-      soudaDate: parseApiDate(contract.created_at),
+      soudaDate: parseApiDate(contract.created_date),
       startDate: parseApiDate(contract.from_date),
       endDate: parseApiDate(contract.to_date),
 
@@ -331,8 +347,9 @@ export default function SalesSouda() {
         customerEmail: contract.customer_email, // Map email
         customerMobile: contract.customer_mobile, // Map mobile
         plantName: contract.plant_name,
-        contractDate: contract.created_at,
-        brokerName: contract.broker_name,
+        contractDate: contract.created_date,
+        brokerName: contract.broker_name || "Direct",
+        location: contract.location,
         quantity: (contract.items || []).reduce(
           (sum, item) => sum + Number(item.gross_qty || 0),
           0,
@@ -344,6 +361,7 @@ export default function SalesSouda() {
         ),
         startDate: contract.from_date,
         endDate: contract.to_date,
+        extended_upto: contract.extended_upto,
         status: contract.status,
         items: contract.items,
         grandTotal: contract.grand_total,
@@ -403,8 +421,11 @@ export default function SalesSouda() {
       customer_id: values.customerId,
       location: values.customerAddress || null, // ✅ NEW
       plant_id: values.plantId || null, // ✅ NEW
-      broker_id: values.brokerId || null, // ✅ NEW (if you store broker id)
-      broker_name: values.brokerName || null, // ✅ NEW
+      broker_id: values.brokerId || null,
+      broker_name: values.brokerId ? values.brokerName?.label || null : null,
+      created_date: values.soudaDate
+        ? dayjs(values.soudaDate).format("DD-MM-YYYY")
+        : null,
       from_date: values.startDate
         ? dayjs(values.startDate).format("YYYY-MM-DD")
         : null,
@@ -583,8 +604,9 @@ export default function SalesSouda() {
       customer: record.customer_name,
       customerEmail: record.customerEmail,
       status: record.status,
-
-      soudaDate: record.created_at ? dayjs(record.created_at) : undefined,
+      location: record.location, // 👈 add karo
+      brokerName: record.broker_name || "Direct", // 👈 add karo
+      soudaDate: record.created_date ? dayjs(record.created_date) : undefined,
       startDate: record.startDate ? dayjs(record.startDate) : undefined,
       endDate: record.endDate ? dayjs(record.endDate) : undefined,
 
@@ -670,6 +692,46 @@ export default function SalesSouda() {
     }
   };
 
+  const openExtendModal = (record) => {
+    console.log("Extend clicked", record);
+
+    setSelectedContract(record);
+
+    extendForm.resetFields();
+
+    setIsExtendModalOpen(true);
+  };
+  const handleApprove = async (record) => {
+    await updateSalesContract(record.key, {
+      status: "Approved",
+    });
+
+    message.success("Approved");
+
+    fetchSalesContracts();
+  };
+  const handleCancel = async (record) => {
+    await updateSalesContract(record.key, {
+      status: "Cancelled",
+    });
+
+    message.success("Cancelled");
+
+    fetchSalesContracts();
+  };
+  const handleExtendSubmit = async (values) => {
+    await updateSalesContract(selectedContract.key, {
+      extended_upto: dayjs(values.extended_upto).format("YYYY-MM-DD"),
+
+      // status: "Approved",
+    });
+
+    message.success("Extended");
+
+    setIsExtendModalOpen(false);
+
+    fetchSalesContracts();
+  };
   // reusalbe data format
   const parseShortDate = (value) => {
     if (!value || value.length !== 6) return null;
@@ -710,7 +772,11 @@ export default function SalesSouda() {
       title: <span className="text-amber-700 font-semibold">Broker Name</span>,
       dataIndex: "brokerName",
       width: 60,
-      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+      render: (text) => (
+        <span className="text-amber-800">
+          {text ? text.split(" ")[0] : "-"}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
@@ -720,16 +786,16 @@ export default function SalesSouda() {
     },
     {
       title: <span className="text-amber-700 font-semibold">Place</span>,
-      // dataIndex: "customer",
+      dataIndex: "location",
       width: 60,
-      // render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">QTY</span>,
       dataIndex: "quantity",
       width: 60,
       render: (value) => (
-        <span className="text-amber-800">{Number(value || 0).toFixed(3)}</span>
+        <span className="text-amber-800">{Number(value || 0)}</span>
       ),
     },
     {
@@ -756,6 +822,18 @@ export default function SalesSouda() {
       width: 80,
       render: (date) => (
         <span className="text-amber-800">{renderDate(date)}</span>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Extended Up To</span>
+      ),
+      dataIndex: "extended_upto",
+      width: 75,
+      render: (value) => (
+        <span className="text-amber-800">
+          {value ? renderDate(value) : "-"}
+        </span>
       ),
     },
     {
@@ -790,7 +868,7 @@ export default function SalesSouda() {
     // },
 
     {
-      title: <span className="text-amber-700 font-semibold">Approval</span>,
+      title: <span className="text-amber-700 font-semibold">Status</span>,
       dataIndex: "status",
       width: 85,
       render: (status) => {
@@ -816,10 +894,53 @@ export default function SalesSouda() {
       },
     },
     {
-      title: <span className="text-amber-700 font-semibold">Status</span>,
-      // dataIndex: "customer",
-      width: 70,
-      // render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+      title: (
+        <span
+          style={{
+            whiteSpace: "nowrap",
+          }}
+          className="text-amber-700 font-semibold"
+        >
+          Button
+        </span>
+      ),
+      width: 100,
+      align: "center",
+      render: (_, record) => {
+        if (record.status === "Pending") {
+          return (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => handleApprove(record)}
+              className="bg-green-500! hover:bg-amber-600! border-none!"
+            >
+              Approve
+            </Button>
+          );
+        }
+
+        if (record.status === "Expired") {
+          return (
+            <Space>
+              <Button
+                type="primary"
+                size="small"
+                onClick={() => openExtendModal(record)}
+                className="bg-amber-500! hover:bg-amber-600! border-none!"
+              >
+                Extend
+              </Button>
+
+              <Button danger size="small" onClick={() => handleCancel(record)}>
+                Cancel
+              </Button>
+            </Space>
+          );
+        }
+
+        return "-";
+      },
     },
     // {
     //   title: <span className="text-amber-700 font-semibold">Total (₹)</span>,
@@ -985,7 +1106,11 @@ export default function SalesSouda() {
         // list and put keyboard focus on it.
         setTimeout(() => {
           setOpenItemIndex?.(newIndex);
-          itemRefs.current[newIndex]?.focus();
+          const selectEl = itemRefs.current[newIndex];
+          selectEl?.focus();
+          const inputEl = selectEl?.nativeElement?.querySelector("input");
+          inputEl?.focus();
+          // itemRefs.current[newIndex]?.focus();
         }, 150);
       }
     };
@@ -1151,14 +1276,10 @@ export default function SalesSouda() {
                       className="w-full!"
                       controls={false}
                       min={0}
-                      formatter={(value) =>
-                        value !== undefined && value !== null
-                          ? Number(value).toFixed(2)
-                          : "0.00"
-                      }
-                      parser={(value) => value?.replace(/[^\d.]/g, "")}
+                      precision={2} // 👈 decimal ko max 2 digit tak khud limit karega, typing ke time bhi
+                      step={0.01}
+                      defaultValue={0} // 👈 shuru me sirf "0" dikhega, "0.00" nahi
                       onFocus={(e) => {
-                        // ✅ Pura value select karo focus pe
                         setTimeout(() => e.target.select(), 0);
                       }}
                       onChange={() => {
@@ -1314,8 +1435,9 @@ export default function SalesSouda() {
         customerEmail: contract.customer_email,
         customerMobile: contract.customer_mobile,
         plantName: contract.plant_name, // ✅ add
-        brokerName: contract.broker_name, // ✅ add
-        contractDate: contract.created_at, // ✅ add
+        brokerName: contract.broker_name || "Direct",
+        location: contract.location,
+        contractDate: contract.created_date, // ✅ add
         startDate: contract.from_date,
         endDate: contract.to_date,
         quantity: (contract.items || []).reduce(
@@ -1339,13 +1461,16 @@ export default function SalesSouda() {
       setData((prev) => [row, ...prev]);
       setIsAddModalOpen(false);
       addForm.resetFields();
-
+      message.success("Sales Contract created successfully");
       // ✅ Optional: Show success message
       console.log("Sales contract created successfully:", row);
     } catch (error) {
       console.error("Failed to create sales contract", error);
       // 🔍 Log: error response
       console.error("Error response:", error.response?.data);
+      message.error(
+        error?.response?.data?.message || "Failed to create Sales Contract",
+      );
     }
   };
 
@@ -1394,10 +1519,21 @@ export default function SalesSouda() {
         customer_id: selectedRecord.customerId, // Use ID from record
         customer_email: values.customerEmail,
         customer_mobile: values.customerMobile || 123456789,
-        location: values.location || null, // ✅
+        location: values.customerAddress || null, // ✅
         plant_id: values.plantId || null, // ✅
-        broker_name: values.brokerName || null,
+
+        broker_id:
+          values.brokerId?.value === "direct"
+            ? null
+            : values.brokerId?.value || null,
+        broker_name:
+          values.brokerId?.value === "direct"
+            ? null
+            : values.brokerId?.label || null,
         status: values.status,
+        created_date: values.soudaDate
+          ? dayjs(values.soudaDate).format("DD-MM-YYYY")
+          : null,
         from_date: values.startDate
           ? dayjs(values.startDate).format("YYYY-MM-DD")
           : null,
@@ -1440,6 +1576,8 @@ export default function SalesSouda() {
                 // Manually update core fields if mapper return structure differs slightly for table
                 saleContractNumber: res.sale_contract_number,
                 customer: res.customer_name,
+                location: res.location, // 👈 add karo
+                brokerName: res.broker_name || "Direct",
                 startDate: res.from_date,
                 endDate: res.to_date,
                 status: res.status,
@@ -1453,9 +1591,12 @@ export default function SalesSouda() {
       setIsEditModalOpen(false);
       editForm.resetFields();
       setSelectedRecord(null);
-      // message.success("Contract updated successfully"); // Optional
+      message.success("Contract updated successfully"); // Optional
     } catch (err) {
       console.error("Failed to update contract", err);
+      message.error(
+        err?.response?.data?.message || "Failed to update Sales Contract",
+      );
     }
   };
 
@@ -1566,8 +1707,12 @@ export default function SalesSouda() {
           columns={columns}
           dataSource={data}
           pagination={false}
-          scroll={{ y: 220 }}
+          scroll={{
+            x: 1500,
+            y: 500,
+          }}
           rowKey="key"
+          size="small"
         />
       </div>
 
@@ -1587,7 +1732,7 @@ export default function SalesSouda() {
           setAddItemDropdownIndex(null);
         }}
         footer={null}
-        width={1600}
+        width={1800}
       >
         <Form
           form={addForm}
@@ -1716,19 +1861,27 @@ export default function SalesSouda() {
                       setBrokerDropdownOpen(visible)
                     }
                     labelInValue
+                    placeholder="Select Broker"
                     onChange={(option) => {
-                      const firstWord = option.label?.split(" ")[0] || "";
-
-                      addForm.setFieldsValue({
-                        brokerId: option.value,
-                        brokerName: firstWord,
-                      });
+                      if (option?.value === "direct") {
+                        addForm.setFieldsValue({
+                          brokerId: null,
+                          brokerName: { value: "direct", label: "Direct" }, // 👈 display bana rahega
+                        });
+                      } else {
+                        const firstWord = option.label?.split(" ")[0] || "";
+                        addForm.setFieldsValue({
+                          brokerId: option.value,
+                          brokerName: { value: option.value, label: firstWord },
+                        });
+                      }
                       setBrokerDropdownOpen(false);
-                      setTimeout(() => {
-                        contractDateRef.current?.focus();
-                      }, 100);
+                      setTimeout(() => contractDateRef.current?.focus(), 100);
                     }}
                   >
+                    <Select.Option key="direct" value="direct">
+                      Direct
+                    </Select.Option>
                     {brokers.map((broker) => (
                       <Select.Option key={broker.id} value={broker.id}>
                         {broker.name}
@@ -1827,10 +1980,15 @@ export default function SalesSouda() {
                       );
                     }}
                     onTabComplete={() => {
+                      setAddItemDropdownIndex(0);
                       setTimeout(() => {
-                        setAddItemDropdownIndex(0);
-                        itemRefs.current[0]?.focus();
-                      }, 50);
+                        const selectEl = itemRefs.current[0];
+                        selectEl?.focus();
+                        const inputEl =
+                          selectEl?.nativeElement?.querySelector("input");
+                        inputEl?.focus();
+                        // itemRefs.current[0]?.focus();
+                      }, 100);
                     }}
                   />
                 </Form.Item>
@@ -1972,7 +2130,7 @@ export default function SalesSouda() {
               type="primary"
               htmlType="submit"
             >
-              Add
+              Save
             </Button>
           </div>
         </Form>
@@ -1989,7 +2147,7 @@ export default function SalesSouda() {
           setEditItemDropdownIndex(null);
         }}
         footer={null}
-        width={1600}
+        width={1800}
       >
         <Form
           form={editForm}
@@ -2018,14 +2176,10 @@ export default function SalesSouda() {
                       const selectedCustomer = customers.find(
                         (c) => c.customer_id === customerId,
                       );
-
                       if (selectedCustomer) {
-                        addForm.setFieldsValue({
-                          customerAddress: [
-                            selectedCustomer.address ||
-                              selectedCustomer.address_line1,
-                            selectedCustomer.city,
-                          ]
+                        editForm.setFieldsValue({
+                          // 👈 sahi form
+                          customerAddress: [selectedCustomer.city]
                             .filter(Boolean)
                             .join(", "),
                         });
@@ -2081,7 +2235,23 @@ export default function SalesSouda() {
                   placeholder="Select Broker"
                   showSearch
                   optionFilterProp="children"
+                  labelInValue
+                  onChange={(option) => {
+                    if (option?.value === "direct") {
+                      editForm.setFieldsValue({
+                        brokerId: { value: "direct", label: "Direct" },
+                      });
+                    } else {
+                      const firstWord = option.label?.split(" ")[0] || "";
+                      editForm.setFieldsValue({
+                        brokerId: { value: option.value, label: firstWord },
+                      });
+                    }
+                  }}
                 >
+                  <Select.Option key="direct" value="direct">
+                    Direct
+                  </Select.Option>
                   {brokers.map((broker) => (
                     <Select.Option key={broker.id} value={broker.id}>
                       {broker.name}
@@ -2175,10 +2345,15 @@ export default function SalesSouda() {
                       );
                     }}
                     onTabComplete={() => {
+                      setEditItemDropdownIndex(0);
                       setTimeout(() => {
-                        setEditItemDropdownIndex(0);
-                        itemRefs.current[0]?.focus();
-                      }, 50);
+                        const selectEl = itemRefs.current[0];
+                        selectEl?.focus();
+                        const inputEl =
+                          selectEl?.nativeElement?.querySelector("input");
+                        inputEl?.focus();
+                        // itemRefs.current[0]?.focus();
+                      }, 100);
                     }}
                   />
                 </Form.Item>
@@ -2324,7 +2499,7 @@ export default function SalesSouda() {
           setSelectedRecord(null);
         }}
         footer={null}
-        width={1600}
+        width={1800}
       >
         <Form layout="vertical" form={viewForm}>
           {/* Basic Information */}
@@ -2541,6 +2716,46 @@ export default function SalesSouda() {
               </Col>
             </Row>
           </Card>
+        </Form>
+      </Modal>
+      <Modal
+        title="Extend Sales Contract"
+        open={isExtendModalOpen}
+        onCancel={() => {
+          setIsExtendModalOpen(false);
+          extendForm.resetFields();
+        }}
+        footer={null}
+        destroyOnClose
+      >
+        <Form form={extendForm} layout="vertical" onFinish={handleExtendSubmit}>
+          <Form.Item
+            label="Extend Up To"
+            name="extended_upto"
+            rules={[
+              {
+                required: true,
+                message: "Please select extend date",
+              },
+            ]}
+          >
+            <AppDatePicker />
+          </Form.Item>
+
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => {
+                setIsExtendModalOpen(false);
+                extendForm.resetFields();
+              }}
+            >
+              Cancel
+            </Button>
+
+            <Button type="primary" htmlType="submit">
+              Submit
+            </Button>
+          </div>
         </Form>
       </Modal>
     </div>
