@@ -163,7 +163,7 @@ export default function PurchaseSouda() {
         name: item.name,
         souda_number: item.souda_number,
         contractDate: item.created_date,
-        vendor_name: item.company_group || item.vendor_name,
+        vendor_name: item.vendor_name,
         plant: res.plant,
         extended_upto: item.extended_upto,
         plant_name: item.plant_name,
