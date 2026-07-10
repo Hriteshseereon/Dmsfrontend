@@ -24,13 +24,13 @@ import {
 } from "@ant-design/icons";
 
 // TODO: point these at your actual API module, e.g. "../../../../../api/vehicleowner"
-// import {
-//   getAllVehicleOwner,
-//   addVehicleOwner,
-//   getVehicleOwnerById,
-//   updateVehicleOwner,
-//   deleteVehicleOwner,
-// } from "../../../../../api/vehicleowner";
+import {
+  getAllVehicleOwner,
+  addVehicleOwner,
+  getVehicleOwnerById,
+  updateVehicleOwner,
+  deleteVehicleOwner,
+} from "../../../../../../api/vehiclemaster.js";
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -58,11 +58,11 @@ export default function VehicleOwnerMaster() {
       const res = await getAllVehicleOwner();
       const formattedData = (res || []).map((item) => ({
         key: item.id,
-        firmName: item.firm_transport_name,
-        ownerName: item.vehicle_owner_name,
+        firmName: item.firm_name,
+        ownerName: item.owner_name,
         location: item.location,
         contactPerson: item.contact_person,
-        mobileNo: item.mobile_no,
+        mobileNo: item.mobile,
       }));
       setData(formattedData);
     } catch (error) {
@@ -79,31 +79,40 @@ export default function VehicleOwnerMaster() {
 
   const buildPayload = (values) => {
     const payload = new FormData();
-    payload.append("firm_transport_name", values.firmName || "");
-    payload.append("vehicle_owner_name", values.ownerName || "");
-    payload.append("location", values.location || "");
+
+    payload.append("firm_name", values.firmName || "");
+    payload.append("owner_name", values.ownerName || "");
     payload.append("father_husband_name", values.fatherHusbandName || "");
+    payload.append("location", values.location || "");
     payload.append("address", values.address || "");
     payload.append("contact_person", values.contactPerson || "");
     payload.append("designation", values.designation || "");
-    payload.append("mobile_no", values.mobileNo || "");
-    payload.append("email_id", values.emailId || "");
-    payload.append("pan_no", values.panNo || "");
-    payload.append("adhar_no", values.adharNo || "");
-    payload.append("non_tds_declaration", values.nonTdsDeclaration || "");
+    payload.append("mobile", values.mobileNo || "");
+    payload.append("email", values.emailId || "");
+    payload.append("pan_number", values.panNo || "");
+    payload.append("aadhaar_number", values.aadhaarNo || "");
+    payload.append(
+      "is_active",
+      values.isActive !== undefined ? values.isActive : true,
+    );
 
     if (values.panUpload?.[0]?.originFileObj) {
-      payload.append("pan_upload", values.panUpload[0].originFileObj);
+      payload.append("pan_document", values.panUpload[0].originFileObj);
     }
-    if (values.adharUpload?.[0]?.originFileObj) {
-      payload.append("adhar_upload", values.adharUpload[0].originFileObj);
+
+    if (values.aadhaarUpload?.[0]?.originFileObj) {
+      payload.append("aadhaar_document", values.aadhaarUpload[0].originFileObj);
     }
+
     if (values.nonTdsUpload?.[0]?.originFileObj) {
-      payload.append("non_tds_upload", values.nonTdsUpload[0].originFileObj);
+      payload.append(
+        "non_tds_declaration",
+        values.nonTdsUpload[0].originFileObj,
+      );
     }
+
     return payload;
   };
-
   /* ---------------- HANDLERS ---------------- */
   const handleAdd = async (values) => {
     try {
@@ -145,45 +154,48 @@ export default function VehicleOwnerMaster() {
 
   const fillFormFromRecord = (form, res) => {
     form.setFieldsValue({
-      firmName: res.firm_transport_name,
-      ownerName: res.vehicle_owner_name,
-      location: res.location,
-      fatherHusbandName: res.father_husband_name,
-      address: res.address,
-      contactPerson: res.contact_person,
-      designation: res.designation,
-      mobileNo: res.mobile_no,
-      emailId: res.email_id,
-      panNo: res.pan_no,
-      adharNo: res.adhar_no,
-      nonTdsDeclaration: res.non_tds_declaration,
-      panUpload: res.pan_upload
+      firmName: res.firm_name ?? "",
+      ownerName: res.owner_name ?? "",
+      fatherHusbandName: res.father_husband_name ?? "",
+      location: res.location ?? "",
+      address: res.address ?? "",
+      contactPerson: res.contact_person ?? "",
+      designation: res.designation ?? "",
+      mobileNo: res.mobile ?? "",
+      emailId: res.email ?? "",
+      panNo: res.pan_number ?? "",
+      aadhaarNo: res.aadhaar_number ?? "",
+      isActive: res.is_active,
+
+      panUpload: res.pan_document
         ? [
             {
               uid: "-1",
               name: "PAN Document",
               status: "done",
-              url: res.pan_upload,
+              url: res.pan_document,
             },
           ]
         : [],
-      adharUpload: res.adhar_upload
+
+      aadhaarUpload: res.aadhaar_document
         ? [
             {
               uid: "-2",
-              name: "Aadhar Document",
+              name: "Aadhaar Document",
               status: "done",
-              url: res.adhar_upload,
+              url: res.aadhaar_document,
             },
           ]
         : [],
-      nonTdsUpload: res.non_tds_upload
+
+      nonTdsUpload: res.non_tds_declaration
         ? [
             {
               uid: "-3",
-              name: "Non-TDS Document",
+              name: "Non TDS Declaration",
               status: "done",
-              url: res.non_tds_upload,
+              url: res.non_tds_declaration,
             },
           ]
         : [],
@@ -441,8 +453,8 @@ export default function VehicleOwnerMaster() {
 
       <Col span={8}>
         <Form.Item
-          label="Aadhar No."
-          name="adharNo"
+          label="Aadhaar No."
+          name="aadhaarNo"
           rules={[
             {
               pattern: /^[0-9]{12}$/,
@@ -460,8 +472,8 @@ export default function VehicleOwnerMaster() {
 
       <Col span={8}>
         <Form.Item
-          label="Upload Aadhar"
-          name="adharUpload"
+          label="Upload Aadhaar"
+          name="aadhaarUpload"
           valuePropName="fileList"
           getValueFromEvent={normFile}
         >
@@ -483,14 +495,14 @@ export default function VehicleOwnerMaster() {
         </Form.Item>
       </Col>
 
-      <Col span={8}>
+      {/* <Col span={8}>
         <Form.Item label="Non-TDS Declaration" name="nonTdsDeclaration">
           <Select placeholder="Select option" disabled={disabled}>
             <Option value="yes">Yes</Option>
             <Option value="no">No</Option>
           </Select>
         </Form.Item>
-      </Col>
+      </Col> */}
 
       <Col span={8}>
         <Form.Item
