@@ -26,6 +26,12 @@ export const MASTER_TAB_DEFINITIONS = [
   //   Icon: FaBarcode,
   // },
   {
+    id: "groupmaster",
+    label: "Group Master",
+    path: "groupmaster",
+    Icon: FaTags,
+  },
+  {
     id: "itemsprice",
     label: "Product Master",
     path: "itemsprice",
