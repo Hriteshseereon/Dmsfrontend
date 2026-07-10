@@ -22,16 +22,18 @@ import {
 } from "@ant-design/icons";
 
 // TODO: point these at your actual API module, e.g. "../../../../../api/whatsappgroup"
-// import {
-//   getAllWhatsappGroups,
-//   addWhatsappGroup,
-//   updateWhatsappGroup,
-//   deleteWhatsappGroup,
-//   getGroupMembers,
-//   addGroupMember,
-//   updateGroupMember,
-//   deleteGroupMember,
-// } from "../../../../../api/whatsappgroup";
+import {
+  getAllWhatsappGroups,
+  addWhatsappGroup,
+  getWhatsappGroupById,
+  updateWhatsappGroup,
+  deleteWhatsappGroup,
+  getGroupMembers,
+  addGroupMember,
+  getGroupMemberById,
+  updateGroupMember,
+  deleteGroupMember,
+} from "../../../../../../api/whatapgroup.js";
 
 // Just suggestions shown while typing a new group name — user can still type any custom name.
 const GROUP_NAME_SUGGESTIONS = [
@@ -87,14 +89,19 @@ export default function WhatappGroup() {
 
   const fetchMembers = async (group) => {
     setMembersLoading(true);
+
     try {
-      const res = await getGroupMembers(group.key);
-      const formatted = (res || []).map((item) => ({
+      const res = await getGroupMembers();
+
+      const filtered = (res || []).filter((item) => item.group === group.key);
+
+      const formatted = filtered.map((item) => ({
         key: item.id,
         personName: item.person_name,
         designation: item.designation,
         whatsappNumber: item.whatsapp_number,
       }));
+
       setMembers(formatted);
     } catch (error) {
       console.log(error);
@@ -162,16 +169,24 @@ export default function WhatappGroup() {
     setMemberModalOpen(true);
   };
 
-  const openEditMember = (record) => {
-    setEditingMember(record);
-    memberForm.setFieldsValue({
-      personName: record.personName,
-      designation: record.designation,
-      whatsappNumber: record.whatsappNumber,
-    });
-    setMemberModalOpen(true);
-  };
+  const openEditMember = async (record) => {
+    try {
+      const res = await getGroupMemberById(record.key);
 
+      setEditingMember(record);
+
+      memberForm.setFieldsValue({
+        personName: res.person_name,
+        designation: res.designation,
+        whatsappNumber: res.whatsapp_number,
+      });
+
+      setMemberModalOpen(true);
+    } catch (error) {
+      console.log(error);
+      message.error("Failed to load member");
+    }
+  };
   const handleMemberSubmit = async (values) => {
     try {
       const payload = {
@@ -180,7 +195,6 @@ export default function WhatappGroup() {
         designation: values.designation,
         whatsapp_number: values.whatsappNumber,
       };
-
       if (editingMember) {
         await updateGroupMember(editingMember.key, payload);
         message.success("Member updated successfully");
@@ -227,12 +241,12 @@ export default function WhatappGroup() {
         </div>
       ),
     },
-    {
-      title: <span className="text-amber-700 font-semibold">Members</span>,
-      dataIndex: "memberCount",
-      width: 140,
-      render: (count) => <Tag color="gold">{count ?? 0} member(s)</Tag>,
-    },
+    // {
+    //   title: <span className="text-amber-700 font-semibold">Members</span>,
+    //   dataIndex: "memberCount",
+    //   width: 140,
+    //   render: (count) => <Tag color="gold">{count ?? 0} member(s)</Tag>,
+    // },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       width: 260,
