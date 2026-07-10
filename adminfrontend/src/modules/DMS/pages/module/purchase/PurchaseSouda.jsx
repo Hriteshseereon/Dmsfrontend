@@ -163,7 +163,7 @@ export default function PurchaseSouda() {
         name: item.name,
         souda_number: item.souda_number,
         contractDate: item.created_date,
-        vendor_name: item.company_group || item.vendor_name,
+        vendor_name: item.vendor_name,
         plant: res.plant,
         extended_upto: item.extended_upto,
         plant_name: item.plant_name,
@@ -328,10 +328,10 @@ export default function PurchaseSouda() {
       setIsEditModalOpen(false);
       editForm.resetFields();
       fetchPurchaseContracts(); // refresh table
-      message.success("Purchase Contract updated successfully");
+      alert("Purchase Contract updated successfully");
     } catch (error) {
       console.error("Update failed:", error);
-      message.error(
+      alert(
         error?.response?.data?.message || "Failed to update Purchase Contract",
       );
     }
@@ -837,9 +837,11 @@ export default function PurchaseSouda() {
 
       await fetchPurchaseContracts();
       setIsAddModalOpen(false);
+      addForm.resetFields(); // 👈 add karo, add form reset bhi missing tha
+      alert("Purchase Contract created successfully");
     } catch (error) {
       console.error("Failed to create purchase contract", error);
-      message.error(
+      alert(
         error?.response?.data?.message || "Failed to create Purchase Contract",
       );
     }

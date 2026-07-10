@@ -14,6 +14,7 @@ import UnitConversionManager from "./UnitConversionManager";
 import AdminPriceManager from "./AdminPriceManager";
 import ItemUnitPriceManager from "./ItemUnitPriceManager/index.jsx";
 import StandalonePriceManagement from "./StandalonePriceManagement";
+import GroupMaster from "./groupmaster/GroupMaster.jsx";
 const MasterModule = ({ allowedTabs }) => {
   return (
     <Routes>
@@ -34,7 +35,7 @@ const MasterModule = ({ allowedTabs }) => {
           path="price-management"
           element={<StandalonePriceManagement />}
         />
-
+        <Route path="groupmaster" element={<GroupMaster />} />
         {/* add more nested routes if you extend tabs */}
       </Route>
     </Routes>

@@ -1461,14 +1461,14 @@ export default function SalesSouda() {
       setData((prev) => [row, ...prev]);
       setIsAddModalOpen(false);
       addForm.resetFields();
-      message.success("Sales Contract created successfully");
+      alert("Sales Contract created successfully");
       // ✅ Optional: Show success message
       console.log("Sales contract created successfully:", row);
     } catch (error) {
       console.error("Failed to create sales contract", error);
       // 🔍 Log: error response
       console.error("Error response:", error.response?.data);
-      message.error(
+      alert(
         error?.response?.data?.message || "Failed to create Sales Contract",
       );
     }
@@ -1591,12 +1591,10 @@ export default function SalesSouda() {
       setIsEditModalOpen(false);
       editForm.resetFields();
       setSelectedRecord(null);
-      message.success("Contract updated successfully"); // Optional
+      alert("Contract updated successfully"); // Optional
     } catch (err) {
       console.error("Failed to update contract", err);
-      message.error(
-        err?.response?.data?.message || "Failed to update Sales Contract",
-      );
+      alert(err?.response?.data?.message || "Failed to update Sales Contract");
     }
   };
 
