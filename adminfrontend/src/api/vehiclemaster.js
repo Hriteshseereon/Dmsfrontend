@@ -175,13 +175,16 @@ export const deleteVehicle = async (id) => {
 // ===================================================================
 
 // Create Driver
-export const addDriver = async (data) => {
+export const addDriver = async (formData) => {
   const currentOrgId = useSessionStore.getState().currentOrgId;
 
   const res = await api.post(
     "/transport/driver-masters/",
-    data,
+    formData,
     {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
       params: {
         organisation: currentOrgId,
       },
@@ -190,7 +193,6 @@ export const addDriver = async (data) => {
 
   return res.data;
 };
-
 // Get All Drivers
 export const getAllDrivers = async () => {
   const currentOrgId = useSessionStore.getState().currentOrgId;
@@ -218,13 +220,16 @@ export const getDriverById = async (id) => {
 };
 
 // Update Driver
-export const updateDriver = async (id, data) => {
+export const updateDriver = async (id, formData) => {
   const currentOrgId = useSessionStore.getState().currentOrgId;
 
   const res = await api.patch(
     `/transport/driver-masters/${id}/`,
-    data,
+    formData,
     {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
       params: {
         organisation: currentOrgId,
       },

@@ -12,6 +12,7 @@ import {
   Upload,
   Popconfirm,
   message,
+  Select,
 } from "antd";
 import {
   SearchOutlined,
@@ -25,13 +26,14 @@ import {
 import dayjs from "dayjs";
 
 // TODO: point these at your actual API module, e.g. "../../../../../api/driver"
-// import {
-//   getAllDriver,
-//   addDriver,
-//   getDriverById,
-//   updateDriver,
-//   deleteDriver,
-// } from "../../../../../api/driver";
+import {
+  getAllDrivers,
+  addDriver,
+  getDriverById,
+  updateDriver,
+  deleteDriver,
+  getAllVehicleOwner,
+} from "../../../../../../api/vehiclemaster.js";
 
 const { TextArea } = Input;
 const DATE_FORMAT = "DD-MM-YYYY";
@@ -48,23 +50,36 @@ export default function VehicleDriverMaster() {
   const [editOpen, setEditOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
-
+  const [ownerList, setOwnerList] = useState([]);
   useEffect(() => {
     fetchDrivers();
+    fetchOwners();
   }, []);
 
+  const fetchOwners = async () => {
+    try {
+      const res = await getAllVehicleOwner();
+
+      console.log("Owner API:", res);
+
+      setOwnerList(res || []);
+    } catch (error) {
+      console.log(error);
+      setOwnerList([]);
+    }
+  };
   /* ---------------- FETCH DATA ---------------- */
   const fetchDrivers = async () => {
     try {
-      const res = await getAllDriver();
+      const res = await getAllDrivers();
       const formattedData = (res || []).map((item) => ({
         key: item.id,
         driverName: item.driver_name,
-        licenceNo: item.driving_licence_no,
-        dlExpiredDate: item.dl_expired_date,
-        driverMobileNo: item.driver_mobile_no,
+        licenceNo: item.driving_licence_number,
+        dlExpiredDate: item.licence_expiry_date,
+        driverMobileNo: item.driver_mobile,
         helperName: item.helper_name,
-        helperMobileNo: item.helper_mobile_no,
+        helperMobileNo: item.helper_mobile,
       }));
       setData(formattedData);
     } catch (error) {
@@ -84,23 +99,36 @@ export default function VehicleDriverMaster() {
 
   const buildPayload = (values) => {
     const payload = new FormData();
-    payload.append("driver_name", values.driverName || "");
-    payload.append("address", values.address || "");
-    payload.append("driving_licence_no", values.licenceNo || "");
-    payload.append(
-      "dl_expired_date",
-      values.dlExpiredDate ? values.dlExpiredDate.format("YYYY-MM-DD") : "",
-    );
-    payload.append("driver_mobile_no", values.driverMobileNo || "");
-    payload.append("helper_name", values.helperName || "");
-    payload.append("helper_mobile_no", values.helperMobileNo || "");
 
-    if (values.dlUpload?.[0]?.originFileObj) {
-      payload.append("dl_upload", values.dlUpload[0].originFileObj);
+    payload.append("transport_owner", values.transportOwner || "");
+
+    payload.append("driver_name", values.driverName || "");
+
+    payload.append("address", values.address || "");
+
+    payload.append("driving_licence_number", values.licenceNumber || "");
+
+    payload.append(
+      "licence_expiry_date",
+      values.licenceExpiryDate
+        ? values.licenceExpiryDate.format("YYYY-MM-DD")
+        : "",
+    );
+
+    payload.append("driver_mobile", values.driverMobile || "");
+
+    payload.append("helper_name", values.helperName || "");
+
+    payload.append("helper_mobile", values.helperMobile || "");
+
+    payload.append("is_active", values.isActive ?? true);
+
+    if (values.licenceCopy?.[0]?.originFileObj) {
+      payload.append("licence_copy", values.licenceCopy[0].originFileObj);
     }
+
     return payload;
   };
-
   /* ---------------- HANDLERS ---------------- */
   const handleAdd = async (values) => {
     try {
@@ -142,14 +170,25 @@ export default function VehicleDriverMaster() {
 
   const fillFormFromRecord = (form, res) => {
     form.setFieldsValue({
+      transportOwner: res.transport_owner,
+
       driverName: res.driver_name,
+
       address: res.address,
-      licenceNo: res.driving_licence_no,
-      dlExpiredDate: res.dl_expired_date ? dayjs(res.dl_expired_date) : null,
-      driverMobileNo: res.driver_mobile_no,
+
+      licenceNumber: res.driving_licence_number,
+
+      licenceExpiryDate: res.licence_expiry_date
+        ? dayjs(res.licence_expiry_date, "DD-MM-YYYY")
+        : null,
+
+      driverMobile: res.driver_mobile,
+
       helperName: res.helper_name,
-      helperMobileNo: res.helper_mobile_no,
-      dlUpload: toFileList(res.dl_upload, "DL Copy"),
+
+      helperMobile: res.helper_mobile,
+
+      licenceCopy: toFileList(res.licence_copy, "Licence Copy"),
     });
   };
 
@@ -267,6 +306,26 @@ export default function VehicleDriverMaster() {
     <Row gutter={16}>
       <Col span={8}>
         <Form.Item
+          label="Transport Owner"
+          name="transportOwner"
+          rules={[
+            {
+              required: !disabled,
+              message: "Transport Owner is required",
+            },
+          ]}
+        >
+          <Select placeholder="Select Transport Owner" disabled={disabled}>
+            {ownerList.map((owner) => (
+              <Option key={owner.id} value={owner.id}>
+                {owner.firm_name}
+              </Option>
+            ))}
+          </Select>
+        </Form.Item>
+      </Col>
+      <Col span={8}>
+        <Form.Item
           label="Driver Name"
           name="driverName"
           rules={[{ required: !disabled, message: "Driver Name is required" }]}
@@ -284,7 +343,7 @@ export default function VehicleDriverMaster() {
       <Col span={8}>
         <Form.Item
           label="Driving Licence No."
-          name="licenceNo"
+          name="licenceNumber"
           rules={[
             { required: !disabled, message: "Driving Licence No. is required" },
           ]}
@@ -298,7 +357,7 @@ export default function VehicleDriverMaster() {
       </Col>
 
       <Col span={8}>
-        <Form.Item label="DL Expired Dt." name="dlExpiredDate">
+        <Form.Item label="DL Expired Dt." name="licenceExpiryDate">
           <DatePicker
             className="w-full!"
             format={DATE_FORMAT}
@@ -310,7 +369,7 @@ export default function VehicleDriverMaster() {
       <Col span={8}>
         <Form.Item
           label="Driver Mobile No."
-          name="driverMobileNo"
+          name="driverMobile"
           rules={[
             { required: !disabled, message: "Driver Mobile No. is required" },
             {
@@ -330,7 +389,7 @@ export default function VehicleDriverMaster() {
       <Col span={8}>
         <Form.Item
           label="Upload DL"
-          name="dlUpload"
+          name="licenceCopy"
           valuePropName="fileList"
           getValueFromEvent={normFile}
         >
@@ -361,7 +420,7 @@ export default function VehicleDriverMaster() {
       <Col span={8}>
         <Form.Item
           label="Helper Mobile No."
-          name="helperMobileNo"
+          name="helperMobile"
           rules={[
             {
               pattern: /^[0-9]{10}$/,
