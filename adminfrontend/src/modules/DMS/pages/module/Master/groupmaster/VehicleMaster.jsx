@@ -26,14 +26,14 @@ import {
 import dayjs from "dayjs";
 
 // TODO: point these at your actual API modules
-// import {
-//   getAllVehicle,
-//   addVehicle,
-//   getVehicleById,
-//   updateVehicle,
-//   deleteVehicle,
-// } from "../../../../../api/vehicle";
-// import { getAllVehicleOwner } from "../../../../../api/vehicleowner";
+import {
+  getAllVehicles,
+  addVehicle,
+  getVehicleById,
+  updateVehicle,
+  deleteVehicle,
+  getAllVehicleOwner,
+} from "../../../../../../api/vehiclemaster.js";
 
 const { Option } = Select;
 const DATE_FORMAT = "DD-MM-YYYY";
@@ -60,13 +60,14 @@ export default function VehicleMaster() {
   /* ---------------- FETCH DATA ---------------- */
   const fetchVehicles = async () => {
     try {
-      const res = await getAllVehicle();
+      const res = await getAllVehicles();
+
       const formattedData = (res || []).map((item) => ({
         key: item.id,
-        ownerName: item.owner_name,
+        ownerName: item.transport_owner_name,
         vehicleType: item.vehicle_type,
-        vehicleNo: item.vehicle_no,
-        regdDate: item.regd_date,
+        vehicleNo: item.vehicle_number,
+        regdDate: item.registration_date,
         insuranceValidUpto: item.insurance_valid_upto,
         permitUpto: item.permit_upto,
       }));
@@ -80,6 +81,9 @@ export default function VehicleMaster() {
   const fetchOwners = async () => {
     try {
       const res = await getAllVehicleOwner();
+
+      console.log("Owner API", res);
+
       setOwnerList(res || []);
     } catch (error) {
       console.log(error);
@@ -97,56 +101,82 @@ export default function VehicleMaster() {
 
   const buildPayload = (values) => {
     const payload = new FormData();
-    payload.append("vehicle_owner", values.vehicleOwner || "");
+
+    payload.append("transport_owner", values.transportOwner || "");
+    payload.append("vehicle_number", values.vehicleNumber || "");
     payload.append("vehicle_type", values.vehicleType || "");
-    payload.append("vehicle_no", values.vehicleNo || "");
+    payload.append("passing_weight", values.passingWeight || "");
+
     payload.append(
-      "regd_date",
-      values.regdDate ? values.regdDate.format("YYYY-MM-DD") : "",
+      "registration_date",
+      values.registrationDate
+        ? values.registrationDate.format("YYYY-MM-DD")
+        : "",
     );
-    payload.append("engine_no", values.engineNo || "");
-    payload.append("chassis_no", values.chassisNo || "");
+
+    payload.append("engine_number", values.engineNumber || "");
+    payload.append("chassis_number", values.chassisNumber || "");
+
     payload.append(
       "insurance_valid_upto",
       values.insuranceValidUpto
         ? values.insuranceValidUpto.format("YYYY-MM-DD")
         : "",
     );
+
     payload.append(
       "tax_paid_upto",
       values.taxPaidUpto ? values.taxPaidUpto.format("YYYY-MM-DD") : "",
     );
+
     payload.append(
       "fitness_valid_upto",
       values.fitnessValidUpto
         ? values.fitnessValidUpto.format("YYYY-MM-DD")
         : "",
     );
+
     payload.append(
       "permit_upto",
       values.permitUpto ? values.permitUpto.format("YYYY-MM-DD") : "",
     );
+
     payload.append(
       "national_permit_upto",
       values.nationalPermitUpto
         ? values.nationalPermitUpto.format("YYYY-MM-DD")
         : "",
     );
-    payload.append("gps_available", values.gpsAvailable || "");
 
-    const fileFields = [
-      ["rcCopyUpload", "rc_copy_upload"],
-      ["chassisStencilUpload", "chassis_stencil_upload"],
-      ["insuranceCopyUpload", "insurance_copy_upload"],
-      ["taxPaidCopyUpload", "tax_paid_copy_upload"],
-      ["fitnessCopyUpload", "fitness_copy_upload"],
-      ["permitCopyUpload", "permit_copy_upload"],
-    ];
-    fileFields.forEach(([formKey, apiKey]) => {
-      if (values[formKey]?.[0]?.originFileObj) {
-        payload.append(apiKey, values[formKey][0].originFileObj);
-      }
-    });
+    payload.append("gps_available", values.gpsAvailable ?? false);
+    payload.append("is_active", values.isActive ?? true);
+
+    if (values.rcCopyUpload?.[0]?.originFileObj) {
+      payload.append("rc_copy", values.rcCopyUpload[0].originFileObj);
+    }
+
+    if (values.chassisCopyUpload?.[0]?.originFileObj) {
+      payload.append("chassis_copy", values.chassisCopyUpload[0].originFileObj);
+    }
+
+    if (values.insuranceCopyUpload?.[0]?.originFileObj) {
+      payload.append(
+        "insurance_copy",
+        values.insuranceCopyUpload[0].originFileObj,
+      );
+    }
+
+    if (values.taxCopyUpload?.[0]?.originFileObj) {
+      payload.append("tax_copy", values.taxCopyUpload[0].originFileObj);
+    }
+
+    if (values.fitnessCopyUpload?.[0]?.originFileObj) {
+      payload.append("fitness_copy", values.fitnessCopyUpload[0].originFileObj);
+    }
+
+    if (values.permitCopyUpload?.[0]?.originFileObj) {
+      payload.append("permit_copy", values.permitCopyUpload[0].originFileObj);
+    }
 
     return payload;
   };
@@ -192,36 +222,52 @@ export default function VehicleMaster() {
 
   const fillFormFromRecord = (form, res) => {
     form.setFieldsValue({
-      vehicleOwner: res.vehicle_owner,
+      transportOwner: res.transport_owner,
+
       vehicleType: res.vehicle_type,
-      vehicleNo: res.vehicle_no,
-      regdDate: res.regd_date ? dayjs(res.regd_date) : null,
-      engineNo: res.engine_no,
-      chassisNo: res.chassis_no,
+      passingWeight: res.passing_weight,
+
+      vehicleNumber: res.vehicle_number,
+
+      registrationDate: res.registration_date
+        ? dayjs(res.registration_date, "DD-MM-YYYY")
+        : null,
+
+      engineNumber: res.engine_number,
+
+      chassisNumber: res.chassis_number,
+
       insuranceValidUpto: res.insurance_valid_upto
-        ? dayjs(res.insurance_valid_upto)
+        ? dayjs(res.insurance_valid_upto, "DD-MM-YYYY")
         : null,
-      taxPaidUpto: res.tax_paid_upto ? dayjs(res.tax_paid_upto) : null,
+
+      taxPaidUpto: res.tax_paid_upto
+        ? dayjs(res.tax_paid_upto, "DD-MM-YYYY")
+        : null,
+
       fitnessValidUpto: res.fitness_valid_upto
-        ? dayjs(res.fitness_valid_upto)
+        ? dayjs(res.fitness_valid_upto, "DD-MM-YYYY")
         : null,
-      permitUpto: res.permit_upto ? dayjs(res.permit_upto) : null,
+
+      permitUpto: res.permit_upto ? dayjs(res.permit_upto, "DD-MM-YYYY") : null,
+
       nationalPermitUpto: res.national_permit_upto
-        ? dayjs(res.national_permit_upto)
+        ? dayjs(res.national_permit_upto, "DD-MM-YYYY")
         : null,
+
       gpsAvailable: res.gps_available,
-      rcCopyUpload: toFileList(res.rc_copy_upload, "RC Copy"),
-      chassisStencilUpload: toFileList(
-        res.chassis_stencil_upload,
-        "Chassis Stencil Copy",
-      ),
-      insuranceCopyUpload: toFileList(
-        res.insurance_copy_upload,
-        "Insurance Copy",
-      ),
-      taxPaidCopyUpload: toFileList(res.tax_paid_copy_upload, "Tax Paid Copy"),
-      fitnessCopyUpload: toFileList(res.fitness_copy_upload, "Fitness Copy"),
-      permitCopyUpload: toFileList(res.permit_copy_upload, "Permit Copy"),
+
+      rcCopyUpload: toFileList(res.rc_copy, "RC Copy"),
+
+      chassisCopyUpload: toFileList(res.chassis_copy, "Chassis Copy"),
+
+      insuranceCopyUpload: toFileList(res.insurance_copy, "Insurance Copy"),
+
+      taxCopyUpload: toFileList(res.tax_copy, "Tax Copy"),
+
+      fitnessCopyUpload: toFileList(res.fitness_copy, "Fitness Copy"),
+
+      permitCopyUpload: toFileList(res.permit_copy, "Permit Copy"),
     });
   };
 
@@ -264,15 +310,15 @@ export default function VehicleMaster() {
 
   /* ---------------- TABLE COLUMNS ---------------- */
   const columns = [
-    {
-      title: (
-        <span className="text-amber-700 font-semibold">
-          Owner / Transport Name
-        </span>
-      ),
-      dataIndex: "ownerName",
-      render: (text) => <span className="text-amber-800">{text}</span>,
-    },
+    // {
+    //   title: (
+    //     <span className="text-amber-700 font-semibold">
+    //       Owner / Transport Name
+    //     </span>
+    //   ),
+    //   dataIndex: "ownerName",
+    //   render: (text) => <span className="text-amber-800">{text}</span>,
+    // },
     {
       title: <span className="text-amber-700 font-semibold">Vehicle Type</span>,
       dataIndex: "vehicleType",
@@ -374,7 +420,7 @@ export default function VehicleMaster() {
       <Col span={8}>
         <Form.Item
           label="Vehicle Owner / Transport Name"
-          name="vehicleOwner"
+          name="transportOwner"
           rules={[
             {
               required: !disabled,
@@ -385,7 +431,7 @@ export default function VehicleMaster() {
           <Select placeholder="Select owner / transport" disabled={disabled}>
             {ownerList.map((owner) => (
               <Option key={owner.id} value={owner.id}>
-                {owner.firm_transport_name || owner.vehicle_owner_name}
+                {owner.firm_name}
               </Option>
             ))}
           </Select>
@@ -403,17 +449,27 @@ export default function VehicleMaster() {
             },
           ]}
         >
-          <Input
-            placeholder="Enter vehicle type / passing weight"
-            disabled={disabled}
-          />
+          <Input placeholder="Enter vehicle type" disabled={disabled} />
         </Form.Item>
       </Col>
-
+      <Col span={8}>
+        <Form.Item
+          label="Passing Weight"
+          name="passingWeight"
+          rules={[
+            {
+              required: !disabled,
+              message: " Passing Weight is required",
+            },
+          ]}
+        >
+          <Input placeholder="Enter vehicle type" disabled={disabled} />
+        </Form.Item>
+      </Col>
       <Col span={8}>
         <Form.Item
           label="Vehicle No."
-          name="vehicleNo"
+          name="vehicleNumber"
           rules={[{ required: !disabled, message: "Vehicle No. is required" }]}
         >
           <Input
@@ -425,7 +481,7 @@ export default function VehicleMaster() {
       </Col>
 
       <Col span={8}>
-        <Form.Item label="Regd. Date" name="regdDate">
+        <Form.Item label="Regd. Date" name="registrationDate">
           <DatePicker
             className="w-full!"
             format={DATE_FORMAT}
@@ -440,23 +496,21 @@ export default function VehicleMaster() {
         disabled={disabled}
       />
 
-      <Col span={8} />
-
       <Col span={8}>
-        <Form.Item label="Engine No." name="engineNo">
+        <Form.Item label="Engine No." name="engineNumber">
           <Input placeholder="Enter engine number" disabled={disabled} />
         </Form.Item>
       </Col>
 
       <Col span={8}>
-        <Form.Item label="Chassis No." name="chassisNo">
+        <Form.Item label="Chassis No." name="chassisNumber">
           <Input placeholder="Enter chassis number" disabled={disabled} />
         </Form.Item>
       </Col>
 
       <UploadField
         label="Upload Chassis No. - Stencil Copy"
-        name="chassisStencilUpload"
+        name="chassisCopyUpload"
         disabled={disabled}
       />
 
@@ -480,7 +534,7 @@ export default function VehicleMaster() {
         </Form.Item>
       </Col>
 
-      <Col span={8} />
+      {/* <Col span={8} /> */}
 
       <UploadField
         label="Upload Insurance Copy"
@@ -489,11 +543,11 @@ export default function VehicleMaster() {
       />
       <UploadField
         label="Upload Tax Paid Copy"
-        name="taxPaidCopyUpload"
+        name="taxCopyUpload"
         disabled={disabled}
       />
 
-      <Col span={8} />
+      {/* <Col span={8} /> */}
 
       <Col span={8}>
         <Form.Item label="Fitness Valid Upto" name="fitnessValidUpto">
@@ -541,9 +595,9 @@ export default function VehicleMaster() {
 
       <Col span={8}>
         <Form.Item label="GPS System (Available or Not)" name="gpsAvailable">
-          <Select placeholder="Select option" disabled={disabled}>
-            <Option value="available">Available</Option>
-            <Option value="not_available">Not Available</Option>
+          <Select>
+            <Option value={true}>Available</Option>
+            <Option value={false}>Not Available</Option>
           </Select>
         </Form.Item>
       </Col>

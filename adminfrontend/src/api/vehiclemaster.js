@@ -92,13 +92,16 @@ export const deleteVehicleOwner = async (id) => {
 // ===================================================================
 
 // Create Vehicle
-export const addVehicle = async (data) => {
+export const addVehicle = async (formData) => {
   const currentOrgId = useSessionStore.getState().currentOrgId;
 
   const res = await api.post(
     "/transport/vehicle-masters/",
-    data,
+    formData,
     {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
       params: {
         organisation: currentOrgId,
       },
@@ -135,13 +138,16 @@ export const getVehicleById = async (id) => {
 };
 
 // Update Vehicle
-export const updateVehicle = async (id, data) => {
+export const updateVehicle = async (id, formData) => {
   const currentOrgId = useSessionStore.getState().currentOrgId;
 
   const res = await api.patch(
     `/transport/vehicle-masters/${id}/`,
-    data,
+    formData,
     {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
       params: {
         organisation: currentOrgId,
       },
