@@ -14,15 +14,16 @@ export default function GroupMaster() {
       children: <WhatappGroup />,
     },
     {
-      key: "vehiclemaster",
-      label: "Vehicle Master",
-      children: <VehicleMaster />,
-    },
-    {
       key: "vehicleowner",
       label: "Vehicle Owner",
       children: <VehicleOwnermaster />,
     },
+    {
+      key: "vehiclemaster",
+      label: "Vehicle Master",
+      children: <VehicleMaster />,
+    },
+
     {
       key: "vehicledriver",
       label: "Vehicle Driver",
