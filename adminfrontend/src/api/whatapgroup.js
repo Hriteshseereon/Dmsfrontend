@@ -172,3 +172,14 @@ export const deleteGroupMember = async (id) => {
 
   return res.data;
 };
+
+// Send message to WhatsApp Group
+export const sendWhatsappMessage = async (groupId, payload) => {
+  const currentOrgId = useSessionStore.getState().currentOrgId;
+  const res = await api.post(`/whatsapps/whatsapp/groups/${groupId}/send-message/`, payload, {
+    params: {
+      organisation: currentOrgId,
+    },
+  });
+  return res.data;
+};
