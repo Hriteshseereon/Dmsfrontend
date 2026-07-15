@@ -118,7 +118,8 @@ export const updatePurchaseContract = async (contractId, payload) => {
 export const createpurchaseOrder = async (payload) => {
     const {currentOrgId,selectedFY} = useSessionStore.getState();
     const res =  await api.post("/purchase/sales-contract-orders/",payload,{
-      params: { organisation: currentOrgId, financial_year: selectedFY }  
+      params: { organisation: currentOrgId, financial_year: selectedFY },
+     
     });
     return res.data;
 }
@@ -126,9 +127,45 @@ export const createpurchaseOrder = async (payload) => {
 export const filterPurchaseContracOrder = async (data) => {
     const {currentOrgId,selectedFY} = useSessionStore.getState();
   const res = await api.get(`/purchase/sales-contract-orders/available-contracts/`,{
-    params: { organisation: currentOrgId, financial_year: selectedFY,start_date:data.startdate,end_date:data.enddate }  
+    params: { organisation: currentOrgId, financial_year: selectedFY,start_date:data.startdate,end_date:data.enddate },
+    headers: {
+      "X-Organisation-Id": currentOrgId,
+      "X-Financial-Year": selectedFY
+    }
   });
   return res.data; 
+}
+
+export const getPurchaseSalesContractOrders = async () => {
+  const { currentOrgId, selectedFY } = useSessionStore.getState();
+  const res = await api.get("/purchase/sales-contract-orders/", {
+    params: { organisation: currentOrgId, financial_year: selectedFY },
+  });
+  return res.data;
+}
+
+export const getPurchaseSalesContractOrderById = async (orderId) => {
+  const { currentOrgId, selectedFY } = useSessionStore.getState();
+  const res = await api.get(`/purchase/sales-contract-orders/${orderId}/`, {
+    params: { organisation: currentOrgId, financial_year: selectedFY },
+    headers: {
+      "X-Organisation-Id": currentOrgId,
+      "X-Financial-Year": selectedFY
+    }
+  });
+  return res.data;
+}
+
+export const updatePurchaseSalesContractOrder = async (orderId, payload) => {
+  const { currentOrgId, selectedFY } = useSessionStore.getState();
+  const res = await api.patch(`/purchase/sales-contract-orders/${orderId}/`, payload, {
+    params: { organisation: currentOrgId, financial_year: selectedFY },
+    headers: {
+      "X-Organisation-Id": currentOrgId,
+      "X-Financial-Year": selectedFY
+    }
+  });
+  return res.data;
 }
 //fetch all purchase orders
 export const getPurchaseOrder = async () => {
