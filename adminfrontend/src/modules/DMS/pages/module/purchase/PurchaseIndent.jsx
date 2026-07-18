@@ -126,10 +126,7 @@ export default function PurchaseIndent() {
   const [contractSearch, setContractSearch] = useState("");
 
   // ---------- new available contracts date range filter ----------
-  const [contractDateRange, setContractDateRange] = useState([
-    dayjs().subtract(30, "day"),
-    dayjs(),
-  ]);
+  const [contractDateRange, setContractDateRange] = useState(null);
 
   // ---------- sales contract edit modal state (full form, mirrors SalesSouda.jsx) ----------
   const [isContractEditModalOpen, setIsContractEditModalOpen] = useState(false);
