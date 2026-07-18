@@ -7,7 +7,7 @@ const SIDEBAR_EXPANDED = 288; // 18rem
 const SIDEBAR_COLLAPSED = 56; // fully hidden
 
 const AppLayout = () => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   const sidebarWidth = collapsed ? 66 : 240;
 
