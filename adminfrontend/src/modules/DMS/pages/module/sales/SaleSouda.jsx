@@ -759,7 +759,12 @@ export default function SalesSouda() {
       title: <span className="text-amber-700 font-semibold">Contract No</span>,
       dataIndex: "saleContractNumber",
       width: 70,
-      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+      render: (text) => (
+        <span className="text-amber-800">
+          {" "}
+          {text ? text.split("-").pop() : "-"}
+        </span>
+      ),
     },
 
     {
@@ -781,7 +786,7 @@ export default function SalesSouda() {
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
       dataIndex: "customer",
-      width: 90,
+      width: 130,
       render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
     {
