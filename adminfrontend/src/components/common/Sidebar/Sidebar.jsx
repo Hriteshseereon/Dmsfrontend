@@ -319,6 +319,7 @@ const SidebarMenu = ({ collapsed }) => {
 };
 
 const Sidebar = ({ collapsed, onToggle }) => {
+  console.log("collapsed =", collapsed);
   return (
     <aside
       className="sidebar fixed left-0 top-0 h-screen bg-white shadow-md transition-all duration-300 relative"
