@@ -63,6 +63,9 @@ export default function VehicleOwnerMaster() {
         location: item.location,
         contactPerson: item.contact_person,
         mobileNo: item.mobile,
+        panNo: item.pan_number,
+        adharNo: item.aadhaar_number,
+        tds_declaration: item.non_tds_declaration,
       }));
       setData(formattedData);
     } catch (error) {
@@ -273,6 +276,44 @@ export default function VehicleOwnerMaster() {
       title: <span className="text-amber-700 font-semibold">Mobile No.</span>,
       dataIndex: "mobileNo",
       render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">PAN No.</span>,
+      dataIndex: "panNo",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Adhaar No.</span>,
+      dataIndex: "adharNo",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Total No. Of vehicle
+        </span>
+      ),
+      dataIndex: "mobileNo",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Non-TDS Declaration
+        </span>
+      ),
+      dataIndex: "tds_declaration",
+      render: (url) =>
+        url ? (
+          <Button
+            type="link"
+            onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
+          >
+            View
+          </Button>
+        ) : (
+          <span className="text-gray-400">-</span>
+        ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
