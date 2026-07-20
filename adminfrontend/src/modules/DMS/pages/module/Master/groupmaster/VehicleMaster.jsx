@@ -64,12 +64,31 @@ export default function VehicleMaster() {
 
       const formattedData = (res || []).map((item) => ({
         key: item.id,
-        ownerName: item.transport_owner_name,
-        vehicleType: item.vehicle_type,
+
+        ownerName: item.owner_name, // agar backend de
         vehicleNo: item.vehicle_number,
+        vehicleType: item.vehicle_type,
+        passingWeight: item.passing_weight,
+
         regdDate: item.registration_date,
+
+        engineNo: item.engine_number,
+        chassisNo: item.chassis_number,
+
         insuranceValidUpto: item.insurance_valid_upto,
+        taxPaidUpto: item.tax_paid_upto,
+        fitnessValidUpto: item.fitness_valid_upto,
         permitUpto: item.permit_upto,
+        nationalPermitUpto: item.national_permit_upto,
+
+        gpsSystem: item.gps_available,
+
+        rcCopy: item.rc_copy,
+        chassisCopy: item.chassis_copy,
+        insuranceCopy: item.insurance_copy,
+        taxCopy: item.tax_copy,
+        fitnessCopy: item.fitness_copy,
+        permitCopy: item.permit_copy,
       }));
       setData(formattedData);
     } catch (error) {
@@ -320,13 +339,27 @@ export default function VehicleMaster() {
     //   render: (text) => <span className="text-amber-800">{text}</span>,
     // },
     {
+      title: <span className="text-amber-700 font-semibold">Vehicle No.</span>,
+      dataIndex: "vehicleNo",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Vehicle Owner Name</span>
+      ),
+      dataIndex: "ownerName",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
       title: <span className="text-amber-700 font-semibold">Vehicle Type</span>,
       dataIndex: "vehicleType",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Vehicle No.</span>,
-      dataIndex: "vehicleNo",
+      title: (
+        <span className="text-amber-700 font-semibold">Passing Weight</span>
+      ),
+      dataIndex: "passingWeight",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
@@ -337,6 +370,16 @@ export default function VehicleMaster() {
           {text ? dayjs(text).format(DATE_FORMAT) : "-"}
         </span>
       ),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Engine No.</span>,
+      dataIndex: "engineNo",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Chesis No.</span>,
+      dataIndex: "chassisNo",
+      render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
       title: (
@@ -352,12 +395,52 @@ export default function VehicleMaster() {
       ),
     },
     {
+      title: (
+        <span className="text-amber-700 font-semibold">Tax Paid Upto</span>
+      ),
+      dataIndex: "taxPaidUpto",
+      render: (text) => (
+        <span className="text-amber-800">
+          {text ? dayjs(text).format(DATE_FORMAT) : "-"}
+        </span>
+      ),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Fitness Upto</span>,
+      dataIndex: "fitnessValidUpto",
+      render: (text) => (
+        <span className="text-amber-800">
+          {text ? dayjs(text).format(DATE_FORMAT) : "-"}
+        </span>
+      ),
+    },
+    {
       title: <span className="text-amber-700 font-semibold">Permit Upto</span>,
       dataIndex: "permitUpto",
       render: (text) => (
         <span className="text-amber-800">
           {text ? dayjs(text).format(DATE_FORMAT) : "-"}
         </span>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">
+          National Permit Upto
+        </span>
+      ),
+      dataIndex: "nationalPermitUpto",
+      render: (text) => (
+        <span className="text-amber-800">
+          {text ? dayjs(text).format(DATE_FORMAT) : "-"}
+        </span>
+      ),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">GPS System</span>,
+      dataIndex: "gpsSystem",
+      render: (value) => (
+        <span className="text-amber-800">{value ? "Yes" : "No"}</span>
       ),
     },
     {
