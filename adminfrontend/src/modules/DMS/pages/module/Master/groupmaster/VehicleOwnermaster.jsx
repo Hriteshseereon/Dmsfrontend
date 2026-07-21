@@ -12,6 +12,7 @@ import {
   Upload,
   Popconfirm,
   message,
+  Radio,
 } from "antd";
 import {
   SearchOutlined,
@@ -66,6 +67,7 @@ export default function VehicleOwnerMaster() {
         panNo: item.pan_number,
         adharNo: item.aadhaar_number,
         tds_declaration: item.non_tds_declaration,
+        vehicle_count: item.vehicle_count,
       }));
       setData(formattedData);
     } catch (error) {
@@ -87,7 +89,15 @@ export default function VehicleOwnerMaster() {
     payload.append("owner_name", values.ownerName || "");
     payload.append("father_husband_name", values.fatherHusbandName || "");
     payload.append("location", values.location || "");
-    payload.append("address", values.address || "");
+    payload.append("relation_type", values.relationType || "");
+    payload.append("father_husband_name", values.fatherHusbandName || "");
+
+    payload.append("address_1", values.address1 || "");
+    payload.append("address_2", values.address2 || "");
+    payload.append("city", values.city || "");
+    payload.append("district", values.district || "");
+    payload.append("state", values.state || "");
+    payload.append("country", values.country || "");
     payload.append("contact_person", values.contactPerson || "");
     payload.append("designation", values.designation || "");
     payload.append("mobile", values.mobileNo || "");
@@ -159,9 +169,19 @@ export default function VehicleOwnerMaster() {
     form.setFieldsValue({
       firmName: res.firm_name ?? "",
       ownerName: res.owner_name ?? "",
+      relationType: res.relation_type ?? "",
+
       fatherHusbandName: res.father_husband_name ?? "",
+
       location: res.location ?? "",
-      address: res.address ?? "",
+
+      address1: res.address_1 ?? "",
+      address2: res.address_2 ?? "",
+
+      city: res.city ?? "",
+      district: res.district ?? "",
+      state: res.state ?? "",
+      country: res.country ?? "",
       contactPerson: res.contact_person ?? "",
       designation: res.designation ?? "",
       mobileNo: res.mobile ?? "",
@@ -293,7 +313,7 @@ export default function VehicleOwnerMaster() {
           Total No. Of vehicle
         </span>
       ),
-      dataIndex: "mobileNo",
+      dataIndex: "vehicle_count",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
@@ -383,7 +403,14 @@ export default function VehicleOwnerMaster() {
           <Input placeholder="Enter location" disabled={disabled} />
         </Form.Item>
       </Col>
-
+      <Col span={8}>
+        <Form.Item label="Relation Type" name="relationType">
+          <Radio.Group disabled={disabled}>
+            <Radio value="Father">Father</Radio>
+            <Radio value="Husband">Husband</Radio>
+          </Radio.Group>
+        </Form.Item>
+      </Col>
       <Col span={8}>
         <Form.Item label="Father / Husband Name" name="fatherHusbandName">
           <Input
@@ -393,12 +420,40 @@ export default function VehicleOwnerMaster() {
         </Form.Item>
       </Col>
 
-      <Col span={16}>
-        <Form.Item label="Address" name="address">
-          <TextArea rows={1} placeholder="Enter address" disabled={disabled} />
+      <Col span={12}>
+        <Form.Item label="Address Line 1" name="address1">
+          <Input placeholder="Enter address line 1" disabled={disabled} />
         </Form.Item>
       </Col>
 
+      <Col span={12}>
+        <Form.Item label="Address Line 2" name="address2">
+          <Input placeholder="Enter address line 2" disabled={disabled} />
+        </Form.Item>
+      </Col>
+      <Col span={6}>
+        <Form.Item label="City" name="city">
+          <Input placeholder="Enter city" disabled={disabled} />
+        </Form.Item>
+      </Col>
+
+      <Col span={6}>
+        <Form.Item label="District" name="district">
+          <Input placeholder="Enter district" disabled={disabled} />
+        </Form.Item>
+      </Col>
+
+      <Col span={6}>
+        <Form.Item label="State" name="state">
+          <Input placeholder="Enter state" disabled={disabled} />
+        </Form.Item>
+      </Col>
+
+      <Col span={6}>
+        <Form.Item label="Country" name="country">
+          <Input placeholder="Enter country" disabled={disabled} />
+        </Form.Item>
+      </Col>
       <Col span={8}>
         <Form.Item
           label="Contact Person"

@@ -13,6 +13,7 @@ import {
   Upload,
   Popconfirm,
   message,
+  AutoComplete,
 } from "antd";
 import {
   SearchOutlined,
@@ -33,6 +34,8 @@ import {
   updateVehicle,
   deleteVehicle,
   getAllVehicleOwner,
+  getallvehicleType,
+  getallPassingWeight,
 } from "../../../../../../api/vehiclemaster.js";
 
 const { Option } = Select;
@@ -51,12 +54,34 @@ export default function VehicleMaster() {
   const [editOpen, setEditOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
-
+  const [vehicleType, setVehileType] = useState(null);
+  const [passingWeight, setPassingWeight] = useState(null);
   useEffect(() => {
     fetchVehicles();
     fetchOwners();
+    fetchllvehicleType();
+    fetchallpassingWeight();
   }, []);
 
+  const fetchllvehicleType = async () => {
+    try {
+      const res = await getallvehicleType();
+      console.log("the vehicletype data", res);
+      setVehileType(res);
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  const fetchallpassingWeight = async () => {
+    try {
+      const res = await getallPassingWeight();
+      console.log("this is the passing weight data", res);
+      setPassingWeight(res);
+    } catch (err) {
+      console.log(err);
+    }
+  };
   /* ---------------- FETCH DATA ---------------- */
   const fetchVehicles = async () => {
     try {
@@ -522,31 +547,31 @@ export default function VehicleMaster() {
       </Col>
 
       <Col span={8}>
-        <Form.Item
-          label="Vehicle Type / Passing Weight"
-          name="vehicleType"
-          rules={[
-            {
-              required: !disabled,
-              message: "Vehicle Type / Passing Weight is required",
-            },
-          ]}
-        >
-          <Input placeholder="Enter vehicle type" disabled={disabled} />
+        <Form.Item name="vehicleType" label="Vehicle Type">
+          <AutoComplete
+            options={vehicleType?.map((item) => ({
+              value: item,
+            }))}
+            filterOption={(inputValue, option) =>
+              option.value.toLowerCase().includes(inputValue.toLowerCase())
+            }
+          >
+            <Input placeholder="Select or type vehicle type" />
+          </AutoComplete>
         </Form.Item>
       </Col>
       <Col span={8}>
-        <Form.Item
-          label="Passing Weight"
-          name="passingWeight"
-          rules={[
-            {
-              required: !disabled,
-              message: " Passing Weight is required",
-            },
-          ]}
-        >
-          <Input placeholder="Enter vehicle type" disabled={disabled} />
+        <Form.Item name="passingWeight" label="passing weight">
+          <AutoComplete
+            options={vehicleType?.map((item) => ({
+              value: item,
+            }))}
+            filterOption={(inputValue, option) =>
+              option.value.toLowerCase().includes(inputValue.toLowerCase())
+            }
+          >
+            <Input placeholder="Select or type vehicle type" />
+          </AutoComplete>
         </Form.Item>
       </Col>
       <Col span={8}>
