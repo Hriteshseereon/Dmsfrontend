@@ -24,7 +24,7 @@ import {
   UploadOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-
+import AppDatePicker from "../../../../../../components/AppDatePicker.jsx";
 // TODO: point these at your actual API module, e.g. "../../../../../api/driver"
 import {
   getAllDrivers,
@@ -404,11 +404,7 @@ export default function VehicleDriverMaster() {
 
       <Col span={8}>
         <Form.Item label="DL Expired Dt." name="licenceExpiryDate">
-          <DatePicker
-            className="w-full!"
-            format={DATE_FORMAT}
-            disabled={disabled}
-          />
+          <AppDatePicker disabled={disabled} />
         </Form.Item>
       </Col>
 

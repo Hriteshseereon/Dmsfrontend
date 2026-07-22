@@ -25,7 +25,7 @@ import {
   UploadOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-
+import AppDatePicker from "../../../../../../components/AppDatePicker.jsx";
 // TODO: point these at your actual API modules
 import {
   getAllVehicles,
@@ -90,7 +90,7 @@ export default function VehicleMaster() {
       const formattedData = (res || []).map((item) => ({
         key: item.id,
 
-        ownerName: item.owner_name, // agar backend de
+        ownerName: item.transport_owner_name, // agar backend de
         vehicleNo: item.vehicle_number,
         vehicleType: item.vehicle_type,
         passingWeight: item.passing_weight,
@@ -590,11 +590,7 @@ export default function VehicleMaster() {
 
       <Col span={8}>
         <Form.Item label="Regd. Date" name="registrationDate">
-          <DatePicker
-            className="w-full!"
-            format={DATE_FORMAT}
-            disabled={disabled}
-          />
+          <AppDatePicker disabled={disabled} />
         </Form.Item>
       </Col>
 
@@ -624,21 +620,13 @@ export default function VehicleMaster() {
 
       <Col span={8}>
         <Form.Item label="Insurance Valid Upto" name="insuranceValidUpto">
-          <DatePicker
-            className="w-full!"
-            format={DATE_FORMAT}
-            disabled={disabled}
-          />
+          <AppDatePicker disabled={disabled} />
         </Form.Item>
       </Col>
 
       <Col span={8}>
         <Form.Item label="Tax Paid Upto" name="taxPaidUpto">
-          <DatePicker
-            className="w-full!"
-            format={DATE_FORMAT}
-            disabled={disabled}
-          />
+          <AppDatePicker disabled={disabled} />
         </Form.Item>
       </Col>
 
@@ -659,11 +647,7 @@ export default function VehicleMaster() {
 
       <Col span={8}>
         <Form.Item label="Fitness Valid Upto" name="fitnessValidUpto">
-          <DatePicker
-            className="w-full!"
-            format={DATE_FORMAT}
-            disabled={disabled}
-          />
+          <AppDatePicker disabled={disabled} />
         </Form.Item>
       </Col>
 
@@ -677,21 +661,13 @@ export default function VehicleMaster() {
 
       <Col span={8}>
         <Form.Item label="Permit Upto" name="permitUpto">
-          <DatePicker
-            className="w-full!"
-            format={DATE_FORMAT}
-            disabled={disabled}
-          />
+          <AppDatePicker disabled={disabled} />
         </Form.Item>
       </Col>
 
       <Col span={8}>
         <Form.Item label="National Permit Upto" name="nationalPermitUpto">
-          <DatePicker
-            className="w-full!"
-            format={DATE_FORMAT}
-            disabled={disabled}
-          />
+          <AppDatePicker disabled={disabled} />
         </Form.Item>
       </Col>
 
