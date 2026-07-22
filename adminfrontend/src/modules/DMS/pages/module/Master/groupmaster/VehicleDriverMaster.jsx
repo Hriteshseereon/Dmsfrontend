@@ -189,7 +189,7 @@ export default function VehicleDriverMaster() {
       licenceNumber: res.driving_licence_number,
 
       licenceExpiryDate: res.licence_expiry_date
-        ? dayjs(res.licence_expiry_date, "DD-MM-YYYY")
+        ? dayjs(res.licence_expiry_date)
         : null,
 
       driverMobile: res.driver_mobile,
