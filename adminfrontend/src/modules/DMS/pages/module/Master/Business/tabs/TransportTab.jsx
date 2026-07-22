@@ -44,19 +44,7 @@ import {
   getStateIsoByName,
 } from "../../../../../../../utils/locationHelper";
 // import { getTransporters, addTransporter, updateTransporter, getTransporterDetails } from "../../../../../../../api/transporter";
-import {
-  createDraft,
-  saveDraft,
-  loadDraft,
-  deleteDraft,
-  deserialiseDraftValues,
-  getAllDrafts,
-  createAutoSaveHandler,
-  createManualSaveHandler,
-  hasDrafts,
-  debugLocalStorage,
-} from "../../../../../../../utils/businessPartnerDraftUtils";
-import UniversalDraftTable from "./UniversalDraftTable";
+
 import { API_BASE_URL } from "@/utils/config";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -107,52 +95,12 @@ export default function TransportTab() {
   };
 
   // draft functionality
-  const [activeDraftId, setActiveDraftId] = useState(null);
-  const [draftSavedAt, setDraftSavedAt] = useState(null);
-  const [draftTableKey, setDraftTableKey] = useState(0);
-  const [hasDraft, setHasDraft] = useState(false);
-
-  // check draft
-  const checkDraftExists = () => {
-    setHasDraft(hasDrafts("transport"));
-  };
-  useEffect(() => {
-    checkDraftExists();
-  }, [draftTableKey]);
 
   // Auto-save handler
-  const handleFormValuesChange = useCallback(
-    createAutoSaveHandler(
-      "transport",
-      form,
-      activeDraftId,
-      setActiveDraftId,
-      setDraftSavedAt,
-      setDraftTableKey,
-      selected,
-      viewMode,
-    ),
-    [form, selected, viewMode, activeDraftId],
-  );
 
   // Manual save handler
-  const handleManualSave = createManualSaveHandler(
-    "transport",
-    form,
-    activeDraftId,
-    setActiveDraftId,
-    setDraftSavedAt,
-    setDraftTableKey,
-    selected,
-    viewMode,
-    message,
-  );
 
   // Close modal from draft table
-  const closeDraftModal = () => {
-    closeModal();
-    setDraftTableKey((k) => k + 1);
-  };
 
   const closeModal = () => {
     setOpen(false);
@@ -161,15 +109,6 @@ export default function TransportTab() {
     setViewMode(false);
   };
 
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (!selected && !viewMode && open) {
-        saveCurrentDraft();
-      }
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [open, selected, viewMode]);
   /* ================= FETCH ================= */
   const fetchTransporters = async () => {
     try {
@@ -357,12 +296,7 @@ export default function TransportTab() {
   const handleSubmit = async (values) => {
     try {
       const formData = buildFormData(values);
-      if (!selected) {
-        deleteDraft(activeDraftId);
-        setActiveDraftId(null);
-        setDraftSavedAt(null);
-        setDraftTableKey((k) => k + 1);
-      }
+
       if (selected) {
         await updateTransport(selected.id, formData);
         message.success("Transporter Updated");
@@ -470,7 +404,7 @@ export default function TransportTab() {
               setSelStateIso(stateIso);
               setSelected(details);
               setViewMode(true);
-              setActiveDraftId(null);
+
               setOpen(true);
             }}
           />
@@ -489,7 +423,7 @@ export default function TransportTab() {
               setSelStateIso(stateIso);
               setSelected(details);
               setViewMode(false);
-              setActiveDraftId(null);
+
               setOpen(true);
             }}
           />
@@ -536,77 +470,6 @@ export default function TransportTab() {
 
   const filteredData = getFilteredData();
 
-  const handleContinueDraft = (id) => {
-    console.log("[TransportTab] Attempting to continue draft:", id);
-
-    // Debug localStorage state in production
-    const storageInfo = debugLocalStorage();
-    if (storageInfo.errors.length > 0) {
-      console.error(
-        "[TransportTab] localStorage issues detected:",
-        storageInfo.errors,
-      );
-    }
-
-    const draft = loadDraft(id);
-    if (!draft) {
-      console.error("[TransportTab] Draft not found or failed to load:", id);
-      message.error("Draft not found");
-      return;
-    }
-
-    console.log(
-      "[TransportTab] Draft loaded successfully, attempting to restore values:",
-      {
-        draftId: draft.id,
-        hasValues: !!draft.values,
-        valuesKeys: Object.keys(draft.values || {}),
-        savedAt: draft.savedAt,
-      },
-    );
-
-    const restored = deserialiseDraftValues(draft.values, dayjs);
-
-    if (!restored || Object.keys(restored).length === 0) {
-      console.error(
-        "[TransportTab] Failed to restore draft values - empty result:",
-        restored,
-      );
-      message.error("Failed to restore draft data");
-      return;
-    }
-
-    console.log("[TransportTab] Successfully restored draft values:", {
-      restoredKeys: Object.keys(restored),
-      sampleValues: Object.keys(restored)
-        .slice(0, 3)
-        .reduce((acc, key) => {
-          acc[key] = restored[key];
-          return acc;
-        }, {}),
-    });
-
-    form.setFieldsValue(restored);
-
-    // Check for uploaded files and show warning
-    const hasFiles = Object.keys(restored).some((key) => {
-      const value = restored[key];
-      return Array.isArray(value) && value.length > 0 && value[0]?._fromDraft;
-    });
-
-    if (hasFiles) {
-      message.warning(
-        "Draft restored! Please re-upload any documents as they are not saved in drafts.",
-        5,
-      );
-    }
-
-    setActiveDraftId(id);
-    setDraftSavedAt(new Date(draft.savedAt));
-    setSelected(null);
-    setViewMode(false);
-    setOpen(true);
-  };
   /* ================= UI ================= */
   return (
     <>
@@ -640,8 +503,7 @@ export default function TransportTab() {
             const randomPassword = generatePassword();
             setSelected(null);
             setViewMode(false);
-            setActiveDraftId(null);
-            setDraftSavedAt(null);
+
             form.resetFields();
 
             const countryIso = getCountryIsoByName("India");
@@ -659,16 +521,7 @@ export default function TransportTab() {
           Add Transport
         </Button>
       </div>
-      {hasDraft && (
-        <UniversalDraftTable
-          key={draftTableKey}
-          moduleType="transport"
-          refreshTrigger={draftTableKey}
-          onContinue={handleContinueDraft}
-          onDelete={() => setDraftTableKey((k) => k + 1)}
-          onCloseModal={closeDraftModal}
-        />
-      )}
+
       {/* ===== TABLE CONTAINER ===== */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
@@ -703,41 +556,6 @@ export default function TransportTab() {
             </span>
 
             {/* Draft indicator — shown only for new-transporter forms */}
-            {!selected && !viewMode && (
-              <div className="flex items-center gap-2 ml-2">
-                {activeDraftId ? (
-                  <Tag
-                    color="gold"
-                    icon={<SaveOutlined />}
-                    className="cursor-default select-none"
-                  >
-                    Draft saved
-                  </Tag>
-                ) : (
-                  <Tag
-                    color="default"
-                    className="cursor-default select-none text-xs"
-                  >
-                    Not saved yet
-                  </Tag>
-                )}
-
-                {/* Manual save button */}
-                <Button
-                  size="small"
-                  icon={<SaveOutlined />}
-                  className="border-amber-400! text-amber-700! hover:bg-amber-100! text-xs!"
-                  onClick={() => {
-                    handleManualSave();
-                    // Navigate to draft table view after saving
-                    closeModal();
-                    setDraftTableKey((k) => k + 1);
-                  }}
-                >
-                  Save Draft
-                </Button>
-              </div>
-            )}
           </div>
         }
         styles={{
@@ -748,7 +566,7 @@ export default function TransportTab() {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          onValuesChange={handleFormValuesChange}
+          // onValuesChange={handleFormValuesChange}
           onFinishFailed={handleFinishFailed}
         >
           {/* ================= Transporter / Agency Details ================= */}

@@ -142,3 +142,17 @@
 
 
 /* sidebar togle button */
+.contract-active td {
+  color: #d97706 !important;   /* Amber */
+  font-weight: 600;
+}
+
+.contract-future td {
+  color: #16a34a !important;   /* Green */
+  font-weight: 600;
+}
+
+.contract-expired td {
+  color: #dc2626 !important;   /* Red */
+  font-weight: 600;
+}
