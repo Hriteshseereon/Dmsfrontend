@@ -274,7 +274,7 @@ export default function VehicleMaster() {
       vehicleNumber: res.vehicle_number,
 
       registrationDate: res.registration_date
-        ? dayjs(res.registration_date, "DD-MM-YYYY")
+        ? dayjs(res.registration_date)
         : null,
 
       engineNumber: res.engine_number,
@@ -282,21 +282,19 @@ export default function VehicleMaster() {
       chassisNumber: res.chassis_number,
 
       insuranceValidUpto: res.insurance_valid_upto
-        ? dayjs(res.insurance_valid_upto, "DD-MM-YYYY")
+        ? dayjs(res.insurance_valid_upto)
         : null,
 
-      taxPaidUpto: res.tax_paid_upto
-        ? dayjs(res.tax_paid_upto, "DD-MM-YYYY")
-        : null,
+      taxPaidUpto: res.tax_paid_upto ? dayjs(res.tax_paid_upto) : null,
 
       fitnessValidUpto: res.fitness_valid_upto
-        ? dayjs(res.fitness_valid_upto, "DD-MM-YYYY")
+        ? dayjs(res.fitness_valid_upto)
         : null,
 
-      permitUpto: res.permit_upto ? dayjs(res.permit_upto, "DD-MM-YYYY") : null,
+      permitUpto: res.permit_upto ? dayjs(res.permit_upto) : null,
 
       nationalPermitUpto: res.national_permit_upto
-        ? dayjs(res.national_permit_upto, "DD-MM-YYYY")
+        ? dayjs(res.national_permit_upto)
         : null,
 
       gpsAvailable: res.gps_available,
