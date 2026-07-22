@@ -135,6 +135,21 @@ export default function SalesSouda() {
     const date = parseApiDate(value);
     return date ? date.format("DD-MM-YYYY") : "-";
   };
+
+  const getRowClassName = (record) => {
+    const today = dayjs().startOf("day");
+
+    const from = parseApiDate(record.startDate)?.startOf("day");
+    const to = parseApiDate(record.endDate)?.startOf("day");
+
+    if (!from || !to) return "";
+
+    if (today.isBefore(from)) return "contract-future";
+
+    if (today.isAfter(to)) return "contract-expired";
+
+    return "contract-active";
+  };
   // Auto-save on form changes
 
   // get the all customer data
@@ -750,58 +765,45 @@ export default function SalesSouda() {
       ),
       dataIndex: "contractDate",
       width: 80,
-      render: (date) => (
-        <span className="text-amber-800">{renderDate(date)}</span>
-      ),
+      render: (date) => <span>{renderDate(date)}</span>,
     },
     // 🆕 Contract Number
     {
       title: <span className="text-amber-700 font-semibold">Contract No</span>,
       dataIndex: "saleContractNumber",
       width: 70,
-      render: (text) => (
-        <span className="text-amber-800">
-          {" "}
-          {text ? text.split("-").pop() : "-"}
-        </span>
-      ),
+      render: (text) => <span> {text ? text.split("-").pop() : "-"}</span>,
     },
 
     {
       title: <span className="text-amber-700 font-semibold">Plant Name</span>,
       dataIndex: "plantName",
       width: 60,
-      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+      render: (text) => <span>{text || "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Broker Name</span>,
       dataIndex: "brokerName",
       width: 60,
-      render: (text) => (
-        <span className="text-amber-800">
-          {text ? text.split(" ")[0] : "-"}
-        </span>
-      ),
+      render: (text) => <span>{text ? text.split(" ")[0] : "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
       dataIndex: "customer",
       width: 130,
-      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+      render: (text) => <span>{text || "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Place</span>,
       dataIndex: "location",
-      width: 60,
-      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+      width: 80,
+      render: (text) => <span>{text || "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">QTY</span>,
       dataIndex: "quantity",
       width: 60,
-      render: (value) => (
-        <span className="text-amber-800">{Number(value || 0)}</span>
-      ),
+      render: (value) => <span>{Number(value || 0)}</span>,
     },
     {
       title: (
@@ -809,25 +811,19 @@ export default function SalesSouda() {
       ),
       dataIndex: "grossWeightTon",
       width: 60,
-      render: (value) => (
-        <span className="text-amber-800">{Number(value || 0).toFixed(3)}</span>
-      ),
+      render: (value) => <span>{Number(value || 0).toFixed(3)}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Valid From</span>,
       dataIndex: "startDate",
       width: 80,
-      render: (date) => (
-        <span className="text-amber-800">{renderDate(date)}</span>
-      ),
+      render: (date) => <span>{renderDate(date)}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Valid To</span>,
       dataIndex: "endDate",
       width: 80,
-      render: (date) => (
-        <span className="text-amber-800">{renderDate(date)}</span>
-      ),
+      render: (date) => <span>{renderDate(date)}</span>,
     },
     {
       title: (
@@ -835,11 +831,7 @@ export default function SalesSouda() {
       ),
       dataIndex: "extended_upto",
       width: 75,
-      render: (value) => (
-        <span className="text-amber-800">
-          {value ? renderDate(value) : "-"}
-        </span>
-      ),
+      render: (value) => <span>{value ? renderDate(value) : "-"}</span>,
     },
     {
       title: (
@@ -1716,6 +1708,7 @@ export default function SalesSouda() {
           }}
           rowKey="key"
           size="small"
+          rowClassName={getRowClassName}
         />
       </div>
 

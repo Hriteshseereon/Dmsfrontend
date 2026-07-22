@@ -251,3 +251,18 @@ export const deleteDriver = async (id) => {
 
   return res.data;
 };
+
+
+// get all vehicle type 
+
+export const getallvehicleType =  async () => {
+  const res = await api.get('/transport/vehicle-masters/unique-vehicle-types/')
+
+  return res.data;
+}
+
+export const getallPassingWeight  = async () => {
+  const res = await api.get("/transport/vehicle-masters/unique-passing-weights/")
+
+  return res.data;
+}

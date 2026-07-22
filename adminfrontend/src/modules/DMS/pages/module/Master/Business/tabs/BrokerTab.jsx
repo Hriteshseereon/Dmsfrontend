@@ -28,19 +28,6 @@ import {
   DeleteOutlined,
   SaveOutlined,
 } from "@ant-design/icons";
-import {
-  createDraft,
-  saveDraft,
-  loadDraft,
-  deleteDraft,
-  deserialiseDraftValues,
-  getAllDrafts,
-  createAutoSaveHandler,
-  createManualSaveHandler,
-  hasDrafts,
-  debugLocalStorage,
-} from "../../../../../../../utils/businessPartnerDraftUtils";
-import UniversalDraftTable from "./UniversalDraftTable";
 
 // import { getBrokers, addBroker, updateBroker, getBrokerDetails } from "../../../../../../../api/broker";
 import {
@@ -196,52 +183,16 @@ export default function BrokerTab() {
   const [selStateName, setSelStateName] = useState(null);
   const [selStateIso, setSelStateIso] = useState(null);
   const [form] = Form.useForm();
-  const [activeDraftId, setActiveDraftId] = useState(null);
-  const [draftSavedAt, setDraftSavedAt] = useState(null);
-  const [draftTableKey, setDraftTableKey] = useState(0);
-  const [hasDraft, setHasDraft] = useState(false);
+
   const [selDistrict, setSelDistrict] = useState(null);
   // check draft
-  const checkDraftExists = () => {
-    setHasDraft(hasDrafts("broker"));
-  };
-  useEffect(() => {
-    checkDraftExists();
-  }, [draftTableKey]);
 
   // Auto-save handler
-  const handleFormValuesChange = useCallback(
-    createAutoSaveHandler(
-      "broker",
-      form,
-      activeDraftId,
-      setActiveDraftId,
-      setDraftSavedAt,
-      setDraftTableKey,
-      selected,
-      viewMode,
-    ),
-    [form, selected, viewMode, activeDraftId],
-  );
 
   // Manual save handler
-  const handleManualSave = createManualSaveHandler(
-    "broker",
-    form,
-    activeDraftId,
-    setActiveDraftId,
-    setDraftSavedAt,
-    setDraftTableKey,
-    selected,
-    viewMode,
-    message,
-  );
 
   // Close modal from draft table
-  const closeDraftModal = () => {
-    closeModal();
-    setDraftTableKey((k) => k + 1);
-  };
+
   const generatePassword = (length = 10) => {
     const chars =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$!";
@@ -441,7 +392,7 @@ export default function BrokerTab() {
       setSelStateIso(stateIso);
       setSelected(details);
       setViewMode(view);
-      setActiveDraftId(null);
+
       setOpen(true);
     } catch {
       message.error("Failed to load broker details");
@@ -463,12 +414,7 @@ export default function BrokerTab() {
   const handleSubmit = async (values) => {
     try {
       const formData = buildFormData(values);
-      if (!selected && activeDraftId) {
-        deleteDraft(activeDraftId);
-        setActiveDraftId(null);
-        setDraftSavedAt(null);
-        setDraftTableKey((k) => k + 1);
-      }
+
       if (selected) {
         await updateBrokerById(selected.id, formData);
         message.success("Broker Updated");
@@ -574,90 +520,7 @@ export default function BrokerTab() {
 
   const filteredData = getFilteredData();
   // draft table
-  const handleContinueDraft = (draftId) => {
-    console.log("[BrokerTab] Attempting to continue draft:", draftId);
 
-    // Debug localStorage state in production
-    const storageInfo = debugLocalStorage();
-    if (storageInfo.errors.length > 0) {
-      console.error(
-        "[BrokerTab] localStorage issues detected:",
-        storageInfo.errors,
-      );
-    }
-
-    const draft = loadDraft(draftId);
-    if (!draft) {
-      console.error("[BrokerTab] Draft not found or failed to load:", draftId);
-      message.error("Draft not found");
-      return;
-    }
-
-    console.log(
-      "[BrokerTab] Draft loaded successfully, attempting to restore values:",
-      {
-        draftId: draft.id,
-        hasValues: !!draft.values,
-        valuesKeys: Object.keys(draft.values || {}),
-        savedAt: draft.savedAt,
-      },
-    );
-
-    const restored = deserialiseDraftValues(draft.values, dayjs);
-
-    if (!restored || Object.keys(restored).length === 0) {
-      console.error(
-        "[BrokerTab] Failed to restore draft values - empty result:",
-        restored,
-      );
-      message.error("Failed to restore draft data");
-      return;
-    }
-
-    console.log("[BrokerTab] Successfully restored draft values:", {
-      restoredKeys: Object.keys(restored),
-      sampleValues: Object.keys(restored)
-        .slice(0, 3)
-        .reduce((acc, key) => {
-          acc[key] = restored[key];
-          return acc;
-        }, {}),
-    });
-
-    form.resetFields();
-    form.setFieldsValue(restored);
-
-    // restore location cascade
-    if (restored.country) {
-      const iso = getCountryIsoByName(restored.country);
-      setSelCountryIso(iso);
-    }
-    if (restored.permanent_state) {
-      const countryIso = getCountryIsoByName(restored.country);
-      const stateIso = getStateIsoByName(countryIso, restored.permanent_state);
-      setSelStateName(restored.permanent_state);
-      setSelStateIso(stateIso);
-    }
-
-    // Check for uploaded files and show warning
-    const hasFiles = Object.keys(restored).some((key) => {
-      const value = restored[key];
-      return Array.isArray(value) && value.length > 0 && value[0]?._fromDraft;
-    });
-
-    if (hasFiles) {
-      message.warning(
-        "Draft restored! Please re-upload any documents as they are not saved in drafts.",
-        5,
-      );
-    }
-
-    setActiveDraftId(draftId);
-    setDraftSavedAt(new Date(draft.savedAt));
-    setSelected(null);
-    setViewMode(false);
-    setOpen(true);
-  };
   /* ================= UI ================= */
   return (
     <>
@@ -688,8 +551,7 @@ export default function BrokerTab() {
           onClick={() => {
             setSelected(null);
             setViewMode(false);
-            setActiveDraftId(null);
-            setDraftSavedAt(null);
+
             form.resetFields();
             const autoPassword = generatePassword();
             const countryIso = getCountryIsoByName("India");
@@ -705,16 +567,7 @@ export default function BrokerTab() {
           Add Broker
         </Button>
       </div>
-      {hasDraft && (
-        <UniversalDraftTable
-          key={draftTableKey}
-          moduleType="broker"
-          refreshTrigger={draftTableKey}
-          onContinue={handleContinueDraft}
-          onDelete={() => setDraftTableKey((k) => k + 1)}
-          onCloseModal={closeDraftModal}
-        />
-      )}
+
       {/* ===== TABLE CONTAINER ===== */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
@@ -749,41 +602,6 @@ export default function BrokerTab() {
             </span>
 
             {/* Draft indicator — shown only for new-broker forms */}
-            {!selected && !viewMode && (
-              <div className="flex items-center gap-2 ml-2">
-                {activeDraftId ? (
-                  <Tag
-                    color="gold"
-                    icon={<SaveOutlined />}
-                    className="cursor-default select-none"
-                  >
-                    Draft saved
-                  </Tag>
-                ) : (
-                  <Tag
-                    color="default"
-                    className="cursor-default select-none text-xs"
-                  >
-                    Not saved yet
-                  </Tag>
-                )}
-
-                {/* Manual save button */}
-                <Button
-                  size="small"
-                  icon={<SaveOutlined />}
-                  className="border-amber-400! text-amber-700! hover:bg-amber-100! text-xs!"
-                  onClick={() => {
-                    handleManualSave();
-                    // Navigate to draft table view after saving
-                    closeModal();
-                    setDraftTableKey((k) => k + 1);
-                  }}
-                >
-                  Save Draft
-                </Button>
-              </div>
-            )}
           </div>
         }
         styles={{
@@ -794,7 +612,6 @@ export default function BrokerTab() {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          onValuesChange={handleFormValuesChange}
           initialValues={{ status: "Active" }}
           onFinishFailed={handleFinishFailed}
         >

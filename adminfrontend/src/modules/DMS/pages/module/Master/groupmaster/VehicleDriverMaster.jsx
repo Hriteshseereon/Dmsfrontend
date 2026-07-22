@@ -24,7 +24,7 @@ import {
   UploadOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-
+import AppDatePicker from "../../../../../../components/AppDatePicker.jsx";
 // TODO: point these at your actual API module, e.g. "../../../../../api/driver"
 import {
   getAllDrivers,
@@ -104,7 +104,12 @@ export default function VehicleDriverMaster() {
 
     payload.append("driver_name", values.driverName || "");
 
-    payload.append("address", values.address || "");
+    payload.append("address_1", values.address1 || "");
+    payload.append("address_2", values.address2 || "");
+    payload.append("city", values.city || "");
+    payload.append("district", values.district || "");
+    payload.append("state", values.state || "");
+    payload.append("country", values.country || "");
 
     payload.append("driving_licence_number", values.licenceNumber || "");
 
@@ -174,7 +179,12 @@ export default function VehicleDriverMaster() {
 
       driverName: res.driver_name,
 
-      address: res.address,
+      address1: res.address_1 ?? "",
+      address2: res.address_2 ?? "",
+      city: res.city ?? "",
+      district: res.district ?? "",
+      state: res.state ?? "",
+      country: res.country ?? "",
 
       licenceNumber: res.driving_licence_number,
 
@@ -237,6 +247,18 @@ export default function VehicleDriverMaster() {
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
+      title: <span className="text-amber-700 font-semibold">Location</span>,
+      dataIndex: "driverName",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Driver Mobile No.</span>
+      ),
+      dataIndex: "driverMobileNo",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
       title: (
         <span className="text-amber-700 font-semibold">
           Driving Licence No.
@@ -256,13 +278,7 @@ export default function VehicleDriverMaster() {
         </span>
       ),
     },
-    {
-      title: (
-        <span className="text-amber-700 font-semibold">Driver Mobile No.</span>
-      ),
-      dataIndex: "driverMobileNo",
-      render: (text) => <span className="text-amber-800">{text}</span>,
-    },
+
     {
       title: <span className="text-amber-700 font-semibold">Helper Name</span>,
       dataIndex: "helperName",
@@ -334,9 +350,39 @@ export default function VehicleDriverMaster() {
         </Form.Item>
       </Col>
 
-      <Col span={16}>
-        <Form.Item label="Address" name="address">
-          <TextArea rows={1} placeholder="Enter address" disabled={disabled} />
+      <Col span={12}>
+        <Form.Item label="Address Line 1" name="address1">
+          <Input placeholder="Enter address line 1" disabled={disabled} />
+        </Form.Item>
+      </Col>
+
+      <Col span={12}>
+        <Form.Item label="Address Line 2" name="address2">
+          <Input placeholder="Enter address line 2" disabled={disabled} />
+        </Form.Item>
+      </Col>
+
+      <Col span={6}>
+        <Form.Item label="City" name="city">
+          <Input placeholder="Enter city" disabled={disabled} />
+        </Form.Item>
+      </Col>
+
+      <Col span={6}>
+        <Form.Item label="District" name="district">
+          <Input placeholder="Enter district" disabled={disabled} />
+        </Form.Item>
+      </Col>
+
+      <Col span={6}>
+        <Form.Item label="State" name="state">
+          <Input placeholder="Enter state" disabled={disabled} />
+        </Form.Item>
+      </Col>
+
+      <Col span={6}>
+        <Form.Item label="Country" name="country">
+          <Input placeholder="Enter country" disabled={disabled} />
         </Form.Item>
       </Col>
 
@@ -358,11 +404,7 @@ export default function VehicleDriverMaster() {
 
       <Col span={8}>
         <Form.Item label="DL Expired Dt." name="licenceExpiryDate">
-          <DatePicker
-            className="w-full!"
-            format={DATE_FORMAT}
-            disabled={disabled}
-          />
+          <AppDatePicker disabled={disabled} />
         </Form.Item>
       </Col>
 

@@ -54,19 +54,6 @@ import {
 //   deleteDraft,
 //   deserialiseDraftValues,
 // } from ";
-import {
-  createDraft,
-  saveDraft,
-  loadDraft,
-  deleteDraft,
-  deserialiseDraftValues,
-  getAllCustomerDrafts,
-  createAutoSaveHandler,
-  createManualSaveHandler,
-  hasDrafts,
-  debugLocalStorage,
-} from "../../../../../../../utils/businessPartnerDraftUtils";
-import UniversalDraftTable from "./UniversalDraftTable";
 
 const { Option } = Select;
 const inputClass = "border-amber-400 h-8";
@@ -86,7 +73,7 @@ export default function CustomerTab() {
   const [loading, setLoading] = useState(false);
   const [securityType, setSecurityType] = useState(null);
   const [sendingId, setSendingId] = useState(null);
-  const [hasDraft, setHasDraft] = useState(false);
+
   // ── location cascade ──
   const [selCountryIso, setSelCountryIso] = useState(null);
   const [selStateName, setSelStateName] = useState(null);
@@ -97,22 +84,13 @@ export default function CustomerTab() {
    * activeDraftId: the localStorage key currently being auto-saved.
    * null when editing an existing customer (no draft needed) or in view mode.
    */
-  const [activeDraftId, setActiveDraftId] = useState(null);
-  const [draftSavedAt, setDraftSavedAt] = useState(null);
-  const [draftTableKey, setDraftTableKey] = useState(0); // trigger re-render of DraftTable
 
   // Debounce timer ref
-  const autosaveTimer = useRef(null);
 
   const [form] = Form.useForm();
 
   // check draft
-  const checkDraftExists = () => {
-    setHasDraft(hasDrafts("customer"));
-  };
-  useEffect(() => {
-    checkDraftExists();
-  }, [draftTableKey]);
+
   // ── helpers ──────────────────────────────────────────────────────────────
 
   const generatePassword = () => {
@@ -204,147 +182,16 @@ export default function CustomerTab() {
    * Called by Form's onValuesChange.
    * Only runs for new-customer forms (not edit/view).
    */
-  const handleFormValuesChange = useCallback(
-    createAutoSaveHandler(
-      "customer",
-      form,
-      activeDraftId,
-      setActiveDraftId,
-      setDraftSavedAt,
-      setDraftTableKey,
-      selected,
-      viewMode,
-    ),
-    [form, selected, viewMode, activeDraftId],
-  );
 
   // ── DRAFT: manual save ────────────────────────────────────────────────────
 
-  const handleManualSave = createManualSaveHandler(
-    "customer",
-    form,
-    activeDraftId,
-    setActiveDraftId,
-    setDraftSavedAt,
-    setDraftTableKey,
-    selected,
-    viewMode,
-    message,
-  );
-
   // ── DRAFT: continue (load into form) ─────────────────────────────────────
 
-  const handleContinueDraft = (draftId) => {
-    console.log("[CustomerTab] Attempting to continue draft:", draftId);
-
-    // Debug localStorage state in production
-    const storageInfo = debugLocalStorage();
-    if (storageInfo.errors.length > 0) {
-      console.error(
-        "[CustomerTab] localStorage issues detected:",
-        storageInfo.errors,
-      );
-    }
-
-    const draft = loadDraft(draftId);
-    if (!draft) {
-      console.error(
-        "[CustomerTab] Draft not found or failed to load:",
-        draftId,
-      );
-      message.error("Draft not found");
-      return;
-    }
-
-    console.log(
-      "[CustomerTab] Draft loaded successfully, attempting to restore values:",
-      {
-        draftId: draft.id,
-        hasValues: !!draft.values,
-        valuesKeys: Object.keys(draft.values || {}),
-        savedAt: draft.savedAt,
-      },
-    );
-
-    // Restore form values
-    const restored = deserialiseDraftValues(draft.values, dayjs);
-
-    if (!restored || Object.keys(restored).length === 0) {
-      console.error(
-        "[CustomerTab] Failed to restore draft values - empty result:",
-        restored,
-      );
-      message.error("Failed to restore draft data");
-      return;
-    }
-
-    console.log("[CustomerTab] Successfully restored draft values:", {
-      restoredKeys: Object.keys(restored),
-      sampleValues: Object.keys(restored)
-        .slice(0, 3)
-        .reduce((acc, key) => {
-          acc[key] = restored[key];
-          return acc;
-        }, {}),
-    });
-
-    form.resetFields();
-    form.setFieldsValue(restored);
-
-    // Restore location cascade state
-    if (restored.country) {
-      const iso = getCountryIsoByName(restored.country);
-      setSelCountryIso(iso);
-    }
-    if (restored.state) {
-      const countryIso = getCountryIsoByName(restored.country);
-      const stateIso = getStateIsoByName(countryIso, restored.state);
-      setSelStateName(restored.state);
-      setSelStateIso(stateIso);
-    }
-
-    // Restore security type
-    if (restored.securityForCreditFacility) {
-      setSecurityType(restored.securityForCreditFacility);
-    }
-
-    // Check for uploaded files and show warning
-    const hasFiles = Object.keys(restored).some((key) => {
-      const value = restored[key];
-      return Array.isArray(value) && value.length > 0 && value[0]?._fromDraft;
-    });
-
-    if (hasFiles) {
-      message.warning(
-        "Draft restored! Please re-upload any documents as they are not saved in drafts.",
-        5,
-      );
-    }
-
-    // Set active draft so further edits continue saving to this key
-    setActiveDraftId(draftId);
-    setDraftSavedAt(draft.savedAt ? new Date(draft.savedAt) : null);
-
-    setSelected(null);
-    setViewMode(false);
-    setOpen(true);
-  };
-
   // ── DRAFT: discard after successful submit ────────────────────────────────
-
-  const discardActiveDraft = () => {
-    if (activeDraftId) {
-      deleteDraft(activeDraftId);
-      setActiveDraftId(null);
-      setDraftSavedAt(null);
-      setDraftTableKey((k) => k + 1);
-    }
-  };
 
   // ── close / reset modal ───────────────────────────────────────────────────
 
   const closeModal = () => {
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     setOpen(false);
     form.resetFields();
     setSelCountryIso(null);
@@ -357,11 +204,6 @@ export default function CustomerTab() {
 
   // ── close modal from draft table ─────────────────────────────────────────────
 
-  const closeDraftModal = () => {
-    closeModal();
-    // Navigate back to the draft table view
-    setDraftTableKey((k) => k + 1);
-  };
   // delte the customer
   const handleDeleteCustomer = async (customerId) => {
     try {
@@ -517,7 +359,7 @@ export default function CustomerTab() {
 
       setSelected(details);
       setViewMode(view);
-      setActiveDraftId(null); // editing existing customer — no draft tracking
+      // editing existing customer — no draft tracking
       setOpen(true);
     } catch (err) {
       console.error(err);
@@ -655,7 +497,6 @@ export default function CustomerTab() {
         await addAdminCustomer(formData);
         message.success("Customer Added");
         // ✅ Delete draft on successful submit
-        discardActiveDraft();
       }
 
       setOpen(false);
@@ -829,8 +670,7 @@ export default function CustomerTab() {
             setSelected(null);
             setViewMode(false);
             setSecurityType(null);
-            setActiveDraftId(null);
-            setDraftSavedAt(null);
+
             form.resetFields();
             setOpen(true);
           }}
@@ -838,16 +678,6 @@ export default function CustomerTab() {
           Add Customer
         </Button>
       </div>
-      {hasDraft && (
-        <UniversalDraftTable
-          key={draftTableKey}
-          moduleType="customer"
-          refreshTrigger={draftTableKey}
-          onContinue={handleContinueDraft}
-          onDelete={() => setDraftTableKey((k) => k + 1)}
-          onCloseModal={closeDraftModal}
-        />
-      )}
 
       {/* ===== CUSTOMER TABLE ===== */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
@@ -884,49 +714,6 @@ export default function CustomerTab() {
             </span>
 
             {/* Draft indicator — shown only for new-customer forms */}
-            {!selected && !viewMode && (
-              <div className="flex items-center gap-2 ml-2">
-                {activeDraftId ? (
-                  <Tooltip
-                    title={
-                      draftSavedAt
-                        ? `Last auto-saved at ${dayjs(draftSavedAt).format("HH:mm:ss")}`
-                        : "Draft saved"
-                    }
-                  >
-                    <Tag
-                      color="gold"
-                      icon={<SaveOutlined />}
-                      className="cursor-default select-none"
-                    >
-                      Draft saved
-                    </Tag>
-                  </Tooltip>
-                ) : (
-                  <Tag
-                    color="default"
-                    className="cursor-default select-none text-xs"
-                  >
-                    Not saved yet
-                  </Tag>
-                )}
-
-                {/* Manual save button */}
-                <Button
-                  size="small"
-                  icon={<SaveOutlined />}
-                  className="border-amber-400! text-amber-700! hover:bg-amber-100! text-xs!"
-                  onClick={() => {
-                    handleManualSave();
-                    // Navigate to draft table view after saving
-                    closeModal();
-                    setDraftTableKey((k) => k + 1);
-                  }}
-                >
-                  Save Draft
-                </Button>
-              </div>
-            )}
           </div>
         }
         styles={{
@@ -941,7 +728,6 @@ export default function CustomerTab() {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          onValuesChange={handleFormValuesChange}
           onFinishFailed={handleFinishFailed}
         >
           {/* ================= Customer Basic Details ================= */}

@@ -13,6 +13,7 @@ import {
   Upload,
   Popconfirm,
   message,
+  AutoComplete,
 } from "antd";
 import {
   SearchOutlined,
@@ -24,7 +25,7 @@ import {
   UploadOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-
+import AppDatePicker from "../../../../../../components/AppDatePicker.jsx";
 // TODO: point these at your actual API modules
 import {
   getAllVehicles,
@@ -33,6 +34,8 @@ import {
   updateVehicle,
   deleteVehicle,
   getAllVehicleOwner,
+  getallvehicleType,
+  getallPassingWeight,
 } from "../../../../../../api/vehiclemaster.js";
 
 const { Option } = Select;
@@ -51,12 +54,34 @@ export default function VehicleMaster() {
   const [editOpen, setEditOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
-
+  const [vehicleType, setVehileType] = useState(null);
+  const [passingWeight, setPassingWeight] = useState(null);
   useEffect(() => {
     fetchVehicles();
     fetchOwners();
+    fetchllvehicleType();
+    fetchallpassingWeight();
   }, []);
 
+  const fetchllvehicleType = async () => {
+    try {
+      const res = await getallvehicleType();
+      console.log("the vehicletype data", res);
+      setVehileType(res);
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  const fetchallpassingWeight = async () => {
+    try {
+      const res = await getallPassingWeight();
+      console.log("this is the passing weight data", res);
+      setPassingWeight(res);
+    } catch (err) {
+      console.log(err);
+    }
+  };
   /* ---------------- FETCH DATA ---------------- */
   const fetchVehicles = async () => {
     try {
@@ -64,12 +89,31 @@ export default function VehicleMaster() {
 
       const formattedData = (res || []).map((item) => ({
         key: item.id,
-        ownerName: item.transport_owner_name,
-        vehicleType: item.vehicle_type,
+
+        ownerName: item.transport_owner_name, // agar backend de
         vehicleNo: item.vehicle_number,
+        vehicleType: item.vehicle_type,
+        passingWeight: item.passing_weight,
+
         regdDate: item.registration_date,
+
+        engineNo: item.engine_number,
+        chassisNo: item.chassis_number,
+
         insuranceValidUpto: item.insurance_valid_upto,
+        taxPaidUpto: item.tax_paid_upto,
+        fitnessValidUpto: item.fitness_valid_upto,
         permitUpto: item.permit_upto,
+        nationalPermitUpto: item.national_permit_upto,
+
+        gpsSystem: item.gps_available,
+
+        rcCopy: item.rc_copy,
+        chassisCopy: item.chassis_copy,
+        insuranceCopy: item.insurance_copy,
+        taxCopy: item.tax_copy,
+        fitnessCopy: item.fitness_copy,
+        permitCopy: item.permit_copy,
       }));
       setData(formattedData);
     } catch (error) {
@@ -320,13 +364,27 @@ export default function VehicleMaster() {
     //   render: (text) => <span className="text-amber-800">{text}</span>,
     // },
     {
+      title: <span className="text-amber-700 font-semibold">Vehicle No.</span>,
+      dataIndex: "vehicleNo",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Vehicle Owner Name</span>
+      ),
+      dataIndex: "ownerName",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
       title: <span className="text-amber-700 font-semibold">Vehicle Type</span>,
       dataIndex: "vehicleType",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Vehicle No.</span>,
-      dataIndex: "vehicleNo",
+      title: (
+        <span className="text-amber-700 font-semibold">Passing Weight</span>
+      ),
+      dataIndex: "passingWeight",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
@@ -337,6 +395,16 @@ export default function VehicleMaster() {
           {text ? dayjs(text).format(DATE_FORMAT) : "-"}
         </span>
       ),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Engine No.</span>,
+      dataIndex: "engineNo",
+      render: (text) => <span className="text-amber-800">{text}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Chesis No.</span>,
+      dataIndex: "chassisNo",
+      render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
       title: (
@@ -352,12 +420,52 @@ export default function VehicleMaster() {
       ),
     },
     {
+      title: (
+        <span className="text-amber-700 font-semibold">Tax Paid Upto</span>
+      ),
+      dataIndex: "taxPaidUpto",
+      render: (text) => (
+        <span className="text-amber-800">
+          {text ? dayjs(text).format(DATE_FORMAT) : "-"}
+        </span>
+      ),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Fitness Upto</span>,
+      dataIndex: "fitnessValidUpto",
+      render: (text) => (
+        <span className="text-amber-800">
+          {text ? dayjs(text).format(DATE_FORMAT) : "-"}
+        </span>
+      ),
+    },
+    {
       title: <span className="text-amber-700 font-semibold">Permit Upto</span>,
       dataIndex: "permitUpto",
       render: (text) => (
         <span className="text-amber-800">
           {text ? dayjs(text).format(DATE_FORMAT) : "-"}
         </span>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">
+          National Permit Upto
+        </span>
+      ),
+      dataIndex: "nationalPermitUpto",
+      render: (text) => (
+        <span className="text-amber-800">
+          {text ? dayjs(text).format(DATE_FORMAT) : "-"}
+        </span>
+      ),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">GPS System</span>,
+      dataIndex: "gpsSystem",
+      render: (value) => (
+        <span className="text-amber-800">{value ? "Yes" : "No"}</span>
       ),
     },
     {
@@ -439,31 +547,31 @@ export default function VehicleMaster() {
       </Col>
 
       <Col span={8}>
-        <Form.Item
-          label="Vehicle Type / Passing Weight"
-          name="vehicleType"
-          rules={[
-            {
-              required: !disabled,
-              message: "Vehicle Type / Passing Weight is required",
-            },
-          ]}
-        >
-          <Input placeholder="Enter vehicle type" disabled={disabled} />
+        <Form.Item name="vehicleType" label="Vehicle Type">
+          <AutoComplete
+            options={vehicleType?.map((item) => ({
+              value: item,
+            }))}
+            filterOption={(inputValue, option) =>
+              option.value.toLowerCase().includes(inputValue.toLowerCase())
+            }
+          >
+            <Input placeholder="Select or type vehicle type" />
+          </AutoComplete>
         </Form.Item>
       </Col>
       <Col span={8}>
-        <Form.Item
-          label="Passing Weight"
-          name="passingWeight"
-          rules={[
-            {
-              required: !disabled,
-              message: " Passing Weight is required",
-            },
-          ]}
-        >
-          <Input placeholder="Enter vehicle type" disabled={disabled} />
+        <Form.Item name="passingWeight" label="passing weight">
+          <AutoComplete
+            options={vehicleType?.map((item) => ({
+              value: item,
+            }))}
+            filterOption={(inputValue, option) =>
+              option.value.toLowerCase().includes(inputValue.toLowerCase())
+            }
+          >
+            <Input placeholder="Select or type vehicle type" />
+          </AutoComplete>
         </Form.Item>
       </Col>
       <Col span={8}>
@@ -482,11 +590,7 @@ export default function VehicleMaster() {
 
       <Col span={8}>
         <Form.Item label="Regd. Date" name="registrationDate">
-          <DatePicker
-            className="w-full!"
-            format={DATE_FORMAT}
-            disabled={disabled}
-          />
+          <AppDatePicker disabled={disabled} />
         </Form.Item>
       </Col>
 
@@ -516,21 +620,13 @@ export default function VehicleMaster() {
 
       <Col span={8}>
         <Form.Item label="Insurance Valid Upto" name="insuranceValidUpto">
-          <DatePicker
-            className="w-full!"
-            format={DATE_FORMAT}
-            disabled={disabled}
-          />
+          <AppDatePicker disabled={disabled} />
         </Form.Item>
       </Col>
 
       <Col span={8}>
         <Form.Item label="Tax Paid Upto" name="taxPaidUpto">
-          <DatePicker
-            className="w-full!"
-            format={DATE_FORMAT}
-            disabled={disabled}
-          />
+          <AppDatePicker disabled={disabled} />
         </Form.Item>
       </Col>
 
@@ -551,11 +647,7 @@ export default function VehicleMaster() {
 
       <Col span={8}>
         <Form.Item label="Fitness Valid Upto" name="fitnessValidUpto">
-          <DatePicker
-            className="w-full!"
-            format={DATE_FORMAT}
-            disabled={disabled}
-          />
+          <AppDatePicker disabled={disabled} />
         </Form.Item>
       </Col>
 
@@ -569,21 +661,13 @@ export default function VehicleMaster() {
 
       <Col span={8}>
         <Form.Item label="Permit Upto" name="permitUpto">
-          <DatePicker
-            className="w-full!"
-            format={DATE_FORMAT}
-            disabled={disabled}
-          />
+          <AppDatePicker disabled={disabled} />
         </Form.Item>
       </Col>
 
       <Col span={8}>
         <Form.Item label="National Permit Upto" name="nationalPermitUpto">
-          <DatePicker
-            className="w-full!"
-            format={DATE_FORMAT}
-            disabled={disabled}
-          />
+          <AppDatePicker disabled={disabled} />
         </Form.Item>
       </Col>
 
