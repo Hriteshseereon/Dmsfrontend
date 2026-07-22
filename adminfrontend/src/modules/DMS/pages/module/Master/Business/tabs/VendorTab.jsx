@@ -53,19 +53,6 @@ import {
   getCountryIsoByName,
   getStateIsoByName,
 } from "../../../../../../../utils/locationHelper";
-import {
-  createDraft,
-  saveDraft,
-  loadDraft,
-  deleteDraft,
-  deserialiseDraftValues,
-  getAllDrafts,
-  createAutoSaveHandler,
-  createManualSaveHandler,
-  hasDrafts,
-  debugLocalStorage,
-} from "../../../../../../../utils/businessPartnerDraftUtils";
-import UniversalDraftTable from "./UniversalDraftTable";
 
 import { API_BASE_URL } from "@/utils/config";
 
@@ -102,11 +89,6 @@ export default function VendorTab() {
   const [corpDistrict, setCorpDistrict] = useState(null);
   const [form] = Form.useForm();
   const [selDistrict, setSelDistrict] = useState(null);
-  // draft state
-  const [activeDraftId, setActiveDraftId] = useState(null);
-  const [draftSavedAt, setDraftSavedAt] = useState(null);
-  const [draftTableKey, setDraftTableKey] = useState(0);
-  const [hasDraft, setHasDraft] = useState(false);
 
   const companyGroupOptions = companyGroups.map((item) => ({
     label: item.name,
@@ -125,47 +107,12 @@ export default function VendorTab() {
   useEffect(() => {
     getCompanyGroups();
   }, []);
-  // check draft
-  const checkDraftExists = () => {
-    setHasDraft(hasDrafts("vendor"));
-  };
-  useEffect(() => {
-    checkDraftExists();
-  }, [draftTableKey]);
 
   // Auto-save handler
-  const handleFormValuesChange = useCallback(
-    createAutoSaveHandler(
-      "vendor",
-      form,
-      activeDraftId,
-      setActiveDraftId,
-      setDraftSavedAt,
-      setDraftTableKey,
-      selected,
-      viewMode,
-    ),
-    [form, selected, viewMode, activeDraftId],
-  );
 
   // Manual save handler
-  const handleManualSave = createManualSaveHandler(
-    "vendor",
-    form,
-    activeDraftId,
-    setActiveDraftId,
-    setDraftSavedAt,
-    setDraftTableKey,
-    selected,
-    viewMode,
-    message,
-  );
 
   // Close modal from draft table
-  const closeDraftModal = () => {
-    closeModal();
-    setDraftTableKey((k) => k + 1);
-  };
 
   // ── helpers ──────────────────────────────────────────────────────────────
   const fileFromUrl = (url) => {
@@ -236,112 +183,8 @@ export default function VendorTab() {
     }
   };
   // ── DRAFT: continue (restore into form) ──────────────────────────────────
-  const handleContinueDraft = (draftId) => {
-    console.log("[VendorTab] Attempting to continue draft:", draftId);
-
-    // Debug localStorage state in production
-    const storageInfo = debugLocalStorage();
-    if (storageInfo.errors.length > 0) {
-      console.error(
-        "[VendorTab] localStorage issues detected:",
-        storageInfo.errors,
-      );
-    }
-
-    const draft = loadDraft(draftId);
-    if (!draft) {
-      console.error("[VendorTab] Draft not found or failed to load:", draftId);
-      message.error("Draft not found");
-      return;
-    }
-
-    console.log(
-      "[VendorTab] Draft loaded successfully, attempting to restore values:",
-      {
-        draftId: draft.id,
-        hasValues: !!draft.values,
-        valuesKeys: Object.keys(draft.values || {}),
-        savedAt: draft.savedAt,
-      },
-    );
-
-    const restored = deserialiseDraftValues(draft.values, dayjs);
-
-    if (!restored || Object.keys(restored).length === 0) {
-      console.error(
-        "[VendorTab] Failed to restore draft values - empty result:",
-        restored,
-      );
-      message.error("Failed to restore draft data");
-      return;
-    }
-
-    console.log("[VendorTab] Successfully restored draft values:", {
-      restoredKeys: Object.keys(restored),
-      sampleValues: Object.keys(restored)
-        .slice(0, 3)
-        .reduce((acc, key) => {
-          acc[key] = restored[key];
-          return acc;
-        }, {}),
-    });
-
-    form.resetFields();
-    form.setFieldsValue(restored);
-
-    // restore top-level location cascade
-    if (restored.country) {
-      const iso = getCountryIsoByName(restored.country) || "IN";
-      setSelCountryIso(iso);
-    }
-    if (restored.state) {
-      const countryIso = getCountryIsoByName(restored.country) || "IN";
-      const stateIso = getStateIsoByName(countryIso, restored.state);
-      setSelStateName(restored.state);
-      setSelStateIso(stateIso);
-    }
-
-    // Check for uploaded files and show warning
-    const hasFiles = Object.keys(restored).some((key) => {
-      const value = restored[key];
-      return Array.isArray(value) && value.length > 0 && value[0]?._fromDraft;
-    });
-
-    // Also check nested plants for files
-    const hasPlantFiles =
-      Array.isArray(restored.plants) &&
-      restored.plants.some((plant) => {
-        if (!plant) return false;
-        return Object.keys(plant).some((key) => {
-          const value = plant[key];
-          return (
-            Array.isArray(value) && value.length > 0 && value[0]?._fromDraft
-          );
-        });
-      });
-
-    if (hasFiles || hasPlantFiles) {
-      message.warning(
-        "Draft restored! Please re-upload any documents as they are not saved in drafts.",
-        5,
-      );
-    }
-
-    setActiveDraftId(draftId);
-    setDraftSavedAt(draft.savedAt ? new Date(draft.savedAt) : null);
-    setSelected(null);
-    setViewMode(false);
-    setOpen(true);
-  };
 
   // ── DRAFT: discard on submit ──────────────────────────────────────────────
-  const discardActiveDraft = () => {
-    if (!activeDraftId) return;
-    deleteDraft(activeDraftId);
-    setActiveDraftId(null);
-    setDraftSavedAt(null);
-    setDraftTableKey((k) => k + 1);
-  };
 
   // ── close modal ───────────────────────────────────────────────────────────
   const closeModal = () => {
@@ -353,16 +196,6 @@ export default function VendorTab() {
     setSelected(null);
     // draft stays in localStorage until submitted
   };
-
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (!selected && !viewMode && open) {
-        saveCurrentDraft();
-      }
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [open, selected, viewMode]);
 
   // ── MAP API → FORM ────────────────────────────────────────────────────────
   const mapDetailsToForm = (d) => {
@@ -511,7 +344,7 @@ export default function VendorTab() {
       }
       setSelected(details);
       setViewMode(view);
-      setActiveDraftId(null);
+
       setOpen(true);
     } catch {
       message.error("Failed to load vendor");
@@ -621,7 +454,6 @@ export default function VendorTab() {
       } else {
         await createVendor(formData);
         message.success("Vendor Created");
-        discardActiveDraft(); // ✅ delete draft on successful submit
       }
       setOpen(false);
       form.resetFields();
@@ -811,8 +643,7 @@ export default function VendorTab() {
           onClick={() => {
             setSelected(null);
             setViewMode(false);
-            setActiveDraftId(null);
-            setDraftSavedAt(null);
+
             form.resetFields();
             setOpen(true);
           }}
@@ -820,16 +651,7 @@ export default function VendorTab() {
           Add Supplier
         </Button>
       </div>
-      {hasDraft && (
-        <UniversalDraftTable
-          key={draftTableKey}
-          moduleType="vendor"
-          refreshTrigger={draftTableKey}
-          onContinue={handleContinueDraft}
-          onDelete={() => setDraftTableKey((k) => k + 1)}
-          onCloseModal={closeDraftModal}
-        />
-      )}
+
       {/* ===== SUPPLIER TABLE ===== */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
@@ -864,47 +686,6 @@ export default function VendorTab() {
             </span>
 
             {/* Draft indicator — only for new-supplier forms */}
-            {!selected && !viewMode && (
-              <div className="flex items-center gap-2 ml-2">
-                {activeDraftId ? (
-                  <Tooltip
-                    title={
-                      draftSavedAt
-                        ? `Last auto-saved at ${dayjs(draftSavedAt).format("HH:mm:ss")}`
-                        : "Draft saved"
-                    }
-                  >
-                    <Tag
-                      color="gold"
-                      icon={<SaveOutlined />}
-                      className="cursor-default select-none"
-                    >
-                      Draft saved
-                    </Tag>
-                  </Tooltip>
-                ) : (
-                  <Tag
-                    color="default"
-                    className="cursor-default select-none text-xs"
-                  >
-                    Not saved yet
-                  </Tag>
-                )}
-                <Button
-                  size="small"
-                  icon={<SaveOutlined />}
-                  className="border-amber-400! text-amber-700! hover:bg-amber-100! text-xs!"
-                  onClick={() => {
-                    handleManualSave();
-                    // Navigate to draft table view after saving
-                    closeModal();
-                    setDraftTableKey((k) => k + 1);
-                  }}
-                >
-                  Save Draft
-                </Button>
-              </div>
-            )}
           </div>
         }
         styles={{
@@ -915,7 +696,6 @@ export default function VendorTab() {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          onValuesChange={handleFormValuesChange}
           initialValues={{
             status: "Active",
             igstApplicable: "No",
