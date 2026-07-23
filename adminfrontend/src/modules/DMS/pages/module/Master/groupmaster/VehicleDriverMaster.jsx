@@ -513,7 +513,12 @@ export default function VehicleDriverMaster() {
 
       {/* ---------------- TABLE ---------------- */}
       <div className="border border-amber-300 rounded-lg p-4 bg-white shadow-md">
-        <Table columns={columns} dataSource={filteredData} rowKey="key" />
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          rowKey="key"
+          size="small"
+        />
       </div>
 
       {/* ---------------- ADD MODAL ---------------- */}

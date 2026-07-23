@@ -352,140 +352,153 @@ export default function VehicleMaster() {
 
   /* ---------------- TABLE COLUMNS ---------------- */
   const columns = [
-    // {
-    //   title: (
-    //     <span className="text-amber-700 font-semibold">
-    //       Owner / Transport Name
-    //     </span>
-    //   ),
-    //   dataIndex: "ownerName",
-    //   render: (text) => <span className="text-amber-800">{text}</span>,
-    // },
     {
       title: <span className="text-amber-700 font-semibold">Vehicle No.</span>,
       dataIndex: "vehicleNo",
-      render: (text) => <span className="text-amber-800">{text}</span>,
+      width: 130,
+      fixed: "left",
+      render: (text) => (
+        <span className="text-amber-800 whitespace-nowrap">{text || "-"}</span>
+      ),
     },
     {
-      title: (
-        <span className="text-amber-700 font-semibold">Vehicle Owner Name</span>
-      ),
+      title: <span className="text-amber-700 font-semibold">Owner</span>,
       dataIndex: "ownerName",
-      render: (text) => <span className="text-amber-800">{text}</span>,
+      width: 180,
+      ellipsis: true,
+      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Vehicle Type</span>,
+      title: <span className="text-amber-700 font-semibold">Type</span>,
       dataIndex: "vehicleType",
-      render: (text) => <span className="text-amber-800">{text}</span>,
+      width: 120,
+      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
     {
-      title: (
-        <span className="text-amber-700 font-semibold">Passing Weight</span>
-      ),
+      title: <span className="text-amber-700 font-semibold">Weight</span>,
       dataIndex: "passingWeight",
-      render: (text) => <span className="text-amber-800">{text}</span>,
+      width: 110,
+      align: "center",
+      render: (text) => (
+        <span className="text-amber-800 whitespace-nowrap">{text || "-"}</span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Regd. Date</span>,
       dataIndex: "regdDate",
+      width: 120,
+      align: "center",
       render: (text) => (
-        <span className="text-amber-800">
+        <span className="text-amber-800 whitespace-nowrap">
           {text ? dayjs(text).format(DATE_FORMAT) : "-"}
         </span>
       ),
     },
     {
-      title: <span className="text-amber-700 font-semibold">Engine No.</span>,
-      dataIndex: "engineNo",
-      render: (text) => <span className="text-amber-800">{text}</span>,
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Chesis No.</span>,
+      title: <span className="text-amber-700 font-semibold">Chassis No.</span>,
       dataIndex: "chassisNo",
-      render: (text) => <span className="text-amber-800">{text}</span>,
+      width: 210,
+      ellipsis: true,
+      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
     {
       title: (
-        <span className="text-amber-700 font-semibold">
-          Insurance Valid Upto
-        </span>
+        <span className="text-amber-700 font-semibold">Insurance Valid</span>
       ),
       dataIndex: "insuranceValidUpto",
+      width: 125,
+      align: "center",
       render: (text) => (
-        <span className="text-amber-800">
+        <span className="text-amber-800 whitespace-nowrap">
           {text ? dayjs(text).format(DATE_FORMAT) : "-"}
         </span>
       ),
     },
     {
-      title: (
-        <span className="text-amber-700 font-semibold">Tax Paid Upto</span>
-      ),
+      title: <span className="text-amber-700 font-semibold">Tax Valid</span>,
       dataIndex: "taxPaidUpto",
+      width: 120,
+      align: "center",
       render: (text) => (
-        <span className="text-amber-800">
-          {text ? dayjs(text).format(DATE_FORMAT) : "-"}
-        </span>
-      ),
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Fitness Upto</span>,
-      dataIndex: "fitnessValidUpto",
-      render: (text) => (
-        <span className="text-amber-800">
-          {text ? dayjs(text).format(DATE_FORMAT) : "-"}
-        </span>
-      ),
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Permit Upto</span>,
-      dataIndex: "permitUpto",
-      render: (text) => (
-        <span className="text-amber-800">
+        <span className="text-amber-800 whitespace-nowrap">
           {text ? dayjs(text).format(DATE_FORMAT) : "-"}
         </span>
       ),
     },
     {
       title: (
-        <span className="text-amber-700 font-semibold">
-          National Permit Upto
+        <span className="text-amber-700 font-semibold">Fitness Valid</span>
+      ),
+      dataIndex: "fitnessValidUpto",
+      width: 120,
+      align: "center",
+      render: (text) => (
+        <span className="text-amber-800 whitespace-nowrap">
+          {text ? dayjs(text).format(DATE_FORMAT) : "-"}
         </span>
+      ),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Permit Valid</span>,
+      dataIndex: "permitUpto",
+      width: 120,
+      align: "center",
+      render: (text) => (
+        <span className="text-amber-800 whitespace-nowrap">
+          {text ? dayjs(text).format(DATE_FORMAT) : "-"}
+        </span>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">N. Permit Valid</span>
       ),
       dataIndex: "nationalPermitUpto",
+      width: 130,
+      align: "center",
       render: (text) => (
-        <span className="text-amber-800">
+        <span className="text-amber-800 whitespace-nowrap">
           {text ? dayjs(text).format(DATE_FORMAT) : "-"}
         </span>
       ),
     },
     {
-      title: <span className="text-amber-700 font-semibold">GPS System</span>,
+      title: <span className="text-amber-700 font-semibold">GPS</span>,
       dataIndex: "gpsSystem",
+      width: 80,
+      align: "center",
       render: (value) => (
-        <span className="text-amber-800">{value ? "Yes" : "No"}</span>
+        <span
+          className={`font-medium ${value ? "text-green-600" : "text-red-500"}`}
+        >
+          {value ? "Yes" : "No"}
+        </span>
       ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       width: 120,
+      fixed: "right",
+      align: "center",
       render: (_, record) => (
-        <div className="flex gap-3">
+        <div className="flex items-center justify-center gap-3">
           <EyeOutlined
-            className="cursor-pointer! text-red-500! hover:text-red-600!"
+            className="cursor-pointer text-red-500 hover:text-red-600"
             onClick={() => handleViewClick(record.key)}
           />
+
           <EditOutlined
-            className="cursor-pointer! text-blue-500! hover:text-blue-600!"
+            className="cursor-pointer text-blue-500 hover:text-blue-600"
             onClick={() => handleEditClick(record.key)}
           />
+
           <Popconfirm
             title="Are you sure to delete this vehicle?"
             onConfirm={() => handleDeleteClick(record.key)}
             okText="Yes"
             cancelText="No"
           >
-            <DeleteOutlined className="cursor-pointer! text-gray-500! hover:text-gray-700!" />
+            <DeleteOutlined className="cursor-pointer text-gray-500 hover:text-gray-700" />
           </Popconfirm>
         </div>
       ),
@@ -719,7 +732,14 @@ export default function VehicleMaster() {
 
       {/* ---------------- TABLE ---------------- */}
       <div className="border border-amber-300 rounded-lg p-4 bg-white shadow-md">
-        <Table columns={columns} dataSource={filteredData} rowKey="key" />
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          rowKey="key"
+          size="small"
+          // bordered
+          scroll={{ x: 1700 }}
+        />
       </div>
 
       {/* ---------------- ADD MODAL ---------------- */}
