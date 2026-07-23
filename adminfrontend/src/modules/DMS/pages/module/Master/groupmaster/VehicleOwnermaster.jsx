@@ -13,6 +13,7 @@ import {
   Popconfirm,
   message,
   Radio,
+  AutoComplete,
 } from "antd";
 import {
   SearchOutlined,
@@ -31,6 +32,7 @@ import {
   getVehicleOwnerById,
   updateVehicleOwner,
   deleteVehicleOwner,
+  getallAddressOfOwner,
 } from "../../../../../../api/vehiclemaster.js";
 
 const { Option } = Select;
@@ -48,11 +50,31 @@ export default function VehicleOwnerMaster() {
   const [editOpen, setEditOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState(null);
-
+  const [addressOptions, setAddressOptions] = useState({
+    countries: [],
+    states: [],
+    districts: [],
+    cities: [],
+  });
   useEffect(() => {
     fetchVehicleOwners();
+    fetchAddressOptions();
   }, []);
 
+  const fetchAddressOptions = async () => {
+    try {
+      const res = await getallAddressOfOwner();
+
+      setAddressOptions({
+        countries: [...new Set(res?.countries || [])],
+        states: [...new Set(res?.states || [])],
+        districts: [...new Set(res?.districts || [])],
+        cities: [...new Set(res?.cities || [])],
+      });
+    } catch (err) {
+      console.log(err);
+    }
+  };
   /* ---------------- FETCH DATA ---------------- */
   const fetchVehicleOwners = async () => {
     try {
@@ -61,7 +83,7 @@ export default function VehicleOwnerMaster() {
         key: item.id,
         firmName: item.firm_name,
         ownerName: item.owner_name,
-        location: item.location,
+        location: item.city,
         contactPerson: item.contact_person,
         mobileNo: item.mobile,
         panNo: item.pan_number,
@@ -281,7 +303,7 @@ export default function VehicleOwnerMaster() {
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Location</span>,
+      title: <span className="text-amber-700 font-semibold">City</span>,
       dataIndex: "location",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
@@ -433,25 +455,59 @@ export default function VehicleOwnerMaster() {
       </Col>
       <Col span={6}>
         <Form.Item label="City" name="city">
-          <Input placeholder="Enter city" disabled={disabled} />
+          <AutoComplete
+            options={addressOptions.cities.map((item) => ({
+              value: item,
+            }))}
+            filterOption={(inputValue, option) =>
+              option.value.toLowerCase().includes(inputValue.toLowerCase())
+            }
+          ></AutoComplete>
         </Form.Item>
       </Col>
 
       <Col span={6}>
         <Form.Item label="District" name="district">
-          <Input placeholder="Enter district" disabled={disabled} />
+          <AutoComplete
+            options={addressOptions.districts.map((item) => ({
+              value: item,
+            }))}
+            filterOption={(inputValue, option) =>
+              option.value.toLowerCase().includes(inputValue.toLowerCase())
+            }
+          >
+            <Input placeholder="Enter or select district" disabled={disabled} />
+          </AutoComplete>
         </Form.Item>
       </Col>
 
       <Col span={6}>
         <Form.Item label="State" name="state">
-          <Input placeholder="Enter state" disabled={disabled} />
+          <AutoComplete
+            options={addressOptions.states.map((item) => ({
+              value: item,
+            }))}
+            filterOption={(inputValue, option) =>
+              option.value.toLowerCase().includes(inputValue.toLowerCase())
+            }
+          >
+            <Input placeholder="Enter or select state" disabled={disabled} />
+          </AutoComplete>
         </Form.Item>
       </Col>
 
       <Col span={6}>
         <Form.Item label="Country" name="country">
-          <Input placeholder="Enter country" disabled={disabled} />
+          <AutoComplete
+            options={addressOptions.countries.map((item) => ({
+              value: item,
+            }))}
+            filterOption={(inputValue, option) =>
+              option.value.toLowerCase().includes(inputValue.toLowerCase())
+            }
+          >
+            <Input placeholder="Enter or select country" disabled={disabled} />
+          </AutoComplete>
         </Form.Item>
       </Col>
       <Col span={8}>
@@ -660,7 +716,12 @@ export default function VehicleOwnerMaster() {
 
       {/* ---------------- TABLE ---------------- */}
       <div className="border border-amber-300 rounded-lg p-4 bg-white shadow-md">
-        <Table columns={columns} dataSource={filteredData} rowKey="key" />
+        <Table
+          columns={columns}
+          dataSource={filteredData}
+          rowKey="key"
+          size="small"
+        />
       </div>
 
       {/* ---------------- ADD MODAL ---------------- */}

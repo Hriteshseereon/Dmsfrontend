@@ -266,3 +266,16 @@ export const getallPassingWeight  = async () => {
 
   return res.data;
 }
+
+// get all address for the data  
+
+export const getallAddressOfOwner =  async () => {
+  const res  = await api.get("/transport/transport-owner-masters/unique-addresses/")
+ 
+  return res.data;
+}
+
+export const getallAddressOfDriver = async () => {
+  const res = await api.get("/transport/driver-masters/unique-addresses/");
+  return res.data;
+};
