@@ -66,8 +66,10 @@ export default function VehicleMaster() {
   const fetchllvehicleType = async () => {
     try {
       const res = await getallvehicleType();
-      console.log("the vehicletype data", res);
-      setVehileType(res);
+
+      const uniqueVehicleTypes = [...new Set((res || []).filter(Boolean))];
+
+      setVehileType(uniqueVehicleTypes);
     } catch (err) {
       console.log(err);
     }
@@ -76,8 +78,10 @@ export default function VehicleMaster() {
   const fetchallpassingWeight = async () => {
     try {
       const res = await getallPassingWeight();
-      console.log("this is the passing weight data", res);
-      setPassingWeight(res);
+
+      const uniquePassingWeights = [...new Set((res || []).filter(Boolean))];
+
+      setPassingWeight(uniquePassingWeights);
     } catch (err) {
       console.log(err);
     }
@@ -483,12 +487,12 @@ export default function VehicleMaster() {
       render: (_, record) => (
         <div className="flex items-center justify-center gap-3">
           <EyeOutlined
-            className="cursor-pointer text-red-500 hover:text-red-600"
+            className="cursor-pointer !text-red-500 hover:text-red-600"
             onClick={() => handleViewClick(record.key)}
           />
 
           <EditOutlined
-            className="cursor-pointer text-blue-500 hover:text-blue-600"
+            className="cursor-pointer !text-blue-500 hover:text-blue-600"
             onClick={() => handleEditClick(record.key)}
           />
 
@@ -498,7 +502,7 @@ export default function VehicleMaster() {
             okText="Yes"
             cancelText="No"
           >
-            <DeleteOutlined className="cursor-pointer text-gray-500 hover:text-gray-700" />
+            <DeleteOutlined className="cursor-pointer !text-gray-500 hover:text-gray-700" />
           </Popconfirm>
         </div>
       ),
@@ -571,17 +575,18 @@ export default function VehicleMaster() {
           </AutoComplete>
         </Form.Item>
       </Col>
+
       <Col span={8}>
-        <Form.Item name="passingWeight" label="passing weight">
+        <Form.Item name="passingWeight" label="Passing Weight">
           <AutoComplete
-            options={vehicleType?.map((item) => ({
+            options={passingWeight?.map((item) => ({
               value: item,
             }))}
             filterOption={(inputValue, option) =>
               option.value.toLowerCase().includes(inputValue.toLowerCase())
             }
           >
-            <Input placeholder="Select or type vehicle type" />
+            <Input placeholder="Select or type passing weight" />
           </AutoComplete>
         </Form.Item>
       </Col>

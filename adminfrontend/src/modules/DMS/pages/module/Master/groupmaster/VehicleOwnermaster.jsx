@@ -61,7 +61,7 @@ export default function VehicleOwnerMaster() {
         key: item.id,
         firmName: item.firm_name,
         ownerName: item.owner_name,
-        location: item.location,
+        location: item.city,
         contactPerson: item.contact_person,
         mobileNo: item.mobile,
         panNo: item.pan_number,
@@ -281,7 +281,7 @@ export default function VehicleOwnerMaster() {
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Location</span>,
+      title: <span className="text-amber-700 font-semibold">City</span>,
       dataIndex: "location",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },

@@ -80,6 +80,7 @@ export default function VehicleDriverMaster() {
         driverMobileNo: item.driver_mobile,
         helperName: item.helper_name,
         helperMobileNo: item.helper_mobile,
+        location: item.city,
       }));
       setData(formattedData);
     } catch (error) {
@@ -247,8 +248,8 @@ export default function VehicleDriverMaster() {
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Location</span>,
-      dataIndex: "driverName",
+      title: <span className="text-amber-700 font-semibold">City</span>,
+      dataIndex: "location",
       render: (text) => <span className="text-amber-800">{text}</span>,
     },
     {
