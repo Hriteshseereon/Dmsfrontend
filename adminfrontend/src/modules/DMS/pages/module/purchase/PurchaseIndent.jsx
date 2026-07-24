@@ -168,6 +168,9 @@ export default function PurchaseIndent() {
   const [whatsappGroups, setWhatsappGroups] = useState([]);
   const [whatsappForm] = Form.useForm();
 
+  // ---------------------------------------------------------------
+  const [isPoContractsModalOpen, setIsPoContractsModalOpen] = useState(false);
+  const [selectedPoForContracts, setSelectedPoForContracts] = useState(null);
   useEffect(() => {
     fetchPurchaseOrder();
   }, []);
@@ -676,7 +679,10 @@ export default function PurchaseIndent() {
       setLoading(false);
     }
   };
-
+  const openPoContractsModal = (record) => {
+    setSelectedPoForContracts(record);
+    setIsPoContractsModalOpen(true);
+  };
   const openEditModal = async (record) => {
     try {
       setLoading(true);
@@ -1554,7 +1560,15 @@ export default function PurchaseIndent() {
       title: <span className="text-amber-700 font-semibold">Order No</span>,
       dataIndex: "order_number",
       width: 120,
-      render: (t) => <span className="text-amber-800">{t}</span>,
+      render: (t, record) => (
+        <span
+          className="text-amber-800 font-semibold cursor-pointer"
+          onDoubleClick={() => openPoContractsModal(record)}
+          title="Double click to view sale contracts"
+        >
+          {t}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Order Date</span>,
@@ -1694,20 +1708,20 @@ export default function PurchaseIndent() {
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       width: 100,
-      render: (_, record) => (
-        <div className="flex gap-3">
-          <EyeOutlined
-            className="cursor-pointer text-blue-500"
-            onClick={() => openViewModal(record)}
-          />
-          {record.status !== "Approved" && (
-            <EditOutlined
-              className="cursor-pointer text-red-500"
-              onClick={() => openEditModal(record)}
-            />
-          )}
-        </div>
-      ),
+      // render: (_, record) => (
+      //   <div className="flex gap-3">
+      //     <EyeOutlined
+      //       className="cursor-pointer text-blue-500"
+      //       onClick={() => openViewModal(record)}
+      //     />
+      //     {record.status !== "Approved" && (
+      //       <EditOutlined
+      //         className="cursor-pointer text-red-500"
+      //         onClick={() => openEditModal(record)}
+      //       />
+      //     )}
+      //   </div>
+      // ),
     },
   ];
 
@@ -1868,6 +1882,45 @@ export default function PurchaseIndent() {
         />
       </div>
 
+      {/* purchase order linked sale contract show */}
+      <Modal
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Sale Contracts - {selectedPoForContracts?.order_number}
+          </span>
+        }
+        open={isPoContractsModalOpen}
+        onCancel={() => {
+          setIsPoContractsModalOpen(false);
+          setSelectedPoForContracts(null);
+        }}
+        footer={null}
+        width={1600}
+      >
+        <Card
+          size="small"
+          style={{ border: "1px solid #FDE68A" }}
+          bodyStyle={{ padding: 12 }}
+        >
+          <div className="flex justify-between items-center mb-3">
+            <h6 className="text-amber-500 mb-0">Linked Sale Contracts</h6>
+
+            <span className="text-sm text-amber-700 font-semibold">
+              {selectedPoForContracts?.sales_contracts?.length || 0} Contract(s)
+            </span>
+          </div>
+
+          <Table
+            columns={contractColumns}
+            dataSource={(selectedPoForContracts?.sales_contracts || []).map(
+              mapContractRecord,
+            )}
+            pagination={false}
+            scroll={{ y: 360, x: 1200 }}
+            rowKey="key"
+          />
+        </Card>
+      </Modal>
       {/* ── Add / Edit Purchase Order Modal ── */}
       <Modal
         title={
