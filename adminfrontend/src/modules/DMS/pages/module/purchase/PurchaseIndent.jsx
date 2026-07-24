@@ -168,6 +168,9 @@ export default function PurchaseIndent() {
   const [whatsappGroups, setWhatsappGroups] = useState([]);
   const [whatsappForm] = Form.useForm();
 
+  // ---------------------------------------------------------------
+  const [isPoContractsModalOpen, setIsPoContractsModalOpen] = useState(false);
+  const [selectedPoForContracts, setSelectedPoForContracts] = useState(null);
   useEffect(() => {
     fetchPurchaseOrder();
   }, []);
@@ -562,37 +565,69 @@ export default function PurchaseIndent() {
   // Fetch selectable sale contracts: same list API used on the Sales
   // Contract page, filtered client-side to Approved + optional date range.
   // ---------------------------------------------------------------
-  const fetchAvailableContracts = async () => {
+  const fetchAvailableContracts = async (range = null) => {
     try {
       setContractsLoading(true);
+
       const res = await getSalescontractGroups();
       const list = res?.data || res || [];
 
-      const startDate = contractDateRange?.[0];
-      const endDate = contractDateRange?.[1];
+      console.log("All Sale Contracts:", list);
 
-      // Only Approved sale contracts are selectable for linking to a purchase order
+      let currentRange = range;
+
+      // Default range = oldest Valid From -> Today
+      if (!currentRange && list.length > 0) {
+        const validFromDates = list
+          .map((c) => parseApiDate(c.from_date))
+          .filter((date) => date && date.isValid());
+
+        if (validFromDates.length > 0) {
+          const oldestDate = validFromDates.reduce((oldest, current) =>
+            current.isBefore(oldest) ? current : oldest,
+          );
+
+          currentRange = [oldestDate.startOf("day"), dayjs().endOf("day")];
+
+          setContractDateRange(currentRange);
+        }
+      }
+
+      const startDate = currentRange?.[0];
+      const endDate = currentRange?.[1];
+
+      // Approved + Valid From date filter
       const approved = list.filter((c) => {
-        const isApproved = c.status && c.status.toLowerCase() === "approved";
+        const isApproved = c.status?.toLowerCase() === "approved";
+
         if (!isApproved) return false;
 
         if (startDate && endDate) {
-          const contractDate = c.created_date ? dayjs(c.created_date) : null;
-          if (contractDate && contractDate.isValid()) {
-            return (
-              !contractDate.isBefore(startDate, "day") &&
-              !contractDate.isAfter(endDate, "day")
-            );
+          // IMPORTANT: Valid From date
+          const contractDate = parseApiDate(c.from_date);
+
+          if (!contractDate || !contractDate.isValid()) {
+            return false;
           }
+
+          return (
+            !contractDate.isBefore(startDate, "day") &&
+            !contractDate.isAfter(endDate, "day")
+          );
         }
+
         return true;
       });
 
+      console.log("Approved Filtered Contracts:", approved);
+
       const formatted = approved.map(mapContractRecord);
+
       setAvailableContracts(formatted);
+
       return formatted;
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load sale contracts:", err);
       message.error("Failed to load available sale contracts");
       return [];
     } finally {
@@ -601,11 +636,11 @@ export default function PurchaseIndent() {
   };
 
   // Reactively fetch when dates or mode change
-  useEffect(() => {
-    if (modalMode === "add" || modalMode === "edit") {
-      fetchAvailableContracts();
-    }
-  }, [contractDateRange, modalMode]);
+  // useEffect(() => {
+  //   if (modalMode === "add" || modalMode === "edit") {
+  //     fetchAvailableContracts();
+  //   }
+  // }, [contractDateRange, modalMode]);
 
   // ---------------------------------------------------------------
   // Modal open/close
@@ -618,13 +653,14 @@ export default function PurchaseIndent() {
     setContractSearch("");
   };
 
-  const openAddModal = () => {
+  const openAddModal = async () => {
     setModalMode("add");
     setSelectedRecord(null);
     setSelectedRowKeys([]);
     setStatusValue("Fresh");
     setContractSearch("");
-    fetchAvailableContracts();
+    setContractDateRange(null);
+    await fetchAvailableContracts(null);
   };
 
   const openViewModal = async (record) => {
@@ -643,7 +679,10 @@ export default function PurchaseIndent() {
       setLoading(false);
     }
   };
-
+  const openPoContractsModal = (record) => {
+    setSelectedPoForContracts(record);
+    setIsPoContractsModalOpen(true);
+  };
   const openEditModal = async (record) => {
     try {
       setLoading(true);
@@ -1521,7 +1560,15 @@ export default function PurchaseIndent() {
       title: <span className="text-amber-700 font-semibold">Order No</span>,
       dataIndex: "order_number",
       width: 120,
-      render: (t) => <span className="text-amber-800">{t}</span>,
+      render: (t, record) => (
+        <span
+          className="text-amber-800 font-semibold cursor-pointer"
+          onDoubleClick={() => openPoContractsModal(record)}
+          title="Double click to view sale contracts"
+        >
+          {t}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Order Date</span>,
@@ -1661,20 +1708,20 @@ export default function PurchaseIndent() {
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       width: 100,
-      render: (_, record) => (
-        <div className="flex gap-3">
-          <EyeOutlined
-            className="cursor-pointer text-blue-500"
-            onClick={() => openViewModal(record)}
-          />
-          {record.status !== "Approved" && (
-            <EditOutlined
-              className="cursor-pointer text-red-500"
-              onClick={() => openEditModal(record)}
-            />
-          )}
-        </div>
-      ),
+      // render: (_, record) => (
+      //   <div className="flex gap-3">
+      //     <EyeOutlined
+      //       className="cursor-pointer text-blue-500"
+      //       onClick={() => openViewModal(record)}
+      //     />
+      //     {record.status !== "Approved" && (
+      //       <EditOutlined
+      //         className="cursor-pointer text-red-500"
+      //         onClick={() => openEditModal(record)}
+      //       />
+      //     )}
+      //   </div>
+      // ),
     },
   ];
 
@@ -1698,7 +1745,11 @@ export default function PurchaseIndent() {
       title: <span className="text-amber-700 font-semibold">Broker Name</span>,
       dataIndex: "brokerName",
       width: 120,
-      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+      render: (t) => (
+        <span className="text-amber-800">
+          {t && t !== "-" ? t.trim().split(/\s+/)[0] : "Direct"}
+        </span>
+      ),
     },
     {
       title: (
@@ -1831,6 +1882,45 @@ export default function PurchaseIndent() {
         />
       </div>
 
+      {/* purchase order linked sale contract show */}
+      <Modal
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Sale Contracts - {selectedPoForContracts?.order_number}
+          </span>
+        }
+        open={isPoContractsModalOpen}
+        onCancel={() => {
+          setIsPoContractsModalOpen(false);
+          setSelectedPoForContracts(null);
+        }}
+        footer={null}
+        width={1600}
+      >
+        <Card
+          size="small"
+          style={{ border: "1px solid #FDE68A" }}
+          bodyStyle={{ padding: 12 }}
+        >
+          <div className="flex justify-between items-center mb-3">
+            <h6 className="text-amber-500 mb-0">Linked Sale Contracts</h6>
+
+            <span className="text-sm text-amber-700 font-semibold">
+              {selectedPoForContracts?.sales_contracts?.length || 0} Contract(s)
+            </span>
+          </div>
+
+          <Table
+            columns={contractColumns}
+            dataSource={(selectedPoForContracts?.sales_contracts || []).map(
+              mapContractRecord,
+            )}
+            pagination={false}
+            scroll={{ y: 360, x: 1200 }}
+            rowKey="key"
+          />
+        </Card>
+      </Modal>
       {/* ── Add / Edit Purchase Order Modal ── */}
       <Modal
         title={
