@@ -562,37 +562,69 @@ export default function PurchaseIndent() {
   // Fetch selectable sale contracts: same list API used on the Sales
   // Contract page, filtered client-side to Approved + optional date range.
   // ---------------------------------------------------------------
-  const fetchAvailableContracts = async () => {
+  const fetchAvailableContracts = async (range = null) => {
     try {
       setContractsLoading(true);
+
       const res = await getSalescontractGroups();
       const list = res?.data || res || [];
 
-      const startDate = contractDateRange?.[0];
-      const endDate = contractDateRange?.[1];
+      console.log("All Sale Contracts:", list);
 
-      // Only Approved sale contracts are selectable for linking to a purchase order
+      let currentRange = range;
+
+      // Default range = oldest Valid From -> Today
+      if (!currentRange && list.length > 0) {
+        const validFromDates = list
+          .map((c) => parseApiDate(c.from_date))
+          .filter((date) => date && date.isValid());
+
+        if (validFromDates.length > 0) {
+          const oldestDate = validFromDates.reduce((oldest, current) =>
+            current.isBefore(oldest) ? current : oldest,
+          );
+
+          currentRange = [oldestDate.startOf("day"), dayjs().endOf("day")];
+
+          setContractDateRange(currentRange);
+        }
+      }
+
+      const startDate = currentRange?.[0];
+      const endDate = currentRange?.[1];
+
+      // Approved + Valid From date filter
       const approved = list.filter((c) => {
-        const isApproved = c.status && c.status.toLowerCase() === "approved";
+        const isApproved = c.status?.toLowerCase() === "approved";
+
         if (!isApproved) return false;
 
         if (startDate && endDate) {
-          const contractDate = c.created_date ? dayjs(c.created_date) : null;
-          if (contractDate && contractDate.isValid()) {
-            return (
-              !contractDate.isBefore(startDate, "day") &&
-              !contractDate.isAfter(endDate, "day")
-            );
+          // IMPORTANT: Valid From date
+          const contractDate = parseApiDate(c.from_date);
+
+          if (!contractDate || !contractDate.isValid()) {
+            return false;
           }
+
+          return (
+            !contractDate.isBefore(startDate, "day") &&
+            !contractDate.isAfter(endDate, "day")
+          );
         }
+
         return true;
       });
 
+      console.log("Approved Filtered Contracts:", approved);
+
       const formatted = approved.map(mapContractRecord);
+
       setAvailableContracts(formatted);
+
       return formatted;
     } catch (err) {
-      console.error(err);
+      console.error("Failed to load sale contracts:", err);
       message.error("Failed to load available sale contracts");
       return [];
     } finally {
@@ -601,11 +633,11 @@ export default function PurchaseIndent() {
   };
 
   // Reactively fetch when dates or mode change
-  useEffect(() => {
-    if (modalMode === "add" || modalMode === "edit") {
-      fetchAvailableContracts();
-    }
-  }, [contractDateRange, modalMode]);
+  // useEffect(() => {
+  //   if (modalMode === "add" || modalMode === "edit") {
+  //     fetchAvailableContracts();
+  //   }
+  // }, [contractDateRange, modalMode]);
 
   // ---------------------------------------------------------------
   // Modal open/close
@@ -618,13 +650,14 @@ export default function PurchaseIndent() {
     setContractSearch("");
   };
 
-  const openAddModal = () => {
+  const openAddModal = async () => {
     setModalMode("add");
     setSelectedRecord(null);
     setSelectedRowKeys([]);
     setStatusValue("Fresh");
     setContractSearch("");
-    fetchAvailableContracts();
+    setContractDateRange(null);
+    await fetchAvailableContracts(null);
   };
 
   const openViewModal = async (record) => {
@@ -1698,7 +1731,11 @@ export default function PurchaseIndent() {
       title: <span className="text-amber-700 font-semibold">Broker Name</span>,
       dataIndex: "brokerName",
       width: 120,
-      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+      render: (t) => (
+        <span className="text-amber-800">
+          {t && t !== "-" ? t.trim().split(/\s+/)[0] : "Direct"}
+        </span>
+      ),
     },
     {
       title: (
