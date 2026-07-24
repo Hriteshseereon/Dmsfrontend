@@ -25,6 +25,7 @@ import {
   UploadOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
 import AppDatePicker from "../../../../../../components/AppDatePicker.jsx";
 // TODO: point these at your actual API module, e.g. "../../../../../api/driver"
 import {
@@ -59,6 +60,19 @@ export default function VehicleDriverMaster() {
     districts: [],
     cities: [],
   });
+
+  dayjs.extend(customParseFormat);
+
+  const parseApiDate = (date) => {
+    if (!date) return null;
+
+    return dayjs(date, [
+      "DD-MM-YYYY",
+      "YYYY-MM-DD",
+      "DD-MM-YYYY HH:mm:ss",
+      "YYYY-MM-DDTHH:mm:ss",
+    ]);
+  };
   useEffect(() => {
     fetchDrivers();
     fetchOwners();
@@ -124,7 +138,7 @@ export default function VehicleDriverMaster() {
   const buildPayload = (values) => {
     const payload = new FormData();
 
-    payload.append("transport_owner", values.transportOwner || "");
+    // payload.append("transport_owner", values.transportOwner || "");
 
     payload.append("driver_name", values.driverName || "");
 
@@ -199,7 +213,7 @@ export default function VehicleDriverMaster() {
 
   const fillFormFromRecord = (form, res) => {
     form.setFieldsValue({
-      transportOwner: res.transport_owner,
+      // transportOwner: res.transport_owner,
 
       driverName: res.driver_name,
 
@@ -212,9 +226,7 @@ export default function VehicleDriverMaster() {
 
       licenceNumber: res.driving_licence_number,
 
-      licenceExpiryDate: res.licence_expiry_date
-        ? dayjs(res.licence_expiry_date)
-        : null,
+      licenceExpiryDate: parseApiDate(res.licence_expiry_date),
 
       driverMobile: res.driver_mobile,
 
@@ -298,7 +310,7 @@ export default function VehicleDriverMaster() {
       dataIndex: "dlExpiredDate",
       render: (text) => (
         <span className="text-amber-800">
-          {text ? dayjs(text).format(DATE_FORMAT) : "-"}
+          {text ? parseApiDate(text)?.format(DATE_FORMAT) : "-"}
         </span>
       ),
     },
@@ -344,7 +356,7 @@ export default function VehicleDriverMaster() {
   /* ---------------- COMMON FORM FIELDS ---------------- */
   const DriverFields = ({ disabled = false }) => (
     <Row gutter={16}>
-      <Col span={8}>
+      {/* <Col span={8}>
         <Form.Item
           label="Transport Owner"
           name="transportOwner"
@@ -363,7 +375,7 @@ export default function VehicleDriverMaster() {
             ))}
           </Select>
         </Form.Item>
-      </Col>
+      </Col> */}
       <Col span={8}>
         <Form.Item
           label="Driver Name"
@@ -374,13 +386,13 @@ export default function VehicleDriverMaster() {
         </Form.Item>
       </Col>
 
-      <Col span={12}>
+      <Col span={8}>
         <Form.Item label="Address Line 1" name="address1">
           <Input placeholder="Enter address line 1" disabled={disabled} />
         </Form.Item>
       </Col>
 
-      <Col span={12}>
+      <Col span={8}>
         <Form.Item label="Address Line 2" name="address2">
           <Input placeholder="Enter address line 2" disabled={disabled} />
         </Form.Item>
