@@ -124,7 +124,7 @@ export default function VehicleDriverMaster() {
   const buildPayload = (values) => {
     const payload = new FormData();
 
-    payload.append("transport_owner", values.transportOwner || "");
+    // payload.append("transport_owner", values.transportOwner || "");
 
     payload.append("driver_name", values.driverName || "");
 
@@ -199,7 +199,7 @@ export default function VehicleDriverMaster() {
 
   const fillFormFromRecord = (form, res) => {
     form.setFieldsValue({
-      transportOwner: res.transport_owner,
+      // transportOwner: res.transport_owner,
 
       driverName: res.driver_name,
 
@@ -344,7 +344,7 @@ export default function VehicleDriverMaster() {
   /* ---------------- COMMON FORM FIELDS ---------------- */
   const DriverFields = ({ disabled = false }) => (
     <Row gutter={16}>
-      <Col span={8}>
+      {/* <Col span={8}>
         <Form.Item
           label="Transport Owner"
           name="transportOwner"
@@ -363,7 +363,7 @@ export default function VehicleDriverMaster() {
             ))}
           </Select>
         </Form.Item>
-      </Col>
+      </Col> */}
       <Col span={8}>
         <Form.Item
           label="Driver Name"
@@ -374,13 +374,13 @@ export default function VehicleDriverMaster() {
         </Form.Item>
       </Col>
 
-      <Col span={12}>
+      <Col span={8}>
         <Form.Item label="Address Line 1" name="address1">
           <Input placeholder="Enter address line 1" disabled={disabled} />
         </Form.Item>
       </Col>
 
-      <Col span={12}>
+      <Col span={8}>
         <Form.Item label="Address Line 2" name="address2">
           <Input placeholder="Enter address line 2" disabled={disabled} />
         </Form.Item>
