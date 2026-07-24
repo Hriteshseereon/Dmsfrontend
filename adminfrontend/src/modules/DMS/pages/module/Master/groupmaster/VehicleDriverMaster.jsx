@@ -25,6 +25,7 @@ import {
   UploadOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
 import AppDatePicker from "../../../../../../components/AppDatePicker.jsx";
 // TODO: point these at your actual API module, e.g. "../../../../../api/driver"
 import {
@@ -59,6 +60,19 @@ export default function VehicleDriverMaster() {
     districts: [],
     cities: [],
   });
+
+  dayjs.extend(customParseFormat);
+
+  const parseApiDate = (date) => {
+    if (!date) return null;
+
+    return dayjs(date, [
+      "DD-MM-YYYY",
+      "YYYY-MM-DD",
+      "DD-MM-YYYY HH:mm:ss",
+      "YYYY-MM-DDTHH:mm:ss",
+    ]);
+  };
   useEffect(() => {
     fetchDrivers();
     fetchOwners();
@@ -212,9 +226,7 @@ export default function VehicleDriverMaster() {
 
       licenceNumber: res.driving_licence_number,
 
-      licenceExpiryDate: res.licence_expiry_date
-        ? dayjs(res.licence_expiry_date)
-        : null,
+      licenceExpiryDate: parseApiDate(res.licence_expiry_date),
 
       driverMobile: res.driver_mobile,
 
@@ -298,7 +310,7 @@ export default function VehicleDriverMaster() {
       dataIndex: "dlExpiredDate",
       render: (text) => (
         <span className="text-amber-800">
-          {text ? dayjs(text).format(DATE_FORMAT) : "-"}
+          {text ? parseApiDate(text)?.format(DATE_FORMAT) : "-"}
         </span>
       ),
     },
