@@ -778,20 +778,22 @@ export default function SalesSouda() {
     {
       title: <span className="text-amber-700 font-semibold">Plant Name</span>,
       dataIndex: "plantName",
-      width: 60,
+      width: 80,
       render: (text) => <span>{text || "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Broker Name</span>,
       dataIndex: "brokerName",
-      width: 60,
+      width: 80,
       render: (text) => <span>{text ? text.split(" ")[0] : "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
       dataIndex: "customer",
-      width: 130,
-      render: (text) => <span>{text || "-"}</span>,
+      width: 100,
+      render: (text) => (
+        <span>{text ? text.split(" ").slice(0, 2).join(" ") : "-"}</span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Place</span>,
