@@ -244,7 +244,9 @@ export default function PurchaseIndent() {
           // purchase order links to sale contracts made with a customer, so
           // we surface that customer name here instead.
           vendor_name:
-            item.vendor_name || contractDetails[0]?.customer_name || "-",
+            item.customer_business_name ||
+            contractDetails[0]?.customer_business_name ||
+            "-",
           sales_contracts: contractDetails,
           contract_count:
             contractDetails.length || (item.sale_contracts || []).length,
@@ -1795,22 +1797,22 @@ export default function PurchaseIndent() {
         <span className="text-amber-800">{Number(t || 0).toFixed(3)}</span>
       ),
     },
-    {
-      title: <span className="text-amber-700 font-semibold">Status</span>,
-      dataIndex: "status",
-      width: 110,
-      render: renderStatusBadge,
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Total (₹)</span>,
-      dataIndex: "grandTotal",
-      width: 130,
-      render: (t) => (
-        <span className="text-amber-800 font-semibold">
-          {t !== undefined && t !== null ? `₹ ${Number(t).toFixed(2)}` : "-"}
-        </span>
-      ),
-    },
+    // {
+    //   title: <span className="text-amber-700 font-semibold">Status</span>,
+    //   dataIndex: "status",
+    //   width: 110,
+    //   render: renderStatusBadge,
+    // },
+    // {
+    //   title: <span className="text-amber-700 font-semibold">Total (₹)</span>,
+    //   dataIndex: "grandTotal",
+    //   width: 130,
+    //   render: (t) => (
+    //     <span className="text-amber-800 font-semibold">
+    //       {t !== undefined && t !== null ? `₹ ${Number(t).toFixed(2)}` : "-"}
+    //     </span>
+    //   ),
+    // },
   ];
 
   const rowSelection = {
@@ -1879,6 +1881,7 @@ export default function PurchaseIndent() {
           pagination={false}
           scroll={{ y: 420 }}
           rowKey="key"
+          size="small"
         />
       </div>
 
@@ -1918,6 +1921,7 @@ export default function PurchaseIndent() {
             pagination={false}
             scroll={{ y: 360, x: 1200 }}
             rowKey="key"
+            size="small"
           />
         </Card>
       </Modal>
@@ -2007,6 +2011,7 @@ export default function PurchaseIndent() {
               onDoubleClick: () => openEditSalesContract(record),
             })}
             rowClassName={() => "cursor-pointer"}
+            size="small"
           />
         </Card>
 
@@ -2117,6 +2122,7 @@ export default function PurchaseIndent() {
                   onDoubleClick: () => openEditSalesContract(record),
                 })}
                 rowClassName={() => "cursor-pointer"}
+                size="small"
               />
             </Card>
           </>
