@@ -1566,7 +1566,7 @@ export default function PurchaseIndent() {
       width: 120,
       render: (t, record) => (
         <span
-          className="text-amber-800 font-semibold cursor-pointer"
+          className="bg-blue-500 text-white font-semibold px-2 py-1 rounded cursor-pointer hover:bg-blue-600"
           onDoubleClick={() => openPoContractsModal(record)}
           title="Double click to view sale contracts"
         >
@@ -1732,12 +1732,22 @@ export default function PurchaseIndent() {
   // ---------------------------------------------------------------
   // Columns — available sale contracts (mirrors SalesSouda table)
   // ---------------------------------------------------------------
-  const contractColumns = [
+  const getContractColumns = (highlightContractNo = false) => [
     {
       title: <span className="text-amber-700 font-semibold">Contract No</span>,
       dataIndex: "saleContractNumber",
       width: 120,
-      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+      render: (t) => (
+        <span
+          className={
+            highlightContractNo
+              ? "bg-blue-500 text-white font-semibold px-2 py-1 rounded"
+              : "text-amber-800"
+          }
+        >
+          {t || "-"}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Plant Name</span>,
@@ -1916,7 +1926,7 @@ export default function PurchaseIndent() {
           </div>
 
           <Table
-            columns={contractColumns}
+            columns={getContractColumns(false)}
             dataSource={(selectedPoForContracts?.sales_contracts || []).map(
               mapContractRecord,
             )}
@@ -2003,7 +2013,7 @@ export default function PurchaseIndent() {
 
           <Table
             rowSelection={rowSelection}
-            columns={contractColumns}
+            columns={getContractColumns(true)}
             dataSource={filteredContracts}
             loading={contractsLoading}
             pagination={false}
@@ -2109,7 +2119,7 @@ export default function PurchaseIndent() {
             >
               <h6 className="text-amber-500 mb-2">Linked Sale Contracts</h6>
               <Table
-                columns={contractColumns}
+                columns={getContractColumns(false)}
                 dataSource={(
                   selectedRecord.sale_contracts ||
                   selectedRecord.sales_contracts ||
