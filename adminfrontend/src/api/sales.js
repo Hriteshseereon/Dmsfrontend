@@ -421,3 +421,17 @@ export const getCustomerLedger = async (customer_id) => {
 
   return res.data;
 };
+
+
+// get all passing weight 
+
+export const getAllPassingWeight = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("transport/vehicle-masters/unique-passing-weights/", {
+    params: { organisation: currentOrgId },
+  });
+  console.log("passing weight res", res);
+  return res.data;
+}
+
+getAllPassingWeight()
