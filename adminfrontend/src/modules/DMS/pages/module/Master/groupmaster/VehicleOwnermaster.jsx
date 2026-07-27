@@ -349,6 +349,7 @@ export default function VehicleOwnerMaster() {
         url ? (
           <Button
             type="link"
+            className="h-auto! p-0!"
             onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
           >
             View
@@ -721,6 +722,7 @@ export default function VehicleOwnerMaster() {
           dataSource={filteredData}
           rowKey="key"
           size="small"
+          scroll={{ x: 1700 }}
         />
       </div>
 

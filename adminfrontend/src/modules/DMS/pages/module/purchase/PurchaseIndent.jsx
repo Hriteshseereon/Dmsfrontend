@@ -682,6 +682,8 @@ export default function PurchaseIndent() {
     }
   };
   const openPoContractsModal = (record) => {
+    console.log("DOUBLE CLICK PO:", record);
+    console.log("LINKED CONTRACTS:", record?.sales_contracts);
     setSelectedPoForContracts(record);
     setIsPoContractsModalOpen(true);
   };
