@@ -551,13 +551,19 @@ export default function VehicleMaster() {
   ];
 
   /* ---------------- SMALL UPLOAD FIELD ---------------- */
-  const UploadField = ({ label, name, disabled }) => (
+  const UploadField = ({ label, name, disabled, required = false }) => (
     <Col span={8}>
       <Form.Item
         label={label}
         name={name}
         valuePropName="fileList"
         getValueFromEvent={normFile}
+        rules={[
+          {
+            required: required && !disabled,
+            message: `${label} is required`,
+          },
+        ]}
       >
         <Upload
           listType="text"
@@ -577,7 +583,6 @@ export default function VehicleMaster() {
       </Form.Item>
     </Col>
   );
-
   /* ---------------- COMMON FORM FIELDS ---------------- */
   const VehicleFields = ({ disabled = false }) => (
     <Row gutter={16}>
@@ -655,6 +660,7 @@ export default function VehicleMaster() {
         label="Upload RC Copy"
         name="rcCopyUpload"
         disabled={disabled}
+        required
       />
 
       <Col span={8}>
@@ -673,6 +679,7 @@ export default function VehicleMaster() {
         label="Upload Chassis No. - Stencil Copy"
         name="chassisCopyUpload"
         disabled={disabled}
+        required
       />
 
       <Col span={8}>
@@ -693,6 +700,7 @@ export default function VehicleMaster() {
         label="Upload Insurance Copy"
         name="insuranceCopyUpload"
         disabled={disabled}
+        required
       />
       <UploadField
         label="Upload Tax Paid Copy"
