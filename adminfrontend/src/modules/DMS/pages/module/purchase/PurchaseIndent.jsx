@@ -12,7 +12,6 @@ import {
   Card,
   message,
   Form,
-  DatePicker,
   InputNumber,
   Dropdown,
 } from "antd";
@@ -47,6 +46,7 @@ import {
   getAllPlantsName,
   getProductByplant,
   getunusedSaleContractGroup,
+  getAllPassingWeight,
 } from "../../../../../api/sales";
 import {
   getAllWhatsappGroups,
@@ -142,6 +142,7 @@ export default function PurchaseIndent() {
   const [plants, setPlants] = useState([]);
   const [vendorProductsMap, setVendorProductsMap] = useState({});
   const [selectedPlantId, setSelectedPlantId] = useState(null);
+  const [passingWeights, setPassingWeights] = useState([]);
   const selectedFY = useSelectedFinancialYear();
 
   // refs used inside the ported ItemsTable (item select / qty / contract rate navigation)
@@ -206,6 +207,34 @@ export default function PurchaseIndent() {
         setPlants(res || []);
       } catch (err) {
         console.error("Failed to fetch plants", err);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await getAllPassingWeight();
+        const list = res?.data || res || [];
+
+        const uniqueWeights = [
+          ...new Set(
+            list
+              .filter(
+                (item) =>
+                  item !== null &&
+                  item !== undefined &&
+                  item !== "" &&
+                  !Number.isNaN(Number(item)),
+              )
+              .map((item) => String(item)),
+          ),
+        ].sort((a, b) => Number(a) - Number(b));
+
+        setPassingWeights(uniqueWeights);
+      } catch (error) {
+        console.error("Failed to fetch passing weights:", error);
+        setPassingWeights([]);
       }
     })();
   }, []);
@@ -373,6 +402,7 @@ export default function PurchaseIndent() {
         contract.customer_name ||
         contract.customer ||
         "-",
+      location: contract.location || "-",
       plantName: contract.plant_name || "-",
       brokerName: contract.broker_name || "-",
       contractDate:
@@ -419,12 +449,22 @@ export default function PurchaseIndent() {
       location: contract.location || "",
       plantId: contract.plant_id || "",
       plantName: contract.plant_name || "",
-      brokerId: contract.broker_id || "direct",
-      brokerName: contract.broker_name || "Direct",
+      brokerId: contract.broker_id || null,
+      brokerName: contract.broker_id
+        ? {
+            value: contract.broker_id,
+            label: (contract.broker_name || "").split(" ")[0] || "Direct",
+          }
+        : { value: "direct", label: "Direct" },
 
       soudaDate: parseApiDate(contract.created_date),
       startDate: parseApiDate(contract.from_date),
       endDate: parseApiDate(contract.to_date),
+      contratGrossWeight:
+        contract.contrat_gross_weight !== null &&
+        contract.contrat_gross_weight !== undefined
+          ? String(contract.contrat_gross_weight)
+          : "loose",
 
       items: (contract.items || []).map((it, idx) => ({
         lineKey: it.id || idx + 1,
@@ -452,7 +492,7 @@ export default function PurchaseIndent() {
 
         discountPercent: Number(it.discount_percent || 0),
         discountAmt: Number(it.discount_amount || 0),
-        grossWt: Number(it.gross_weight || 0),
+        grossWt: Number(it.gross_weight || it.product?.gross_weight || 0),
       })),
 
       orderTaxAndTotals: {
@@ -473,10 +513,10 @@ export default function PurchaseIndent() {
       },
 
       orderTotals: {
-        totalQty: Number(contract.total_qty) || calculatedTotalQty,
+        totalQty: calculatedTotalQty,
 
         totalWeightTon:
-          Number(contract.total_net_weight) || calculatedTotalWeightTon,
+          calculatedTotalWeightTon || Number(contract.total_net_weight || 0),
 
         totalAmount: Number(contract.total_amount || contract.totalAmount || 0),
 
@@ -553,15 +593,73 @@ export default function PurchaseIndent() {
   };
 
   const handleContractEditValuesChange = (_changed, allValues) => {
-    const computed = computeFromFormValues(allValues || {});
+    const latestValues = contractForm.getFieldsValue(true);
+    const computed = computeFromFormValues({
+      ...allValues,
+      ...latestValues,
+      items: latestValues.items || allValues.items,
+      orderTaxAndTotals:
+        latestValues.orderTaxAndTotals || allValues.orderTaxAndTotals,
+    });
+
     contractForm.setFieldsValue({
-      items: computed.items,
       orderTaxAndTotals: {
-        ...allValues.orderTaxAndTotals,
+        ...(latestValues.orderTaxAndTotals || allValues.orderTaxAndTotals),
         ...computed.orderTaxAndTotals,
       },
       orderTotals: computed.orderTotals,
     });
+  };
+
+  const validateContractGrossWeight = (contractGrossWeight, totalWeightTon) => {
+    if (
+      contractGrossWeight === undefined ||
+      contractGrossWeight === null ||
+      contractGrossWeight === ""
+    ) {
+      return {
+        valid: false,
+        message: "Please select Contract Gross Weight.",
+      };
+    }
+
+    if (String(contractGrossWeight).toLowerCase() === "loose") {
+      return {
+        valid: true,
+        message: "",
+      };
+    }
+
+    const selectedWeight = Number(contractGrossWeight);
+    const actualWeight = Number(totalWeightTon || 0);
+
+    if (Number.isNaN(selectedWeight) || selectedWeight <= 0) {
+      return {
+        valid: false,
+        message: "Invalid Contract Gross Weight.",
+      };
+    }
+
+    const maxAllowedWeight = selectedWeight * 1.05;
+
+    if (actualWeight < selectedWeight) {
+      return {
+        valid: false,
+        message: `Gross Weight cannot be less than ${selectedWeight.toFixed(3)} Ton. Current Gross Weight is ${actualWeight.toFixed(3)} Ton.`,
+      };
+    }
+
+    if (actualWeight > maxAllowedWeight) {
+      return {
+        valid: false,
+        message: `Gross Weight cannot exceed ${maxAllowedWeight.toFixed(3)} Ton (5% tolerance). Current Gross Weight is ${actualWeight.toFixed(3)} Ton.`,
+      };
+    }
+
+    return {
+      valid: true,
+      message: "",
+    };
   };
 
   // ---------------------------------------------------------------
@@ -596,26 +694,26 @@ export default function PurchaseIndent() {
         }
       }
 
-      const startDate = currentRange?.[0];
-      const endDate = currentRange?.[1];
+      const startDate = currentRange?.[0]?.startOf("day");
+      const endDate = currentRange?.[1]?.endOf("day");
 
-      // Approved + Valid From date filter
+      // Approved + selected date-range overlap filter
       const approved = list.filter((c) => {
         const isApproved = c.status?.toLowerCase() === "approved";
 
         if (!isApproved) return false;
 
         if (startDate && endDate) {
-          // IMPORTANT: Valid From date
-          const contractDate = parseApiDate(c.from_date);
+          const contractStart = parseApiDate(c.from_date)?.startOf("day");
+          const contractEnd =
+            parseApiDate(c.to_date)?.endOf("day") || contractStart;
 
-          if (!contractDate || !contractDate.isValid()) {
+          if (!contractStart || !contractStart.isValid()) {
             return false;
           }
 
           return (
-            !contractDate.isBefore(startDate, "day") &&
-            !contractDate.isAfter(endDate, "day")
+            !contractEnd.isBefore(startDate) && !contractStart.isAfter(endDate)
           );
         }
 
@@ -1014,9 +1112,21 @@ export default function PurchaseIndent() {
 
       if (contract.plant_id) {
         const products = await getProductByplant(contract.plant_id);
+        const productList = Array.isArray(products) ? products : [];
+        const productMap = Object.fromEntries(
+          productList.map((p) => [p.product_id, p]),
+        );
+
+        mapped.items = (mapped.items || []).map((it) => ({
+          ...it,
+          grossWt:
+            Number(it.grossWt || 0) ||
+            Number(productMap[it.item]?.gross_weight || 0),
+        }));
+
         setSelectedPlantId(contract.plant_id);
         setVendorProductsMap({
-          [contract.plant_id]: Array.isArray(products) ? products : [],
+          [contract.plant_id]: productList,
         });
       }
 
@@ -1078,6 +1188,16 @@ export default function PurchaseIndent() {
           };
         });
 
+      const grossWeightValidation = validateContractGrossWeight(
+        values.contratGrossWeight,
+        values.orderTotals?.totalWeightTon,
+      );
+
+      if (!grossWeightValidation.valid) {
+        message.error(grossWeightValidation.message);
+        return;
+      }
+
       const payload = {
         customer_id: contractEditingRecord.customerId,
         customer_email: values.customerEmail,
@@ -1089,21 +1209,17 @@ export default function PurchaseIndent() {
           values.customerAddress || contractEditingRecord.location || null,
         plant_id: values.plantId || null,
 
-        broker_id:
-          values.brokerId?.value === "direct"
-            ? null
-            : (values.brokerId?.value ?? contractEditingRecord.brokerId) ||
-              null,
-        broker_name:
-          values.brokerId?.value === "direct"
-            ? null
-            : (values.brokerId?.label ?? contractEditingRecord.brokerName) ||
-              null,
+        broker_id: values.brokerId || null,
+        broker_name: values.brokerId ? values.brokerName?.label || null : null,
 
         status: values.status,
         created_date: values.soudaDate
           ? dayjs(values.soudaDate).format("YYYY-MM-DD")
           : null,
+        contrat_gross_weight:
+          values.contratGrossWeight === "loose"
+            ? null
+            : Number(values.contratGrossWeight),
         from_date: values.startDate
           ? dayjs(values.startDate).format("YYYY-MM-DD")
           : null,
@@ -1139,7 +1255,7 @@ export default function PurchaseIndent() {
       contractForm.resetFields();
 
       // refresh the checkbox-selectable list in the Purchase Order modal
-      fetchAvailableContracts();
+      fetchAvailableContracts(contractDateRange);
     } catch (err) {
       console.error(err);
       message.error(
@@ -1187,10 +1303,10 @@ export default function PurchaseIndent() {
       }, 100);
     };
 
-    const recalculateRow = (index, itemsOverride) => {
-      const items = itemsOverride || form.getFieldValue("items") || [];
-      const it = items[index];
-      if (!it) return;
+    const recalculateRow = (index, itemsOverride, patch = {}) => {
+      const items = [...(itemsOverride || form.getFieldValue("items") || [])];
+      const it = { ...items[index], ...patch };
+      if (!items[index]) return;
 
       const qty = Number(it.qty || 0);
       const freeQty = Number(it.freeQty || 0);
@@ -1213,6 +1329,10 @@ export default function PurchaseIndent() {
       const updatedItems = [...items];
       updatedItems[index] = {
         ...updatedItems[index],
+        ...patch,
+        qty,
+        freeQty,
+        totalQty: qty + freeQty,
         weightTon: Number(weightTon.toFixed(3)),
         rate: Number(rate.toFixed(2)),
         amount: Number(amount.toFixed(2)),
@@ -1222,6 +1342,19 @@ export default function PurchaseIndent() {
       };
 
       form.setFieldsValue({ items: updatedItems });
+
+      const allValues = form.getFieldsValue(true);
+      const computed = computeFromFormValues({
+        ...allValues,
+        items: updatedItems,
+      });
+      form.setFieldsValue({
+        orderTotals: computed.orderTotals,
+        orderTaxAndTotals: {
+          ...allValues.orderTaxAndTotals,
+          ...computed.orderTaxAndTotals,
+        },
+      });
     };
 
     const handleAutoAddRow = (add) => {
@@ -1344,6 +1477,9 @@ export default function PurchaseIndent() {
                           .replace(/\D/g, "")
                           .slice(0, 5);
                       }}
+                      onChange={(value) => {
+                        recalculateRow(field.name, undefined, { qty: value });
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === "Tab") {
                           e.preventDefault();
@@ -1369,18 +1505,16 @@ export default function PurchaseIndent() {
                           .replace(/\D/g, "")
                           .slice(0, 5);
                       }}
-                      onChange={() => {
-                        setTimeout(() => {
-                          const qtyInput =
-                            qtyRefs.current[
-                              field.name
-                            ]?.nativeElement?.querySelector("input");
-
-                          qtyInput?.focus();
-                          qtyInput?.select();
-                        }, 100);
+                      onChange={(value) => {
+                        recalculateRow(field.name, undefined, {
+                          freeQty: value,
+                        });
                       }}
                     />
+                  </Form.Item>
+
+                  <Form.Item name={[field.name, "grossWt"]} hidden>
+                    <InputNumber />
                   </Form.Item>
                 </Col>
 
@@ -1427,14 +1561,10 @@ export default function PurchaseIndent() {
                       onFocus={(e) => {
                         setTimeout(() => e.target.select(), 0);
                       }}
-                      onChange={() => {
-                        setTimeout(() => recalculateRow(field.name), 0);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === "Tab") {
-                          e.preventDefault();
-                          handleAutoAddRow(add);
-                        }
+                      onChange={(value) => {
+                        recalculateRow(field.name, undefined, {
+                          contractRate: value,
+                        });
                       }}
                       onBlur={() => handleAutoAddRow(add)}
                     />
@@ -1735,31 +1865,39 @@ export default function PurchaseIndent() {
   // ---------------------------------------------------------------
   const getContractColumns = (highlightContractNo = false) => [
     {
+      title: (
+        <span className="text-amber-700 font-semibold">Contract Date</span>
+      ),
+      dataIndex: "contractDate",
+      width: 80,
+      render: (t) => <span className="text-amber-800">{fmtDate(t)}</span>,
+    },
+    {
       title: <span className="text-amber-700 font-semibold">Contract No</span>,
       dataIndex: "saleContractNumber",
-      width: 120,
+      width: 70,
       render: (t) => (
         <span
           className={
             highlightContractNo
-              ? "bg-blue-500 text-white font-semibold px-2 py-1 rounded"
+              ? "bg-blue-500 text-white font-semibold px-1 py-0.5 rounded text-xs"
               : "text-amber-800"
           }
         >
-          {t || "-"}
+          {t ? String(t).split("-").pop() : "-"}
         </span>
       ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Plant Name</span>,
       dataIndex: "plantName",
-      width: 120,
+      width: 80,
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Broker Name</span>,
       dataIndex: "brokerName",
-      width: 120,
+      width: 80,
       render: (t) => (
         <span className="text-amber-800">
           {t && t !== "-" ? t.trim().split(/\s+/)[0] : "Direct"}
@@ -1767,48 +1905,72 @@ export default function PurchaseIndent() {
       ),
     },
     {
-      title: (
-        <span className="text-amber-700 font-semibold">Contract Date</span>
+      title: <span className="text-amber-700 font-semibold">Customer</span>,
+      dataIndex: "customer",
+      width: 100,
+      render: (t) => (
+        <span className="text-amber-800">
+          {t ? t.split(" ").slice(0, 2).join(" ") : "-"}
+        </span>
       ),
-      dataIndex: "contractDate",
-      width: 120,
-      render: (t) => <span className="text-amber-800">{fmtDate(t)}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Place</span>,
+      dataIndex: "location",
+      width: 80,
+      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">QTY</span>,
+      dataIndex: "quantity",
+      width: 60,
+      render: (t) => <span className="text-amber-800">{Number(t || 0)}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Gross Wt.(Ton)</span>
+      ),
+      dataIndex: "grossWeightTon",
+      width: 60,
+      render: (t) => (
+        <span className="text-amber-800">{Number(t || 0).toFixed(3)}</span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Valid From</span>,
       dataIndex: "startDate",
-      width: 110,
+      width: 80,
       render: (t) => <span className="text-amber-800">{fmtDate(t)}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Valid To</span>,
       dataIndex: "endDate",
-      width: 110,
+      width: 80,
       render: (t) => <span className="text-amber-800">{fmtDate(t)}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Customer</span>,
-      dataIndex: "customer",
-      width: 150,
-      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Quantity</span>,
-      dataIndex: "quantity",
-      width: 100,
-      render: (t) => (
-        <span className="text-amber-800">{Number(t || 0).toFixed(3)}</span>
+      title: (
+        <span className="text-amber-700 font-semibold">Extended Up To</span>
       ),
+      dataIndex: "extendedUpto",
+      width: 75,
+      render: (t) => <span className="text-amber-800">{fmtDate(t)}</span>,
     },
     {
       title: (
-        <span className="text-amber-700 font-semibold">Gross Weight (Ton)</span>
+        <span className="text-amber-700 font-semibold">Balance Qnty.</span>
       ),
-      dataIndex: "grossWeightTon",
-      width: 140,
-      render: (t) => (
-        <span className="text-amber-800">{Number(t || 0).toFixed(3)}</span>
+      dataIndex: "balanceQty",
+      width: 70,
+      render: (t) => <span className="text-amber-800">{t ?? ""}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Balance Weight</span>
       ),
+      dataIndex: "balanceWeight",
+      width: 70,
+      render: (t) => <span className="text-amber-800">{t ?? ""}</span>,
     },
     // {
     //   title: <span className="text-amber-700 font-semibold">Status</span>,
@@ -1932,8 +2094,9 @@ export default function PurchaseIndent() {
               mapContractRecord,
             )}
             pagination={false}
-            scroll={{ y: 360, x: 1200 }}
+            scroll={{ y: 500, x: 1500 }}
             rowKey="key"
+            className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1"
             size="small"
           />
         </Card>
@@ -1950,7 +2113,8 @@ export default function PurchaseIndent() {
         open={modalMode === "add" || modalMode === "edit"}
         onCancel={closeModal}
         footer={null}
-        width={1600}
+        width={1800}
+        style={{ top: 20 }}
       >
         {modalMode === "edit" && (
           <Card
@@ -1986,17 +2150,36 @@ export default function PurchaseIndent() {
         >
           <div className="flex justify-between items-center mb-2">
             <h6 className="text-amber-500 mb-0">Approved Sale Contracts</h6>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-amber-700 font-semibold">
-                Dates:
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-sm text-amber-700 font-semibold whitespace-nowrap">
+                Start Date:
               </span>
-              <DatePicker.RangePicker
-                value={contractDateRange}
-                onChange={(dates) => {
-                  if (dates) setContractDateRange(dates);
+              <AppDatePicker
+                value={contractDateRange?.[0]}
+                onChange={(date) => {
+                  const end = contractDateRange?.[1] || dayjs().endOf("day");
+                  const range = date ? [date.startOf("day"), end] : null;
+                  setContractDateRange(range);
+                  if (date) fetchAvailableContracts(range);
                 }}
-                className="border-amber-300"
-                style={{ width: 240 }}
+                style={{ width: 160 }}
+              />
+              <span className="text-sm text-amber-700 font-semibold whitespace-nowrap">
+                End Date:
+              </span>
+              <AppDatePicker
+                value={contractDateRange?.[1]}
+                onChange={(date) => {
+                  const start = contractDateRange?.[0];
+                  if (start && date) {
+                    const range = [start, date.endOf("day")];
+                    setContractDateRange(range);
+                    fetchAvailableContracts(range);
+                  } else if (date) {
+                    setContractDateRange([contractDateRange?.[0], date]);
+                  }
+                }}
+                style={{ width: 160 }}
               />
               <Input
                 prefix={<SearchOutlined className="text-amber-600" />}
@@ -2018,12 +2201,13 @@ export default function PurchaseIndent() {
             dataSource={filteredContracts}
             loading={contractsLoading}
             pagination={false}
-            scroll={{ y: 360, x: 1200 }}
+            scroll={{ y: 500, x: 1500 }}
             rowKey="key"
             onRow={(record) => ({
               onDoubleClick: () => openEditSalesContract(record),
             })}
             rowClassName={() => "cursor-pointer"}
+            className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1"
             size="small"
           />
         </Card>
@@ -2129,12 +2313,13 @@ export default function PurchaseIndent() {
                   []
                 ).map(mapContractRecord)}
                 pagination={false}
-                scroll={{ y: 280, x: 1200 }}
+                scroll={{ y: 500, x: 1500 }}
                 rowKey="key"
                 onRow={(record) => ({
                   onDoubleClick: () => openEditSalesContract(record),
                 })}
                 rowClassName={() => "cursor-pointer"}
+                className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1"
                 size="small"
               />
             </Card>
@@ -2252,7 +2437,7 @@ export default function PurchaseIndent() {
               <Col span={3}>
                 <Form.Item
                   label={<span className="text-amber-700">Broker Name</span>}
-                  name="brokerId"
+                  name="brokerName"
                   rules={[{ required: true, message: "Select Broker Name" }]}
                 >
                   <Select
@@ -2263,12 +2448,17 @@ export default function PurchaseIndent() {
                     onChange={(option) => {
                       if (option?.value === "direct") {
                         contractForm.setFieldsValue({
-                          brokerId: { value: "direct", label: "Direct" },
+                          brokerId: null,
+                          brokerName: { value: "direct", label: "Direct" },
                         });
                       } else {
                         const firstWord = option.label?.split(" ")[0] || "";
                         contractForm.setFieldsValue({
-                          brokerId: { value: option.value, label: firstWord },
+                          brokerId: option.value,
+                          brokerName: {
+                            value: option.value,
+                            label: firstWord,
+                          },
                         });
                       }
                     }}
@@ -2283,9 +2473,38 @@ export default function PurchaseIndent() {
                     ))}
                   </Select>
                 </Form.Item>
+                <Form.Item name="brokerId" hidden>
+                  <Input />
+                </Form.Item>
               </Col>
 
-              <Col span={3}>
+              <Col span={2}>
+                <Form.Item
+                  label={<span className="text-amber-700">Gross Weight</span>}
+                  name="contratGrossWeight"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Select Contract Gross Weight",
+                    },
+                  ]}
+                >
+                  <Select
+                    placeholder="Select Gross Weight"
+                    showSearch
+                    optionFilterProp="children"
+                  >
+                    <Select.Option value="loose">Loose</Select.Option>
+                    {passingWeights.map((weight) => (
+                      <Select.Option key={weight} value={weight}>
+                        {weight} Ton
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+
+              <Col span={2}>
                 <Form.Item
                   label={<span className="text-amber-700">Contract Date</span>}
                   name="soudaDate"
@@ -2307,7 +2526,7 @@ export default function PurchaseIndent() {
                 </Form.Item>
               </Col>
 
-              <Col span={3}>
+              <Col span={2}>
                 <Form.Item
                   label={<span className="text-amber-700">Valid From</span>}
                   name="startDate"
@@ -2322,7 +2541,7 @@ export default function PurchaseIndent() {
                 </Form.Item>
               </Col>
 
-              <Col span={3}>
+              <Col span={2}>
                 <Form.Item
                   label={<span className="text-amber-700">Valid To</span>}
                   name="endDate"
