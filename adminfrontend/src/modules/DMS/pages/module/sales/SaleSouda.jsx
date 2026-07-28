@@ -105,6 +105,13 @@ export default function SalesSouda() {
   const contractDateRef = useRef(null);
   const validFromRef = useRef();
   const validToRef = useRef();
+
+  const editPlantRef = useRef(null);
+  const editBrokerRef = useRef(null);
+  const editGrossWeightRef = useRef(null);
+  const editContractDateRef = useRef(null);
+  const editValidFromRef = useRef(null);
+  const editValidToRef = useRef(null);
   const [plantDropdownOpen, setPlantDropdownOpen] = useState(false);
   const [brokerDropdownOpen, setBrokerDropdownOpen] = useState(false);
   const [addItemDropdownIndex, setAddItemDropdownIndex] = useState(null);
@@ -112,6 +119,10 @@ export default function SalesSouda() {
   const [grossWeightDropdownOpen, setGrossWeightDropdownOpen] = useState(false);
   const [editGrossWeightDropdownOpen, setEditGrossWeightDropdownOpen] =
     useState(false);
+  const [editPlantDropdownOpen, setEditPlantDropdownOpen] = useState(false);
+
+  const [editBrokerDropdownOpen, setEditBrokerDropdownOpen] = useState(false);
+
   const qtyRefs = useRef({});
   const contractRateRefs = useRef({});
   const [extendForm] = Form.useForm();

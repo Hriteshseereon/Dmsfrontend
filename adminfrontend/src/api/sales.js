@@ -430,7 +430,7 @@ export const getAllPassingWeight = async () => {
   const res = await api.get("transport/vehicle-masters/unique-passing-weights/", {
     params: { organisation: currentOrgId },
   });
-  console.log("passing weight res", res);
+
   return res.data;
 }
 
