@@ -46,6 +46,7 @@ import {
   getAllBrokerName,
   getAllPlantsName,
   getProductByplant,
+  getunusedSaleContractGroup,
 } from "../../../../../api/sales";
 import {
   getAllWhatsappGroups,
@@ -571,7 +572,7 @@ export default function PurchaseIndent() {
     try {
       setContractsLoading(true);
 
-      const res = await getSalescontractGroups();
+      const res = await getunusedSaleContractGroup();
       const list = res?.data || res || [];
 
       console.log("All Sale Contracts:", list);
