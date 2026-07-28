@@ -23,6 +23,7 @@ import {
   message,
   Popconfirm,
   Space,
+  Tooltip,
 } from "antd";
 import {
   SearchOutlined,
@@ -1181,6 +1182,21 @@ export default function SalesSouda() {
       };
 
       form.setFieldsValue({ items: updatedItems });
+
+      const currentValues = form.getFieldsValue(true);
+
+      const computed = computeFromFormValues({
+        ...currentValues,
+        items: updatedItems,
+      });
+
+      form.setFieldsValue({
+        orderTaxAndTotals: {
+          ...currentValues.orderTaxAndTotals,
+          ...computed.orderTaxAndTotals,
+        },
+        orderTotals: computed.orderTotals,
+      });
     };
 
     const handleAutoAddRow = (add) => {
@@ -1308,6 +1324,11 @@ export default function SalesSouda() {
                         e.target.value = e.target.value
                           .replace(/\D/g, "")
                           .slice(0, 5);
+                      }}
+                      onChange={() => {
+                        setTimeout(() => {
+                          recalculateRow(field.name);
+                        }, 0);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === "Tab") {
@@ -2268,7 +2289,19 @@ export default function SalesSouda() {
                       <Form.Item
                         name={["orderTotals", "totalWeightTon"]}
                         validateStatus={shouldShowError ? "error" : ""}
-                        help={shouldShowError ? validation.message : null}
+                        help={
+                          shouldShowError ? (
+                            <Tooltip title={validation.message}>
+                              <span className="text-red-500 cursor-pointer text-[11px]">
+                                Allowed: {contractGrossWeight}T -{" "}
+                                {(Number(contractGrossWeight) * 1.05).toFixed(
+                                  2,
+                                )}
+                                T
+                              </span>
+                            </Tooltip>
+                          ) : null
+                        }
                       >
                         <Input disabled />
                       </Form.Item>
@@ -2645,7 +2678,7 @@ export default function SalesSouda() {
             <ItemsTable
               form={editForm}
               allowRemove={false}
-              allowAdd={false}
+              allowAdd={true}
               productList={vendorProductsMap[selectedPlantId] || []}
               openItemIndex={editItemDropdownIndex}
               setOpenItemIndex={setEditItemDropdownIndex}
@@ -2701,7 +2734,19 @@ export default function SalesSouda() {
                       <Form.Item
                         name={["orderTotals", "totalWeightTon"]}
                         validateStatus={shouldShowError ? "error" : ""}
-                        help={shouldShowError ? validation.message : null}
+                        help={
+                          shouldShowError ? (
+                            <Tooltip title={validation.message}>
+                              <span className="text-red-500 cursor-pointer text-[11px]">
+                                {contractGrossWeight}T -{" "}
+                                {(Number(contractGrossWeight) * 1.05).toFixed(
+                                  2,
+                                )}
+                                T
+                              </span>
+                            </Tooltip>
+                          ) : null
+                        }
                       >
                         <Input disabled />
                       </Form.Item>
