@@ -86,8 +86,13 @@ export default function VehicleOwnerMaster() {
         location: item.city,
         contactPerson: item.contact_person,
         mobileNo: item.mobile,
+
         panNo: item.pan_number,
+        panDocument: item.pan_document,
+
         adharNo: item.aadhaar_number,
+        aadhaarDocument: item.aadhaar_document,
+
         tds_declaration: item.non_tds_declaration,
         vehicle_count: item.vehicle_count,
       }));
@@ -322,12 +327,32 @@ export default function VehicleOwnerMaster() {
     {
       title: <span className="text-amber-700 font-semibold">PAN No.</span>,
       dataIndex: "panNo",
-      render: (text) => <span className="text-amber-800">{text}</span>,
+      render: (text, record) => (
+        <span
+          className={
+            record.panDocument
+              ? "text-amber-800"
+              : "text-amber-800 bg-red-200 px-2 py-1 rounded"
+          }
+        >
+          {text || "-"}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Adhaar No.</span>,
       dataIndex: "adharNo",
-      render: (text) => <span className="text-amber-800">{text}</span>,
+      render: (text, record) => (
+        <span
+          className={
+            record.aadhaarDocument
+              ? "text-amber-800"
+              : "text-amber-800 bg-red-200 px-2 py-1 rounded"
+          }
+        >
+          {text || "-"}
+        </span>
+      ),
     },
     {
       title: (
@@ -349,12 +374,15 @@ export default function VehicleOwnerMaster() {
         url ? (
           <Button
             type="link"
+            className="h-auto! p-0!"
             onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
           >
             View
           </Button>
         ) : (
-          <span className="text-gray-400">-</span>
+          <span className="bg-red-100 text-red-600 px-2 py-1 rounded font-medium">
+            Pending
+          </span>
         ),
     },
     {
@@ -721,6 +749,7 @@ export default function VehicleOwnerMaster() {
           dataSource={filteredData}
           rowKey="key"
           size="small"
+          scroll={{ x: 1700 }}
         />
       </div>
 

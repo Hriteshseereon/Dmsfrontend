@@ -75,6 +75,26 @@ export default function VehicleMaster() {
     }
   };
 
+  //  resubale component
+  const renderDocumentStatus = (url) => {
+    if (url) {
+      return (
+        <Button
+          type="link"
+          className="h-auto! p-0!"
+          onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
+        >
+          View
+        </Button>
+      );
+    }
+
+    return (
+      <span className="bg-red-100 text-red-600 px-2 py-1 rounded font-medium">
+        Pending
+      </span>
+    );
+  };
   const fetchallpassingWeight = async () => {
     try {
       const res = await getallPassingWeight();
@@ -359,7 +379,7 @@ export default function VehicleMaster() {
     {
       title: <span className="text-amber-700 font-semibold">Vehicle No.</span>,
       dataIndex: "vehicleNo",
-      width: 130,
+      width: 80,
       fixed: "left",
       render: (text) => (
         <span className="text-amber-800 whitespace-nowrap">{text || "-"}</span>
@@ -368,20 +388,20 @@ export default function VehicleMaster() {
     {
       title: <span className="text-amber-700 font-semibold">Owner</span>,
       dataIndex: "ownerName",
-      width: 180,
+      width: 120,
       ellipsis: true,
       render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Type</span>,
       dataIndex: "vehicleType",
-      width: 120,
+      width: 50,
       render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Weight</span>,
       dataIndex: "passingWeight",
-      width: 110,
+      width: 90,
       align: "center",
       render: (text) => (
         <span className="text-amber-800 whitespace-nowrap">{text || "-"}</span>
@@ -390,7 +410,7 @@ export default function VehicleMaster() {
     {
       title: <span className="text-amber-700 font-semibold">Regd. Date</span>,
       dataIndex: "regdDate",
-      width: 120,
+      width: 100,
       align: "center",
       render: (text) => (
         <span className="text-amber-800 whitespace-nowrap">
@@ -401,7 +421,7 @@ export default function VehicleMaster() {
     {
       title: <span className="text-amber-700 font-semibold">Chassis No.</span>,
       dataIndex: "chassisNo",
-      width: 210,
+      width: 150,
       ellipsis: true,
       render: (text) => <span className="text-amber-800">{text || "-"}</span>,
     },
@@ -428,6 +448,27 @@ export default function VehicleMaster() {
           {text ? dayjs(text).format(DATE_FORMAT) : "-"}
         </span>
       ),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Tax Copy</span>,
+      dataIndex: "taxCopy",
+      width: 100,
+      align: "center",
+      render: renderDocumentStatus,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Fitness Copy</span>,
+      dataIndex: "fitnessCopy",
+      width: 110,
+      align: "center",
+      render: renderDocumentStatus,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Permit Copy</span>,
+      dataIndex: "permitCopy",
+      width: 110,
+      align: "center",
+      render: renderDocumentStatus,
     },
     {
       title: (
@@ -510,13 +551,19 @@ export default function VehicleMaster() {
   ];
 
   /* ---------------- SMALL UPLOAD FIELD ---------------- */
-  const UploadField = ({ label, name, disabled }) => (
+  const UploadField = ({ label, name, disabled, required = false }) => (
     <Col span={8}>
       <Form.Item
         label={label}
         name={name}
         valuePropName="fileList"
         getValueFromEvent={normFile}
+        rules={[
+          {
+            required: required && !disabled,
+            message: `${label} is required`,
+          },
+        ]}
       >
         <Upload
           listType="text"
@@ -536,7 +583,6 @@ export default function VehicleMaster() {
       </Form.Item>
     </Col>
   );
-
   /* ---------------- COMMON FORM FIELDS ---------------- */
   const VehicleFields = ({ disabled = false }) => (
     <Row gutter={16}>
@@ -614,6 +660,7 @@ export default function VehicleMaster() {
         label="Upload RC Copy"
         name="rcCopyUpload"
         disabled={disabled}
+        required
       />
 
       <Col span={8}>
@@ -632,6 +679,7 @@ export default function VehicleMaster() {
         label="Upload Chassis No. - Stencil Copy"
         name="chassisCopyUpload"
         disabled={disabled}
+        required
       />
 
       <Col span={8}>
@@ -652,6 +700,7 @@ export default function VehicleMaster() {
         label="Upload Insurance Copy"
         name="insuranceCopyUpload"
         disabled={disabled}
+        required
       />
       <UploadField
         label="Upload Tax Paid Copy"
