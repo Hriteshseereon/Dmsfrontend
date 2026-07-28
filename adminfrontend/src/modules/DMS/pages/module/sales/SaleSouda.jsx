@@ -23,6 +23,7 @@ import {
   message,
   Popconfirm,
   Space,
+  Tooltip,
 } from "antd";
 import {
   SearchOutlined,
@@ -54,6 +55,7 @@ import {
   getAllPlantsName,
   getProductByplant,
   deleteSalesContract,
+  getAllPassingWeight,
 } from "../../../../../api/sales";
 import { getAdminCustomerDetails } from "../../../../../api/customer";
 import AppDatePicker from "../../../../../components/AppDatePicker";
@@ -99,14 +101,29 @@ export default function SalesSouda() {
   const selectedFY = useSelectedFinancialYear();
   const plantRef = useRef(null);
   const brokerRef = useRef(null);
+  const grossWeightRef = useRef(null);
   const itemRefs = useRef({});
   const contractDateRef = useRef(null);
   const validFromRef = useRef();
   const validToRef = useRef();
+
+  const editPlantRef = useRef(null);
+  const editBrokerRef = useRef(null);
+  const editGrossWeightRef = useRef(null);
+  const editContractDateRef = useRef(null);
+  const editValidFromRef = useRef(null);
+  const editValidToRef = useRef(null);
   const [plantDropdownOpen, setPlantDropdownOpen] = useState(false);
   const [brokerDropdownOpen, setBrokerDropdownOpen] = useState(false);
   const [addItemDropdownIndex, setAddItemDropdownIndex] = useState(null);
   const [editItemDropdownIndex, setEditItemDropdownIndex] = useState(null);
+  const [grossWeightDropdownOpen, setGrossWeightDropdownOpen] = useState(false);
+  const [editGrossWeightDropdownOpen, setEditGrossWeightDropdownOpen] =
+    useState(false);
+  const [editPlantDropdownOpen, setEditPlantDropdownOpen] = useState(false);
+
+  const [editBrokerDropdownOpen, setEditBrokerDropdownOpen] = useState(false);
+
   const qtyRefs = useRef({});
   const contractRateRefs = useRef({});
   const [extendForm] = Form.useForm();
@@ -114,6 +131,7 @@ export default function SalesSouda() {
   const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
 
   const [selectedContract, setSelectedContract] = useState(null);
+  const [passingWeights, setPassingWeights] = useState([]);
   // Draft functions
   // date helper
   const parseApiDate = (value) => {
@@ -167,7 +185,37 @@ export default function SalesSouda() {
 
     fetchCustomers();
   }, []);
+  // GET ALL THE PASSING WEIGHT DATA
+  useEffect(() => {
+    const fetchPassingWeights = async () => {
+      try {
+        const res = await getAllPassingWeight();
 
+        const list = res?.data || res || [];
+
+        const uniqueWeights = [
+          ...new Set(
+            list
+              .filter(
+                (item) =>
+                  item !== null &&
+                  item !== undefined &&
+                  item !== "" &&
+                  !Number.isNaN(Number(item)),
+              )
+              .map((item) => String(item)),
+          ),
+        ].sort((a, b) => Number(a) - Number(b));
+
+        setPassingWeights(uniqueWeights);
+      } catch (error) {
+        console.error("Failed to fetch passing weights:", error);
+        setPassingWeights([]);
+      }
+    };
+
+    fetchPassingWeights();
+  }, []);
   useEffect(() => {
     const fetchBrokerDetails = async () => {
       try {
@@ -282,7 +330,11 @@ export default function SalesSouda() {
       soudaDate: parseApiDate(contract.created_date),
       startDate: parseApiDate(contract.from_date),
       endDate: parseApiDate(contract.to_date),
-
+      contratGrossWeight:
+        contract.contrat_gross_weight !== null &&
+        contract.contrat_gross_weight !== undefined
+          ? String(contract.contrat_gross_weight)
+          : "loose",
       items: (contract.items || []).map((it, idx) => ({
         lineKey: it.id || idx + 1,
         vendorId: it.company_group_id,
@@ -438,6 +490,10 @@ export default function SalesSouda() {
       plant_id: values.plantId || null, // ✅ NEW
       broker_id: values.brokerId || null,
       broker_name: values.brokerId ? values.brokerName?.label || null : null,
+      contrat_gross_weight:
+        values.contratGrossWeight === "loose"
+          ? null
+          : Number(values.contratGrossWeight),
       created_date: values.soudaDate
         ? dayjs(values.soudaDate).format("YYYY-MM-DD")
         : null,
@@ -553,6 +609,66 @@ export default function SalesSouda() {
     );
   };
 
+  // validation
+  const validateContractGrossWeight = (contractGrossWeight, totalWeightTon) => {
+    // Nothing selected
+    if (
+      contractGrossWeight === undefined ||
+      contractGrossWeight === null ||
+      contractGrossWeight === ""
+    ) {
+      return {
+        valid: false,
+        message: "Please select Contract Gross Weight.",
+      };
+    }
+
+    // Loose = no weight restriction
+    if (String(contractGrossWeight).toLowerCase() === "loose") {
+      return {
+        valid: true,
+        message: "",
+      };
+    }
+
+    const selectedWeight = Number(contractGrossWeight);
+    const actualWeight = Number(totalWeightTon || 0);
+
+    if (Number.isNaN(selectedWeight) || selectedWeight <= 0) {
+      return {
+        valid: false,
+        message: "Invalid Contract Gross Weight.",
+      };
+    }
+
+    // Maximum allowed = selected weight + 5%
+    const maxAllowedWeight = selectedWeight * 1.05;
+
+    if (actualWeight < selectedWeight) {
+      return {
+        valid: false,
+        message: `Gross Weight cannot be less than ${selectedWeight.toFixed(
+          3,
+        )} Ton. Current Gross Weight is ${actualWeight.toFixed(3)} Ton.`,
+      };
+    }
+
+    if (actualWeight > maxAllowedWeight) {
+      return {
+        valid: false,
+        message: `Gross Weight cannot exceed ${maxAllowedWeight.toFixed(
+          3,
+        )} Ton (5% tolerance). Current Gross Weight is ${actualWeight.toFixed(
+          3,
+        )} Ton.`,
+      };
+    }
+
+    return {
+      valid: true,
+      message: "",
+    };
+  };
   // compute per-item + order totals
   const computeFromFormValues = (values) => {
     const items = (values.items || []).map((it, idx) => ({
@@ -1066,6 +1182,21 @@ export default function SalesSouda() {
       };
 
       form.setFieldsValue({ items: updatedItems });
+
+      const currentValues = form.getFieldsValue(true);
+
+      const computed = computeFromFormValues({
+        ...currentValues,
+        items: updatedItems,
+      });
+
+      form.setFieldsValue({
+        orderTaxAndTotals: {
+          ...currentValues.orderTaxAndTotals,
+          ...computed.orderTaxAndTotals,
+        },
+        orderTotals: computed.orderTotals,
+      });
     };
 
     const handleAutoAddRow = (add) => {
@@ -1193,6 +1324,11 @@ export default function SalesSouda() {
                         e.target.value = e.target.value
                           .replace(/\D/g, "")
                           .slice(0, 5);
+                      }}
+                      onChange={() => {
+                        setTimeout(() => {
+                          recalculateRow(field.name);
+                        }, 0);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === "Tab") {
@@ -1409,6 +1545,15 @@ export default function SalesSouda() {
   // Add / Edit submit handlers - ensure startDate/endDate are saved (company moved into items)
   const handleAddFinish = async (values) => {
     try {
+      const validation = validateContractGrossWeight(
+        values.contratGrossWeight,
+        values.orderTotals?.totalWeightTon,
+      );
+
+      if (!validation.valid) {
+        message.error(validation.message);
+        return;
+      }
       const payload = buildCreateContractPayload(values);
 
       // 🔍 Debug logging
@@ -1476,6 +1621,15 @@ export default function SalesSouda() {
   // Edit submit handler
   const handleEditFinish = async (values) => {
     try {
+      const validation = validateContractGrossWeight(
+        values.contratGrossWeight,
+        values.orderTotals?.totalWeightTon,
+      );
+
+      if (!validation.valid) {
+        message.error(validation.message);
+        return;
+      }
       // Re-calculate item totals to be safe
       const round2 = (value) => Number(Number(value || 0).toFixed(2));
       const items = (values.items || [])
@@ -1529,6 +1683,10 @@ export default function SalesSouda() {
           values.brokerId?.value === "direct"
             ? null
             : values.brokerId?.label || null,
+        contrat_gross_weight:
+          values.contratGrossWeight === "loose"
+            ? null
+            : Number(values.contratGrossWeight),
         status: values.status,
         created_date: values.soudaDate
           ? dayjs(values.soudaDate).format("YYYY-MM-DD")
@@ -1874,7 +2032,10 @@ export default function SalesSouda() {
                         });
                       }
                       setBrokerDropdownOpen(false);
-                      setTimeout(() => contractDateRef.current?.focus(), 100);
+                      setTimeout(() => {
+                        grossWeightRef.current?.focus();
+                        setGrossWeightDropdownOpen(true);
+                      }, 100);
                     }}
                   >
                     <Select.Option key="direct" value="direct">
@@ -1891,7 +2052,45 @@ export default function SalesSouda() {
                   <Input />
                 </Form.Item>
               </Col>
-              <Col span={3}>
+              <Col span={2}>
+                <Form.Item
+                  label={<span className="text-amber-700">Gross Weight</span>}
+                  name="contratGrossWeight"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Select Contract Gross Weight",
+                    },
+                  ]}
+                >
+                  <Select
+                    ref={grossWeightRef}
+                    open={grossWeightDropdownOpen}
+                    onDropdownVisibleChange={(visible) =>
+                      setGrossWeightDropdownOpen(visible)
+                    }
+                    placeholder="Select Gross Weight"
+                    showSearch
+                    optionFilterProp="children"
+                    onChange={() => {
+                      setGrossWeightDropdownOpen(false);
+
+                      setTimeout(() => {
+                        contractDateRef.current?.focus();
+                      }, 100);
+                    }}
+                  >
+                    <Select.Option value="loose">Loose</Select.Option>
+
+                    {passingWeights.map((weight) => (
+                      <Select.Option key={weight} value={weight}>
+                        {weight} Ton
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={2}>
                 <Form.Item
                   label={<span className="text-amber-700">Contract Date</span>}
                   name="soudaDate"
@@ -1920,7 +2119,7 @@ export default function SalesSouda() {
                 </Form.Item>
               </Col>
 
-              <Col span={3}>
+              <Col span={2}>
                 <Form.Item
                   label={<span className="text-amber-700">Valid From</span>}
                   name="startDate"
@@ -1940,7 +2139,7 @@ export default function SalesSouda() {
                 </Form.Item>
               </Col>
 
-              <Col span={3}>
+              <Col span={2}>
                 <Form.Item
                   label={<span className="text-amber-700">Valid To</span>}
                   name="endDate"
@@ -2060,8 +2259,54 @@ export default function SalesSouda() {
               </Col>
               <Col span={3}></Col>
               <Col span={1}>
-                <Form.Item name={["orderTotals", "totalWeightTon"]}>
-                  <Input disabled />
+                <Form.Item
+                  shouldUpdate={(prev, current) =>
+                    prev?.contratGrossWeight !== current?.contratGrossWeight ||
+                    prev?.orderTotals?.totalWeightTon !==
+                      current?.orderTotals?.totalWeightTon
+                  }
+                  noStyle
+                >
+                  {({ getFieldValue }) => {
+                    const contractGrossWeight =
+                      getFieldValue("contratGrossWeight");
+
+                    const totalWeightTon = Number(
+                      getFieldValue(["orderTotals", "totalWeightTon"]) || 0,
+                    );
+
+                    const validation = validateContractGrossWeight(
+                      contractGrossWeight,
+                      totalWeightTon,
+                    );
+
+                    const shouldShowError =
+                      contractGrossWeight &&
+                      String(contractGrossWeight).toLowerCase() !== "loose" &&
+                      !validation.valid;
+
+                    return (
+                      <Form.Item
+                        name={["orderTotals", "totalWeightTon"]}
+                        validateStatus={shouldShowError ? "error" : ""}
+                        help={
+                          shouldShowError ? (
+                            <Tooltip title={validation.message}>
+                              <span className="text-red-500 cursor-pointer text-[11px]">
+                                Allowed: {contractGrossWeight}T -{" "}
+                                {(Number(contractGrossWeight) * 1.05).toFixed(
+                                  2,
+                                )}
+                                T
+                              </span>
+                            </Tooltip>
+                          ) : null
+                        }
+                      >
+                        <Input disabled />
+                      </Form.Item>
+                    );
+                  }}
                 </Form.Item>
               </Col>
               <Col span={5}></Col>
@@ -2206,58 +2451,109 @@ export default function SalesSouda() {
                   <Input disabled />
                 </Form.Item>
               </Col>
-              <Form.Item
-                label={<span className="text-amber-700">Plant Name</span>}
-                name="plantId"
-                rules={[{ required: true, message: "Select Plant Name" }]}
-              >
-                <Select
-                  placeholder="Select Plant"
-                  showSearch
-                  optionFilterProp="children"
-                >
-                  {plants.map((plant) => (
-                    <Select.Option key={plant.plant_id} value={plant.plant_id}>
-                      {plant.plant_name}
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
-
-              <Form.Item
-                label={<span className="text-amber-700">Broker Name</span>}
-                name="brokerId"
-                rules={[{ required: true, message: "Select Broker Name" }]}
-              >
-                <Select
-                  placeholder="Select Broker"
-                  showSearch
-                  optionFilterProp="children"
-                  labelInValue
-                  onChange={(option) => {
-                    if (option?.value === "direct") {
-                      editForm.setFieldsValue({
-                        brokerId: { value: "direct", label: "Direct" },
-                      });
-                    } else {
-                      const firstWord = option.label?.split(" ")[0] || "";
-                      editForm.setFieldsValue({
-                        brokerId: { value: option.value, label: firstWord },
-                      });
-                    }
-                  }}
-                >
-                  <Select.Option key="direct" value="direct">
-                    Direct
-                  </Select.Option>
-                  {brokers.map((broker) => (
-                    <Select.Option key={broker.id} value={broker.id}>
-                      {broker.name}
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
               <Col span={3}>
+                <Form.Item
+                  label={<span className="text-amber-700">Plant Name</span>}
+                  name="plantId"
+                  rules={[{ required: true, message: "Select Plant Name" }]}
+                >
+                  <Select
+                    placeholder="Select Plant"
+                    showSearch
+                    optionFilterProp="children"
+                  >
+                    {plants.map((plant) => (
+                      <Select.Option
+                        key={plant.plant_id}
+                        value={plant.plant_id}
+                      >
+                        {plant.plant_name}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+
+              <Col span={3}>
+                <Form.Item
+                  label={<span className="text-amber-700">Broker Name</span>}
+                  name="brokerId"
+                  rules={[{ required: true, message: "Select Broker Name" }]}
+                >
+                  <Select
+                    ref={editBrokerRef}
+                    open={editBrokerDropdownOpen}
+                    onDropdownVisibleChange={setEditBrokerDropdownOpen}
+                    labelInValue
+                    placeholder="Select Broker"
+                    onChange={(option) => {
+                      if (option?.value === "direct") {
+                        editForm.setFieldsValue({
+                          brokerId: null,
+                          brokerName: {
+                            value: "direct",
+                            label: "Direct",
+                          },
+                        });
+                      } else {
+                        const firstWord = option.label?.split(" ")[0] || "";
+
+                        editForm.setFieldsValue({
+                          brokerId: option.value,
+                          brokerName: {
+                            value: option.value,
+                            label: firstWord,
+                          },
+                        });
+                      }
+
+                      setEditBrokerDropdownOpen(false);
+
+                      // Broker -> Gross Weight
+                      setTimeout(() => {
+                        editGrossWeightRef.current?.focus();
+                        setEditGrossWeightDropdownOpen(true);
+                      }, 100);
+                    }}
+                  >
+                    <Select.Option key="direct" value="direct">
+                      Direct
+                    </Select.Option>
+                    {brokers.map((broker) => (
+                      <Select.Option key={broker.id} value={broker.id}>
+                        {broker.name}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={2}>
+                <Form.Item
+                  label={<span className="text-amber-700">Gross Weight</span>}
+                  name="contratGrossWeight"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Select Contract Gross Weight",
+                    },
+                  ]}
+                >
+                  <Select
+                    placeholder="Select Gross Weight"
+                    showSearch
+                    optionFilterProp="children"
+                  >
+                    <Select.Option value="loose">Loose</Select.Option>
+
+                    {passingWeights.map((weight) => (
+                      <Select.Option key={weight} value={weight}>
+                        {weight} Ton
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={2}>
                 <Form.Item
                   label={<span className="text-amber-700">Contract Date</span>}
                   name="soudaDate"
@@ -2285,7 +2581,7 @@ export default function SalesSouda() {
                 </Form.Item>
               </Col>
 
-              <Col span={3}>
+              <Col span={2}>
                 <Form.Item
                   label={<span className="text-amber-700">Valid From</span>}
                   name="startDate"
@@ -2305,7 +2601,7 @@ export default function SalesSouda() {
                 </Form.Item>
               </Col>
 
-              <Col span={3}>
+              <Col span={2}>
                 <Form.Item
                   label={<span className="text-amber-700">Valid To</span>}
                   name="endDate"
@@ -2382,7 +2678,7 @@ export default function SalesSouda() {
             <ItemsTable
               form={editForm}
               allowRemove={false}
-              allowAdd={false}
+              allowAdd={true}
               productList={vendorProductsMap[selectedPlantId] || []}
               openItemIndex={editItemDropdownIndex}
               setOpenItemIndex={setEditItemDropdownIndex}
@@ -2408,8 +2704,54 @@ export default function SalesSouda() {
               </Col>
               <Col span={3}></Col>
               <Col span={1}>
-                <Form.Item name={["orderTotals", "totalWeightTon"]}>
-                  <Input disabled />
+                <Form.Item
+                  shouldUpdate={(prev, current) =>
+                    prev?.contratGrossWeight !== current?.contratGrossWeight ||
+                    prev?.orderTotals?.totalWeightTon !==
+                      current?.orderTotals?.totalWeightTon
+                  }
+                  noStyle
+                >
+                  {({ getFieldValue }) => {
+                    const contractGrossWeight =
+                      getFieldValue("contratGrossWeight");
+
+                    const totalWeightTon = Number(
+                      getFieldValue(["orderTotals", "totalWeightTon"]) || 0,
+                    );
+
+                    const validation = validateContractGrossWeight(
+                      contractGrossWeight,
+                      totalWeightTon,
+                    );
+
+                    const shouldShowError =
+                      contractGrossWeight &&
+                      String(contractGrossWeight).toLowerCase() !== "loose" &&
+                      !validation.valid;
+
+                    return (
+                      <Form.Item
+                        name={["orderTotals", "totalWeightTon"]}
+                        validateStatus={shouldShowError ? "error" : ""}
+                        help={
+                          shouldShowError ? (
+                            <Tooltip title={validation.message}>
+                              <span className="text-red-500 cursor-pointer text-[11px]">
+                                {contractGrossWeight}T -{" "}
+                                {(Number(contractGrossWeight) * 1.05).toFixed(
+                                  2,
+                                )}
+                                T
+                              </span>
+                            </Tooltip>
+                          ) : null
+                        }
+                      >
+                        <Input disabled />
+                      </Form.Item>
+                    );
+                  }}
                 </Form.Item>
               </Col>
               <Col span={5}></Col>
@@ -2560,8 +2902,34 @@ export default function SalesSouda() {
                   </Select>
                 </Form.Item>
               </Col>
+              <Col span={2}>
+                <Form.Item
+                  label={<span className="text-amber-700">Gross Weight</span>}
+                  name="contratGrossWeight"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Select Contract Gross Weight",
+                    },
+                  ]}
+                >
+                  <Select
+                    placeholder="Select Gross Weight"
+                    showSearch
+                    optionFilterProp="children"
+                    disabled
+                  >
+                    <Select.Option value="loose">Loose</Select.Option>
 
-              <Col span={3}>
+                    {passingWeights.map((weight) => (
+                      <Select.Option key={weight} value={weight}>
+                        {weight} Ton
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={2}>
                 <Form.Item
                   label={<span className="text-amber-700">Contract Date</span>}
                   name="soudaDate"
@@ -2570,7 +2938,7 @@ export default function SalesSouda() {
                 </Form.Item>
               </Col>
 
-              <Col span={3}>
+              <Col span={2}>
                 <Form.Item
                   label={<span className="text-amber-700">Valid From</span>}
                   name="startDate"
@@ -2579,7 +2947,7 @@ export default function SalesSouda() {
                 </Form.Item>
               </Col>
 
-              <Col span={3}>
+              <Col span={2}>
                 <Form.Item
                   label={<span className="text-amber-700">Valid To</span>}
                   name="endDate"

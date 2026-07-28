@@ -20,6 +20,14 @@ export const getSalescontractGroups = async () => {
   const res = await api.get(`/sales/contracts/`, { params: { organisation: currentOrgId.currentOrgId,financial_year: selectedFY, } });
   return res.data;
 }
+
+export const getunusedSaleContractGroup = async () => {
+  const { currentOrgId, selectedFY } = useSessionStore.getState();
+  const res = await api.get(`/sales/contracts/unused/`, { params: { organisation: currentOrgId, financial_year: selectedFY } });
+  return res.data;
+}
+
+getunusedSaleContractGroup()
 export const getSalesValidContractGroups = async () => {
   const { currentOrgId, selectedFY } = useSessionStore.getState();
   const res = await api.get(`/sales/contracts/active-dropdown/`, { params: { organisation: currentOrgId, financial_year: selectedFY } });
@@ -421,3 +429,17 @@ export const getCustomerLedger = async (customer_id) => {
 
   return res.data;
 };
+
+
+// get all passing weight 
+
+export const getAllPassingWeight = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("transport/vehicle-masters/unique-passing-weights/", {
+    params: { organisation: currentOrgId },
+  });
+
+  return res.data;
+}
+
+getAllPassingWeight()
