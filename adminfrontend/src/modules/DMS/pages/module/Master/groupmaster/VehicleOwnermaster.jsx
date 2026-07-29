@@ -332,7 +332,7 @@ export default function VehicleOwnerMaster() {
           className={
             record.panDocument
               ? "text-amber-800"
-              : "text-amber-800 bg-red-200 px-2 py-1 rounded"
+              : "text-amber-800 bg-red-200 px-1.5 py-0.5 rounded text-xs"
           }
         >
           {text || "-"}
@@ -347,7 +347,7 @@ export default function VehicleOwnerMaster() {
           className={
             record.aadhaarDocument
               ? "text-amber-800"
-              : "text-amber-800 bg-red-200 px-2 py-1 rounded"
+              : "text-amber-800 bg-red-200 px-1.5 py-0.5 rounded text-xs"
           }
         >
           {text || "-"}
@@ -380,7 +380,7 @@ export default function VehicleOwnerMaster() {
             View
           </Button>
         ) : (
-          <span className="bg-red-100 text-red-600 px-2 py-1 rounded font-medium">
+          <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-xs font-medium">
             Pending
           </span>
         ),
@@ -389,7 +389,7 @@ export default function VehicleOwnerMaster() {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       width: 120,
       render: (_, record) => (
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <EyeOutlined
             className="cursor-pointer! text-red-500! hover:text-red-600!"
             onClick={() => handleViewClick(record.key)}
@@ -743,13 +743,14 @@ export default function VehicleOwnerMaster() {
       </div>
 
       {/* ---------------- TABLE ---------------- */}
-      <div className="border border-amber-300 rounded-lg p-4 bg-white shadow-md">
+      <div className="border border-amber-300 rounded-lg p-3 bg-white shadow-md">
         <Table
           columns={columns}
           dataSource={filteredData}
           rowKey="key"
           size="small"
           scroll={{ x: 1700 }}
+          className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1 [&_.ant-table-thead_th]:!py-1.5"
         />
       </div>
 

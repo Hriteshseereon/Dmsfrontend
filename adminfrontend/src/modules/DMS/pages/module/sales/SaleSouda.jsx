@@ -906,9 +906,12 @@ export default function SalesSouda() {
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
       dataIndex: "customer",
-      width: 100,
+      width: 140,
+      ellipsis: true,
       render: (text) => (
-        <span>{text ? text.split(" ").slice(0, 2).join(" ") : "-"}</span>
+        <span className="whitespace-nowrap" title={text || ""}>
+          {text || "-"}
+        </span>
       ),
     },
     {
@@ -1869,6 +1872,7 @@ export default function SalesSouda() {
           rowKey="key"
           size="small"
           rowClassName={getRowClassName}
+          className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1 [&_.ant-table-thead_th]:!py-1.5"
         />
       </div>
 
