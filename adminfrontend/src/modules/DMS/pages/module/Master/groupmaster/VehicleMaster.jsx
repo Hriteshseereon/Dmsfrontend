@@ -90,7 +90,7 @@ export default function VehicleMaster() {
     }
 
     return (
-      <span className="bg-red-100 text-red-600 px-2 py-1 rounded font-medium">
+      <span className="bg-red-100 text-red-600 px-1.5 py-0.5 rounded text-xs font-medium">
         Pending
       </span>
     );
@@ -379,7 +379,7 @@ export default function VehicleMaster() {
     {
       title: <span className="text-amber-700 font-semibold">Vehicle No.</span>,
       dataIndex: "vehicleNo",
-      width: 80,
+      width: 105,
       fixed: "left",
       render: (text) => (
         <span className="text-amber-800 whitespace-nowrap">{text || "-"}</span>
@@ -388,20 +388,24 @@ export default function VehicleMaster() {
     {
       title: <span className="text-amber-700 font-semibold">Owner</span>,
       dataIndex: "ownerName",
-      width: 120,
+      width: 145,
       ellipsis: true,
-      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+      render: (text) => (
+        <span className="text-amber-800 whitespace-nowrap">{text || "-"}</span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Type</span>,
       dataIndex: "vehicleType",
-      width: 50,
-      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+      width: 95,
+      render: (text) => (
+        <span className="text-amber-800 whitespace-nowrap">{text || "-"}</span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Weight</span>,
       dataIndex: "passingWeight",
-      width: 90,
+      width: 75,
       align: "center",
       render: (text) => (
         <span className="text-amber-800 whitespace-nowrap">{text || "-"}</span>
@@ -410,7 +414,7 @@ export default function VehicleMaster() {
     {
       title: <span className="text-amber-700 font-semibold">Regd. Date</span>,
       dataIndex: "regdDate",
-      width: 100,
+      width: 95,
       align: "center",
       render: (text) => (
         <span className="text-amber-800 whitespace-nowrap">
@@ -421,16 +425,18 @@ export default function VehicleMaster() {
     {
       title: <span className="text-amber-700 font-semibold">Chassis No.</span>,
       dataIndex: "chassisNo",
-      width: 150,
+      width: 130,
       ellipsis: true,
-      render: (text) => <span className="text-amber-800">{text || "-"}</span>,
+      render: (text) => (
+        <span className="text-amber-800 whitespace-nowrap">{text || "-"}</span>
+      ),
     },
     {
       title: (
         <span className="text-amber-700 font-semibold">Insurance Valid</span>
       ),
       dataIndex: "insuranceValidUpto",
-      width: 125,
+      width: 110,
       align: "center",
       render: (text) => (
         <span className="text-amber-800 whitespace-nowrap">
@@ -441,7 +447,7 @@ export default function VehicleMaster() {
     {
       title: <span className="text-amber-700 font-semibold">Tax Valid</span>,
       dataIndex: "taxPaidUpto",
-      width: 120,
+      width: 95,
       align: "center",
       render: (text) => (
         <span className="text-amber-800 whitespace-nowrap">
@@ -452,21 +458,21 @@ export default function VehicleMaster() {
     {
       title: <span className="text-amber-700 font-semibold">Tax Copy</span>,
       dataIndex: "taxCopy",
-      width: 100,
+      width: 85,
       align: "center",
       render: renderDocumentStatus,
     },
     {
       title: <span className="text-amber-700 font-semibold">Fitness Copy</span>,
       dataIndex: "fitnessCopy",
-      width: 110,
+      width: 95,
       align: "center",
       render: renderDocumentStatus,
     },
     {
       title: <span className="text-amber-700 font-semibold">Permit Copy</span>,
       dataIndex: "permitCopy",
-      width: 110,
+      width: 95,
       align: "center",
       render: renderDocumentStatus,
     },
@@ -475,7 +481,7 @@ export default function VehicleMaster() {
         <span className="text-amber-700 font-semibold">Fitness Valid</span>
       ),
       dataIndex: "fitnessValidUpto",
-      width: 120,
+      width: 105,
       align: "center",
       render: (text) => (
         <span className="text-amber-800 whitespace-nowrap">
@@ -486,7 +492,7 @@ export default function VehicleMaster() {
     {
       title: <span className="text-amber-700 font-semibold">Permit Valid</span>,
       dataIndex: "permitUpto",
-      width: 120,
+      width: 100,
       align: "center",
       render: (text) => (
         <span className="text-amber-800 whitespace-nowrap">
@@ -499,7 +505,7 @@ export default function VehicleMaster() {
         <span className="text-amber-700 font-semibold">N. Permit Valid</span>
       ),
       dataIndex: "nationalPermitUpto",
-      width: 130,
+      width: 110,
       align: "center",
       render: (text) => (
         <span className="text-amber-800 whitespace-nowrap">
@@ -510,7 +516,7 @@ export default function VehicleMaster() {
     {
       title: <span className="text-amber-700 font-semibold">GPS</span>,
       dataIndex: "gpsSystem",
-      width: 80,
+      width: 55,
       align: "center",
       render: (value) => (
         <span
@@ -785,14 +791,14 @@ export default function VehicleMaster() {
       </div>
 
       {/* ---------------- TABLE ---------------- */}
-      <div className="border border-amber-300 rounded-lg p-4 bg-white shadow-md">
+      <div className="border border-amber-300 rounded-lg p-3 bg-white shadow-md">
         <Table
           columns={columns}
           dataSource={filteredData}
           rowKey="key"
           size="small"
-          // bordered
-          scroll={{ x: 1700 }}
+          scroll={{ x: 1600 }}
+          className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1 [&_.ant-table-thead_th]:!py-1.5"
         />
       </div>
 
