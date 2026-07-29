@@ -31,7 +31,7 @@ export const cityData = {
     Nayagarh: ["Nayagarh", "Daspalla", "Khandapada","Bhapur", "Gania","Khandapara","Nayagarh","Nuagaon","Odagaon","Ranapur"],
  
     Mayurbhanj: ["Badasahi","Bahalda","Bangriposi","Baripada","Betnoti","Bijatala","Bisoi","Gopabandhunagar","Jamda","Joshipur","Kaptipada","Karanjia","Khunta","Kuliana","Kusumi","Morada","Rairangpur","Raruan","Rasgovindpur","Samakhunta","Saraskana","Sukruli","Suliapada","Thakurmunda","Tiring","Udala","Dukura"],
-    Kendujhar: ["Anandapur","Bansapal","Champua","Ghasipura","Ghatgaon","Harichadanpur","Hatadihi","Jhumpura","Joda","Kendujhar Sadar","Patana","Saharapada","Telkoi","Barbil","Naranpur","Basantia"],
+    Kendujhar: ["Anandapur","Bansapal","Champua","Ghasipura","Ghatgaon","Harichadanpur","Hatadihi","Jhumpura","Joda","Kendujhar Sadar","Patana","Saharapada","Telkoi","Barbil","Naranpur","Basantia","Kendujhar"],
     Deogarh: ["Deogarh","Barkote","Reamal","Tileibani"],
   },
  
