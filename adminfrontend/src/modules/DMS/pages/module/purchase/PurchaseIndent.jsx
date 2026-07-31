@@ -36,6 +36,7 @@ import {
   getAllTransport,
   addAssignment,
   updatePurchaseSalesContractOrder,
+  downloadPurchaseOrderPDF,
 } from "../../../../../api/purchase";
 import {
   getSalesContractById,
@@ -217,17 +218,19 @@ export default function PurchaseIndent() {
         const res = await getAllPassingWeight();
         const list = res?.data || res || [];
 
+        // API returns values like "27 TON" — extract numeric part
         const uniqueWeights = [
           ...new Set(
             list
-              .filter(
-                (item) =>
-                  item !== null &&
-                  item !== undefined &&
-                  item !== "" &&
-                  !Number.isNaN(Number(item)),
-              )
-              .map((item) => String(item)),
+              .map((item) => {
+                if (item === null || item === undefined || item === "")
+                  return null;
+                const match = String(item).match(/[\d.]+/);
+                if (!match) return null;
+                const num = Number(match[0]);
+                return Number.isNaN(num) ? null : String(num);
+              })
+              .filter(Boolean),
           ),
         ].sort((a, b) => Number(a) - Number(b));
 
@@ -619,7 +622,7 @@ export default function PurchaseIndent() {
     ) {
       return {
         valid: false,
-        message: "Please select Contract Gross Weight.",
+        message: "Please select Passing Weight.",
       };
     }
 
@@ -630,13 +633,15 @@ export default function PurchaseIndent() {
       };
     }
 
-    const selectedWeight = Number(contractGrossWeight);
+    const selectedWeight = Number(
+      String(contractGrossWeight).match(/[\d.]+/)?.[0],
+    );
     const actualWeight = Number(totalWeightTon || 0);
 
     if (Number.isNaN(selectedWeight) || selectedWeight <= 0) {
       return {
         valid: false,
-        message: "Invalid Contract Gross Weight.",
+        message: "Invalid Passing Weight.",
       };
     }
 
@@ -645,14 +650,14 @@ export default function PurchaseIndent() {
     if (actualWeight < selectedWeight) {
       return {
         valid: false,
-        message: `Gross Weight cannot be less than ${selectedWeight.toFixed(3)} Ton. Current Gross Weight is ${actualWeight.toFixed(3)} Ton.`,
+        message: `Passing Weight cannot be less than ${selectedWeight.toFixed(3)} Ton. Current Gross Weight is ${actualWeight.toFixed(3)} Ton.`,
       };
     }
 
     if (actualWeight > maxAllowedWeight) {
       return {
         valid: false,
-        message: `Gross Weight cannot exceed ${maxAllowedWeight.toFixed(3)} Ton (5% tolerance). Current Gross Weight is ${actualWeight.toFixed(3)} Ton.`,
+        message: `Passing Weight cannot exceed ${maxAllowedWeight.toFixed(3)} Ton (5% tolerance). Current Gross Weight is ${actualWeight.toFixed(3)} Ton.`,
       };
     }
 
@@ -875,6 +880,31 @@ export default function PurchaseIndent() {
   // ---------------------------------------------------------------
   // Related contracts actions
   // ---------------------------------------------------------------
+  const handleDownloadPurchaseOrderPDF = async (record) => {
+    const orderId = record.id || record.key;
+    if (!orderId) {
+      message.error("Purchase order id not found");
+      return;
+    }
+    try {
+      message.loading({
+        content: "Downloading purchase order PDF...",
+        key: "download_po",
+      });
+      await downloadPurchaseOrderPDF(orderId);
+      message.success({
+        content: "Purchase order PDF downloaded!",
+        key: "download_po",
+      });
+    } catch (err) {
+      console.error(err);
+      message.error({
+        content: "Failed to download purchase order PDF",
+        key: "download_po",
+      });
+    }
+  };
+
   const handleDownloadContractReport = async (contract) => {
     const cId = contract.sale_contract_id || contract.id || contract;
     const cNo =
@@ -1219,7 +1249,7 @@ export default function PurchaseIndent() {
         contrat_gross_weight:
           values.contratGrossWeight === "loose"
             ? null
-            : Number(values.contratGrossWeight),
+            : Number(String(values.contratGrossWeight).match(/[\d.]+/)?.[0]),
         from_date: values.startDate
           ? dayjs(values.startDate).format("YYYY-MM-DD")
           : null,
@@ -1843,20 +1873,27 @@ export default function PurchaseIndent() {
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       width: 100,
-      // render: (_, record) => (
-      //   <div className="flex gap-3">
-      //     <EyeOutlined
-      //       className="cursor-pointer text-blue-500"
-      //       onClick={() => openViewModal(record)}
-      //     />
-      //     {record.status !== "Approved" && (
-      //       <EditOutlined
-      //         className="cursor-pointer text-red-500"
-      //         onClick={() => openEditModal(record)}
-      //       />
-      //     )}
-      //   </div>
-      // ),
+      render: (_, record) => (
+        <div className="flex gap-3 items-center">
+          {/* <EyeOutlined
+            className="cursor-pointer text-blue-500 hover:text-blue-600"
+            onClick={() => openViewModal(record)}
+            title="View"
+          />
+          {record.status !== "Approved" && (
+            <EditOutlined
+              className="cursor-pointer text-red-500 hover:text-red-600"
+              onClick={() => openEditModal(record)}
+              title="Edit"
+            />
+          )} */}
+          <DownloadOutlined
+            className="cursor-pointer text-green-600 hover:text-green-700"
+            onClick={() => handleDownloadPurchaseOrderPDF(record)}
+            title="Download PDF"
+          />
+        </div>
+      ),
     },
   ];
 
@@ -1907,10 +1944,11 @@ export default function PurchaseIndent() {
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
       dataIndex: "customer",
-      width: 100,
+      width: 140,
+      ellipsis: true,
       render: (t) => (
-        <span className="text-amber-800">
-          {t ? t.split(" ").slice(0, 2).join(" ") : "-"}
+        <span className="text-amber-800 whitespace-nowrap" title={t || ""}>
+          {t || "-"}
         </span>
       ),
     },
@@ -2054,9 +2092,10 @@ export default function PurchaseIndent() {
           dataSource={data}
           loading={loading}
           pagination={false}
-          scroll={{ y: 420 }}
+          scroll={{ y: 650 }}
           rowKey="key"
           size="small"
+          className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1 [&_.ant-table-thead_th]:!py-1.5"
         />
       </div>
 
@@ -2480,17 +2519,17 @@ export default function PurchaseIndent() {
 
               <Col span={2}>
                 <Form.Item
-                  label={<span className="text-amber-700">Gross Weight</span>}
+                  label={<span className="text-amber-700">Passing Weight</span>}
                   name="contratGrossWeight"
                   rules={[
                     {
                       required: true,
-                      message: "Select Contract Gross Weight",
+                      message: "Select Passing Weight",
                     },
                   ]}
                 >
                   <Select
-                    placeholder="Select Gross Weight"
+                    placeholder="Select Passing Weight"
                     showSearch
                     optionFilterProp="children"
                   >

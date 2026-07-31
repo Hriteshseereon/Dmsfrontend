@@ -193,17 +193,19 @@ export default function SalesSouda() {
 
         const list = res?.data || res || [];
 
+        // API returns values like "27 TON" / "22 TON" — extract numeric part
         const uniqueWeights = [
           ...new Set(
             list
-              .filter(
-                (item) =>
-                  item !== null &&
-                  item !== undefined &&
-                  item !== "" &&
-                  !Number.isNaN(Number(item)),
-              )
-              .map((item) => String(item)),
+              .map((item) => {
+                if (item === null || item === undefined || item === "")
+                  return null;
+                const match = String(item).match(/[\d.]+/);
+                if (!match) return null;
+                const num = Number(match[0]);
+                return Number.isNaN(num) ? null : String(num);
+              })
+              .filter(Boolean),
           ),
         ].sort((a, b) => Number(a) - Number(b));
 
@@ -493,7 +495,7 @@ export default function SalesSouda() {
       contrat_gross_weight:
         values.contratGrossWeight === "loose"
           ? null
-          : Number(values.contratGrossWeight),
+          : Number(String(values.contratGrossWeight).match(/[\d.]+/)?.[0]),
       created_date: values.soudaDate
         ? dayjs(values.soudaDate).format("YYYY-MM-DD")
         : null,
@@ -619,7 +621,7 @@ export default function SalesSouda() {
     ) {
       return {
         valid: false,
-        message: "Please select Contract Gross Weight.",
+        message: "Please select Passing Weight.",
       };
     }
 
@@ -631,13 +633,15 @@ export default function SalesSouda() {
       };
     }
 
-    const selectedWeight = Number(contractGrossWeight);
+    const selectedWeight = Number(
+      String(contractGrossWeight).match(/[\d.]+/)?.[0],
+    );
     const actualWeight = Number(totalWeightTon || 0);
 
     if (Number.isNaN(selectedWeight) || selectedWeight <= 0) {
       return {
         valid: false,
-        message: "Invalid Contract Gross Weight.",
+        message: "Invalid Passing Weight.",
       };
     }
 
@@ -647,7 +651,7 @@ export default function SalesSouda() {
     if (actualWeight < selectedWeight) {
       return {
         valid: false,
-        message: `Gross Weight cannot be less than ${selectedWeight.toFixed(
+        message: `Passing Weight cannot be less than ${selectedWeight.toFixed(
           3,
         )} Ton. Current Gross Weight is ${actualWeight.toFixed(3)} Ton.`,
       };
@@ -656,7 +660,7 @@ export default function SalesSouda() {
     if (actualWeight > maxAllowedWeight) {
       return {
         valid: false,
-        message: `Gross Weight cannot exceed ${maxAllowedWeight.toFixed(
+        message: `Passing Weight cannot exceed ${maxAllowedWeight.toFixed(
           3,
         )} Ton (5% tolerance). Current Gross Weight is ${actualWeight.toFixed(
           3,
@@ -1689,7 +1693,7 @@ export default function SalesSouda() {
         contrat_gross_weight:
           values.contratGrossWeight === "loose"
             ? null
-            : Number(values.contratGrossWeight),
+            : Number(String(values.contratGrossWeight).match(/[\d.]+/)?.[0]),
         status: values.status,
         created_date: values.soudaDate
           ? dayjs(values.soudaDate).format("YYYY-MM-DD")
@@ -1867,7 +1871,7 @@ export default function SalesSouda() {
           pagination={false}
           scroll={{
             x: 1500,
-            y: 500,
+            y: 650,
           }}
           rowKey="key"
           size="small"
@@ -2058,12 +2062,12 @@ export default function SalesSouda() {
               </Col>
               <Col span={2}>
                 <Form.Item
-                  label={<span className="text-amber-700">Gross Weight</span>}
+                  label={<span className="text-amber-700">Passing Weight</span>}
                   name="contratGrossWeight"
                   rules={[
                     {
                       required: true,
-                      message: "Select Contract Gross Weight",
+                      message: "Select Passing Weight",
                     },
                   ]}
                 >
@@ -2073,7 +2077,7 @@ export default function SalesSouda() {
                     onDropdownVisibleChange={(visible) =>
                       setGrossWeightDropdownOpen(visible)
                     }
-                    placeholder="Select Gross Weight"
+                    placeholder="Select Passing Weight"
                     showSearch
                     optionFilterProp="children"
                     onChange={() => {
@@ -2533,17 +2537,17 @@ export default function SalesSouda() {
               </Col>
               <Col span={2}>
                 <Form.Item
-                  label={<span className="text-amber-700">Gross Weight</span>}
+                  label={<span className="text-amber-700">Passing Weight</span>}
                   name="contratGrossWeight"
                   rules={[
                     {
                       required: true,
-                      message: "Select Contract Gross Weight",
+                      message: "Select Passing Weight",
                     },
                   ]}
                 >
                   <Select
-                    placeholder="Select Gross Weight"
+                    placeholder="Select Passing Weight"
                     showSearch
                     optionFilterProp="children"
                   >
@@ -2908,17 +2912,17 @@ export default function SalesSouda() {
               </Col>
               <Col span={2}>
                 <Form.Item
-                  label={<span className="text-amber-700">Gross Weight</span>}
+                  label={<span className="text-amber-700">Passing Weight</span>}
                   name="contratGrossWeight"
                   rules={[
                     {
                       required: true,
-                      message: "Select Contract Gross Weight",
+                      message: "Select Passing Weight",
                     },
                   ]}
                 >
                   <Select
-                    placeholder="Select Gross Weight"
+                    placeholder="Select Passing Weight"
                     showSearch
                     optionFilterProp="children"
                     disabled
