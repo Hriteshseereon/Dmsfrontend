@@ -479,8 +479,13 @@ export default function PurchaseSouda() {
         <span className="text-amber-700 font-semibold">Supplier Name</span>
       ),
       dataIndex: "vendor_name",
-      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
-      width: 60,
+      width: 140,
+      ellipsis: true,
+      render: (t) => (
+        <span className="text-amber-800 whitespace-nowrap" title={t || ""}>
+          {t || "-"}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Quantity</span>,
@@ -1695,8 +1700,9 @@ export default function PurchaseSouda() {
           size="small"
           scroll={{
             x: 1500,
-            y: 360,
+            y: 650,
           }}
+          className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1 [&_.ant-table-thead_th]:!py-1.5"
         />
       </div>
 
