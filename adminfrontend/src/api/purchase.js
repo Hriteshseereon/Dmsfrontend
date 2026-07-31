@@ -167,6 +167,33 @@ export const updatePurchaseSalesContractOrder = async (orderId, payload) => {
   });
   return res.data;
 }
+
+// download purchase order (sales-contract-order) PDF
+export const downloadPurchaseOrderPDF = async (orderId) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const res = await api.get(
+    `/purchase/sales-contract-orders/${orderId}/download-pdf/`,
+    {
+      params: { organisation: currentOrgId },
+      responseType: "blob",
+    },
+  );
+
+  const url = window.URL.createObjectURL(
+    new Blob([res.data], { type: "application/pdf" }),
+  );
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `purchase_order_${orderId}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+
+  return res.data;
+};
+
 //fetch all purchase orders
 export const getPurchaseOrder = async () => {
   const {currentOrgId,selectedFY} = useSessionStore.getState();
