@@ -892,7 +892,7 @@ export default function SalesSouda() {
       title: <span className="text-amber-700 font-semibold">Contract No</span>,
       dataIndex: "saleContractNumber",
       width: 70,
-      render: (text) => <span> {text ? text.split("-").pop() : "-"}</span>,
+      render: (text) => <span> {text || "-"}</span>,
     },
 
     {
@@ -2282,6 +2282,13 @@ export default function SalesSouda() {
                     const totalWeightTon = Number(
                       getFieldValue(["orderTotals", "totalWeightTon"]) || 0,
                     );
+                    const selectedWeight = Number(
+                      String(contractGrossWeight).match(/[\d.]+/)?.[0] || 0,
+                    );
+                    const remainingWeight =
+                      selectedWeight > totalWeightTon
+                        ? selectedWeight - totalWeightTon
+                        : 0;
 
                     const validation = validateContractGrossWeight(
                       contractGrossWeight,
@@ -2299,15 +2306,19 @@ export default function SalesSouda() {
                         validateStatus={shouldShowError ? "error" : ""}
                         help={
                           shouldShowError ? (
-                            <Tooltip title={validation.message}>
-                              <span className="text-red-500 cursor-pointer text-[11px]">
-                                Allowed: {contractGrossWeight}T -{" "}
-                                {(Number(contractGrossWeight) * 1.05).toFixed(
-                                  2,
-                                )}
-                                T
-                              </span>
-                            </Tooltip>
+                            <div className="leading-tight">
+                              <Tooltip title={validation.message}>
+                                <span className="block text-red-500 cursor-pointer text-[11px]">
+                                  Allowed: {selectedWeight}T -{" "}
+                                  {(selectedWeight * 1.05).toFixed(2)}T
+                                </span>
+                              </Tooltip>
+                              {remainingWeight > 0 && (
+                                <span className="block text-amber-600 text-[11px]">
+                                  Required: {remainingWeight.toFixed(3)}T more
+                                </span>
+                              )}
+                            </div>
                           ) : null
                         }
                       >
@@ -2727,6 +2738,13 @@ export default function SalesSouda() {
                     const totalWeightTon = Number(
                       getFieldValue(["orderTotals", "totalWeightTon"]) || 0,
                     );
+                    const selectedWeight = Number(
+                      String(contractGrossWeight).match(/[\d.]+/)?.[0] || 0,
+                    );
+                    const remainingWeight =
+                      selectedWeight > totalWeightTon
+                        ? selectedWeight - totalWeightTon
+                        : 0;
 
                     const validation = validateContractGrossWeight(
                       contractGrossWeight,
@@ -2744,15 +2762,19 @@ export default function SalesSouda() {
                         validateStatus={shouldShowError ? "error" : ""}
                         help={
                           shouldShowError ? (
-                            <Tooltip title={validation.message}>
-                              <span className="text-red-500 cursor-pointer text-[11px]">
-                                {contractGrossWeight}T -{" "}
-                                {(Number(contractGrossWeight) * 1.05).toFixed(
-                                  2,
-                                )}
-                                T
-                              </span>
-                            </Tooltip>
+                            <div className="leading-tight">
+                              <Tooltip title={validation.message}>
+                                <span className="block text-red-500 cursor-pointer text-[11px]">
+                                  Allowed: {selectedWeight}T -{" "}
+                                  {(selectedWeight * 1.05).toFixed(2)}T
+                                </span>
+                              </Tooltip>
+                              {remainingWeight > 0 && (
+                                <span className="block text-amber-600 text-[11px]">
+                                  Required: {remainingWeight.toFixed(3)}T more
+                                </span>
+                              )}
+                            </div>
                           ) : null
                         }
                       >
