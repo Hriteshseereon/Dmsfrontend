@@ -891,7 +891,7 @@ export default function SalesSouda() {
     {
       title: <span className="text-amber-700 font-semibold">Contract No</span>,
       dataIndex: "saleContractNumber",
-      width: 70,
+      width: 80,
       render: (text) => <span> {text || "-"}</span>,
     },
 
@@ -1243,12 +1243,20 @@ export default function SalesSouda() {
         // list and put keyboard focus on it.
         setTimeout(() => {
           setOpenItemIndex?.(newIndex);
-          const selectEl = itemRefs.current[newIndex];
-          selectEl?.focus();
-          const inputEl = selectEl?.nativeElement?.querySelector("input");
-          inputEl?.focus();
-          // itemRefs.current[newIndex]?.focus();
-        }, 150);
+
+          setTimeout(() => {
+            const selectEl = itemRefs.current[newIndex];
+
+            selectEl?.focus();
+
+            const inputEl = selectEl?.nativeElement?.querySelector("input");
+
+            if (inputEl) {
+              inputEl.focus();
+              inputEl.select();
+            }
+          }, 100);
+        }, 50);
       }
     };
 
@@ -1256,7 +1264,7 @@ export default function SalesSouda() {
       <Form.List name="items">
         {(fields, { add, remove }) => (
           <>
-            <div className="mb-2">
+            <div className="mb-0">
               <h6 className="text-amber-500">Items</h6>
             </div>
 
@@ -1293,6 +1301,12 @@ export default function SalesSouda() {
                       placeholder="Select Item"
                       showSearch
                       optionFilterProp="children"
+                      filterOption={(input, option) =>
+                        (option?.children ?? "")
+                          .toLowerCase()
+                          .includes(input.toLowerCase())
+                      }
+                      autoClearSearchValue={false}
                       open={openItemIndex === field.name}
                       onFocus={() => setOpenItemIndex?.(field.name)}
                       onDropdownVisibleChange={(visible) => {
@@ -2266,7 +2280,7 @@ export default function SalesSouda() {
                 </Form.Item>
               </Col>
               <Col span={3}></Col>
-              <Col span={1}>
+              <Col span={2}>
                 <Form.Item
                   shouldUpdate={(prev, current) =>
                     prev?.contratGrossWeight !== current?.contratGrossWeight ||
@@ -2328,7 +2342,7 @@ export default function SalesSouda() {
                   }}
                 </Form.Item>
               </Col>
-              <Col span={5}></Col>
+              <Col span={4}></Col>
 
               <Col span={2}>
                 <Form.Item name={["orderTotals", "totalAmount"]}>
