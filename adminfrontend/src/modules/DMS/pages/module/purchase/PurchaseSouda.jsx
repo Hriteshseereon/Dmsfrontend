@@ -934,7 +934,7 @@ export default function PurchaseSouda() {
                 </Button>
               )} */}
             </div>
-            <Row gutter={12} className=" pb-2 mb-2">
+            <Row gutter={12} className=" pb-1 mb-0">
               <Col span={6}>Item Name</Col>
               <Col span={2}>Qty</Col>
               <Col span={2}>Unit</Col>
