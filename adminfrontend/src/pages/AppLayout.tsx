@@ -13,7 +13,11 @@ const AppLayout = () => {
 
   return (
     <div className="flex">
-      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
+      <Sidebar
+        collapsed={collapsed}
+        onToggle={() => setCollapsed(!collapsed)}
+        onNavClick={() => setCollapsed(true)}
+      />
 
       <div
         className="flex-1 transition-all duration-300 main-content"

@@ -12,6 +12,7 @@ export default function Layout({ children }) {
         <Sidebar
           collapsed={collapsed}
           onToggle={() => setCollapsed(!collapsed)}
+          onNavClick={() => setCollapsed(true)}
         />
         <main className="flex-1 overflow-auto p-6 bg-gray-50">{children}</main>
       </div>

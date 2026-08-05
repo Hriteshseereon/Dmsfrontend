@@ -47,7 +47,7 @@ const pickPreferredModule = (orgModules = []) => {
 };
 
 // ===== Header =====
-const SidebarHeader = ({ collapsed, onToggle }) => {
+const SidebarHeader = ({ collapsed, onNavClick }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { orgModules } = useAuth();
@@ -110,6 +110,7 @@ const SidebarHeader = ({ collapsed, onToggle }) => {
           <NavLink
             to={dashboardRoute}
             end
+            onClick={onNavClick}
             className={({ isActive }) =>
               `font-semibold no-underline flex items-center px-3 py-1 rounded-md ${
                 isActive
@@ -124,6 +125,7 @@ const SidebarHeader = ({ collapsed, onToggle }) => {
 
           <NavLink
             to={organisationRoute}
+            onClick={onNavClick}
             className={({ isActive }) =>
               `font-semibold no-underline flex items-center px-1 py-1 rounded-md ${
                 isActive
@@ -205,7 +207,7 @@ const baseMenuItems = [
   },
 ];
 
-const SidebarMenu = ({ collapsed }) => {
+const SidebarMenu = ({ collapsed, onNavClick }) => {
   const location = useLocation();
   const { user, orgModules } = useAuth();
 
@@ -304,7 +306,7 @@ const SidebarMenu = ({ collapsed }) => {
           )
         ) : (
           <Menu.Item key={item.key} icon={item.icon}>
-            <NavLink to={item.path} className="sidebar-menu-link">
+            <NavLink to={item.path} className="sidebar-menu-link" onClick={onNavClick}>
               <span
                 className={`sidebar-menu-label ${collapsed ? "hidden" : ""}`}
               >
@@ -318,8 +320,11 @@ const SidebarMenu = ({ collapsed }) => {
   );
 };
 
-const Sidebar = ({ collapsed, onToggle }) => {
-  console.log("collapsed =", collapsed);
+const Sidebar = ({ collapsed, onToggle, onNavClick }) => {
+  const handleNavClick = () => {
+    if (!collapsed) onNavClick?.();
+  };
+
   return (
     <aside
       className="sidebar fixed left-0 top-0 h-screen bg-white shadow-md transition-all duration-300 relative"
@@ -329,10 +334,10 @@ const Sidebar = ({ collapsed, onToggle }) => {
       }}
     >
       {/* Sidebar content */}
-      <SidebarHeader collapsed={collapsed} />
+      <SidebarHeader collapsed={collapsed} onNavClick={handleNavClick} />
 
       <div className="flex-1 mt-2 overflow-y-auto">
-        <SidebarMenu collapsed={collapsed} />
+        <SidebarMenu collapsed={collapsed} onNavClick={handleNavClick} />
       </div>
 
       {/* Toggle Button (CENTERED) */}
