@@ -2314,10 +2314,21 @@ export default function SalesSouda() {
                       String(contractGrossWeight).toLowerCase() !== "loose" &&
                       !validation.valid;
 
+                    const shouldShowSuccess =
+                      contractGrossWeight &&
+                      String(contractGrossWeight).toLowerCase() !== "loose" &&
+                      validation.valid;
+
                     return (
                       <Form.Item
                         name={["orderTotals", "totalWeightTon"]}
-                        validateStatus={shouldShowError ? "error" : ""}
+                        validateStatus={
+                          shouldShowSuccess
+                            ? "success"
+                            : shouldShowError
+                              ? "error"
+                              : ""
+                        }
                         help={
                           shouldShowError ? (
                             <div className="leading-tight">
@@ -2336,7 +2347,16 @@ export default function SalesSouda() {
                           ) : null
                         }
                       >
-                        <Input disabled />
+                        <Input
+                          disabled
+                          className={
+                            shouldShowSuccess
+                              ? "border-green-500! border-2!"
+                              : shouldShowError
+                                ? "border-red-500! border-2!"
+                                : ""
+                          }
+                        />
                       </Form.Item>
                     );
                   }}
@@ -2770,10 +2790,21 @@ export default function SalesSouda() {
                       String(contractGrossWeight).toLowerCase() !== "loose" &&
                       !validation.valid;
 
+                    const shouldShowSuccess =
+                      contractGrossWeight &&
+                      String(contractGrossWeight).toLowerCase() !== "loose" &&
+                      validation.valid;
+
                     return (
                       <Form.Item
                         name={["orderTotals", "totalWeightTon"]}
-                        validateStatus={shouldShowError ? "error" : ""}
+                        validateStatus={
+                          shouldShowSuccess
+                            ? "success"
+                            : shouldShowError
+                              ? "error"
+                              : ""
+                        }
                         help={
                           shouldShowError ? (
                             <div className="leading-tight">
@@ -2792,7 +2823,16 @@ export default function SalesSouda() {
                           ) : null
                         }
                       >
-                        <Input disabled />
+                        <Input
+                          disabled
+                          className={
+                            shouldShowSuccess
+                              ? "border-green-500! border-2!"
+                              : shouldShowError
+                                ? "border-red-500! border-2!"
+                                : ""
+                          }
+                        />
                       </Form.Item>
                     );
                   }}
