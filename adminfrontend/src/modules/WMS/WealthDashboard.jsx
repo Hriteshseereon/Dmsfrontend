@@ -69,11 +69,11 @@ export default function WealthDashboard() {
     })) || [];
 
   return (
-    <div className="p-2">
+    <div className="w-full">
       {/* Top Cards */}
-      <Row gutter={16} className="mb-2 flex flex-wrap">
+      <Row gutter={[16, 16]} className="mb-4">
         {topCards.map((card, index) => (
-          <Col key={index} flex="1" className="mb-4">
+          <Col key={index} xs={24} sm={12} xl={6}>
             <Card className="p-1! h-full! border-1! border-amber-500! bg-amber-50!">
               <div className="flex items-center text-amber-800 mb-3 gap-3">
                 {card.icon}
@@ -88,11 +88,11 @@ export default function WealthDashboard() {
       </Row>
 
       {/* Charts */}
-      <Row gutter={16} className="mb-6">
+      <Row gutter={[16, 16]} className="mb-6">
         {/* Stock */}
-        <Col span={12}>
+        <Col xs={24} xl={12}>
           <Card title={<span className="text-amber-700 font-bold">Stock</span>}>
-            <ResponsiveContainer width="100%" height={250}>
+            <ResponsiveContainer width="100%" height={320}>
               <LineChart data={stockData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#fcd34d" />
                 <XAxis dataKey="name" stroke="#92400e" />
@@ -110,9 +110,9 @@ export default function WealthDashboard() {
         </Col>
 
         {/* ETF */}
-        <Col span={12}>
+        <Col xs={24} xl={12}>
           <Card title={<span className="text-amber-700 font-bold">ETF</span>}>
-            <ResponsiveContainer width="100%" height={250}>
+            <ResponsiveContainer width="100%" height={320}>
               <AreaChart data={etfData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#fcd34d" />
                 <XAxis dataKey="name" stroke="#92400e" />

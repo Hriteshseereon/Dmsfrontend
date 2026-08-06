@@ -272,19 +272,18 @@ const WealthModule = ({ allowedTabs }) => {
   });
 
   return (
-    <div className="p-2 mt-4 h-[550px] w-full overflow-auto rounded">
+    <div className="wealth-module p-4 mt-4 w-full max-w-full pb-8">
       <h1 className="text-2xl font-bold text-amber-800 mb-0">Wealth Module</h1>
       <p className="text-amber-700 mb-3">Manage your wealth data</p>
 
       <div className="wealth-tabs-wrapper">
-  <Tabs
-    activeKey={activeKey}
-    onChange={handleChange}
-    items={tabItems}
-     
-  />
-</div>
-
+        <Tabs
+          activeKey={activeKey}
+          onChange={handleChange}
+          items={tabItems}
+          destroyInactiveTabPane={false}
+        />
+      </div>
     </div>
   );
 };

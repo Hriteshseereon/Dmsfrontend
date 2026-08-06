@@ -3,22 +3,28 @@ body {
   overflow-x: hidden;
 }
 
-/* Wrapper for tabs (fixed width like AntD demo) */
+/* Wrapper spans full available width */
 .wealth-tabs-wrapper {
-  width: 1000px;          /* 👈 adjust as needed */
+  width: 100%;
   max-width: 100%;
-  overflow: hidden;
-  border-bottom: 1px solid #eee;
 }
 
-/* Enable horizontal scroll on correct layer */
+.wealth-tabs-wrapper .ant-tabs,
+.wealth-tabs-wrapper .ant-tabs-content-holder,
+.wealth-tabs-wrapper .ant-tabs-content,
+.wealth-tabs-wrapper .ant-tabs-tabpane {
+  width: 100%;
+}
+
+/* Enable horizontal scroll on tab nav only */
+.wealth-tabs-wrapper .ant-tabs-nav {
+  margin-bottom: 16px;
+}
+
 .wealth-tabs-wrapper .ant-tabs-nav-wrap {
   overflow-x: auto !important;
   overflow-y: hidden;
   white-space: nowrap;
-  
-  
-  
 }
 
 /* Keep all tabs in one row */
@@ -59,7 +65,7 @@ body {
   right: 12px;
   bottom: 0;
   height: 3px;
-  background: #1890ff;
+  background: #d97706;
   transform: scaleX(0);
   transform-origin: left;
   transition: transform 220ms cubic-bezier(.2,.8,.2,1);
