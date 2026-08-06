@@ -1921,7 +1921,7 @@ export default function PurchaseIndent() {
               : "text-amber-800"
           }
         >
-          {t ? String(t).split("-").pop() : "-"}
+          {t || "-"}
         </span>
       ),
     },
