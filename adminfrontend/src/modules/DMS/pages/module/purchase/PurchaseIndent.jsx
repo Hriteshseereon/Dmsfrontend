@@ -171,6 +171,10 @@ export default function PurchaseIndent() {
   const [whatsappGroups, setWhatsappGroups] = useState([]);
   const [whatsappForm] = Form.useForm();
 
+  // purchase order created date (for backdated / legacy entries)
+  const [poCreatedDate, setPoCreatedDate] = useState(dayjs());
+  const [isConfirmDateModalOpen, setIsConfirmDateModalOpen] = useState(false);
+
   // ---------------------------------------------------------------
   const [isPoContractsModalOpen, setIsPoContractsModalOpen] = useState(false);
   const [selectedPoForContracts, setSelectedPoForContracts] = useState(null);
@@ -272,6 +276,7 @@ export default function PurchaseIndent() {
           id: item.id,
           order_number: item.order_number || item.order_no || item.id,
           order_date: item.order_date,
+          created_date: item.created_date,
           plant_name: item.plant_name || contractDetails[0]?.plant_name || "-",
           // No true "vendor/supplier" field is returned by this API — each
           // purchase order links to sale contracts made with a customer, so
@@ -757,6 +762,7 @@ export default function PurchaseIndent() {
     setSelectedRowKeys([]);
     setAvailableContracts([]);
     setContractSearch("");
+    setIsConfirmDateModalOpen(false);
   };
 
   const openAddModal = async () => {
@@ -766,6 +772,7 @@ export default function PurchaseIndent() {
     setStatusValue("Fresh");
     setContractSearch("");
     setContractDateRange(null);
+    setPoCreatedDate(dayjs());
     await fetchAvailableContracts(null);
   };
 
@@ -801,6 +808,12 @@ export default function PurchaseIndent() {
       setSelectedRecord(detail);
       setStatusValue(detail.status || "Fresh");
       setContractSearch("");
+
+      if (detail.created_date) {
+        setPoCreatedDate(parseApiDate(detail.created_date));
+      } else {
+        setPoCreatedDate(dayjs());
+      }
 
       const linkedContracts =
         detail.sale_contracts ||
@@ -855,6 +868,7 @@ export default function PurchaseIndent() {
 
       const payload = {
         order_date: dayjs().format("YYYY-MM-DD"),
+        created_date: poCreatedDate ? poCreatedDate.format("YYYY-MM-DD") : null,
         status: modalMode === "edit" ? statusValue : "Fresh",
         sale_contracts: selectedRowKeys,
       };
@@ -1737,33 +1751,34 @@ export default function PurchaseIndent() {
     },
     {
       title: <span className="text-amber-700 font-semibold">Order Date</span>,
-      dataIndex: "order_date",
-      width: 110,
+      dataIndex: "created_date",
+      width: 90,
       render: (t) => <span className="text-amber-800">{fmtDate(t)}</span>,
     },
+
     {
       title: <span className="text-amber-700 font-semibold">Plant</span>,
       dataIndex: "plant_name",
-      width: 150,
+      width: 110,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Customer</span>,
       dataIndex: "vendor_name",
-      width: 150,
+      width: 120,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Contracts</span>,
       dataIndex: "contract_count",
-      width: 100,
+      width: 70,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: (
         <span className="text-amber-700 font-semibold">Related Contracts</span>
       ),
-      width: 180,
+      width: 120,
       render: (_, record) => {
         const contracts = record.sales_contracts || [];
         if (contracts.length === 0) {
@@ -1849,7 +1864,7 @@ export default function PurchaseIndent() {
     {
       title: <span className="text-amber-700 font-semibold">Total Qty</span>,
       dataIndex: "total_qty_all_items",
-      width: 120,
+      width: 100,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
@@ -1857,7 +1872,7 @@ export default function PurchaseIndent() {
         <span className="text-amber-700 font-semibold">Total Amount (₹)</span>
       ),
       dataIndex: "grand_total",
-      width: 160,
+      width: 120,
       render: (t) => (
         <span className="text-amber-800">
           ₹{Number(t || 0).toLocaleString()}
@@ -2260,10 +2275,9 @@ export default function PurchaseIndent() {
           </Button>
           <Button
             type="primary"
-            loading={submitting}
             disabled={selectedRowKeys.length === 0}
             className="!bg-amber-500 !hover:bg-amber-600 !border-none"
-            onClick={handleSubmitSelection}
+            onClick={() => setIsConfirmDateModalOpen(true)}
           >
             {modalMode === "edit"
               ? "Update Purchase Order"
@@ -2881,6 +2895,43 @@ export default function PurchaseIndent() {
             </Button>
           </div>
         </Form>
+      </Modal>
+
+      {/* ── Confirm Created Date Modal ── */}
+      <Modal
+        title={
+          <span className="text-amber-700 text-xl font-semibold">
+            Confirm Created Date
+          </span>
+        }
+        open={isConfirmDateModalOpen}
+        onCancel={() => setIsConfirmDateModalOpen(false)}
+        footer={null}
+        width={400}
+      >
+        <div className="mb-4">
+          <label className="block text-sm text-gray-600 mb-1">
+            Created Date
+          </label>
+          <AppDatePicker
+            value={poCreatedDate}
+            onChange={(date) => setPoCreatedDate(date || dayjs())}
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 mt-4">
+          <Button onClick={() => setIsConfirmDateModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            type="primary"
+            loading={submitting}
+            onClick={handleSubmitSelection}
+            className="!bg-amber-500 !hover:bg-amber-600 !border-none"
+          >
+            Confirm & Submit
+          </Button>
+        </div>
       </Modal>
     </div>
   );
