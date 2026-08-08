@@ -171,6 +171,10 @@ export default function PurchaseIndent() {
   const [whatsappGroups, setWhatsappGroups] = useState([]);
   const [whatsappForm] = Form.useForm();
 
+  // purchase order created date (for backdated / legacy entries)
+  const [poCreatedDate, setPoCreatedDate] = useState(dayjs());
+  const [isConfirmDateModalOpen, setIsConfirmDateModalOpen] = useState(false);
+
   // ---------------------------------------------------------------
   const [isPoContractsModalOpen, setIsPoContractsModalOpen] = useState(false);
   const [selectedPoForContracts, setSelectedPoForContracts] = useState(null);
@@ -258,20 +262,42 @@ export default function PurchaseIndent() {
           item.sale_contracts_details ||
           [];
 
-        const totalQty = contractDetails.reduce(
-          (sum, c) => sum + Number(c.total_qty || 0),
-          0,
-        );
-        const grandTotal = contractDetails.reduce(
-          (sum, c) => sum + Number(c.grand_total || 0),
-          0,
-        );
+        const totalQty = contractDetails.reduce((sum, c) => {
+          const items = c.items || [];
+          const qty =
+            items.length > 0
+              ? items.reduce((s, it) => s + Number(it.gross_qty || 0), 0)
+              : Number(c.total_qty ?? c.quantity ?? 0);
+          return sum + qty;
+        }, 0);
+
+        const totalGrossWeight = contractDetails.reduce((sum, c) => {
+          const items = c.items || [];
+          const weight =
+            items.length > 0
+              ? items.reduce(
+                  (s, it) =>
+                    s +
+                    Number(it.total_net_wt_in_ton || it.totalnetWtinTon || 0),
+                  0,
+                )
+              : Number(c.total_net_weight ?? c.grossWeightTon ?? 0);
+          return sum + weight;
+        }, 0);
+
+        const totalPOValue = contractDetails.reduce((sum, c) => {
+          const val = Number(
+            c.grand_total || c.total_amount || c.totalAmount || 0,
+          );
+          return sum + val;
+        }, 0);
 
         return {
           key: item.id || index + 1,
           id: item.id,
           order_number: item.order_number || item.order_no || item.id,
           order_date: item.order_date,
+          created_date: item.created_date,
           plant_name: item.plant_name || contractDetails[0]?.plant_name || "-",
           // No true "vendor/supplier" field is returned by this API — each
           // purchase order links to sale contracts made with a customer, so
@@ -283,8 +309,11 @@ export default function PurchaseIndent() {
           sales_contracts: contractDetails,
           contract_count:
             contractDetails.length || (item.sale_contracts || []).length,
-          total_qty_all_items: item.total_qty_all_items ?? totalQty,
-          grand_total: item.grand_total ?? item.total_amount ?? grandTotal,
+          total_qty_all_items: totalQty,
+          total_indent_qty: totalQty,
+          total_gross_weight_indent: totalGrossWeight,
+          total_purchase_order_value_indent: totalPOValue,
+          grand_total: totalPOValue,
           status: item.status || "Fresh",
         };
       });
@@ -757,6 +786,7 @@ export default function PurchaseIndent() {
     setSelectedRowKeys([]);
     setAvailableContracts([]);
     setContractSearch("");
+    setIsConfirmDateModalOpen(false);
   };
 
   const openAddModal = async () => {
@@ -766,6 +796,7 @@ export default function PurchaseIndent() {
     setStatusValue("Fresh");
     setContractSearch("");
     setContractDateRange(null);
+    setPoCreatedDate(dayjs());
     await fetchAvailableContracts(null);
   };
 
@@ -801,6 +832,12 @@ export default function PurchaseIndent() {
       setSelectedRecord(detail);
       setStatusValue(detail.status || "Fresh");
       setContractSearch("");
+
+      if (detail.created_date) {
+        setPoCreatedDate(parseApiDate(detail.created_date));
+      } else {
+        setPoCreatedDate(dayjs());
+      }
 
       const linkedContracts =
         detail.sale_contracts ||
@@ -855,6 +892,7 @@ export default function PurchaseIndent() {
 
       const payload = {
         order_date: dayjs().format("YYYY-MM-DD"),
+        created_date: poCreatedDate ? poCreatedDate.format("YYYY-MM-DD") : null,
         status: modalMode === "edit" ? statusValue : "Fresh",
         sale_contracts: selectedRowKeys,
       };
@@ -1286,6 +1324,7 @@ export default function PurchaseIndent() {
 
       // refresh the checkbox-selectable list in the Purchase Order modal
       fetchAvailableContracts(contractDateRange);
+      fetchPurchaseOrder();
     } catch (err) {
       console.error(err);
       message.error(
@@ -1722,9 +1761,11 @@ export default function PurchaseIndent() {
   // ---------------------------------------------------------------
   const orderColumns = [
     {
-      title: <span className="text-amber-700 font-semibold">Order No</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Purchase Order No.</span>
+      ),
       dataIndex: "order_number",
-      width: 120,
+      width: 130,
       render: (t, record) => (
         <span
           className="bg-blue-500 text-white font-semibold px-2 py-1 rounded cursor-pointer hover:bg-blue-600"
@@ -1736,34 +1777,26 @@ export default function PurchaseIndent() {
       ),
     },
     {
-      title: <span className="text-amber-700 font-semibold">Order Date</span>,
-      dataIndex: "order_date",
-      width: 110,
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Purchase Order Date.
+        </span>
+      ),
+      dataIndex: "created_date",
+      width: 100,
       render: (t) => <span className="text-amber-800">{fmtDate(t)}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Plant</span>,
+      title: <span className="text-amber-700 font-semibold">Plant Name</span>,
       dataIndex: "plant_name",
-      width: 150,
-      render: (t) => <span className="text-amber-800">{t}</span>,
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Customer</span>,
-      dataIndex: "vendor_name",
-      width: 150,
-      render: (t) => <span className="text-amber-800">{t}</span>,
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Contracts</span>,
-      dataIndex: "contract_count",
-      width: 100,
+      width: 120,
       render: (t) => <span className="text-amber-800">{t}</span>,
     },
     {
       title: (
         <span className="text-amber-700 font-semibold">Related Contracts</span>
       ),
-      width: 180,
+      width: 130,
       render: (_, record) => {
         const contracts = record.sales_contracts || [];
         if (contracts.length === 0) {
@@ -1771,9 +1804,6 @@ export default function PurchaseIndent() {
         }
 
         const menuItems = contracts.map((c) => {
-          // sale_contract_id is the real contract id; id on this record is
-          // just the purchase-order-to-contract link row — never use it for
-          // API calls.
           const cId = c.sale_contract_id || c.id || c;
           const cNo =
             c.sale_contract_number || c.contract_number || `Contract #${cId}`;
@@ -1847,46 +1877,86 @@ export default function PurchaseIndent() {
       },
     },
     {
-      title: <span className="text-amber-700 font-semibold">Total Qty</span>,
-      dataIndex: "total_qty_all_items",
-      width: 120,
-      render: (t) => <span className="text-amber-800">{t}</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Total No Of Vehicle (Indent)
+        </span>
+      ),
+      width: 140,
+      render: () => <span className="text-amber-800">-</span>,
     },
     {
       title: (
-        <span className="text-amber-700 font-semibold">Total Amount (₹)</span>
+        <span className="text-amber-700 font-semibold">
+          Total Indent Qty (Nos)
+        </span>
       ),
-      dataIndex: "grand_total",
-      width: 160,
+      dataIndex: "total_indent_qty",
+      width: 130,
+      render: (t) => <span className="text-amber-800">{Number(t || 0)}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Total Gross Weight(Mt) Indent
+        </span>
+      ),
+      dataIndex: "total_gross_weight_indent",
+      width: 150,
+      render: (t) => (
+        <span className="text-amber-800">{Number(t || 0).toFixed(3)}</span>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Total Purchase Order Value (Indent)
+        </span>
+      ),
+      dataIndex: "total_purchase_order_value_indent",
+      width: 180,
       render: (t) => (
         <span className="text-amber-800">
-          ₹{Number(t || 0).toLocaleString()}
+          ₹
+          {Number(t || 0).toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
         </span>
       ),
     },
     {
-      title: <span className="text-amber-700 font-semibold">Status</span>,
-      dataIndex: "status",
-      width: 120,
-      render: renderStatusBadge,
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Total No of Vehicle placed
+        </span>
+      ),
+      width: 140,
+      render: () => <span className="text-amber-800">-</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Total Gross Weight(Mt) Placed
+        </span>
+      ),
+      width: 150,
+      render: () => <span className="text-amber-800">-</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Total Purchase Order Value (Placed)
+        </span>
+      ),
+      width: 180,
+      render: () => <span className="text-amber-800">-</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
-      width: 100,
+      width: 90,
       render: (_, record) => (
         <div className="flex gap-3 items-center">
-          {/* <EyeOutlined
-            className="cursor-pointer text-blue-500 hover:text-blue-600"
-            onClick={() => openViewModal(record)}
-            title="View"
-          />
-          {record.status !== "Approved" && (
-            <EditOutlined
-              className="cursor-pointer text-red-500 hover:text-red-600"
-              onClick={() => openEditModal(record)}
-              title="Edit"
-            />
-          )} */}
           <DownloadOutlined
             className="cursor-pointer text-green-600 hover:text-green-700"
             onClick={() => handleDownloadPurchaseOrderPDF(record)}
@@ -2033,6 +2103,11 @@ export default function PurchaseIndent() {
     onChange: (keys) => setSelectedRowKeys(keys),
   };
 
+  const poForContracts = selectedPoForContracts
+    ? data.find((item) => item.id === selectedPoForContracts.id) ||
+      selectedPoForContracts
+    : null;
+
   // ---------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------
@@ -2092,7 +2167,7 @@ export default function PurchaseIndent() {
           dataSource={data}
           loading={loading}
           pagination={false}
-          scroll={{ y: 650 }}
+          scroll={{ y: 650, x: 1600 }}
           rowKey="key"
           size="small"
           className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1 [&_.ant-table-thead_th]:!py-1.5"
@@ -2103,7 +2178,7 @@ export default function PurchaseIndent() {
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            Sale Contracts - {selectedPoForContracts?.order_number}
+            Sale Contracts - {poForContracts?.order_number}
           </span>
         }
         open={isPoContractsModalOpen}
@@ -2123,18 +2198,22 @@ export default function PurchaseIndent() {
             <h6 className="text-amber-500 mb-0">Linked Sale Contracts</h6>
 
             <span className="text-sm text-amber-700 font-semibold">
-              {selectedPoForContracts?.sales_contracts?.length || 0} Contract(s)
+              {poForContracts?.sales_contracts?.length || 0} Contract(s)
             </span>
           </div>
 
           <Table
-            columns={getContractColumns(false)}
-            dataSource={(selectedPoForContracts?.sales_contracts || []).map(
+            columns={getContractColumns(true)}
+            dataSource={(poForContracts?.sales_contracts || []).map(
               mapContractRecord,
             )}
             pagination={false}
             scroll={{ y: 500, x: 1500 }}
             rowKey="key"
+            onRow={(record) => ({
+              onDoubleClick: () => openEditSalesContract(record),
+            })}
+            rowClassName={() => "cursor-pointer"}
             className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1"
             size="small"
           />
@@ -2260,10 +2339,9 @@ export default function PurchaseIndent() {
           </Button>
           <Button
             type="primary"
-            loading={submitting}
             disabled={selectedRowKeys.length === 0}
             className="!bg-amber-500 !hover:bg-amber-600 !border-none"
-            onClick={handleSubmitSelection}
+            onClick={() => setIsConfirmDateModalOpen(true)}
           >
             {modalMode === "edit"
               ? "Update Purchase Order"
@@ -2881,6 +2959,43 @@ export default function PurchaseIndent() {
             </Button>
           </div>
         </Form>
+      </Modal>
+
+      {/* ── Confirm Created Date Modal ── */}
+      <Modal
+        title={
+          <span className="text-amber-700 text-xl font-semibold">
+            Confirm Created Date
+          </span>
+        }
+        open={isConfirmDateModalOpen}
+        onCancel={() => setIsConfirmDateModalOpen(false)}
+        footer={null}
+        width={400}
+      >
+        <div className="mb-4">
+          <label className="block text-sm text-gray-600 mb-1">
+            Created Date
+          </label>
+          <AppDatePicker
+            value={poCreatedDate}
+            onChange={(date) => setPoCreatedDate(date || dayjs())}
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 mt-4">
+          <Button onClick={() => setIsConfirmDateModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            type="primary"
+            loading={submitting}
+            onClick={handleSubmitSelection}
+            className="!bg-amber-500 !hover:bg-amber-600 !border-none"
+          >
+            Confirm & Submit
+          </Button>
+        </div>
       </Modal>
     </div>
   );
