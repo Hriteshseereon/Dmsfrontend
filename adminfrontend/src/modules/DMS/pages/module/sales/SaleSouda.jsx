@@ -1885,7 +1885,7 @@ export default function SalesSouda() {
           pagination={false}
           scroll={{
             x: 1500,
-            y: 650,
+            y: "calc(100vh - 230px)",
           }}
           rowKey="key"
           size="small"
