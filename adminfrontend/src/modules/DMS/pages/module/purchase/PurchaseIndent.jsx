@@ -178,6 +178,9 @@ export default function PurchaseIndent() {
   // ---------------------------------------------------------------
   const [isPoContractsModalOpen, setIsPoContractsModalOpen] = useState(false);
   const [selectedPoForContracts, setSelectedPoForContracts] = useState(null);
+  const [modalContracts, setModalContracts] = useState([]);
+  const [releasedContractIds, setReleasedContractIds] = useState(new Set());
+  const [poContractsLoading, setPoContractsLoading] = useState(false);
   useEffect(() => {
     fetchPurchaseOrder();
   }, []);
@@ -816,11 +819,109 @@ export default function PurchaseIndent() {
       setLoading(false);
     }
   };
-  const openPoContractsModal = (record) => {
-    console.log("DOUBLE CLICK PO:", record);
-    console.log("LINKED CONTRACTS:", record?.sales_contracts);
-    setSelectedPoForContracts(record);
-    setIsPoContractsModalOpen(true);
+  const openPoContractsModal = async (record) => {
+    try {
+      setPoContractsLoading(true);
+      setIsPoContractsModalOpen(true);
+      setReleasedContractIds(new Set());
+      setModalContracts([]);
+
+      const res = await getPurchaseSalesContractOrderById(
+        record.id || record.key,
+      );
+      const detail = res?.data || res;
+      setSelectedPoForContracts(detail);
+
+      const linkedContracts =
+        detail.sale_contract_details ||
+        detail.sales_contract_details ||
+        detail.sale_contracts_details ||
+        detail.sales_contracts ||
+        detail.sale_contracts ||
+        [];
+      setModalContracts(linkedContracts);
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to load purchase order details");
+      setIsPoContractsModalOpen(false);
+    } finally {
+      setPoContractsLoading(false);
+    }
+  };
+
+  const getPoContractsColumns = () => {
+    return [
+      ...getContractColumns(true),
+      {
+        title: <span className="text-amber-700 font-semibold">Actions</span>,
+        width: 100,
+        render: (_, record) => {
+          const isReleased = releasedContractIds.has(record.id || record.key);
+          return (
+            <Button
+              type="primary"
+              danger
+              size="small"
+              disabled={isReleased}
+              onClick={() => handleReleaseContract(record.id || record.key)}
+            >
+              {isReleased ? "Released" : "Release"}
+            </Button>
+          );
+        },
+      },
+    ];
+  };
+
+  const handleReleaseContract = async (contractId) => {
+    if (!selectedPoForContracts) return;
+
+    try {
+      const allIds = (selectedPoForContracts.sale_contracts || []).map((c) =>
+        typeof c === "object" ? c.id || c.sale_contract_id : c,
+      );
+
+      if (allIds.length <= 1) {
+        message.warning(
+          "At least one sale contract is required. You cannot release the last contract of a purchase order.",
+        );
+        return;
+      }
+
+      message.loading({
+        content: "Releasing contract...",
+        key: "release_contract",
+      });
+
+      const updatedIds = allIds.filter((id) => id !== contractId);
+
+      await updatePurchaseSalesContractOrder(selectedPoForContracts.id, {
+        sale_contracts: updatedIds,
+      });
+
+      setReleasedContractIds((prev) => {
+        const next = new Set(prev);
+        next.add(contractId);
+        return next;
+      });
+
+      setSelectedPoForContracts((prev) => ({
+        ...prev,
+        sale_contracts: updatedIds,
+      }));
+
+      message.success({
+        content: "Contract released successfully",
+        key: "release_contract",
+      });
+      fetchPurchaseOrder();
+    } catch (err) {
+      console.error(err);
+      message.error({
+        content: "Failed to release contract",
+        key: "release_contract",
+      });
+    }
   };
   const openEditModal = async (record) => {
     try {
@@ -1878,43 +1979,43 @@ export default function PurchaseIndent() {
     },
     {
       title: (
-        <span className="text-amber-700 font-semibold">
-          Total No Of Vehicle (Indent)
+        <span className="text-amber-700 font-semibold block text-left leading-tight">
+          Total No Of<br />Vehicle<br />(Indent)
         </span>
       ),
-      width: 140,
+      width: 90,
       render: () => <span className="text-amber-800">-</span>,
     },
     {
       title: (
-        <span className="text-amber-700 font-semibold">
-          Total Indent Qty (Nos)
+        <span className="text-amber-700 font-semibold block text-left leading-tight">
+          Total Indent<br />Qty<br />(Nos)
         </span>
       ),
       dataIndex: "total_indent_qty",
-      width: 130,
+      width: 90,
       render: (t) => <span className="text-amber-800">{Number(t || 0)}</span>,
     },
     {
       title: (
-        <span className="text-amber-700 font-semibold">
-          Total Gross Weight(Mt) Indent
+        <span className="text-amber-700 font-semibold block text-left leading-tight">
+          Total Gross<br />Weight(Mt)<br />Indent
         </span>
       ),
       dataIndex: "total_gross_weight_indent",
-      width: 150,
+      width: 100,
       render: (t) => (
         <span className="text-amber-800">{Number(t || 0).toFixed(3)}</span>
       ),
     },
     {
       title: (
-        <span className="text-amber-700 font-semibold">
-          Total Purchase Order Value (Indent)
+        <span className="text-amber-700 font-semibold block text-left leading-tight">
+          Total Purchase<br />Order Value<br />(Indent)
         </span>
       ),
       dataIndex: "total_purchase_order_value_indent",
-      width: 180,
+      width: 110,
       render: (t) => (
         <span className="text-amber-800">
           ₹
@@ -1927,29 +2028,29 @@ export default function PurchaseIndent() {
     },
     {
       title: (
-        <span className="text-amber-700 font-semibold">
-          Total No of Vehicle placed
+        <span className="text-amber-700 font-semibold block text-left leading-tight">
+          Total No of<br />Vehicle<br />placed
         </span>
       ),
-      width: 140,
+      width: 90,
       render: () => <span className="text-amber-800">-</span>,
     },
     {
       title: (
-        <span className="text-amber-700 font-semibold">
-          Total Gross Weight(Mt) Placed
+        <span className="text-amber-700 font-semibold block text-left leading-tight">
+          Total Gross<br />Weight(Mt)<br />Placed
         </span>
       ),
-      width: 150,
+      width: 100,
       render: () => <span className="text-amber-800">-</span>,
     },
     {
       title: (
-        <span className="text-amber-700 font-semibold">
-          Total Purchase Order Value (Placed)
+        <span className="text-amber-700 font-semibold block text-left leading-tight">
+          Total Purchase<br />Order Value<br />(Placed)
         </span>
       ),
-      width: 180,
+      width: 110,
       render: () => <span className="text-amber-800">-</span>,
     },
     {
@@ -2103,10 +2204,6 @@ export default function PurchaseIndent() {
     onChange: (keys) => setSelectedRowKeys(keys),
   };
 
-  const poForContracts = selectedPoForContracts
-    ? data.find((item) => item.id === selectedPoForContracts.id) ||
-      selectedPoForContracts
-    : null;
 
   // ---------------------------------------------------------------
   // Render
@@ -2167,7 +2264,7 @@ export default function PurchaseIndent() {
           dataSource={data}
           loading={loading}
           pagination={false}
-          scroll={{ y: 650, x: 1600 }}
+          scroll={{ y: 650, x: 1200 }}
           rowKey="key"
           size="small"
           className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1 [&_.ant-table-thead_th]:!py-1.5"
@@ -2178,13 +2275,15 @@ export default function PurchaseIndent() {
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            Sale Contracts - {poForContracts?.order_number}
+            Sale Contracts - {selectedPoForContracts?.order_number}
           </span>
         }
         open={isPoContractsModalOpen}
         onCancel={() => {
           setIsPoContractsModalOpen(false);
           setSelectedPoForContracts(null);
+          setModalContracts([]);
+          setReleasedContractIds(new Set());
         }}
         footer={null}
         width={1600}
@@ -2198,22 +2297,28 @@ export default function PurchaseIndent() {
             <h6 className="text-amber-500 mb-0">Linked Sale Contracts</h6>
 
             <span className="text-sm text-amber-700 font-semibold">
-              {poForContracts?.sales_contracts?.length || 0} Contract(s)
+              {modalContracts.length} Contract(s)
             </span>
           </div>
 
           <Table
-            columns={getContractColumns(true)}
-            dataSource={(poForContracts?.sales_contracts || []).map(
-              mapContractRecord,
-            )}
+            columns={getPoContractsColumns()}
+            dataSource={modalContracts.map(mapContractRecord)}
+            loading={poContractsLoading}
             pagination={false}
             scroll={{ y: 500, x: 1500 }}
             rowKey="key"
             onRow={(record) => ({
-              onDoubleClick: () => openEditSalesContract(record),
+              onDoubleClick: () => {
+                if (!releasedContractIds.has(record.id || record.key)) {
+                  openEditSalesContract(record);
+                }
+              },
             })}
-            rowClassName={() => "cursor-pointer"}
+            rowClassName={(record) => {
+              const isReleased = releasedContractIds.has(record.id || record.key);
+              return isReleased ? "!bg-green-100" : "cursor-pointer";
+            }}
             className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1"
             size="small"
           />

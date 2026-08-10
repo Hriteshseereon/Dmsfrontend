@@ -889,11 +889,16 @@ export default function PurchaseSouda() {
             });
             setTimeout(() => {
               setItemDropdownIndex(nextIndex);
-              const selectEl = itemRefs.current[nextIndex];
-              selectEl?.focus();
-              const inputEl = selectEl?.nativeElement?.querySelector("input");
-              inputEl?.focus();
-            }, 150);
+              setTimeout(() => {
+                const selectEl = itemRefs.current[nextIndex];
+                selectEl?.focus();
+                const inputEl = selectEl?.nativeElement?.querySelector("input");
+                if (inputEl) {
+                  inputEl.focus();
+                  inputEl.select();
+                }
+              }, 100);
+            }, 50);
           }
         };
         // 👇 Ye helper function add karo
@@ -948,24 +953,14 @@ export default function PurchaseSouda() {
               <Col span={1}></Col>
             </Row>
             {fields.map((field, index) => (
-              <div
-                key={field.key}
-                className=""
-                bodyStyle={{ padding: 12 }}
-                extra={
-                  !disabled && (
-                    <Button
-                      type="text"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={() => remove(field.name)}
-                    />
-                  )
-                }
-              >
+              <div key={field.key} className="mb-5">
                 <Row gutter={12} align="middle">
                   <Col span={6}>
-                    <Form.Item {...field} name={[field.name, "item_name"]}>
+                    <Form.Item
+                      {...field}
+                      name={[field.name, "item_name"]}
+                      style={{ marginBottom: 0 }}
+                    >
                       <Select
                         ref={(el) => (itemRefs.current[field.name] = el)}
                         showSearch
@@ -1060,6 +1055,7 @@ export default function PurchaseSouda() {
                     <Form.Item
                       {...field}
                       name={[field.name, "qty"]}
+                      style={{ marginBottom: 0 }}
                       rules={[
                         {
                           validator: (_, value) =>
@@ -1099,43 +1095,21 @@ export default function PurchaseSouda() {
                       />
                     </Form.Item>
                   </Col>
-                  {/* FIX: Free Qty with proper validation */}
-                  {/* <Col span={4}>
-                  <Form.Item
-                    {...field}
-                    label="Free Qty"
-                    name={[field.name, "freeQty"]}
-                    fieldKey={[field.fieldKey, "freeQty"]}
-                                     rules={[
-                        { required: true, message: " Free Quantity is required" },
-                        {
-                          validator: (_, value) =>
-                            value >= 0
-                              ? Promise.resolve()
-                              : Promise.reject("Enter valid positive number"),
-                        },
-                      ]}
-                  >
-                    <Input
-                      
-                      disabled={disabled}
-                      onChange={() => {
-                        const all = form.getFieldsValue();
-                        const computed = computeAllFromFormValues(all || {});
-                        form.setFieldsValue({ items: computed.items });
-                      }}
-                      className="w-full!"
-                    />
-                  </Form.Item>
-                </Col> */}
 
                   <Col span={2}>
-                    <Form.Item {...field} name={[field.name, "base_unit"]}>
+                    <Form.Item
+                      {...field}
+                      name={[field.name, "base_unit"]}
+                      style={{ marginBottom: 0 }}
+                    >
                       <Input disabled />
                     </Form.Item>
                   </Col>
                   <Col span={2}>
-                    <Form.Item name={[field.name, "totalNetWt"]}>
+                    <Form.Item
+                      name={[field.name, "totalNetWt"]}
+                      style={{ marginBottom: 0 }}
+                    >
                       <InputNumber
                         className="w-full!"
                         disabled
@@ -1149,7 +1123,10 @@ export default function PurchaseSouda() {
                     </Form.Item>
                   </Col>
                   <Col span={2}>
-                    <Form.Item name={[field.name, "igstPercent"]}>
+                    <Form.Item
+                      name={[field.name, "igstPercent"]}
+                      style={{ marginBottom: 0 }}
+                    >
                       <Input disabled />
                     </Form.Item>
                   </Col>
@@ -1160,6 +1137,7 @@ export default function PurchaseSouda() {
                       {...field}
                       name={[field.name, "rate"]}
                       fieldKey={[field.fieldKey, "rate"]}
+                      style={{ marginBottom: 0 }}
                     >
                       <InputNumber
                         ref={(el) => (rateRefs.current[field.name] = el)}
@@ -1171,12 +1149,6 @@ export default function PurchaseSouda() {
                         precision={2}
                         step={0.01}
                         defaultValue={0}
-                        // formatter={(value) =>
-                        //   value !== undefined && value !== null
-                        //     ? Number(value).toFixed(2)
-                        //     : ""
-                        // }
-                        // parser={(value) => value?.replace(/[^\d.]/g, "")}
                         onChange={() => {
                           const all = form.getFieldsValue();
 
@@ -1199,61 +1171,12 @@ export default function PurchaseSouda() {
                     </Form.Item>
                   </Col>
 
-                  {/* FIX: Discount% with proper validation */}
-                  {/* <Col span={2}>
-                  <Form.Item
-                    {...field}
-                    label="Dis%"
-                    name={[field.name, "discountPercent"]}
-                    fieldKey={[field.fieldKey, "discountPercent"]}
-                    rules={[
-                      {
-                        validator: (_, value) =>
-                          value >= 0
-                            ? Promise.resolve()
-                            : Promise.reject("Enter valid positive number"),
-                      },
-                    ]}
-                  >
-                    <Input
-                      max={100}
-                      disabled={disabled}
-                      onChange={() => {
-                        const all = form.getFieldsValue();
-
-                        const computed = computeAllFromFormValues(all || {});
-
-                        form.setFieldsValue({
-                          items: computed.items,
-                          orderTotals: computed.orderTotals,
-                        });
-                      }}
-                      className="w-full!"
-                    />
-                  </Form.Item>
-                </Col> */}
-                  {/* <Col span={2}>
-                  <Form.Item
-                    {...field}
-                    label="Discount(₹)"
-                    name={[field.name, "discountAmt"]}
-                    fieldKey={[field.fieldKey, "discountAmt"]}
-                  >
-                    <InputNumber className="w-full!" disabled />
-                  </Form.Item>
-                </Col> */}
-
-                  {/* FIX: SGST% with proper validation */}
-
-                  {/* FIX: CGST% with proper validation */}
-
-                  {/* FIX: IGST% with proper validation */}
-
                   <Col span={2}>
                     <Form.Item
                       {...field}
                       name={[field.name, "grossAmount"]}
                       fieldKey={[field.fieldKey, "grossAmount"]}
+                      style={{ marginBottom: 0 }}
                     >
                       <InputNumber
                         className="w-full!"
@@ -1271,6 +1194,7 @@ export default function PurchaseSouda() {
                       {...field}
                       name={[field.name, "gstAmount"]}
                       fieldKey={[field.fieldKey, "gstAmount"]}
+                      style={{ marginBottom: 0 }}
                     >
                       <InputNumber
                         className="w-full!"
@@ -1284,7 +1208,11 @@ export default function PurchaseSouda() {
                     </Form.Item>
                   </Col>
                   <Col span={1}>
-                    <Form.Item {...field} name={[field.name, "roundOff"]}>
+                    <Form.Item
+                      {...field}
+                      name={[field.name, "roundOff"]}
+                      style={{ marginBottom: 0 }}
+                    >
                       <InputNumber
                         className="w-full!"
                         disabled
@@ -1301,6 +1229,7 @@ export default function PurchaseSouda() {
                       {...field}
                       name={[field.name, "totalAmt"]}
                       fieldKey={[field.fieldKey, "totalAmt"]}
+                      style={{ marginBottom: 0 }}
                     >
                       <InputNumber
                         className="w-full!"
@@ -1314,7 +1243,7 @@ export default function PurchaseSouda() {
                     </Form.Item>
                   </Col>
                   <Col span={1}>
-                    <Form.Item>
+                    <Form.Item style={{ marginBottom: 0 }}>
                       <Button
                         type="text"
                         danger
