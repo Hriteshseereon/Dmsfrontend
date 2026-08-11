@@ -14,6 +14,7 @@ import {
   Form,
   InputNumber,
   Dropdown,
+  Popover,
 } from "antd";
 import {
   SearchOutlined,
@@ -181,6 +182,7 @@ export default function PurchaseIndent() {
   const [modalContracts, setModalContracts] = useState([]);
   const [releasedContractIds, setReleasedContractIds] = useState(new Set());
   const [poContractsLoading, setPoContractsLoading] = useState(false);
+  const [isContractReadOnly, setIsContractReadOnly] = useState(false);
   useEffect(() => {
     fetchPurchaseOrder();
   }, []);
@@ -734,27 +736,34 @@ export default function PurchaseIndent() {
       const startDate = currentRange?.[0]?.startOf("day");
       const endDate = currentRange?.[1]?.endOf("day");
 
-      // Approved + selected date-range overlap filter
+      // Approved + selected date-range filter on valid from / valid to basis
       const approved = list.filter((c) => {
         const isApproved = c.status?.toLowerCase() === "approved";
-
         if (!isApproved) return false;
 
-        if (startDate && endDate) {
-          const contractStart = parseApiDate(c.from_date)?.startOf("day");
-          const contractEnd =
-            parseApiDate(c.to_date)?.endOf("day") || contractStart;
+        const contractStart = parseApiDate(c.from_date)?.startOf("day");
+        const contractEnd =
+          parseApiDate(c.to_date)?.endOf("day") || contractStart;
 
-          if (!contractStart || !contractStart.isValid()) {
-            return false;
-          }
-
-          return (
-            !contractEnd.isBefore(startDate) && !contractStart.isAfter(endDate)
-          );
+        if (!contractStart || !contractStart.isValid()) {
+          return false;
         }
 
-        return true;
+        let isMatch = true;
+        if (startDate && startDate.isValid()) {
+          isMatch =
+            isMatch &&
+            (contractStart.isAfter(startDate) ||
+              contractStart.isSame(startDate, "day"));
+        }
+        if (endDate && endDate.isValid()) {
+          isMatch =
+            isMatch &&
+            (contractEnd.isBefore(endDate) ||
+              contractEnd.isSame(endDate, "day"));
+        }
+
+        return isMatch;
       });
 
       console.log("Approved Filtered Contracts:", approved);
@@ -1269,6 +1278,54 @@ export default function PurchaseIndent() {
   // SalesSouda.jsx's own edit modal.
   // ---------------------------------------------------------------
   const openEditSalesContract = async (contractRecord) => {
+    setIsContractReadOnly(false);
+    const cId =
+      contractRecord.sale_contract_id || contractRecord.id || contractRecord;
+    try {
+      message.loading({
+        content: "Loading contract details...",
+        key: "load_contract",
+      });
+      const contract = await getSalesContractById(cId);
+      const mapped = mapContractToForm(contract);
+
+      if (contract.plant_id) {
+        const products = await getProductByplant(contract.plant_id);
+        const productList = Array.isArray(products) ? products : [];
+        const productMap = Object.fromEntries(
+          productList.map((p) => [p.product_id, p]),
+        );
+
+        mapped.items = (mapped.items || []).map((it) => ({
+          ...it,
+          grossWt:
+            Number(it.grossWt || 0) ||
+            Number(productMap[it.item]?.gross_weight || 0),
+        }));
+
+        setSelectedPlantId(contract.plant_id);
+        setVendorProductsMap({
+          [contract.plant_id]: productList,
+        });
+      }
+
+      setContractEditingRecord(mapped);
+      contractForm.setFieldsValue(mapped);
+      setEditItemDropdownIndex(null);
+
+      message.destroy("load_contract");
+      setIsContractEditModalOpen(true);
+    } catch (err) {
+      console.error(err);
+      message.error({
+        content: "Failed to load contract details",
+        key: "load_contract",
+      });
+    }
+  };
+
+  const openReadOnlySalesContract = async (contractRecord) => {
+    setIsContractReadOnly(true);
     const cId =
       contractRecord.sale_contract_id || contractRecord.id || contractRecord;
     try {
@@ -1857,6 +1914,14 @@ export default function PurchaseIndent() {
       )
     : availableContracts;
 
+  const sortedFilteredContracts = [...filteredContracts].sort((a, b) => {
+    const aSelected = selectedRowKeys.includes(a.id || a.key);
+    const bSelected = selectedRowKeys.includes(b.id || b.key);
+    if (aSelected && !bSelected) return -1;
+    if (!aSelected && bSelected) return 1;
+    return 0;
+  });
+
   // ---------------------------------------------------------------
   // Columns — purchase order list
   // ---------------------------------------------------------------
@@ -2084,12 +2149,13 @@ export default function PurchaseIndent() {
       title: <span className="text-amber-700 font-semibold">Contract No</span>,
       dataIndex: "saleContractNumber",
       width: 70,
-      render: (t) => (
+      render: (t, record) => (
         <span
+          onMouseEnter={() => openReadOnlySalesContract(record)}
           className={
             highlightContractNo
-              ? "bg-blue-500 text-white font-semibold px-1 py-0.5 rounded text-xs"
-              : "text-amber-800"
+              ? "bg-blue-500 text-white font-semibold px-1 py-0.5 rounded text-xs cursor-pointer"
+              : "text-amber-800 cursor-pointer hover:underline"
           }
         >
           {t || "-"}
@@ -2380,12 +2446,17 @@ export default function PurchaseIndent() {
               <AppDatePicker
                 value={contractDateRange?.[0]}
                 onChange={(date) => {
-                  const end = contractDateRange?.[1] || dayjs().endOf("day");
-                  const range = date ? [date.startOf("day"), end] : null;
+                  const end = contractDateRange?.[1];
+                  const range = date
+                    ? [date.startOf("day"), end]
+                    : end
+                      ? [null, end]
+                      : null;
                   setContractDateRange(range);
-                  if (date) fetchAvailableContracts(range);
+                  fetchAvailableContracts(range);
                 }}
                 style={{ width: 160 }}
+                allowClear
               />
               <span className="text-sm text-amber-700 font-semibold whitespace-nowrap">
                 End Date:
@@ -2394,15 +2465,16 @@ export default function PurchaseIndent() {
                 value={contractDateRange?.[1]}
                 onChange={(date) => {
                   const start = contractDateRange?.[0];
-                  if (start && date) {
-                    const range = [start, date.endOf("day")];
-                    setContractDateRange(range);
-                    fetchAvailableContracts(range);
-                  } else if (date) {
-                    setContractDateRange([contractDateRange?.[0], date]);
-                  }
+                  const range = date
+                    ? [start || dayjs().startOf("day"), date.endOf("day")]
+                    : start
+                      ? [start, null]
+                      : null;
+                  setContractDateRange(range);
+                  fetchAvailableContracts(range);
                 }}
                 style={{ width: 160 }}
+                allowClear
               />
               <Input
                 prefix={<SearchOutlined className="text-amber-600" />}
@@ -2421,7 +2493,7 @@ export default function PurchaseIndent() {
           <Table
             rowSelection={rowSelection}
             columns={getContractColumns(true)}
-            dataSource={filteredContracts}
+            dataSource={sortedFilteredContracts}
             loading={contractsLoading}
             pagination={false}
             scroll={{ y: 500, x: 1500 }}
@@ -2553,7 +2625,9 @@ export default function PurchaseIndent() {
       <Modal
         title={
           <span className="text-amber-700 text-2xl font-semibold">
-            Edit Sales Contract (Double Click)
+            {isContractReadOnly
+              ? "View Sales Contract"
+              : "Edit Sales Contract (Double Click)"}
           </span>
         }
         open={isContractEditModalOpen}
@@ -2569,6 +2643,7 @@ export default function PurchaseIndent() {
         <Form
           form={contractForm}
           layout="vertical"
+          disabled={isContractReadOnly}
           onFinish={handleEditSalesContractFinish}
           onValuesChange={handleContractEditValuesChange}
         >
@@ -2928,16 +3003,18 @@ export default function PurchaseIndent() {
                 setEditItemDropdownIndex(null);
               }}
             >
-              Cancel
+              {isContractReadOnly ? "Close" : "Cancel"}
             </Button>
-            <Button
-              type="primary"
-              htmlType="submit"
-              loading={contractSubmitting}
-              className="!bg-amber-500 !hover:bg-amber-600 !border-none"
-            >
-              Save Contract Changes
-            </Button>
+            {!isContractReadOnly && (
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={contractSubmitting}
+                className="!bg-amber-500 !hover:bg-amber-600 !border-none"
+              >
+                Save Contract Changes
+              </Button>
+            )}
           </div>
         </Form>
       </Modal>
