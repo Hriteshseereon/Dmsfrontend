@@ -3,1053 +3,706 @@ import {
   Table,
   Input,
   Button,
+  message,
+  Space,
+  Tooltip,
   Modal,
   Form,
   Select,
-  DatePicker,
+  InputNumber,
   Row,
   Col,
-  message,
-  InputNumber,
+  Card,
 } from "antd";
 import {
   SearchOutlined,
-  FilterOutlined,
-  PlusOutlined,
-  DownloadOutlined,
-  EyeOutlined,
+  SyncOutlined,
+  FileExcelOutlined,
   EditOutlined,
+  SafetyOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 
 import { exportToExcel } from "../../../../../utils/exportToExcel";
-import { getPurchaseInvoice, getPurchaseOrder, addPurchaseInvoice, getPurchaseInvoiceById, updatePurchaseInvoice, getPurchaseOrderById, getAllTransport, addAssignment } from "../../../../../api/purchase";
-const { Option } = Select;
-const isAdmin = true; // <-- change to false to simulate non-admin
+import {
+  getVehiclePlacements,
+  updateVehiclePlacement,
+  getAllTransport,
+  updatePurchaseSalesContractOrder,
+} from "../../../../../api/purchase";
+import {
+  getAllVehicles,
+  getAllDrivers,
+} from "../../../../../api/vehiclemaster";
 
+const parseApiDate = (value) => {
+  if (!value) return null;
 
-export default function PurchaseInvoice() {
+  let d = dayjs(value, "DD-MM-YYYY", true);
+  if (d.isValid()) return d;
+
+  d = dayjs(value, "DD-MM-YYYY HH:mm:ss", true);
+  if (d.isValid()) return d;
+
+  d = dayjs(value, "YYYY-MM-DD", true);
+  if (d.isValid()) return d;
+
+  d = dayjs(value);
+  return d.isValid() ? d : null;
+};
+
+const fmtDate = (d) => {
+  const parsed = parseApiDate(d);
+  return parsed ? parsed.format("DD-MM-YYYY") : "-";
+};
+
+export default function VehiclePlacements() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // Lookups data
+  const [transporters, setTransporters] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+
+  // Edit modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [recordToAssign, setRecordToAssign] = useState(null);
-  const [selectedTransporter, setSelectedTransporter] = useState(null);
-  const [orderList, setOrderList] = useState([]);
-  const [selectedRecord, setSelectedRecord] = useState(null);
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [transportList, setTransportList] = useState([]);
-  const [addForm] = Form.useForm();
+  const [editingRecord, setEditingRecord] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
   const [editForm] = Form.useForm();
-  const [viewForm] = Form.useForm();
-  const [assignForm] = Form.useForm();
-  const [saleOrders, setSaleOrders] = useState([]);
 
-  const formOptions = {
-    purchaseTypeOptions: ["Local", "Import"],
-    billTypeOptions: ["Tax Invoice", "Regular Invoice"],
-    billModeOptions: ["Credit", "Cash"],
-    statusOptions: ["Approved", "Pending", "Rejected"],
-  };
-  // Search handler
-  const handleSearch = (value) => {
-    setSearchText(value);
+  // Photo uploads
+  const [file1, setFile1] = useState(null);
+  const [file2, setFile2] = useState(null);
+  const [file3, setFile3] = useState(null);
+  const [file4, setFile4] = useState(null);
 
-    if (!value) {
-      fetchPurchaseInvoices(); // reset to original data
-      return;
+  // Released contract IDs
+  const [releasedContractIds, setReleasedContractIds] = useState(new Set());
+
+  const fetchLookups = async () => {
+    try {
+      const [transRes, vehicleRes, driverRes] = await Promise.all([
+        getAllTransport(),
+        getAllVehicles(),
+        getAllDrivers(),
+      ]);
+      setTransporters(
+        Array.isArray(transRes) ? transRes : transRes?.data || [],
+      );
+      setVehicles(
+        Array.isArray(vehicleRes) ? vehicleRes : vehicleRes?.data || [],
+      );
+      setDrivers(Array.isArray(driverRes) ? driverRes : driverRes?.data || []);
+    } catch (err) {
+      console.error("Failed to load lookups:", err);
     }
-
-    const filtered = data.filter((item) =>
-      JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
-    );
-
-    setData(filtered);
   };
 
-  useEffect(() => {
-    fetchPurchaseInvoices();
-    fetchPurchaseOrders();
-  }, []);
-
-
-  const fetchPurchaseInvoices = async () => {
+  const fetchPlacements = async () => {
     try {
       setLoading(true);
-      const res = await getPurchaseInvoice();
-    const list = Array.isArray(res) ? res : res.data;
-      console.log("API DATA:", list);
-     const formatted = list.map((item) => ({
-  key: item.id,
-  ...item,
-  trn_number: item.trn_number || item.invoice_number,
-
-        assigned: item.is_transport_assigned,
-        transport: item.transport_name,
-      }));
-      console.log("FORMATTED DATA:", formatted);  // 👈 check here
-
-      setData(formatted);
+      const res = await getVehiclePlacements();
+      const list = Array.isArray(res) ? res : res?.data || [];
+      setData(list);
     } catch (err) {
-      message.error("Failed to load purchase invoices");
       console.error(err);
+      message.error("Failed to load vehicle placements data");
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchTransportList = async () => {
-    try {
-      const res = await getAllTransport();
-      setTransportList(res); // your API returns array
-    } catch (err) {
-      message.error("Failed to load transport list");
-      console.error(err);
-    }
+  useEffect(() => {
+    fetchLookups();
+    fetchPlacements();
+  }, []);
+
+  const handleOpenEdit = (record) => {
+    setEditingRecord(record);
+    editForm.setFieldsValue({
+      transporter: record.transporter || undefined,
+      vehicle: record.vehicle || undefined,
+      driver: record.driver || undefined,
+      passing_weight: record.passing_weight || null,
+      min_guarantee_weight: record.min_guarantee_weight || null,
+    });
+    setFile1(null);
+    setFile2(null);
+    setFile3(null);
+    setFile4(null);
+    setIsEditModalOpen(true);
   };
 
-  const fetchPurchaseOrders = async () => {
+  const handleEditFinish = async (values) => {
     try {
-      const res = await getPurchaseOrder();
-      setOrderList(res); // store full order objects
-    } catch (err) {
-      message.error("Failed to load purchase orders");
-      console.error(err);
-    }
-  };
-
-
-  const handleOrderSelect = async (orderId) => {
-    try {
-      const order = await getPurchaseOrderById(orderId);
-
-      setSelectedOrder(order);
-      setSaleOrders(order.sales_order_details || []);
-      addForm.setFieldsValue({
-        purchase_order: order.id,
-
-        vendorName: order.vendor_name,
-        plantName: order.plant_name,
-        deliveryAddress: order.delivery_address,
-
-        deliveryDate: order.expected_receiving_date
-          ? dayjs(order.expected_receiving_date)
-          : null,
-
-        sgstPercent: Number(order.sgst),
-        cgstPercent: Number(order.cgst),
-        igstPercent: Number(order.igst),
-
-        sgst: Number(order.total_gst_amount) ? Number(order.sgst) : 0,
-        cgst: Number(order.total_gst_amount) ? Number(order.cgst) : 0,
-        igst: Number(order.total_gst_amount) ? Number(order.igst) : 0,
-
-        totalGST: Number(order.total_gst_amount),
-        tcsAmt: Number(order.tcs_amount),
-
-        totalQty: Number(order.total_qty_all_items),
-        totalAmount: Number(order.grand_total),
-
-        items: order.items.map((item) => ({
-          product_id: item.product,
-          itemName: item.item_name,
-          itemCode: item.hsn_code,  // your API gives hsn_code not item_code
-          qty: Number(item.qty),
-         // freeQty: Number(item.free_qty),
-          uom: item.uom_details?.unit_name,
-          rate: Number(item.rate),
-          discountPercent: Number(item.discount_percent),
-          discountAmount: Number(item.discount_amount),
-          grossWt: Number(item.gross_weight),
-          totalGrossWt: Number(item.total_gross_weight),
-          grossAmount: Number(item.gross_amount),
-          totalQty: Number(item.total_qty),
-        })),
+      setSubmitting(true);
+      message.loading({
+        content: "Updating placement details...",
+        key: "update_placement",
       });
-      console.log("ORDER RESPONSE:", order);
 
+      const formData = new FormData();
+      if (values.transporter) {
+        formData.append("transporter", values.transporter);
+      }
+      if (values.vehicle) {
+        formData.append("vehicle", values.vehicle);
+      }
+      if (values.driver) {
+        formData.append("driver", values.driver);
+      }
+      if (
+        values.passing_weight !== undefined &&
+        values.passing_weight !== null
+      ) {
+        formData.append("passing_weight", values.passing_weight);
+      }
+      if (
+        values.min_guarantee_weight !== undefined &&
+        values.min_guarantee_weight !== null
+      ) {
+        formData.append("min_guarantee_weight", values.min_guarantee_weight);
+      }
+      if (file1) formData.append("photo_1", file1);
+      if (file2) formData.append("photo_2", file2);
+      if (file3) formData.append("photo_3", file3);
+      if (file4) formData.append("photo_4", file4);
 
+      await updateVehiclePlacement(editingRecord.id, formData);
 
-      console.log(order)
-      // calculate totals
+      message.success({
+        content: "Placement updated successfully!",
+        key: "update_placement",
+      });
+      setIsEditModalOpen(false);
+      fetchPlacements();
     } catch (err) {
-      message.error("Failed to fetch order details");
       console.error(err);
+      message.error({
+        content: "Failed to update placement details",
+        key: "update_placement",
+      });
+    } finally {
+      setSubmitting(false);
     }
   };
 
+  const handleReleaseContract = async (record) => {
+    // 1. Get all active placements for this PO in memory (not including released ones)
+    const activeRelatedRows = data.filter(
+      (item) =>
+        item.purchase_order === record.purchase_order &&
+        !releasedContractIds.has(item.id),
+    );
+
+    if (activeRelatedRows.length <= 1) {
+      message.warning(
+        "At least one sale contract is required. You cannot release the last contract of a purchase order.",
+      );
+      return;
+    }
+
+    try {
+      message.loading({
+        content: "Releasing contract...",
+        key: "release_contract",
+      });
+
+      // 2. Extract UUIDs of all contract items for this PO except the one being released
+      const updatedContractIds = activeRelatedRows
+        .filter((item) => item.id !== record.id)
+        .map((item) => item.sale_contract)
+        .filter(Boolean);
+
+      // 3. Patch the PO using existing api
+      await updatePurchaseSalesContractOrder(record.purchase_order, {
+        sale_contracts: updatedContractIds,
+      });
+
+      // 4. Track released state locally
+      setReleasedContractIds((prev) => {
+        const next = new Set(prev);
+        next.add(record.id);
+        return next;
+      });
+
+      message.success({
+        content: "Contract released successfully!",
+        key: "release_contract",
+      });
+      fetchPlacements();
+    } catch (err) {
+      console.error(err);
+      message.error({
+        content: "Failed to release contract",
+        key: "release_contract",
+      });
+    }
+  };
+
+  const handleExport = () => {
+    exportToExcel(filteredData, columns, "Vehicle_Placements");
+  };
+
+  const filteredData = data.filter((item) => {
+    if (!searchText) return true;
+    const lower = searchText.toLowerCase();
+    return (
+      item.purchase_order_number?.toLowerCase().includes(lower) ||
+      item.sale_contract_number?.toLowerCase().includes(lower) ||
+      item.customer_name?.toLowerCase().includes(lower) ||
+      item.plant_name?.toLowerCase().includes(lower) ||
+      item.place?.toLowerCase().includes(lower)
+    );
+  });
 
   const columns = [
-{
-  title: <span className="text-amber-700 font-semibold">Assign No</span>,
-  dataIndex: "trn_number",
-  key: "trn_number",
-  width: 120,
-  render: (_, record) => (   // 👈 use _ and read from record directly
-    <span className="text-amber-800 font-medium">
-      {record.trn_number || record.invoice_number || "-"}
-    </span>
-  ),
-},
-
     {
-      title: <span className="text-amber-700 font-semibold">Total Qty</span>,
-      dataIndex: "total_qty",
+      title: (
+        <span className="text-amber-700 font-semibold">Purchase Order No.</span>
+      ),
+      dataIndex: "purchase_order_number",
+      width: 110,
+      render: (t) => (
+        <span className="text-amber-800 font-medium">{t || "-"}</span>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Purchase Order Date
+        </span>
+      ),
+      dataIndex: "purchase_order_date",
+      width: 90,
+      render: (t) => <span className="text-amber-800">{fmtDate(t)}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Sale Contract No.</span>
+      ),
+      dataIndex: "sale_contract_number",
+      width: 110,
+      render: (t) => (
+        <span className="text-amber-800 font-medium">{t || "-"}</span>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Sale Contract Date</span>
+      ),
+      dataIndex: "sale_contract_date",
+      width: 90,
+      render: (t) => <span className="text-amber-800">{fmtDate(t)}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Plant Name</span>,
+      dataIndex: "plant_name",
       width: 100,
-      render: (text, record) => (
-        <span className="text-amber-800">
-          {record.total_qty} {record.uom}
+      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Customer Name</span>
+      ),
+      dataIndex: "customer_name",
+      width: 120,
+      ellipsis: true,
+      render: (t) => (
+        <span className="text-amber-800" title={t}>
+          {t || "-"}
         </span>
       ),
     },
     {
-      title: <span className="text-amber-700 font-semibold">Total Amount</span>,
-      dataIndex: "total_amount",
-      width: 100,
-      render: (text) => <span className="text-amber-800 ">{text}</span>,
+      title: <span className="text-amber-700 font-semibold">Place</span>,
+      dataIndex: "place",
+      width: 90,
+      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
-
     {
-      title: <span className="text-amber-700 font-semibold">Transporter</span>,
-      dataIndex: "transporter_name",
-      width: 100,
-      render: (_, record) => (
-        <span className="text-amber-800">{record.transporter_name || "-"}</span>
+      title: <span className="text-amber-700 font-semibold">Broker Name</span>,
+      dataIndex: "broker_name",
+      width: 90,
+      render: (t) => <span className="text-amber-800">{t || "DIRECT"}</span>,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">QTY</span>,
+      dataIndex: "qty",
+      width: 60,
+      render: (t) => (
+        <span className="text-amber-800 font-semibold">{t || "-"}</span>
       ),
     },
     {
-      title: <span className="text-amber-700 font-semibold">Assigne</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Gross Weight(Ton)
+          <br />
+          Loading Plan
+        </span>
+      ),
+      dataIndex: "gross_weight_ton",
+      width: 90,
+      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Transport Name</span>
+      ),
+      dataIndex: "transporter",
+      width: 120,
+      render: (t, record) => {
+        const trans = transporters.find((x) => x.id === t);
+        return (
+          <span className="text-amber-800">
+            {trans ? trans.registered_name || trans.name : "-"}
+          </span>
+        );
+      },
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Vehicle Details</span>
+      ),
+      dataIndex: "vehicle",
       width: 100,
-      render: (_, record) => (
-        record.is_transport_assigned ? (
-          <Button disabled className="bg-green-200! border-none! text-green-800!">
-            Assigned
-          </Button>
-        ) : (
-          <Button
-            type="primary"
-            onClick={() => openAssignModal(record)}
-            className="bg-amber-500! hover:bg-amber-600! border-none!"
-          >
-            Assign
-          </Button>
-        )
+      render: (t) => {
+        const veh = vehicles.find((x) => x.id === t);
+        return (
+          <span className="text-amber-800">
+            {veh ? veh.vehicle_number : "-"}
+          </span>
+        );
+      },
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Driver Name</span>,
+      dataIndex: "driver",
+      width: 100,
+      render: (t) => {
+        const drv = drivers.find((x) => x.id === t);
+        return (
+          <span className="text-amber-800">{drv ? drv.driver_name : "-"}</span>
+        );
+      },
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Passing Weight</span>
+      ),
+      dataIndex: "passing_weight",
+      width: 80,
+      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Min Guarantee</span>
+      ),
+      dataIndex: "min_guarantee_weight",
+      width: 110,
+      render: (t) => (
+        <span className="text-amber-800 font-medium">{t || "-"}</span>
       ),
     },
-
+    {
+      title: <span className="text-amber-700 font-semibold">Documents</span>,
+      width: 90,
+      render: (_, record) => {
+        const docs = [];
+        if (record.photo_1) docs.push({ name: "Doc 1", url: record.photo_1 });
+        if (record.photo_2) docs.push({ name: "Doc 2", url: record.photo_2 });
+        if (record.photo_3) docs.push({ name: "Doc 3", url: record.photo_3 });
+        if (record.photo_4) docs.push({ name: "Doc 4", url: record.photo_4 });
+        if (docs.length === 0) return <span className="text-gray-400">-</span>;
+        return (
+          <Space size="small">
+            {docs.map((d, idx) => (
+              <a
+                key={idx}
+                href={d.url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-600 hover:underline font-medium text-xs"
+              >
+                {d.name}
+              </a>
+            ))}
+          </Space>
+        );
+      },
+    },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
-      width: 100,
-      render: (record) => (
-        <div className="flex gap-3">
-          <EyeOutlined className="cursor-pointer! text-blue-500!" onClick={() => openView(record)} />
-              {!record.is_transport_assigned && (
-          <EditOutlined className="cursor-pointer! text-red-500!" onClick={() => openEdit(record)} />
-          )}
-        </div>
-      ),
+      width: 150,
+      render: (_, record) => {
+        const isReleased = releasedContractIds.has(record.id);
+        return (
+          <div className="flex gap-2">
+            <Button
+              type="primary"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => handleOpenEdit(record)}
+              disabled={isReleased}
+              className="!bg-amber-500 !hover:bg-amber-600 !border-none text-xs"
+            >
+              Edit
+            </Button>
+            <Button
+              danger
+              size="small"
+              icon={<SafetyOutlined />}
+              onClick={() => handleReleaseContract(record)}
+              disabled={isReleased}
+              className="text-xs"
+            >
+              {isReleased ? "Released" : "Release"}
+            </Button>
+          </div>
+        );
+      },
     },
   ];
 
-  // Open view modal
-  const openView = async (record) => {
-    try {
-      setLoading(true);
-
-      // 🔥 Call API by ID
-      const invoice = await getPurchaseInvoiceById(record.id);
-
-      setSelectedRecord(invoice);
-
-      viewForm.setFieldsValue({
-        purchase_order: invoice.order,
-
-        invoiceDate: invoice.invoice_date
-          ? dayjs(invoice.invoice_date)
-          : null,
-
-        deliveryDate: invoice.delivery_date
-          ? dayjs(invoice.delivery_date)
-          : null,
-
-        deliveryAddress: invoice.delivery_address,
-        vendorName: invoice.vendor_name,
-        plantName: invoice.plant_name,
-
-        purchaseType: invoice.purchase_type,
-        billType: invoice.bill_type,
-        billMode: invoice.bill_mode,
-        waybillNo: invoice.waybill_no,
-        status: invoice.status,
-
-        sgstPercent: invoice.sgst_percent,
-        cgstPercent: invoice.cgst_percent,
-        igstPercent: invoice.igst_percent,
-
-        sgst: invoice.sgst_amount,
-        cgst: invoice.cgst_amount,
-        igst: invoice.igst_amount,
-
-        totalGST: invoice.total_gst_amount,
-        tcsAmt: invoice.tcs_amount,
-        totalQty: invoice.total_qty,
-        totalAmount: invoice.total_amount,
-
-        items: invoice.items.map((item) => ({
-          product_id: item.product,
-          itemName: item.item_name,
-          itemCode: item.hsn_code,
-          qty: item.qty,
-          // freeQty: item.free_qty,
-          uom: item.uom_details?.unit_name,
-          rate: item.rate,
-          discountPercent: item.dis_percent,
-          discountAmount: item.dis_amount,
-          grossWt: item.gross_wt,
-          totalGrossWt: item.total_gross_wt,
-          grossAmount: item.gross_amount,
-        })),
-      });
-
-      setIsViewModalOpen(true);
-
-    } catch (err) {
-      message.error("Failed to fetch invoice details");
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleExport = async () => {
-    try {
-      const res = await getPurchaseInvoice();
-      const list = res?.data || res;
-
-      const exportRows = [];
-
-      for (const invoice of list) {
-        // get full details (important)
-        const detail = await getPurchaseInvoiceById(invoice.id);
-
-        detail.items?.forEach((item) => {
-          exportRows.push({
-            "Assigne No": detail.trn_number,
-
-            "Purchase Type": detail.purchase_type,
-            "Bill Type": detail.bill_type,
-            "Bill Mode": detail.bill_mode,
-            "Waybill No": detail.waybill_no,
-            "Status": detail.status,
-
-            "Delivery Date": detail.delivery_date,
-            "Invoice Date": detail.invoice_date,
-
-            "Supplier Name": detail.vendor_name,
-            "Plant Name": detail.plant_name,
-            "Delivery Address": detail.delivery_address,
-
-            "Item Name": item.item_name,
-            "Item Code": item.hsn_code,
-            "Qty": item.qty,
-            "Free Qty": item.free_qty,
-            "Total Qty": Number(item.qty || 0) + Number(item.free_qty || 0),
-            "UOM": item.uom_details?.unit_name,
-            "Rate": item.rate,
-            "Dis %": item.dis_percent,
-            "Dis Amt": item.dis_amount,
-            "Gross Wt": item.gross_wt,
-            "Gross Amount (₹)": item.gross_amount,
-
-            "Total Qty (All Items)": detail.total_qty,
-
-            "SGST %": detail.sgst_percent,
-            "CGST %": detail.cgst_percent,
-            "GST %": detail.igst_percent,
-
-            "SGST (₹)": detail.sgst_amount,
-            "CGST (₹)": detail.cgst_amount,
-            "GST (₹)": detail.igst_amount,
-
-            "Total GST (₹)": detail.total_gst_amount,
-            "TCS Amt (₹)": detail.tcs_amount,
-            "Total Amount (₹)": detail.total_amount,
-          });
-        });
-      }
-
-      exportToExcel(exportRows, "Purchase_Invoice_Details", "InvoiceData");
-
-    } catch (error) {
-      console.error("Export failed:", error);
-      message.error("Export failed");
-    }
-  };
-
-  // Open edit modal
-  const openEdit = async (record) => {
-    try {
-      setLoading(true);
-
-      // 🔥 Call API by ID
-      const invoice = await getPurchaseInvoiceById(record.id);
-
-      setSelectedRecord(invoice);
-
-      // Map backend response to form structure
-      editForm.setFieldsValue({
-        purchase_order: invoice.order,
-
-        purchaseType: invoice.purchase_type,
-        billType: invoice.bill_type,
-        billMode: invoice.bill_mode,
-        waybillNo: invoice.waybill_no,
-        status: invoice.status,
-
-        invoiceDate: invoice.invoice_date
-          ? dayjs(invoice.invoice_date)
-          : null,
-
-        deliveryDate: invoice.delivery_date
-          ? dayjs(invoice.delivery_date)
-          : null,
-
-        deliveryAddress: invoice.delivery_address,
-        vendorName: invoice.vendor_name,
-        plantName: invoice.plant_name,
-
-        sgstPercent: invoice.sgst_percent,
-        cgstPercent: invoice.cgst_percent,
-        igstPercent: invoice.igst_percent,
-
-        sgst: invoice.sgst_amount,
-        cgst: invoice.cgst_amount,
-        igst: invoice.igst_amount,
-
-        totalGST: invoice.total_gst_amount,
-        tcsAmt: invoice.tcs_amount,
-        totalQty: invoice.total_qty,
-
-
-        totalAmount: invoice.total_amount,
-
-        items: invoice.items.map((item) => ({
-          product_id: item.product,
-          itemName: item.item_name,
-          // adjust if needed
-          itemCode: item.hsn_code,
-          qty: item.qty,
-          // freeQty: item.free_qty,
-          uom: item.uom_details?.unit_name,
-
-          rate: item.rate,
-          discountPercent: item.dis_percent,
-          discountAmount: item.dis_amount,
-          grossWt: item.gross_wt,
-          totalGrossWt: item.total_gross_wt,
-          grossAmount: item.gross_amount,
-        })),
-      });
-
-      setIsEditModalOpen(true);
-
-    } catch (err) {
-      message.error("Failed to fetch invoice details");
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-  // Open assign modal
-  const openAssignModal = async (record) => {
-    setRecordToAssign(record);
-    assignForm.resetFields();
-    await fetchTransportList();   // 👈 load transport here
-    setIsAssignModalOpen(true);
-  };
-
-
-  // Assign submit handler
-  const handleAssignSubmit = async (values) => {
-    try {
-      const selectedTransport = transportList.find(
-        (t) => t.id === values.transporterName
-      );
-
-      const payload = {
-        invoice: recordToAssign.id,      // ✅ must match backend
-        transport: selectedTransport.id,
-        invoice_number: recordToAssign.invoice_number,
-        transport_name: selectedTransport.registered_name,
-      };
-
-      await addAssignment(payload);
-
-      message.success("Transport assigned successfully");
-
-      await fetchPurchaseInvoices();
-
-      setIsAssignModalOpen(false);
-    } catch (error) {
-      console.error(error);
-      message.error("Assignment failed");
-    }
-  };
-
-
-
-
-  const handleFormSubmit = async (values) => {
-    try {
-      const items = values.items || [];
-      const payload = {
-        order: values.purchase_order,
-
-        vendor: isAddModalOpen
-          ? selectedOrder?.vendor
-          : selectedRecord?.vendor,
-        plant: isAddModalOpen
-          ? selectedOrder?.plant
-          : selectedRecord?.plant,
-
-        invoice_date: values.invoiceDate
-          ? dayjs(values.invoiceDate).format("YYYY-MM-DD")
-          : null,
-
-
-        delivery_date: values.deliveryDate
-          ? dayjs(values.deliveryDate).format("YYYY-MM-DD")
-          : null,
-
-        delivery_address: values.deliveryAddress || "",
-        order_number: selectedOrder?.order_number || "", // optional, for reference
-        purchase_type: values.purchaseType || "",
-        bill_type: values.billType || "",
-        bill_mode: values.billMode || "",
-        waybill_no: values.waybillNo || "",
-        status: values.status || "",
-        sgst_percent: values.sgstPercent || 0,
-        cgst_percent: values.cgstPercent || 0,
-        igst_percent: values.igstPercent || 0,
-
-        sgst_amount: values.sgst || 0,        // ✅ not sgst
-        cgst_amount: values.cgst || 0,        // ✅ not cgst
-        igst_amount: values.igst || 0,        // ✅ not igst
-
-        total_gst_amount: values.totalGST || 0,  // ✅ not total_gst
-        tcs_amount: values.tcsAmt || 0,
-
-        total_qty: values.totalQty || 0,
-        total_amount: values.totalAmount || 0,
-
-        items: (values.items || []).map((item) => ({
-          product: item.product_id,   // 👈 VERY IMPORTANT
-          qty: item.qty,
-         // free_qty: item.freeQty,
-          uom: item.uom,
-          rate: item.rate,
-          dis_percent: item.discountPercent || 0,
-          dis_amount: item.discountAmount || 0,
-          gross_wt: item.grossWt || 0,
-          total_gross_wt: item.totalGrossWt || 0,
-          gross_amount: item.grossAmount || 0,
-        }))
-
-      };
-      console.log("PAYLOAD:", payload);
-
-
-
-      // 🔹 ADD INVOICE
-      if (isAddModalOpen) {
-        await addPurchaseInvoice(payload);
-        message.success("Invoice added successfully!");
-        setIsAddModalOpen(false);
-        addForm.resetFields();
-        fetchPurchaseInvoices();
-      }
-
-      // 🔹 EDIT INVOICE
-      if (isEditModalOpen && selectedRecord?.id) {
-        await updatePurchaseInvoice(selectedRecord.id, payload);
-        message.success("Invoice updated successfully!");
-        setIsEditModalOpen(false);
-        editForm.resetFields();
-        fetchPurchaseInvoices();
-      }
-
-    } catch (error) {
-      console.error(error);
-      message.error("Something went wrong while saving invoice");
-    }
-  };
-
-
-  // Render form fields - show only after indent selected (per request)
-  const renderFormFields = (formInstance, disabled = false) => {
-    const indentChosen = formInstance.getFieldValue("indentNo");
-
-    return (
-      <>
-        <h6 className=" text-amber-500 ">Basic Information</h6>
-        <Row gutter={24}>
-          <Col span={6}>
-            <Form.Item
-              label="Order No"
-              name="purchase_order"
-              rules={[{ required: true, message: "Please select Order No" }]}
-            >
-              <Select
-                placeholder="Select Order No"
-                onChange={(val) => handleOrderSelect(val)}
-                disabled={disabled || isEditModalOpen || isViewModalOpen}
-
-              >
-                {orderList.map((order) => (
-                  <Select.Option key={order.id} value={order.id}>
-                    {order.order_number}
-
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-
-          </Col>
-
-
-
-          <Col span={6}>
-            <Form.Item label="Purchase Type" name="purchaseType">
-              <Select disabled={!isAdmin || disabled} placeholder="Select Type">
-                {formOptions.purchaseTypeOptions.map((val) => (
-                  <Option key={val} value={val}>
-                    {val}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Bill Type" name="billType">
-              <Select disabled={!isAdmin || disabled} placeholder="Select Bill Type">
-                {formOptions.billTypeOptions.map((val) => (
-                  <Option key={val} value={val}>
-                    {val}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Bill Mode" name="billMode">
-              <Select disabled={!isAdmin || disabled} placeholder="Select Bill Mode">
-                {formOptions.billModeOptions.map((val) => (
-                  <Option key={val} value={val}>
-                    {val}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Col>
-        </Row>
-
-        <Row gutter={24}>
-
-
-          <Col span={6}>
-            <Form.Item label="Waybill No" name="waybillNo">
-              <Input disabled={!isAdmin || disabled} />
-            </Form.Item>
-          </Col>
-{/* 
-          <Col span={6}>
-            <Form.Item label="Status" name="status">
-              <Select disabled={!isAdmin || disabled} placeholder="Select Status">
-                {formOptions.statusOptions.map((opt) => (
-                  <Option key={opt} value={opt}>
-                    {opt}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Col> */}
-          <Col span={6}>
-            <Form.Item label="Delivery Date" name="deliveryDate">
-              <DatePicker
-                className="w-full"
-                disabled
-                format="YYYY-MM-DD"
-              />
-
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Supplier Name" name="vendorName">
-              <Input disabled placeholder="Auto filled" />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        <>
-          <Row gutter={24}>
-            <Col span={6}>
-              <Form.Item label="Plant Name" name="plantName">
-                <Input disabled placeholder="Auto filled" />
-              </Form.Item>
-            </Col>
-
-
-
-            <Col span={6}>
-              <Form.Item label="Assigne Date" name="invoiceDate">
-                <DatePicker className="w-full" disabled format="YYYY-MM-DD" />
-              </Form.Item>
-            </Col>
-
-
-
-          </Row>
-
-
-          <h6 className=" text-amber-500 ">Item & Pricing Details</h6>
-
-          {/* MULTI ITEM SECTION (auto-populated from indent) */}
-          <Form.List name="items" initialValue={[{}]}>
-            {(fields) => (
-              <>
-                {fields.map((field, index) => (
-                  <div
-                    key={field.key}
-
-                  >
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-semibold text-amber-700">Item {index + 1}</span>
-                    </div>
-
-                    <Row gutter={24}>
-                      <Col span={6}>
-                        <Form.Item
-                          {...field}
-                          label="Item Name"
-                          name={[field.name, "itemName"]}
-                          rules={[{ required: true }]}
-                        >
-                          <Input disabled />
-                        </Form.Item>
-                      </Col>
-
-                      <Col span={6}>
-                        <Form.Item {...field} label="Item Code" name={[field.name, "itemCode"]}>
-                          <Input disabled />
-                        </Form.Item>
-                      </Col>
-
-                      <Col span={6}>
-                        <Form.Item {...field} label="Qty" name={[field.name, "qty"]}>
-                          <InputNumber className="w-full!" disabled />
-                        </Form.Item>
-                      </Col>
-
-                      {/* <Col span={6}>
-                        <Form.Item {...field} label="Free Qty" name={[field.name, "freeQty"]}>
-                          <InputNumber className="w-full!" disabled />
-                        </Form.Item>
-                      </Col> */}
-                    </Row>
-
-                    <Row gutter={24}>
-                      <Col span={6}>
-                        <Form.Item {...field} label="UOM" name={[field.name, "uom"]}>
-                          <Input disabled />
-                        </Form.Item>
-                      </Col>
-
-                      <Col span={6}>
-                        <Form.Item {...field} label="Rate" name={[field.name, "rate"]}>
-                          <InputNumber className="w-full!" disabled />
-                        </Form.Item>
-                      </Col>
-
-                      <Col span={6}>
-                        <Form.Item {...field} label="Dis%" name={[field.name, "discountPercent"]}>
-                          <InputNumber className="w-full!" disabled />
-                        </Form.Item>
-                      </Col>
-
-                      <Col span={6}>
-                        <Form.Item {...field} label="Gross Wt" name={[field.name, "grossWt"]}>
-                          <InputNumber className="w-full!" disabled />
-                        </Form.Item>
-                      </Col>
-                    </Row>
-
-                    <Row gutter={24}>
-
-
-                      <Col span={6}>
-                        <Form.Item {...field} label="Dis Amt" name={[field.name, "discountAmount"]}>
-                          <InputNumber className="w-full! " disabled />
-                        </Form.Item>
-                      </Col>
-
-
-                      <Col span={6}>
-                        <Form.Item {...field} label="Gross Amount (₹)" name={[field.name, "grossAmount"]}>
-                          <InputNumber className="w-full!" disabled />
-                        </Form.Item>
-                      </Col>
-                    </Row>
-                  </div>
-                ))}
-              </>
-            )}
-          </Form.List>
-
-          {/* COMMON TAX & TOTAL SECTION */}
-          <h6 className=" text-amber-500 ">Tax, Charges & Others</h6>
-          <Row gutter={24}>
-            <Col span={6}>
-              <Form.Item label="Total Qty (All Items)" name="totalQty">
-                <InputNumber className="w-full! " disabled />
-              </Form.Item>
-            </Col>
- <Col span={6}>
-              <Form.Item label="GST %" name="igstPercent">
-                <InputNumber className="w-full!" disabled />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item label="SGST %" name="sgstPercent">
-                <InputNumber className="w-full!" disabled />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item label="CGST %" name="cgstPercent">
-                <InputNumber className="w-full!" disabled />
-              </Form.Item>
-            </Col>
-
-           
-          </Row>
-
-          <Row gutter={24}>
-             <Col span={6}>
-              <Form.Item label="GST (₹)" name="igst">
-                <InputNumber className="w-full! " disabled />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item label="SGST (₹)" name="sgst">
-                <InputNumber className="w-full! " disabled />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item label="CGST (₹)" name="cgst">
-                <InputNumber className="w-full! " disabled />
-              </Form.Item>
-            </Col>
-
-           
-
-            <Col span={6}>
-              <Form.Item label="Total GST (₹)" name="totalGST">
-                <InputNumber className="w-full! " disabled />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Row gutter={24}>
-            <Col span={6}>
-              <Form.Item label="TCS Amt (₹)" name="tcsAmt">
-                <InputNumber className="w-full! " disabled />
-              </Form.Item>
-            </Col>
-
-            <Col span={6}>
-              <Form.Item label="Total Amount (₹)" name="totalAmount" rules={[{ required: true }]}>
-                <InputNumber className="w-full! " disabled />
-              </Form.Item>
-            </Col>
-          </Row>
-        
-        </>
-
-      </>
-    );
-  };
-
-
-
-
-console.log("TABLE DATA:", data.map(d => ({ id: d.id, trn_number: d.trn_number, invoice_number: d.invoice_number })));
   return (
-    <div>
-      {/* Header */}
+    <div className="p-4 bg-white rounded-lg shadow max-w-full overflow-hidden">
+      {/* Banner */}
+      {/* <div className="bg-amber-500 text-white font-bold text-xl py-3.5 px-4 rounded-t-lg text-center uppercase tracking-wider shadow-sm mb-4">
+        Vehicle Placement
+      </div> */}
+
+      {/* Controls Bar */}
       <div className="flex justify-between items-center mb-4">
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-96">
           <Input
-            prefix={<SearchOutlined className="text-amber-600!" />}
-            placeholder="Search..."
-            className="w-64! border-amber-300! focus:border-amber-500!"
+            prefix={<SearchOutlined className="text-amber-600" />}
+            placeholder="Search by PO No, Contract No, Customer, Plant..."
             value={searchText}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={(e) => setSearchText(e.target.value)}
+            allowClear
+            className="border-amber-300 hover:border-amber-400 focus:border-amber-500 rounded"
           />
-          <Button
-            icon={<FilterOutlined />}
-            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-            onClick={() => handleSearch("")}
-          >
-            Reset
-          </Button>
         </div>
-        <div className="flex gap-2">
-          <Button
-            icon={<DownloadOutlined />}
-            onClick={handleExport}
-            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-          >
-            Export
-          </Button>
-          <Button
+        <Space>
+          {/* <Button
             type="primary"
-            icon={<PlusOutlined />}
-            className="bg-amber-500! hover:bg-amber-600! border-none!"
-            onClick={() => {
-              addForm.resetFields();
-              addForm.setFieldsValue({ invoiceDate: dayjs(), items: [] });
-              setIsAddModalOpen(true);
-            }}
+            icon={<FileExcelOutlined />}
+            onClick={handleExport}
+            className="!bg-green-600 !hover:bg-green-700 !border-none rounded font-medium"
           >
-            Add New
-          </Button>
-        </div>
+            Export to Excel
+          </Button> */}
+          <Tooltip title="Reload placement records">
+            <Button
+              icon={<SyncOutlined spin={loading} />}
+              onClick={fetchPlacements}
+              className="border-amber-300 hover:border-amber-400 text-amber-700 rounded"
+            />
+          </Tooltip>
+        </Space>
       </div>
 
-      {/* Table */}
-      <div className="border border-amber-300 rounded-lg p-4 shadow-md">
-        <h2 className="text-lg font-semibold text-amber-700 mb-0">Transport Assignment Records</h2>
-        <p className="text-amber-600 mb-3">Manage transport assignments for purchase orders</p>
-        
-        <Table
-          columns={columns}
-          dataSource={data}
-          rowKey="id"
-          loading={loading}
-          pagination={false}
-          scroll={{ y: 240 }}
-        />
-      </div>
+      {/* Placement Table */}
+      <Table
+        columns={columns}
+        dataSource={filteredData}
+        loading={loading}
+        pagination={false}
+        scroll={{ y: "calc(100vh - 250px)" }}
+        rowKey="id"
+        size="small"
+        rowClassName={(record) => {
+          if (releasedContractIds.has(record.id)) {
+            return "!bg-green-50";
+          }
+          return "";
+        }}
+        className="[&_.ant-table-cell]:!px-1.5 [&_.ant-table-cell]:!py-1 [&_.ant-table-thead_th]:!py-1.5 border border-gray-100 rounded-b-lg shadow-sm"
+      />
 
-      {/* ➤ Add Modal */}
+      {/* Edit placement details modal */}
       <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Add New Transport Assignment</span>}
-        open={isAddModalOpen}
-        onCancel={() => setIsAddModalOpen(false)}
-        footer={null}
-        width={1100}
-      >
-        <Form
-          layout="vertical"
-          form={addForm}
-          onFinish={(vals) => handleFormSubmit(vals)}
-          onFinishFailed={(err) => console.log("Add form validation failed:", err)}
-        >
-          {/* capture form instance for handlers */}
-          <Form.Item noStyle shouldUpdate>
-            {() => renderFormFields(addForm, false)}
-          </Form.Item>
-
-
-          <div className="flex justify-end gap-2 mt-4">
-            <Button onClick={() => setIsAddModalOpen(false)} className="border-amber-400! text-amber-700! hover:bg-amber-100!">Cancel</Button>
-            <Button type="primary" htmlType="submit" className="bg-amber-500! hover:bg-amber-600! border-none!">Add</Button>
-          </div>
-        </Form>
-      </Modal>
-
-      {/* ➤ Edit Modal */}
-      <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Edit Transport Assignment</span>}
+        title={
+          <span className="text-amber-700 text-xl font-semibold">
+            Update Vehicle Placement
+          </span>
+        }
         open={isEditModalOpen}
         onCancel={() => setIsEditModalOpen(false)}
         footer={null}
-        width={1100}
+        width={700}
       >
         <Form
-          layout="vertical"
           form={editForm}
-          onFinish={(vals) => handleFormSubmit(vals)}
-          onFinishFailed={(err) => console.log("Edit form validation failed:", err)}
-        >
-          <Form.Item noStyle shouldUpdate>
-            {() => renderFormFields(editForm, false)}
-
-          </Form.Item>
-
-          <div className="flex justify-end gap-2 mt-4">
-            <Button onClick={() => setIsEditModalOpen(false)} className="border-amber-400! text-amber-700! hover:bg-amber-100!">Cancel</Button>
-            <Button type="primary" htmlType="submit" className="bg-amber-500! hover:bg-amber-600! border-none!">Update</Button>
-          </div>
-        </Form>
-      </Modal>
-
-      {/* ➤ View Modal */}
-      <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">View Transport Assignment</span>}
-        open={isViewModalOpen}
-        onCancel={() => setIsViewModalOpen(false)}
-        footer={null}
-        width={1100}
-      >
-        <Form layout="vertical" form={viewForm}>
-          <Form.Item noStyle shouldUpdate>
-            {() => renderFormFields(viewForm, true)}
-
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      {/* ➤ Assign Modal */}
-      <Modal
-        title={<span className="text-amber-700 text-2xl font-semibold">Assign Transporter</span>}
-        open={isAssignModalOpen}
-        onCancel={() => setIsAssignModalOpen(false)}
-        footer={null}
-        width={600}
-      >
-        <Form
           layout="vertical"
-          form={assignForm}
-          onFinish={(vals) => handleAssignSubmit(vals)}
+          onFinish={handleEditFinish}
+          className="mt-4"
         >
-          <Form.Item
-            label="Select Transporter"
-            name="transporterName"
-            rules={[{ required: true, message: "Please select transporter" }]}
-          >
-            <Select
-              placeholder="Select transporter"
-              onChange={(val) => setSelectedTransporter(val)}
-            >
-              {transportList.map((t) => (
-                <Option key={t.id} value={t.id}>
-                  {t.registered_name}
-                </Option>
-              ))}
+          <Row gutter={8}>
+            <Col span={12}>
+              <Form.Item
+                name="transporter"
+                label="Transporter Name"
+                className="!mb-3"
+              >
+                <Select
+                  placeholder="Select Transporter"
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                >
+                  {transporters.map((t) => (
+                    <Select.Option
+                      key={t.id}
+                      value={t.id}
+                      label={t.registered_name || t.name}
+                    >
+                      {t.registered_name || t.name}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="vehicle"
+                label="Vehicle Number"
+                className="!mb-3"
+              >
+                <Select
+                  placeholder="Select Vehicle"
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                >
+                  {vehicles.map((v) => (
+                    <Select.Option
+                      key={v.id}
+                      value={v.id}
+                      label={v.vehicle_number}
+                    >
+                      {v.vehicle_number} ({v.vehicle_type || "Truck"})
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="driver" label="Driver Name" className="!mb-3">
+                <Select
+                  placeholder="Select Driver"
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                >
+                  {drivers.map((d) => (
+                    <Select.Option
+                      key={d.id}
+                      value={d.id}
+                      label={d.driver_name}
+                    >
+                      {d.driver_name} ({d.driver_mobile || "-"})
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item
+                name="passing_weight"
+                label="Passing Weight (Ton)"
+                className="!mb-3"
+              >
+                <InputNumber
+                  className="w-full"
+                  min={0}
+                  precision={3}
+                  placeholder="Weight"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item
+                name="min_guarantee_weight"
+                label="Min Guarantee (Ton)"
+                className="!mb-3"
+              >
+                <InputNumber
+                  className="w-full"
+                  min={0}
+                  precision={3}
+                  placeholder="Guarantee"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
 
-            </Select>
-          </Form.Item>
+          <Card
+            size="small"
+            title="Upload Documents / Photos"
+            className="mb-4 mt-2 border-amber-200"
+          >
+            <Row gutter={8}>
+              <Col span={12} className="mb-2">
+                <div className="text-xs text-gray-500 mb-1">
+                  Loading Photo 1
+                </div>
+                <input
+                  type="file"
+                  onChange={(e) => setFile1(e.target.files[0])}
+                  accept="image/*"
+                  className="text-xs"
+                />
+              </Col>
+              <Col span={12} className="mb-2">
+                <div className="text-xs text-gray-500 mb-1">
+                  Loading Photo 2
+                </div>
+                <input
+                  type="file"
+                  onChange={(e) => setFile2(e.target.files[0])}
+                  accept="image/*"
+                  className="text-xs"
+                />
+              </Col>
+              <Col span={12}>
+                <div className="text-xs text-gray-500 mb-1">
+                  Loading Photo 3
+                </div>
+                <input
+                  type="file"
+                  onChange={(e) => setFile3(e.target.files[0])}
+                  accept="image/*"
+                  className="text-xs"
+                />
+              </Col>
+              <Col span={12}>
+                <div className="text-xs text-gray-500 mb-1">
+                  Loading Photo 4
+                </div>
+                <input
+                  type="file"
+                  onChange={(e) => setFile4(e.target.files[0])}
+                  accept="image/*"
+                  className="text-xs"
+                />
+              </Col>
+            </Row>
+          </Card>
 
           <div className="flex justify-end gap-2 mt-4">
-            <Button onClick={() => setIsAssignModalOpen(false)} className="border-amber-400! text-amber-700! hover:bg-amber-100!">Cancel</Button>
-            <Button type="primary" htmlType="submit" className="bg-amber-500! hover:bg-amber-600! border-none!">Submit</Button>
+            <Button onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={submitting}
+              className="!bg-amber-500 !hover:bg-amber-600 !border-none"
+            >
+              Save Placement Details
+            </Button>
           </div>
         </Form>
       </Modal>
