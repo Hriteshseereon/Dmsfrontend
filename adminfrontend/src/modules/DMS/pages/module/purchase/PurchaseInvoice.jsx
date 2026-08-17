@@ -75,6 +75,18 @@ const fmtDate = (d) => {
   return parsed ? parsed.format("DD-MM-YYYY") : "-";
 };
 
+const parseWeightToTon = (val) => {
+  if (val === undefined || val === null || val === "") return null;
+  const str = String(val).trim().toLowerCase();
+  const match = str.match(/[\d.]+/);
+  if (!match) return null;
+  const num = Number(match[0]);
+  if (str.includes("kg")) {
+    return num / 1000;
+  }
+  return num;
+};
+
 export default function VehiclePlacements() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -1355,7 +1367,7 @@ export default function VehiclePlacements() {
       title: (
         <span className="text-amber-700 font-semibold">Customer Name</span>
       ),
-      dataIndex: "customer_name",
+      dataIndex: "customer_business_name",
       width: 120,
       ellipsis: true,
       render: (t) => (
@@ -1367,6 +1379,7 @@ export default function VehiclePlacements() {
     {
       title: <span className="text-amber-700 font-semibold">Place</span>,
       dataIndex: "place",
+      ellipsis: true,
       width: 90,
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
@@ -1641,6 +1654,26 @@ export default function VehiclePlacements() {
                   allowClear
                   showSearch
                   optionFilterProp="label"
+                  onChange={(vehicleId) => {
+                    const selectedVeh = vehicles.find(
+                      (v) => v.id === vehicleId,
+                    );
+                    if (selectedVeh) {
+                      const pw = parseWeightToTon(selectedVeh.passing_weight);
+                      const mgw = parseWeightToTon(
+                        selectedVeh.min_guarantee_weight,
+                      );
+                      editForm.setFieldsValue({
+                        passing_weight: pw,
+                        min_guarantee_weight: mgw,
+                      });
+                    } else {
+                      editForm.setFieldsValue({
+                        passing_weight: null,
+                        min_guarantee_weight: null,
+                      });
+                    }
+                  }}
                 >
                   {vehicles.map((v) => (
                     <Select.Option
