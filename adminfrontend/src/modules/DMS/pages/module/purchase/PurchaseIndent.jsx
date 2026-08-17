@@ -954,33 +954,31 @@ export default function PurchaseIndent() {
       }
 
       const linkedContracts =
-        detail.sale_contracts ||
-        detail.sales_contracts ||
+        detail.sale_contract_details ||
+        detail.sales_contract_details ||
+        detail.sale_contracts_details ||
         detail.sales_contracts_details ||
-        detail.contracts ||
         [];
-      const linkedIds = linkedContracts.map((c) =>
-        typeof c === "object" ? c.sale_contract_id || c.id : c,
-      );
+      const linkedIds = (detail.sale_contracts && detail.sale_contracts.length > 0)
+        ? detail.sale_contracts.map((c) => typeof c === "object" ? c.sale_contract_id || c.id : c)
+        : linkedContracts.map((c) => typeof c === "object" ? c.sale_contract_id || c.id : c);
       setSelectedRowKeys(linkedIds);
 
       // Fetch available (Approved) contracts, then merge in already-linked ones
       // even if their status has since changed, so nothing silently disappears.
       const fetched = await fetchAvailableContracts();
+      const existingIds = new Set(fetched.map((c) => c.id));
+      const merged = [...fetched];
 
       if (linkedContracts.length) {
-        const existingIds = new Set(fetched.map((c) => c.id));
-        const merged = [...fetched];
         linkedContracts.forEach((c, idx) => {
-          if (
-            typeof c === "object" &&
-            !existingIds.has(c.sale_contract_id || c.id)
-          ) {
+          const cId = c.sale_contract_id || c.id;
+          if (cId && !existingIds.has(cId)) {
             merged.push(mapContractRecord(c, idx));
           }
         });
-        setAvailableContracts(merged);
       }
+      setAvailableContracts(merged);
 
       setModalMode("edit");
     } catch (err) {
@@ -2177,12 +2175,19 @@ export default function PurchaseIndent() {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       width: 180,
       render: (_, record) => (
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-3 items-center">
           <DownloadOutlined
             className="cursor-pointer text-green-600 hover:text-green-700 text-lg"
             onClick={() => handleDownloadPurchaseOrderPDF(record)}
             title="Download PDF"
           />
+          {record.status === "Fresh" && (
+            <EditOutlined
+              className="cursor-pointer text-blue-600 hover:text-blue-700 text-lg"
+              onClick={() => openEditModal(record)}
+              title="Edit Purchase Order"
+            />
+          )}
           {record.status === "Fresh" ? (
             <Button
               type="primary"
