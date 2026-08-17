@@ -34,6 +34,7 @@ import {
   getAllVehicles,
   getAllDrivers,
 } from "../../../../../api/vehiclemaster";
+import { getSalesContractById } from "../../../../../api/sales";
 
 const parseApiDate = (value) => {
   if (!value) return null;
@@ -81,6 +82,12 @@ export default function VehiclePlacements() {
   // Released contract IDs
   const [releasedContractIds, setReleasedContractIds] = useState(new Set());
 
+  // Bulk Selection and Contract View States
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [isBulkEdit, setIsBulkEdit] = useState(false);
+  const [isContractModalOpen, setIsContractModalOpen] = useState(false);
+  const [contractDetails, setContractDetails] = useState(null);
+
   const fetchLookups = async () => {
     try {
       const [transRes, vehicleRes, driverRes] = await Promise.all([
@@ -120,6 +127,7 @@ export default function VehiclePlacements() {
   }, []);
 
   const handleOpenEdit = (record) => {
+    setIsBulkEdit(false);
     setEditingRecord(record);
     editForm.setFieldsValue({
       transporter: record.transporter || undefined,
@@ -135,48 +143,103 @@ export default function VehiclePlacements() {
     setIsEditModalOpen(true);
   };
 
+  const handleOpenBulkEdit = () => {
+    setIsBulkEdit(true);
+    setEditingRecord(null);
+    const firstSelected = data.find((item) => item.id === selectedRowKeys[0]);
+    if (firstSelected) {
+      editForm.setFieldsValue({
+        transporter: firstSelected.transporter || undefined,
+        vehicle: firstSelected.vehicle || undefined,
+        driver: firstSelected.driver || undefined,
+        passing_weight: firstSelected.passing_weight || null,
+        min_guarantee_weight: firstSelected.min_guarantee_weight || null,
+      });
+    } else {
+      editForm.resetFields();
+    }
+    setFile1(null);
+    setFile2(null);
+    setFile3(null);
+    setFile4(null);
+    setIsEditModalOpen(true);
+  };
+
+  const handleOpenContractView = async (record) => {
+    const contractId = record.sale_contract;
+    if (!contractId) {
+      message.warning("No sales contract associated with this placement.");
+      return;
+    }
+    try {
+      message.loading({
+        content: "Loading sales contract details...",
+        key: "load_contract",
+      });
+      const res = await getSalesContractById(contractId);
+      setContractDetails(res);
+      setIsContractModalOpen(true);
+      message.destroy("load_contract");
+    } catch (err) {
+      console.error(err);
+      message.error({
+        content: "Failed to load contract details",
+        key: "load_contract",
+      });
+    }
+  };
+
   const handleEditFinish = async (values) => {
     try {
       setSubmitting(true);
+      const targetIds = isBulkEdit ? selectedRowKeys : [editingRecord.id];
       message.loading({
-        content: "Updating placement details...",
+        content: `Updating ${targetIds.length} placement(s)...`,
         key: "update_placement",
       });
 
-      const formData = new FormData();
-      if (values.transporter) {
-        formData.append("transporter", values.transporter);
-      }
-      if (values.vehicle) {
-        formData.append("vehicle", values.vehicle);
-      }
-      if (values.driver) {
-        formData.append("driver", values.driver);
-      }
-      if (
-        values.passing_weight !== undefined &&
-        values.passing_weight !== null
-      ) {
-        formData.append("passing_weight", values.passing_weight);
-      }
-      if (
-        values.min_guarantee_weight !== undefined &&
-        values.min_guarantee_weight !== null
-      ) {
-        formData.append("min_guarantee_weight", values.min_guarantee_weight);
-      }
-      if (file1) formData.append("photo_1", file1);
-      if (file2) formData.append("photo_2", file2);
-      if (file3) formData.append("photo_3", file3);
-      if (file4) formData.append("photo_4", file4);
+      await Promise.all(
+        targetIds.map(async (id) => {
+          const formData = new FormData();
+          if (values.transporter) {
+            formData.append("transporter", values.transporter);
+          }
+          if (values.vehicle) {
+            formData.append("vehicle", values.vehicle);
+          }
+          if (values.driver) {
+            formData.append("driver", values.driver);
+          }
+          if (
+            values.passing_weight !== undefined &&
+            values.passing_weight !== null
+          ) {
+            formData.append("passing_weight", values.passing_weight);
+          }
+          if (
+            values.min_guarantee_weight !== undefined &&
+            values.min_guarantee_weight !== null
+          ) {
+            formData.append(
+              "min_guarantee_weight",
+              values.min_guarantee_weight,
+            );
+          }
+          if (file1) formData.append("photo_1", file1);
+          if (file2) formData.append("photo_2", file2);
+          if (file3) formData.append("photo_3", file3);
+          if (file4) formData.append("photo_4", file4);
 
-      await updateVehiclePlacement(editingRecord.id, formData);
+          return updateVehiclePlacement(id, formData);
+        }),
+      );
 
       message.success({
-        content: "Placement updated successfully!",
+        content: "Placements updated successfully!",
         key: "update_placement",
       });
       setIsEditModalOpen(false);
+      setSelectedRowKeys([]);
       fetchPlacements();
     } catch (err) {
       console.error(err);
@@ -285,8 +348,14 @@ export default function VehiclePlacements() {
       ),
       dataIndex: "sale_contract_number",
       width: 110,
-      render: (t) => (
-        <span className="text-amber-800 font-medium">{t || "-"}</span>
+      render: (t, record) => (
+        <span
+          className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-medium border border-blue-200 cursor-pointer block text-center hover:bg-blue-100"
+          onDoubleClick={() => handleOpenContractView(record)}
+          title="Double click to view contract"
+        >
+          {t || "-"}
+        </span>
       ),
     },
     {
@@ -487,14 +556,23 @@ export default function VehiclePlacements() {
           />
         </div>
         <Space>
-          {/* <Button
+          <Button
+            type="primary"
+            icon={<EditOutlined />}
+            onClick={handleOpenBulkEdit}
+            disabled={selectedRowKeys.length === 0}
+            className="!bg-amber-500 !hover:bg-amber-600 !border-none rounded font-medium"
+          >
+            Bulk Edit ({selectedRowKeys.length})
+          </Button>
+          <Button
             type="primary"
             icon={<FileExcelOutlined />}
             onClick={handleExport}
             className="!bg-green-600 !hover:bg-green-700 !border-none rounded font-medium"
           >
             Export to Excel
-          </Button> */}
+          </Button>
           <Tooltip title="Reload placement records">
             <Button
               icon={<SyncOutlined spin={loading} />}
@@ -507,6 +585,13 @@ export default function VehiclePlacements() {
 
       {/* Placement Table */}
       <Table
+        rowSelection={{
+          selectedRowKeys,
+          onChange: (keys) => setSelectedRowKeys(keys),
+          getCheckboxProps: (record) => ({
+            disabled: releasedContractIds.has(record.id),
+          }),
+        }}
         columns={columns}
         dataSource={filteredData}
         loading={loading}
@@ -705,6 +790,291 @@ export default function VehiclePlacements() {
             </Button>
           </div>
         </Form>
+      </Modal>
+
+      {/* Read-Only Sales Contract Modal */}
+      <Modal
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            View Sales Contract ({contractDetails?.sale_contract_number || "-"})
+          </span>
+        }
+        open={isContractModalOpen}
+        onCancel={() => {
+          setIsContractModalOpen(false);
+          setContractDetails(null);
+        }}
+        footer={[
+          <Button key="close" onClick={() => setIsContractModalOpen(false)}>
+            Close
+          </Button>,
+        ]}
+        width={1000}
+      >
+        {contractDetails ? (
+          <div className="mt-4">
+            <Card
+              size="small"
+              title="Basic Information"
+              className="mb-4 border-amber-200"
+              headStyle={{ backgroundColor: "#FEF3C7", color: "#B45309" }}
+            >
+              <Row gutter={12}>
+                <Col span={8} className="mb-2">
+                  <div className="text-xs text-amber-700 font-semibold mb-1">
+                    Customer Name
+                  </div>
+                  <Input
+                    value={contractDetails.customer_name || "-"}
+                    disabled
+                    className="!text-gray-800"
+                  />
+                </Col>
+                <Col span={8} className="mb-2">
+                  <div className="text-xs text-amber-700 font-semibold mb-1">
+                    Plant Name
+                  </div>
+                  <Input
+                    value={contractDetails.plant_name || "-"}
+                    disabled
+                    className="!text-gray-800"
+                  />
+                </Col>
+                <Col span={8} className="mb-2">
+                  <div className="text-xs text-amber-700 font-semibold mb-1">
+                    Broker Name
+                  </div>
+                  <Input
+                    value={contractDetails.broker_name || "DIRECT"}
+                    disabled
+                    className="!text-gray-800"
+                  />
+                </Col>
+                <Col span={6}>
+                  <div className="text-xs text-amber-700 font-semibold mb-1">
+                    Passing Weight (Ton)
+                  </div>
+                  <Input
+                    value={contractDetails.contrat_gross_weight || "Loose"}
+                    disabled
+                    className="!text-gray-800"
+                  />
+                </Col>
+                <Col span={6}>
+                  <div className="text-xs text-amber-700 font-semibold mb-1">
+                    Contract Date
+                  </div>
+                  <Input
+                    value={fmtDate(contractDetails.created_date)}
+                    disabled
+                    className="!text-gray-800"
+                  />
+                </Col>
+                <Col span={6}>
+                  <div className="text-xs text-amber-700 font-semibold mb-1">
+                    Valid From
+                  </div>
+                  <Input
+                    value={fmtDate(contractDetails.from_date)}
+                    disabled
+                    className="!text-gray-800"
+                  />
+                </Col>
+                <Col span={6}>
+                  <div className="text-xs text-amber-700 font-semibold mb-1">
+                    Valid To
+                  </div>
+                  <Input
+                    value={fmtDate(contractDetails.to_date)}
+                    disabled
+                    className="!text-gray-800"
+                  />
+                </Col>
+              </Row>
+            </Card>
+
+            <Card
+              size="small"
+              title="Contract Items"
+              className="mb-4 border-amber-200"
+              headStyle={{ backgroundColor: "#FEF3C7", color: "#B45309" }}
+            >
+              <Table
+                columns={[
+                  {
+                    title: (
+                      <span className="text-amber-700 font-semibold">
+                        Product Name
+                      </span>
+                    ),
+                    dataIndex: ["product", "product_name"],
+                    render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+                  },
+                  {
+                    title: (
+                      <span className="text-amber-700 font-semibold">
+                        Company Group
+                      </span>
+                    ),
+                    dataIndex: "company_group_name",
+                    render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+                  },
+                  {
+                    title: (
+                      <span className="text-amber-700 font-semibold">
+                        HSN Code
+                      </span>
+                    ),
+                    dataIndex: "hsn_code",
+                    render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+                  },
+                  {
+                    title: (
+                      <span className="text-amber-700 font-semibold">UOM</span>
+                    ),
+                    dataIndex: ["uom", "unit_name"],
+                    render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+                  },
+                  {
+                    title: (
+                      <span className="text-amber-700 font-semibold">Qty</span>
+                    ),
+                    dataIndex: "net_qty",
+                    align: "right",
+                    render: (t) => (
+                      <span className="text-amber-800 font-semibold">
+                        {t || 0}
+                      </span>
+                    ),
+                  },
+                  {
+                    title: (
+                      <span className="text-amber-700 font-semibold">
+                        Free Qty
+                      </span>
+                    ),
+                    dataIndex: "free_qty",
+                    align: "right",
+                    render: (t) => <span className="text-amber-800">{t || 0}</span>,
+                  },
+                  {
+                    title: (
+                      <span className="text-amber-700 font-semibold">
+                        Contract Rate (₹)
+                      </span>
+                    ),
+                    dataIndex: "contract_rate",
+                    align: "right",
+                    render: (t) => (
+                      <span className="text-amber-800 font-semibold">
+                        ₹{Number(t || 0).toFixed(2)}
+                      </span>
+                    ),
+                  },
+                  {
+                    title: (
+                      <span className="text-amber-700 font-semibold">
+                        MRP (₹)
+                      </span>
+                    ),
+                    dataIndex: "mrp",
+                    align: "right",
+                    render: (t) => (
+                      <span className="text-amber-800">
+                        ₹{Number(t || 0).toFixed(2)}
+                      </span>
+                    ),
+                  },
+                ]}
+                dataSource={contractDetails.items || []}
+                rowKey="id"
+                pagination={false}
+                size="small"
+                className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1 border border-gray-100 rounded shadow-sm"
+              />
+            </Card>
+
+            <Card
+              size="small"
+              title="Tax & Totals"
+              className="border-amber-200"
+              headStyle={{ backgroundColor: "#FEF3C7", color: "#B45309" }}
+            >
+              <Row gutter={12}>
+                <Col span={6}>
+                  <div className="text-xs text-amber-700 font-semibold">
+                    SGST (%)
+                  </div>
+                  <Input
+                    value={`${contractDetails.sgst || 0}%`}
+                    disabled
+                    className="!text-gray-800"
+                  />
+                </Col>
+                <Col span={6}>
+                  <div className="text-xs text-amber-700 font-semibold">
+                    CGST (%)
+                  </div>
+                  <Input
+                    value={`${contractDetails.cgst || 0}%`}
+                    disabled
+                    className="!text-gray-800"
+                  />
+                </Col>
+                <Col span={6}>
+                  <div className="text-xs text-amber-700 font-semibold">
+                    IGST (%)
+                  </div>
+                  <Input
+                    value={`${contractDetails.igst || 0}%`}
+                    disabled
+                    className="!text-gray-800"
+                  />
+                </Col>
+                <Col span={6} className="mb-2">
+                  <div className="text-xs text-amber-700 font-semibold">
+                    TCS Amount
+                  </div>
+                  <Input
+                    value={`₹${Number(contractDetails.tcs_amount || 0).toFixed(2)}`}
+                    disabled
+                    className="!text-gray-800"
+                  />
+                </Col>
+                <Col span={8}>
+                  <div className="text-xs text-amber-700 font-semibold">
+                    Total Amount (Before Tax)
+                  </div>
+                  <Input
+                    value={`₹${Number(contractDetails.total_amount || 0).toFixed(2)}`}
+                    disabled
+                    className="!text-gray-800"
+                  />
+                </Col>
+                <Col span={8}>
+                  <div className="text-xs text-amber-700 font-semibold">
+                    Total GST Amount
+                  </div>
+                  <Input
+                    value={`₹${Number(contractDetails.total_gst_amount || 0).toFixed(2)}`}
+                    disabled
+                    className="!text-gray-800"
+                  />
+                </Col>
+                <Col span={8}>
+                  <div className="text-xs text-amber-700 font-semibold">
+                    Grand Total (After Tax)
+                  </div>
+                  <Input
+                    value={`₹${Number(contractDetails.grand_total || 0).toFixed(2)}`}
+                    disabled
+                    className="!text-gray-800"
+                  />
+                </Col>
+              </Row>
+            </Card>
+          </div>
+        ) : null}
       </Modal>
     </div>
   );
