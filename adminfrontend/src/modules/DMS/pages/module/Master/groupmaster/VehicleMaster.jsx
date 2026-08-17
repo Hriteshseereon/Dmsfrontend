@@ -25,6 +25,7 @@ import {
   UploadOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
 import AppDatePicker from "../../../../../../components/AppDatePicker.jsx";
 // TODO: point these at your actual API modules
 import {
@@ -38,8 +39,26 @@ import {
   getallPassingWeight,
 } from "../../../../../../api/vehiclemaster.js";
 
+dayjs.extend(customParseFormat);
+
 const { Option } = Select;
 const DATE_FORMAT = "DD-MM-YYYY";
+
+const parseApiDate = (value) => {
+  if (!value) return null;
+
+  let d = dayjs(value, "DD-MM-YYYY", true);
+  if (d.isValid()) return d;
+
+  d = dayjs(value, "DD-MM-YYYY HH:mm:ss", true);
+  if (d.isValid()) return d;
+
+  d = dayjs(value, "YYYY-MM-DD", true);
+  if (d.isValid()) return d;
+
+  d = dayjs(value);
+  return d.isValid() ? d : null;
+};
 
 export default function VehicleMaster() {
   const [data, setData] = useState([]);
@@ -118,6 +137,7 @@ export default function VehicleMaster() {
         vehicleNo: item.vehicle_number,
         vehicleType: item.vehicle_type,
         passingWeight: item.passing_weight,
+        minGuaranteeWeight: item.min_guarantee_weight,
 
         regdDate: item.registration_date,
 
@@ -174,6 +194,7 @@ export default function VehicleMaster() {
     payload.append("vehicle_number", values.vehicleNumber || "");
     payload.append("vehicle_type", values.vehicleType || "");
     payload.append("passing_weight", values.passingWeight || "");
+    payload.append("min_guarantee_weight", values.minGuaranteeWeight || "");
 
     payload.append(
       "registration_date",
@@ -294,32 +315,25 @@ export default function VehicleMaster() {
 
       vehicleType: res.vehicle_type,
       passingWeight: res.passing_weight,
+      minGuaranteeWeight: res.min_guarantee_weight,
 
       vehicleNumber: res.vehicle_number,
 
-      registrationDate: res.registration_date
-        ? dayjs(res.registration_date)
-        : null,
+      registrationDate: parseApiDate(res.registration_date),
 
       engineNumber: res.engine_number,
 
       chassisNumber: res.chassis_number,
 
-      insuranceValidUpto: res.insurance_valid_upto
-        ? dayjs(res.insurance_valid_upto)
-        : null,
+      insuranceValidUpto: parseApiDate(res.insurance_valid_upto),
 
-      taxPaidUpto: res.tax_paid_upto ? dayjs(res.tax_paid_upto) : null,
+      taxPaidUpto: parseApiDate(res.tax_paid_upto),
 
-      fitnessValidUpto: res.fitness_valid_upto
-        ? dayjs(res.fitness_valid_upto)
-        : null,
+      fitnessValidUpto: parseApiDate(res.fitness_valid_upto),
 
-      permitUpto: res.permit_upto ? dayjs(res.permit_upto) : null,
+      permitUpto: parseApiDate(res.permit_upto),
 
-      nationalPermitUpto: res.national_permit_upto
-        ? dayjs(res.national_permit_upto)
-        : null,
+      nationalPermitUpto: parseApiDate(res.national_permit_upto),
 
       gpsAvailable: res.gps_available,
 
@@ -412,15 +426,27 @@ export default function VehicleMaster() {
       ),
     },
     {
+      title: <span className="text-amber-700 font-semibold">Min Guarantee</span>,
+      dataIndex: "minGuaranteeWeight",
+      width: 100,
+      align: "center",
+      render: (text) => (
+        <span className="text-amber-800 whitespace-nowrap">{text || "-"}</span>
+      ),
+    },
+    {
       title: <span className="text-amber-700 font-semibold">Regd. Date</span>,
       dataIndex: "regdDate",
       width: 95,
       align: "center",
-      render: (text) => (
-        <span className="text-amber-800 whitespace-nowrap">
-          {text ? dayjs(text).format(DATE_FORMAT) : "-"}
-        </span>
-      ),
+      render: (text) => {
+        const parsed = parseApiDate(text);
+        return (
+          <span className="text-amber-800 whitespace-nowrap">
+            {parsed ? parsed.format(DATE_FORMAT) : "-"}
+          </span>
+        );
+      },
     },
     {
       title: <span className="text-amber-700 font-semibold">Chassis No.</span>,
@@ -438,22 +464,28 @@ export default function VehicleMaster() {
       dataIndex: "insuranceValidUpto",
       width: 110,
       align: "center",
-      render: (text) => (
-        <span className="text-amber-800 whitespace-nowrap">
-          {text ? dayjs(text).format(DATE_FORMAT) : "-"}
-        </span>
-      ),
+      render: (text) => {
+        const parsed = parseApiDate(text);
+        return (
+          <span className="text-amber-800 whitespace-nowrap">
+            {parsed ? parsed.format(DATE_FORMAT) : "-"}
+          </span>
+        );
+      },
     },
     {
       title: <span className="text-amber-700 font-semibold">Tax Valid</span>,
       dataIndex: "taxPaidUpto",
       width: 95,
       align: "center",
-      render: (text) => (
-        <span className="text-amber-800 whitespace-nowrap">
-          {text ? dayjs(text).format(DATE_FORMAT) : "-"}
-        </span>
-      ),
+      render: (text) => {
+        const parsed = parseApiDate(text);
+        return (
+          <span className="text-amber-800 whitespace-nowrap">
+            {parsed ? parsed.format(DATE_FORMAT) : "-"}
+          </span>
+        );
+      },
     },
     {
       title: <span className="text-amber-700 font-semibold">Tax Copy</span>,
@@ -483,22 +515,28 @@ export default function VehicleMaster() {
       dataIndex: "fitnessValidUpto",
       width: 105,
       align: "center",
-      render: (text) => (
-        <span className="text-amber-800 whitespace-nowrap">
-          {text ? dayjs(text).format(DATE_FORMAT) : "-"}
-        </span>
-      ),
+      render: (text) => {
+        const parsed = parseApiDate(text);
+        return (
+          <span className="text-amber-800 whitespace-nowrap">
+            {parsed ? parsed.format(DATE_FORMAT) : "-"}
+          </span>
+        );
+      },
     },
     {
       title: <span className="text-amber-700 font-semibold">Permit Valid</span>,
       dataIndex: "permitUpto",
       width: 100,
       align: "center",
-      render: (text) => (
-        <span className="text-amber-800 whitespace-nowrap">
-          {text ? dayjs(text).format(DATE_FORMAT) : "-"}
-        </span>
-      ),
+      render: (text) => {
+        const parsed = parseApiDate(text);
+        return (
+          <span className="text-amber-800 whitespace-nowrap">
+            {parsed ? parsed.format(DATE_FORMAT) : "-"}
+          </span>
+        );
+      },
     },
     {
       title: (
@@ -507,11 +545,14 @@ export default function VehicleMaster() {
       dataIndex: "nationalPermitUpto",
       width: 110,
       align: "center",
-      render: (text) => (
-        <span className="text-amber-800 whitespace-nowrap">
-          {text ? dayjs(text).format(DATE_FORMAT) : "-"}
-        </span>
-      ),
+      render: (text) => {
+        const parsed = parseApiDate(text);
+        return (
+          <span className="text-amber-800 whitespace-nowrap">
+            {parsed ? parsed.format(DATE_FORMAT) : "-"}
+          </span>
+        );
+      },
     },
     {
       title: <span className="text-amber-700 font-semibold">GPS</span>,
@@ -640,6 +681,11 @@ export default function VehicleMaster() {
           >
             <Input placeholder="Select or type passing weight" />
           </AutoComplete>
+        </Form.Item>
+      </Col>
+      <Col span={8}>
+        <Form.Item name="minGuaranteeWeight" label="Min Guarantee Weight">
+          <Input placeholder="Enter min guarantee weight" disabled={disabled} />
         </Form.Item>
       </Col>
       <Col span={8}>
