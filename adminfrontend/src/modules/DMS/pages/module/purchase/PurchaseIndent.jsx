@@ -865,24 +865,24 @@ export default function PurchaseIndent() {
   const getPoContractsColumns = () => {
     return [
       ...getContractColumns(true),
-      {
-        title: <span className="text-amber-700 font-semibold">Actions</span>,
-        width: 100,
-        render: (_, record) => {
-          const isReleased = releasedContractIds.has(record.id || record.key);
-          return (
-            <Button
-              type="primary"
-              danger
-              size="small"
-              disabled={isReleased}
-              onClick={() => handleReleaseContract(record.id || record.key)}
-            >
-              {isReleased ? "Released" : "Release"}
-            </Button>
-          );
-        },
-      },
+      // {
+      //   title: <span className="text-amber-700 font-semibold">Actions</span>,
+      //   width: 100,
+      //   render: (_, record) => {
+      //     const isReleased = releasedContractIds.has(record.id || record.key);
+      //     return (
+      //       <Button
+      //         type="primary"
+      //         danger
+      //         size="small"
+      //         disabled={isReleased}
+      //         onClick={() => handleReleaseContract(record.id || record.key)}
+      //       >
+      //         {isReleased ? "Released" : "Release"}
+      //       </Button>
+      //     );
+      //   },
+      // },
     ];
   };
 
@@ -2072,7 +2072,11 @@ export default function PurchaseIndent() {
     {
       title: (
         <span className="text-amber-700 font-semibold block text-left leading-tight">
-          Total No Of<br />Vehicle<br />(Indent)
+          Total No Of
+          <br />
+          Vehicle
+          <br />
+          (Indent)
         </span>
       ),
       width: 90,
@@ -2081,7 +2085,11 @@ export default function PurchaseIndent() {
     {
       title: (
         <span className="text-amber-700 font-semibold block text-left leading-tight">
-          Total Indent<br />Qty<br />(Nos)
+          Total Indent
+          <br />
+          Qty
+          <br />
+          (Nos)
         </span>
       ),
       dataIndex: "total_indent_qty",
@@ -2091,7 +2099,11 @@ export default function PurchaseIndent() {
     {
       title: (
         <span className="text-amber-700 font-semibold block text-left leading-tight">
-          Total Gross<br />Weight(Mt)<br />Indent
+          Total Gross
+          <br />
+          Weight(Mt)
+          <br />
+          Indent
         </span>
       ),
       dataIndex: "total_gross_weight_indent",
@@ -2103,7 +2115,11 @@ export default function PurchaseIndent() {
     {
       title: (
         <span className="text-amber-700 font-semibold block text-left leading-tight">
-          Total Purchase<br />Order Value<br />(Indent)
+          Total Purchase
+          <br />
+          Order Value
+          <br />
+          (Indent)
         </span>
       ),
       dataIndex: "total_purchase_order_value_indent",
@@ -2121,7 +2137,11 @@ export default function PurchaseIndent() {
     {
       title: (
         <span className="text-amber-700 font-semibold block text-left leading-tight">
-          Total No of<br />Vehicle<br />placed
+          Total No of
+          <br />
+          Vehicle
+          <br />
+          placed
         </span>
       ),
       width: 90,
@@ -2130,7 +2150,11 @@ export default function PurchaseIndent() {
     {
       title: (
         <span className="text-amber-700 font-semibold block text-left leading-tight">
-          Total Gross<br />Weight(Mt)<br />Placed
+          Total Gross
+          <br />
+          Weight(Mt)
+          <br />
+          Placed
         </span>
       ),
       width: 100,
@@ -2139,7 +2163,11 @@ export default function PurchaseIndent() {
     {
       title: (
         <span className="text-amber-700 font-semibold block text-left leading-tight">
-          Total Purchase<br />Order Value<br />(Placed)
+          Total Purchase
+          <br />
+          Order Value
+          <br />
+          (Placed)
         </span>
       ),
       width: 110,
@@ -2309,7 +2337,6 @@ export default function PurchaseIndent() {
     onChange: (keys) => setSelectedRowKeys(keys),
   };
 
-
   // ---------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------
@@ -2421,7 +2448,9 @@ export default function PurchaseIndent() {
               },
             })}
             rowClassName={(record) => {
-              const isReleased = releasedContractIds.has(record.id || record.key);
+              const isReleased = releasedContractIds.has(
+                record.id || record.key,
+              );
               return isReleased ? "!bg-green-100" : "cursor-pointer";
             }}
             className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1"
