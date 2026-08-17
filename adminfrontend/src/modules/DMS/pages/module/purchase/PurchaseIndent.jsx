@@ -70,14 +70,18 @@ const statusOptions = ["Pending", "Approved", "Rejected"];
 
 // shared pill badge
 const renderStatusBadge = (status) => {
-  const base = "px-3 py-1 rounded-full text-sm font-semibold";
+  const base = "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap";
   if (status === "Approved")
     return (
       <span className={`${base} bg-green-100 text-green-700`}>{status}</span>
     );
-  if (status === "Pending")
+  if (status === "Pending" || status === "Fresh")
     return (
       <span className={`${base} bg-yellow-100 text-yellow-700`}>{status}</span>
+    );
+  if (status === "TransportAssign")
+    return (
+      <span className={`${base} bg-blue-100 text-blue-700`}>Placement</span>
     );
   return (
     <span className={`${base} bg-red-100 text-red-700`}>{status || "-"}</span>
@@ -861,24 +865,24 @@ export default function PurchaseIndent() {
   const getPoContractsColumns = () => {
     return [
       ...getContractColumns(true),
-      {
-        title: <span className="text-amber-700 font-semibold">Actions</span>,
-        width: 100,
-        render: (_, record) => {
-          const isReleased = releasedContractIds.has(record.id || record.key);
-          return (
-            <Button
-              type="primary"
-              danger
-              size="small"
-              disabled={isReleased}
-              onClick={() => handleReleaseContract(record.id || record.key)}
-            >
-              {isReleased ? "Released" : "Release"}
-            </Button>
-          );
-        },
-      },
+      // {
+      //   title: <span className="text-amber-700 font-semibold">Actions</span>,
+      //   width: 100,
+      //   render: (_, record) => {
+      //     const isReleased = releasedContractIds.has(record.id || record.key);
+      //     return (
+      //       <Button
+      //         type="primary"
+      //         danger
+      //         size="small"
+      //         disabled={isReleased}
+      //         onClick={() => handleReleaseContract(record.id || record.key)}
+      //       >
+      //         {isReleased ? "Released" : "Release"}
+      //       </Button>
+      //     );
+      //   },
+      // },
     ];
   };
 
@@ -950,33 +954,31 @@ export default function PurchaseIndent() {
       }
 
       const linkedContracts =
-        detail.sale_contracts ||
-        detail.sales_contracts ||
+        detail.sale_contract_details ||
+        detail.sales_contract_details ||
+        detail.sale_contracts_details ||
         detail.sales_contracts_details ||
-        detail.contracts ||
         [];
-      const linkedIds = linkedContracts.map((c) =>
-        typeof c === "object" ? c.sale_contract_id || c.id : c,
-      );
+      const linkedIds = (detail.sale_contracts && detail.sale_contracts.length > 0)
+        ? detail.sale_contracts.map((c) => typeof c === "object" ? c.sale_contract_id || c.id : c)
+        : linkedContracts.map((c) => typeof c === "object" ? c.sale_contract_id || c.id : c);
       setSelectedRowKeys(linkedIds);
 
       // Fetch available (Approved) contracts, then merge in already-linked ones
       // even if their status has since changed, so nothing silently disappears.
       const fetched = await fetchAvailableContracts();
+      const existingIds = new Set(fetched.map((c) => c.id));
+      const merged = [...fetched];
 
       if (linkedContracts.length) {
-        const existingIds = new Set(fetched.map((c) => c.id));
-        const merged = [...fetched];
         linkedContracts.forEach((c, idx) => {
-          if (
-            typeof c === "object" &&
-            !existingIds.has(c.sale_contract_id || c.id)
-          ) {
+          const cId = c.sale_contract_id || c.id;
+          if (cId && !existingIds.has(cId)) {
             merged.push(mapContractRecord(c, idx));
           }
         });
-        setAvailableContracts(merged);
       }
+      setAvailableContracts(merged);
 
       setModalMode("edit");
     } catch (err) {
@@ -1049,6 +1051,29 @@ export default function PurchaseIndent() {
       message.error({
         content: "Failed to download purchase order PDF",
         key: "download_po",
+      });
+    }
+  };
+
+  const handleSendToPlacement = async (record) => {
+    try {
+      message.loading({
+        content: "Sending to placement...",
+        key: "send_placement",
+      });
+      await updatePurchaseSalesContractOrder(record.id || record.key, {
+        status: "TransportAssign",
+      });
+      message.success({
+        content: "Purchase Order sent to placement successfully!",
+        key: "send_placement",
+      });
+      fetchPurchaseOrder(); // refresh list
+    } catch (err) {
+      console.error(err);
+      message.error({
+        content: "Failed to send to placement",
+        key: "send_placement",
       });
     }
   };
@@ -2045,7 +2070,11 @@ export default function PurchaseIndent() {
     {
       title: (
         <span className="text-amber-700 font-semibold block text-left leading-tight">
-          Total No Of<br />Vehicle<br />(Indent)
+          Total No Of
+          <br />
+          Vehicle
+          <br />
+          (Indent)
         </span>
       ),
       width: 90,
@@ -2054,7 +2083,11 @@ export default function PurchaseIndent() {
     {
       title: (
         <span className="text-amber-700 font-semibold block text-left leading-tight">
-          Total Indent<br />Qty<br />(Nos)
+          Total Indent
+          <br />
+          Qty
+          <br />
+          (Nos)
         </span>
       ),
       dataIndex: "total_indent_qty",
@@ -2064,7 +2097,11 @@ export default function PurchaseIndent() {
     {
       title: (
         <span className="text-amber-700 font-semibold block text-left leading-tight">
-          Total Gross<br />Weight(Mt)<br />Indent
+          Total Gross
+          <br />
+          Weight(Mt)
+          <br />
+          Indent
         </span>
       ),
       dataIndex: "total_gross_weight_indent",
@@ -2076,7 +2113,11 @@ export default function PurchaseIndent() {
     {
       title: (
         <span className="text-amber-700 font-semibold block text-left leading-tight">
-          Total Purchase<br />Order Value<br />(Indent)
+          Total Purchase
+          <br />
+          Order Value
+          <br />
+          (Indent)
         </span>
       ),
       dataIndex: "total_purchase_order_value_indent",
@@ -2094,7 +2135,11 @@ export default function PurchaseIndent() {
     {
       title: (
         <span className="text-amber-700 font-semibold block text-left leading-tight">
-          Total No of<br />Vehicle<br />placed
+          Total No of
+          <br />
+          Vehicle
+          <br />
+          placed
         </span>
       ),
       width: 90,
@@ -2103,7 +2148,11 @@ export default function PurchaseIndent() {
     {
       title: (
         <span className="text-amber-700 font-semibold block text-left leading-tight">
-          Total Gross<br />Weight(Mt)<br />Placed
+          Total Gross
+          <br />
+          Weight(Mt)
+          <br />
+          Placed
         </span>
       ),
       width: 100,
@@ -2112,7 +2161,11 @@ export default function PurchaseIndent() {
     {
       title: (
         <span className="text-amber-700 font-semibold block text-left leading-tight">
-          Total Purchase<br />Order Value<br />(Placed)
+          Total Purchase
+          <br />
+          Order Value
+          <br />
+          (Placed)
         </span>
       ),
       width: 110,
@@ -2120,14 +2173,33 @@ export default function PurchaseIndent() {
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
-      width: 90,
+      width: 180,
       render: (_, record) => (
         <div className="flex gap-3 items-center">
           <DownloadOutlined
-            className="cursor-pointer text-green-600 hover:text-green-700"
+            className="cursor-pointer text-green-600 hover:text-green-700 text-lg"
             onClick={() => handleDownloadPurchaseOrderPDF(record)}
             title="Download PDF"
           />
+          {record.status === "Fresh" && (
+            <EditOutlined
+              className="cursor-pointer text-blue-600 hover:text-blue-700 text-lg"
+              onClick={() => openEditModal(record)}
+              title="Edit Purchase Order"
+            />
+          )}
+          {record.status === "Fresh" ? (
+            <Button
+              type="primary"
+              size="small"
+              className="!bg-emerald-600 !hover:bg-emerald-700 !border-none text-xs"
+              onClick={() => handleSendToPlacement(record)}
+            >
+              Send to Placement
+            </Button>
+          ) : (
+            <span className="text-gray-400 text-xs italic">Sent</span>
+          )}
         </div>
       ),
     },
@@ -2247,29 +2319,28 @@ export default function PurchaseIndent() {
       width: 70,
       render: (t) => <span className="text-amber-800">{t ?? ""}</span>,
     },
-    // {
-    //   title: <span className="text-amber-700 font-semibold">Status</span>,
-    //   dataIndex: "status",
-    //   width: 110,
-    //   render: renderStatusBadge,
-    // },
-    // {
-    //   title: <span className="text-amber-700 font-semibold">Total (₹)</span>,
-    //   dataIndex: "grandTotal",
-    //   width: 130,
-    //   render: (t) => (
-    //     <span className="text-amber-800 font-semibold">
-    //       {t !== undefined && t !== null ? `₹ ${Number(t).toFixed(2)}` : "-"}
-    //     </span>
-    //   ),
-    // },
+    {
+      title: <span className="text-amber-700 font-semibold">Status</span>,
+      dataIndex: "status",
+      width: 110,
+      render: renderStatusBadge,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Total (₹)</span>,
+      dataIndex: "grandTotal",
+      width: 130,
+      render: (t) => (
+        <span className="text-amber-800 font-semibold">
+          {t !== undefined && t !== null ? `₹ ${Number(t).toFixed(2)}` : "-"}
+        </span>
+      ),
+    },
   ];
 
   const rowSelection = {
     selectedRowKeys,
     onChange: (keys) => setSelectedRowKeys(keys),
   };
-
 
   // ---------------------------------------------------------------
   // Render
@@ -2330,7 +2401,7 @@ export default function PurchaseIndent() {
           dataSource={data}
           loading={loading}
           pagination={false}
-          scroll={{ y: 650, x: 1200 }}
+          scroll={{ y: 650, x: 1450 }}
           rowKey="key"
           size="small"
           className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1 [&_.ant-table-thead_th]:!py-1.5"
@@ -2382,7 +2453,9 @@ export default function PurchaseIndent() {
               },
             })}
             rowClassName={(record) => {
-              const isReleased = releasedContractIds.has(record.id || record.key);
+              const isReleased = releasedContractIds.has(
+                record.id || record.key,
+              );
               return isReleased ? "!bg-green-100" : "cursor-pointer";
             }}
             className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1"

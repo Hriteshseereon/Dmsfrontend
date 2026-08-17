@@ -5,6 +5,7 @@ import WhatappGroup from "./WhatappGroup";
 import VehicleMaster from "./VehicleMaster";
 import VehicleOwnermaster from "./VehicleOwnermaster";
 import VehicleDriverMaster from "./VehicleDriverMaster";
+import FreightMaster from "./FreightMaster";
 
 export default function GroupMaster() {
   const items = [
@@ -23,11 +24,15 @@ export default function GroupMaster() {
       label: "Vehicle Master",
       children: <VehicleMaster />,
     },
-
     {
       key: "vehicledriver",
       label: "Vehicle Driver",
       children: <VehicleDriverMaster />,
+    },
+    {
+      key: "freightmaster",
+      label: "Freight Master",
+      children: <FreightMaster />,
     },
   ];
 

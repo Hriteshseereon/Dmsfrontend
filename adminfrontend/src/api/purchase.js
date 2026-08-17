@@ -486,3 +486,22 @@ export const getVendors = async () => {
   const res = await api.get("/vendors/vendors/", { params: { organisation: currentOrgId } });
   return res.data;
 }
+
+export const getVehiclePlacements = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("/transport/vehicle-placements/", {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+
+export const updateVehiclePlacement = async (id, formData) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.patch(`/transport/vehicle-placements/${id}/`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};

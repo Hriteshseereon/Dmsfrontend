@@ -8,10 +8,8 @@ import {
   FaTachometerAlt,
   FaPaperPlane,
   FaShippingFast,
-  
 } from "react-icons/fa";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
-
 
 export const PURCHASE_TAB_DEFINITIONS = [
   {
@@ -34,13 +32,13 @@ export const PURCHASE_TAB_DEFINITIONS = [
   },
   {
     id: "assign",
-    label: "Transport Assign",
+    label: "Vehicle Placement",
     path: "assign",
-   Icon: FaPaperPlane,
+    Icon: FaPaperPlane,
   },
   {
     id: "loading",
-    label: "Loading Advice",
+    label: "Transport Freight Details",
     path: "loading",
     Icon: FaShippingFast,
   },
@@ -59,9 +57,7 @@ export const PURCHASE_TAB_DEFINITIONS = [
 ];
 
 const normalize = (values = []) =>
-  values
-    .map((value) => value?.toLowerCase())
-    .filter(Boolean);
+  values.map((value) => value?.toLowerCase()).filter(Boolean);
 
 export const getVisiblePurchaseTabs = (allowedTabs) => {
   const normalized = new Set(normalize(allowedTabs));
@@ -79,7 +75,7 @@ export default function PurchaseTabs({ allowedTabs }) {
 
   const visibleTabs = useMemo(
     () => getVisiblePurchaseTabs(allowedTabs),
-    [allowedTabs]
+    [allowedTabs],
   );
   const defaultTab = visibleTabs[0];
 
@@ -93,9 +89,11 @@ export default function PurchaseTabs({ allowedTabs }) {
   const allowedSegments = useMemo(
     () =>
       new Set(
-        visibleTabs.map((tab) => (tab.path === "" ? "" : tab.path.toLowerCase()))
+        visibleTabs.map((tab) =>
+          tab.path === "" ? "" : tab.path.toLowerCase(),
+        ),
       ),
-    [visibleTabs]
+    [visibleTabs],
   );
 
   const derivedActiveTab = useMemo(() => {
@@ -103,7 +101,7 @@ export default function PurchaseTabs({ allowedTabs }) {
       visibleTabs.find(
         (tab) =>
           (tab.path === "" && currentSegment === "") ||
-          tab.path === currentSegment
+          tab.path === currentSegment,
       ) || defaultTab;
     return match?.id || "";
   }, [currentSegment, defaultTab, visibleTabs]);
@@ -119,7 +117,9 @@ export default function PurchaseTabs({ allowedTabs }) {
   useEffect(() => {
     if (!allowedSegments.has(currentSegment) && defaultTab) {
       const redirectPath =
-        defaultTab.path === "" ? "/dms/purchase" : `/dms/purchase/${defaultTab.path}`;
+        defaultTab.path === ""
+          ? "/dms/purchase"
+          : `/dms/purchase/${defaultTab.path}`;
       navigate(redirectPath, { replace: true });
     }
   }, [allowedSegments, currentSegment, defaultTab, navigate]);
