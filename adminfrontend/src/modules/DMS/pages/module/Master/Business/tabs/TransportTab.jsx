@@ -35,6 +35,8 @@ import {
   sendTransportCredential,
   deleteTransport,
 } from "@/api/transport.js";
+import { getallvehicleType } from "@/api/vehiclemaster.js";
+
 import {
   getCountryOptions,
   getStateOptions,
@@ -83,6 +85,7 @@ export default function TransportTab() {
   const [selStateName, setSelStateName] = useState(null);
   const [selStateIso, setSelStateIso] = useState(null);
   const [selDistrict, setSelDistrict] = useState(null);
+  const [vehicleTypes, setVehicleTypes] = useState([]);
   const [form] = Form.useForm();
   const generatePassword = (length = 10) => {
     const chars =
@@ -120,8 +123,19 @@ export default function TransportTab() {
     }
   };
 
+  const fetchVehicleTypes = async () => {
+    try {
+      const res = await getallvehicleType();
+      const uniqueTypes = [...new Set((res || []).filter(Boolean))];
+      setVehicleTypes(uniqueTypes);
+    } catch (err) {
+      console.error("Failed to fetch vehicle types", err);
+    }
+  };
+
   useEffect(() => {
     fetchTransporters();
+    fetchVehicleTypes();
   }, []);
   // handler function to get the dynamic country state dsitrict and cities
   const handleCountryChange = (isoCode, option) => {
@@ -243,6 +257,9 @@ export default function TransportTab() {
     panDoc: fileFromUrl(d.pan_document),
     gstDoc: fileFromUrl(d.gstin_document),
     aadharDoc: fileFromUrl(d.aadhar_document),
+    vehicleTypes: typeof d.vehicle_types === "string"
+      ? JSON.parse(d.vehicle_types)
+      : (d.vehicle_types || []),
   });
   const buildFormData = (values) => {
     const fd = new FormData();
@@ -267,6 +284,7 @@ export default function TransportTab() {
     fd.append("state", values.state || "");
     fd.append("district", values.district || "");
     fd.append("pin", values.pinCode || "");
+    fd.append("vehicle_types", JSON.stringify(values.vehicleTypes || []));
 
     // FILES
     if (values.panDoc?.[0]?.originFileObj)
@@ -949,6 +967,91 @@ export default function TransportTab() {
                 </Form.Item>
               </Col>
             </Row>
+          </Card>
+
+          {/* ================= Vehicle Type & Commission Setup ================= */}
+          <Card className="mb-4 border border-amber-200 rounded-lg">
+            <h3 className="text-lg font-semibold text-amber-700 mb-3">
+              Vehicle Type & Commission Setup
+            </h3>
+            <Form.List name="vehicleTypes">
+              {(fields, { add, remove }) => (
+                <>
+                  {fields.map(({ key, name, ...restField }, index) => (
+                    <Row gutter={24} key={key} align="middle">
+                      <Col span={10}>
+                        <Form.Item
+                          {...restField}
+                          label="Vehicle Type"
+                          name={[name, "vehicle_type"]}
+                          rules={[
+                            { required: true, message: "Select vehicle type" },
+                          ]}
+                        >
+                          <Select
+                            className={selectClass}
+                            disabled={viewMode}
+                            placeholder="Select vehicle type"
+                          >
+                            {vehicleTypes.map((type) => (
+                              <Option key={type} value={type}>
+                                {type}
+                              </Option>
+                            ))}
+                          </Select>
+                        </Form.Item>
+                      </Col>
+
+                      <Col span={10}>
+                        <Form.Item
+                          {...restField}
+                          label="Commission Rate (₹)"
+                          name={[name, "commission_rate"]}
+                          rules={[
+                            { required: true, message: "Enter commission rate" },
+                          ]}
+                        >
+                          <Input
+                            type="number"
+                            step="0.01"
+                            className={inputClass}
+                            disabled={viewMode}
+                            placeholder="Enter commission rate"
+                          />
+                        </Form.Item>
+                      </Col>
+
+                      {!viewMode && (
+                        <Col span={4}>
+                          <Form.Item label=" ">
+                            <Button
+                              type="text"
+                              danger
+                              icon={<DeleteOutlined />}
+                              onClick={() => remove(name)}
+                              className="mt-1"
+                            />
+                          </Form.Item>
+                        </Col>
+                      )}
+                    </Row>
+                  ))}
+
+                  {!viewMode && (
+                    <Form.Item className="mb-0">
+                      <Button
+                        type="dashed"
+                        onClick={() => add()}
+                        icon={<PlusOutlined />}
+                        className="w-full border-amber-400! text-amber-700! hover:bg-amber-100!"
+                      >
+                        Add Vehicle Type & Commission Rate
+                      </Button>
+                    </Form.Item>
+                  )}
+                </>
+              )}
+            </Form.List>
           </Card>
 
           {/* ===== FOOTER ACTIONS ===== */}
