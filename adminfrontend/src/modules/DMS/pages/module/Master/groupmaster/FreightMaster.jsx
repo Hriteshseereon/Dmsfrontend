@@ -102,6 +102,7 @@ export default function FreightMaster() {
     try {
       await addFreightRate({
         location: values.city,
+        dispatch_from: values.dispatch_from,
         freight_rate_per_mt: Number(values.freight_rate_per_mt),
       });
       message.success("Freight rate added successfully");
@@ -120,6 +121,7 @@ export default function FreightMaster() {
   const handleEditFinish = async (values) => {
     try {
       await updateFreightRate(selectedRow.id, {
+        dispatch_from: values.dispatch_from,
         freight_rate_per_mt: Number(values.freight_rate_per_mt),
       });
       message.success("Freight rate updated successfully");
@@ -147,6 +149,7 @@ export default function FreightMaster() {
     setSelectedRow(record);
     viewForm.setFieldsValue({
       location: record.location,
+      dispatch_from: record.dispatch_from,
       freight_rate_per_mt: record.freight_rate_per_mt,
     });
     setViewOpen(true);
@@ -156,6 +159,7 @@ export default function FreightMaster() {
     setSelectedRow(record);
     editForm.setFieldsValue({
       location: record.location,
+      dispatch_from: record.dispatch_from,
       freight_rate_per_mt: record.freight_rate_per_mt,
     });
     setEditOpen(true);
@@ -168,10 +172,18 @@ export default function FreightMaster() {
 
   const filteredData = data.filter((item) => {
     if (!searchText) return true;
-    return item.location?.toLowerCase().includes(searchText.toLowerCase());
+    return (
+      item.location?.toLowerCase().includes(searchText.toLowerCase()) ||
+      item.dispatch_from?.toLowerCase().includes(searchText.toLowerCase())
+    );
   });
 
   const columns = [
+    {
+      title: <span className="text-amber-700 font-semibold">Dispatch From</span>,
+      dataIndex: "dispatch_from",
+      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+    },
     {
       title: <span className="text-amber-700 font-semibold">Location</span>,
       dataIndex: "location",
@@ -343,6 +355,13 @@ export default function FreightMaster() {
               />
             </Form.Item>
             <Form.Item
+              name="dispatch_from"
+              label="Dispatch From"
+              className="!mb-3"
+            >
+              <Input placeholder="Enter dispatch from location" />
+            </Form.Item>
+            <Form.Item
               name="freight_rate_per_mt"
               label="Freight Rate per MT (₹)"
               rules={[{ required: true, message: "Please input rate!" }]}
@@ -399,6 +418,13 @@ export default function FreightMaster() {
               <Input disabled />
             </Form.Item>
             <Form.Item
+              name="dispatch_from"
+              label="Dispatch From"
+              className="!mb-3"
+            >
+              <Input disabled />
+            </Form.Item>
+            <Form.Item
               name="freight_rate_per_mt"
               label="Freight Rate per MT (₹)"
               className="!mb-3"
@@ -434,6 +460,13 @@ export default function FreightMaster() {
             <h6 className="text-amber-500 mb-3">Freight Details</h6>
             <Form.Item name="location" label="Location" className="!mb-3">
               <Input disabled />
+            </Form.Item>
+            <Form.Item
+              name="dispatch_from"
+              label="Dispatch From"
+              className="!mb-3"
+            >
+              <Input placeholder="Enter dispatch from location" />
             </Form.Item>
             <Form.Item
               name="freight_rate_per_mt"
