@@ -1418,8 +1418,8 @@ export default function VehiclePlacements() {
       render: (t, record) => {
         const trans = transporters.find((x) => x.id === t);
         return (
-          <span className="text-amber-800">
-            {trans ? trans.registered_name || trans.name : "-"}
+          <span className={trans ? "text-amber-800" : "text-red-500 font-semibold"}>
+            {trans ? trans.registered_name || trans.name : "Pending"}
           </span>
         );
       },
@@ -1433,8 +1433,8 @@ export default function VehiclePlacements() {
       render: (t) => {
         const veh = vehicles.find((x) => x.id === t);
         return (
-          <span className="text-amber-800">
-            {veh ? veh.vehicle_number : "-"}
+          <span className={veh ? "text-amber-800" : "text-red-500 font-semibold"}>
+            {veh ? veh.vehicle_number : "Pending"}
           </span>
         );
       },
@@ -1624,6 +1624,7 @@ export default function VehiclePlacements() {
                 name="transporter"
                 label="Transporter Name"
                 className="!mb-3"
+                rules={[{ required: true, message: "Please select Transporter" }]}
               >
                 <Select
                   placeholder="Select Transporter"
@@ -1648,6 +1649,7 @@ export default function VehiclePlacements() {
                 name="vehicle"
                 label="Vehicle Number"
                 className="!mb-3"
+                rules={[{ required: true, message: "Please select Vehicle" }]}
               >
                 <Select
                   placeholder="Select Vehicle"
