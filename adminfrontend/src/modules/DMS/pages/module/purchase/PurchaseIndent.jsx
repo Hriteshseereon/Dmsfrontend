@@ -132,6 +132,11 @@ export default function PurchaseIndent() {
   // ---------- search text for the contracts table inside modal ----------
   const [contractSearch, setContractSearch] = useState("");
 
+  const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
+  const [selectedPoForVehicles, setSelectedPoForVehicles] = useState(null);
+  const [vehicleCountInput, setVehicleCountInput] = useState(null);
+  const [poVehicleCount, setPoVehicleCount] = useState(null);
+
   // ---------- new available contracts date range filter ----------
   const [contractDateRange, setContractDateRange] = useState(null);
 
@@ -324,6 +329,8 @@ export default function PurchaseIndent() {
           total_purchase_order_value_indent: totalPOValue,
           grand_total: totalPOValue,
           status: item.status || "Fresh",
+          number_of_vehicles: item.number_of_vehicles,
+          number_of_vehicle: item.number_of_vehicle,
         };
       });
 
@@ -810,6 +817,7 @@ export default function PurchaseIndent() {
     setSelectedRecord(null);
     setSelectedRowKeys([]);
     setStatusValue("Fresh");
+    setPoVehicleCount(null);
     setContractSearch("");
     setContractDateRange(null);
     setPoCreatedDate(dayjs());
@@ -945,6 +953,7 @@ export default function PurchaseIndent() {
       const detail = res?.data || res;
       setSelectedRecord(detail);
       setStatusValue(detail.status || "Fresh");
+      setPoVehicleCount(detail.number_of_vehicles || detail.number_of_vehicle || null);
       setContractSearch("");
 
       if (detail.created_date) {
@@ -1007,6 +1016,8 @@ export default function PurchaseIndent() {
         created_date: poCreatedDate ? poCreatedDate.format("YYYY-MM-DD") : null,
         status: modalMode === "edit" ? statusValue : "Fresh",
         sale_contracts: selectedRowKeys,
+        number_of_vehicles: poVehicleCount ? Number(poVehicleCount) : null,
+        number_of_vehicle: poVehicleCount ? Number(poVehicleCount) : null,
       };
 
       if (modalMode === "edit") {
@@ -1024,6 +1035,39 @@ export default function PurchaseIndent() {
       message.error("Something went wrong");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleOpenAddVehicleModal = (record) => {
+    setSelectedPoForVehicles(record);
+    setVehicleCountInput(record.number_of_vehicles || record.number_of_vehicle || "");
+    setVehicleModalOpen(true);
+  };
+
+  const handleSaveVehicleCount = async () => {
+    if (!selectedPoForVehicles) return;
+    const poId = selectedPoForVehicles.id || selectedPoForVehicles.key;
+    try {
+      message.loading({
+        content: "Updating number of vehicles...",
+        key: "update_vehicles",
+      });
+      await updatePurchaseSalesContractOrder(poId, {
+        number_of_vehicles: vehicleCountInput ? Number(vehicleCountInput) : null,
+        number_of_vehicle: vehicleCountInput ? Number(vehicleCountInput) : null,
+      });
+      message.success({
+        content: "Number of vehicles updated successfully!",
+        key: "update_vehicles",
+      });
+      setVehicleModalOpen(false);
+      fetchPurchaseOrder();
+    } catch (err) {
+      console.error(err);
+      message.error({
+        content: "Failed to update number of vehicles",
+        key: "update_vehicles",
+      });
     }
   };
 
@@ -2078,7 +2122,11 @@ export default function PurchaseIndent() {
         </span>
       ),
       width: 90,
-      render: () => <span className="text-amber-800">-</span>,
+      render: (_, record) => (
+        <span className="text-amber-800">
+          {record.number_of_vehicles || record.number_of_vehicle || "-"}
+        </span>
+      ),
     },
     {
       title: (
@@ -2176,11 +2224,22 @@ export default function PurchaseIndent() {
       width: 180,
       render: (_, record) => (
         <div className="flex gap-3 items-center">
-          <DownloadOutlined
-            className="cursor-pointer text-green-600 hover:text-green-700 text-lg"
-            onClick={() => handleDownloadPurchaseOrderPDF(record)}
-            title="Download PDF"
-          />
+          {record.number_of_vehicles || record.number_of_vehicle ? (
+            <DownloadOutlined
+              className="cursor-pointer text-green-600 hover:text-green-700 text-lg"
+              onClick={() => handleDownloadPurchaseOrderPDF(record)}
+              title="Download PDF"
+            />
+          ) : (
+            <Button
+              type="primary"
+              size="small"
+              className="!bg-amber-500 !hover:bg-amber-600 !border-none text-xs whitespace-nowrap"
+              onClick={() => handleOpenAddVehicleModal(record)}
+            >
+              Vehicle No.
+            </Button>
+          )}
           {record.status === "Fresh" && (
             <EditOutlined
               className="cursor-pointer text-blue-600 hover:text-blue-700 text-lg"
@@ -2220,14 +2279,14 @@ export default function PurchaseIndent() {
     {
       title: <span className="text-amber-700 font-semibold">Contract No</span>,
       dataIndex: "saleContractNumber",
-      width: 70,
+      width: 140,
       render: (t, record) => (
         <span
           onMouseEnter={() => openReadOnlySalesContract(record)}
           className={
-            highlightContractNo
+            (highlightContractNo
               ? "bg-blue-500 text-white font-semibold px-1 py-0.5 rounded text-xs cursor-pointer"
-              : "text-amber-800 cursor-pointer hover:underline"
+              : "text-amber-800 cursor-pointer hover:underline") + " whitespace-nowrap"
           }
         >
           {t || "-"}
@@ -2339,7 +2398,28 @@ export default function PurchaseIndent() {
 
   const rowSelection = {
     selectedRowKeys,
-    onChange: (keys) => setSelectedRowKeys(keys),
+    onSelect: (record, selected) => {
+      const key = record.id || record.key;
+      setSelectedRowKeys((prev) => {
+        if (selected) {
+          if (prev.includes(key)) return prev;
+          return [...prev, key];
+        } else {
+          return prev.filter((k) => k !== key);
+        }
+      });
+    },
+    onSelectAll: (selected, selectedRows, changeRows) => {
+      const changeKeys = changeRows.map((r) => r.id || r.key);
+      setSelectedRowKeys((prev) => {
+        if (selected) {
+          const newKeys = changeKeys.filter((k) => !prev.includes(k));
+          return [...prev, ...newKeys];
+        } else {
+          return prev.filter((k) => !changeKeys.includes(k));
+        }
+      });
+    },
   };
 
   // ---------------------------------------------------------------
@@ -2500,6 +2580,18 @@ export default function PurchaseIndent() {
                     </Option>
                   ))}
                 </Select>
+              </Col>
+              <Col span={6}>
+                <label className="block text-sm text-gray-600 mb-1">
+                  Number of Vehicles
+                </label>
+                <InputNumber
+                  className="w-full"
+                  min={0}
+                  value={poVehicleCount}
+                  onChange={setPoVehicleCount}
+                  placeholder="Enter number of vehicles"
+                />
               </Col>
             </Row>
           </Card>
@@ -3249,6 +3341,45 @@ export default function PurchaseIndent() {
             className="!bg-amber-500 !hover:bg-amber-600 !border-none"
           >
             Confirm & Submit
+          </Button>
+        </div>
+      </Modal>
+
+      {/* ── Add Vehicle Number Modal ── */}
+      <Modal
+        title={
+          <span className="text-amber-700 text-xl font-semibold">
+            Add/Edit Number of Vehicles
+          </span>
+        }
+        open={vehicleModalOpen}
+        onCancel={() => setVehicleModalOpen(false)}
+        footer={null}
+        width={400}
+      >
+        <div className="mb-4">
+          <label className="block text-sm text-gray-600 mb-1">
+            Number of Vehicles
+          </label>
+          <InputNumber
+            className="w-full font-medium"
+            min={1}
+            value={vehicleCountInput}
+            onChange={setVehicleCountInput}
+            placeholder="Enter number of vehicles"
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 mt-4">
+          <Button onClick={() => setVehicleModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            type="primary"
+            onClick={handleSaveVehicleCount}
+            className="!bg-amber-500 !hover:bg-amber-600 !border-none"
+          >
+            Save
           </Button>
         </div>
       </Modal>
