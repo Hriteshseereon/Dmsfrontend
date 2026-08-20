@@ -51,30 +51,44 @@ export default function FreightMaster() {
   // Cascading location states
   const [selCountryIso, setSelCountryIso] = useState("IN");
   const [selState, setSelState] = useState("Odisha");
-  const [selDistrict, setSelDistrict] = useState(null);
+  const [selDispatchDistrict, setSelDispatchDistrict] = useState(null);
+  const [selDeliveryDistrict, setSelDeliveryDistrict] = useState(null);
 
   const handleCountryChange = (isoCode) => {
     setSelCountryIso(isoCode);
     setSelState(null);
-    setSelDistrict(null);
+    setSelDispatchDistrict(null);
+    setSelDeliveryDistrict(null);
     addForm.setFieldsValue({
       state: undefined,
-      district: undefined,
+      dispatch_district: undefined,
+      dispatch_from: undefined,
+      delivery_district: undefined,
       city: undefined,
     });
   };
 
   const handleStateChange = (isoCode, option) => {
     setSelState(option.label);
-    setSelDistrict(null);
+    setSelDispatchDistrict(null);
+    setSelDeliveryDistrict(null);
     addForm.setFieldsValue({
-      district: undefined,
+      dispatch_district: undefined,
+      dispatch_from: undefined,
+      delivery_district: undefined,
       city: undefined,
     });
   };
 
-  const handleDistrictChange = (val) => {
-    setSelDistrict(val);
+  const handleDispatchDistrictChange = (val) => {
+    setSelDispatchDistrict(val);
+    addForm.setFieldsValue({
+      dispatch_from: undefined,
+    });
+  };
+
+  const handleDeliveryDistrictChange = (val) => {
+    setSelDeliveryDistrict(val);
     addForm.setFieldsValue({
       city: undefined,
     });
@@ -108,9 +122,10 @@ export default function FreightMaster() {
       message.success("Freight rate added successfully");
       setAddOpen(false);
       addForm.resetFields();
-      setSelCountryIso(null);
-      setSelState(null);
-      setSelDistrict(null);
+      setSelCountryIso("IN");
+      setSelState("Odisha");
+      setSelDispatchDistrict(null);
+      setSelDeliveryDistrict(null);
       fetchFreightRates();
     } catch (err) {
       console.error(err);
@@ -266,7 +281,8 @@ export default function FreightMaster() {
 
             setSelCountryIso("IN");
             setSelState("Odisha");
-            setSelDistrict(null);
+            setSelDispatchDistrict(null);
+            setSelDeliveryDistrict(null);
           }}
           className="bg-amber-500! hover:bg-amber-600! border-none!"
         >
@@ -298,9 +314,10 @@ export default function FreightMaster() {
         onCancel={() => {
           setAddOpen(false);
           addForm.resetFields();
-          setSelCountryIso(null);
-          setSelState(null);
-          setSelDistrict(null);
+          setSelCountryIso("IN");
+          setSelState("Odisha");
+          setSelDispatchDistrict(null);
+          setSelDeliveryDistrict(null);
         }}
         footer={null}
         width={500}
@@ -345,36 +362,52 @@ export default function FreightMaster() {
               />
             </Form.Item>
             <Form.Item
-              name="district"
-              label="District"
-              rules={[{ required: true, message: "Please select district" }]}
+              name="dispatch_district"
+              label="Dispatch From District"
+              rules={[{ required: true, message: "Please select dispatch district" }]}
+              className="!mb-3"
+            >
+              <Select
+                placeholder={selState ? "Select dispatch district" : "Select state first"}
+                showSearch
+                optionFilterProp="label"
+                disabled={!selState}
+                options={getDistrictOptions(selState)}
+                onChange={handleDispatchDistrictChange}
+              />
+            </Form.Item>
+            <Form.Item
+              name="dispatch_from"
+              label="Dispatch From (City)"
+              rules={[{ required: true, message: "Please select dispatch city" }]}
               className="!mb-3"
             >
               <Select
                 placeholder={
-                  selState ? "Select district" : "Select state first"
+                  selDispatchDistrict ? "Select dispatch city" : "Select dispatch district first"
+                }
+                showSearch
+                optionFilterProp="label"
+                disabled={!selDispatchDistrict}
+                options={getCityOptions(selState, selDispatchDistrict)}
+              />
+            </Form.Item>
+
+            <Form.Item
+              name="district"
+              label="Delivery District"
+              rules={[{ required: true, message: "Please select delivery district" }]}
+              className="!mb-3"
+            >
+              <Select
+                placeholder={
+                  selState ? "Select delivery district" : "Select state first"
                 }
                 showSearch
                 optionFilterProp="label"
                 disabled={!selState}
                 options={getDistrictOptions(selState)}
-                onChange={handleDistrictChange}
-              />
-            </Form.Item>
-
-            <Form.Item
-              name="dispatch_from"
-              label="Dispatch From"
-              className="!mb-3"
-            >
-              <Select
-                placeholder={
-                  selDistrict ? "Select city" : "Select district first"
-                }
-                showSearch
-                optionFilterProp="label"
-                disabled={!selDistrict}
-                options={getCityOptions(selState, selDistrict)}
+                onChange={handleDeliveryDistrictChange}
               />
             </Form.Item>
             <Form.Item
@@ -385,12 +418,12 @@ export default function FreightMaster() {
             >
               <Select
                 placeholder={
-                  selDistrict ? "Select city" : "Select district first"
+                  selDeliveryDistrict ? "Select city" : "Select delivery district first"
                 }
                 showSearch
                 optionFilterProp="label"
-                disabled={!selDistrict}
-                options={getCityOptions(selState, selDistrict)}
+                disabled={!selDeliveryDistrict}
+                options={getCityOptions(selState, selDeliveryDistrict)}
               />
             </Form.Item>
             <Form.Item
@@ -415,7 +448,8 @@ export default function FreightMaster() {
                 addForm.resetFields();
                 setSelCountryIso("IN");
                 setSelState("Odisha");
-                setSelDistrict(null);
+                setSelDispatchDistrict(null);
+                setSelDeliveryDistrict(null);
               }}
             >
               Cancel
