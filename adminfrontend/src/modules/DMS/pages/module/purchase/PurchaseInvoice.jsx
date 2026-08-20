@@ -2103,6 +2103,7 @@ export default function VehiclePlacements() {
 
       {/* ── Sales Contract Edit Modal — full form, same as SalesSouda.jsx ── */}
       <Modal
+        zIndex={1100}
         title={
           <span className="text-amber-700 text-2xl font-semibold">
             {isContractReadOnly
