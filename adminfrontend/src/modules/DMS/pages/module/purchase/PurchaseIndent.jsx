@@ -136,6 +136,38 @@ export default function PurchaseIndent() {
   const [selectedPoForVehicles, setSelectedPoForVehicles] = useState(null);
   const [vehicleCountInput, setVehicleCountInput] = useState(null);
   const [poVehicleCount, setPoVehicleCount] = useState(null);
+  const [contractSerialNumbers, setContractSerialNumbers] = useState({});
+
+  const getVehicleSerialNumber = (contractId, detail) => {
+    if (!detail) return null;
+    const scList = detail.sale_contracts || [];
+    const matched = scList.find(
+      (c) =>
+        typeof c === "object" &&
+        (c?.contract_id === contractId ||
+          c?.sale_contract_id === contractId ||
+          c?.id === contractId)
+    );
+    if (matched && matched.vehicle_serial_number !== undefined) {
+      return matched.vehicle_serial_number;
+    }
+    const detailsList =
+      detail.sale_contract_details ||
+      detail.sales_contract_details ||
+      detail.sale_contracts_details ||
+      detail.sales_contracts_details ||
+      [];
+    const matchedDetail = detailsList.find(
+      (c) =>
+        c?.contract_id === contractId ||
+        c?.sale_contract_id === contractId ||
+        c?.id === contractId
+    );
+    if (matchedDetail && matchedDetail.vehicle_serial_number !== undefined) {
+      return matchedDetail.vehicle_serial_number;
+    }
+    return null;
+  };
 
   // ---------- new available contracts date range filter ----------
   const [contractDateRange, setContractDateRange] = useState(null);
@@ -441,8 +473,8 @@ export default function PurchaseIndent() {
       // junction/link row, `sale_contract_id` is the actual contract —
       // sale_contract_id must win, or downstream calls (download/assign/
       // whatsapp/edit) hit the wrong record.
-      key: contract.sale_contract_id || contract.id || index + 1,
-      id: contract.sale_contract_id || contract.id,
+      key: contract.contract_id || contract.sale_contract_id || contract.id || index + 1,
+      id: contract.contract_id || contract.sale_contract_id || contract.id,
       saleContractNumber:
         contract.sale_contract_number || contract.contract_number || "-",
       customer:
@@ -463,6 +495,7 @@ export default function PurchaseIndent() {
       status: contract.status || "Approved",
       grandTotal:
         contract.grand_total || contract.total_amount || contract.totalAmount,
+      link_status: contract.link_status || contract.linkStatus || "Active",
     };
   };
 
@@ -861,6 +894,14 @@ export default function PurchaseIndent() {
         detail.sale_contracts ||
         [];
       setModalContracts(linkedContracts);
+
+      const serials = {};
+      linkedContracts.forEach((c) => {
+        const cId = c.contract_id || c.sale_contract_id || c.id;
+        const val = getVehicleSerialNumber(cId, detail);
+        serials[cId] = val !== null && val !== undefined ? val : "";
+      });
+      setContractSerialNumbers(serials);
     } catch (err) {
       console.error(err);
       message.error("Failed to load purchase order details");
@@ -873,24 +914,30 @@ export default function PurchaseIndent() {
   const getPoContractsColumns = () => {
     return [
       ...getContractColumns(true),
-      // {
-      //   title: <span className="text-amber-700 font-semibold">Actions</span>,
-      //   width: 100,
-      //   render: (_, record) => {
-      //     const isReleased = releasedContractIds.has(record.id || record.key);
-      //     return (
-      //       <Button
-      //         type="primary"
-      //         danger
-      //         size="small"
-      //         disabled={isReleased}
-      //         onClick={() => handleReleaseContract(record.id || record.key)}
-      //       >
-      //         {isReleased ? "Released" : "Release"}
-      //       </Button>
-      //     );
-      //   },
-      // },
+      {
+        title: (
+          <span className="text-amber-700 font-semibold">Vehicle Sr. No.</span>
+        ),
+        width: 120,
+        render: (_, record) => {
+          const cId = record.id || record.key;
+          return (
+            <InputNumber
+              min={1}
+              precision={0}
+              placeholder="Sr. No."
+              value={contractSerialNumbers[cId] !== undefined ? contractSerialNumbers[cId] : ""}
+              onChange={(val) => {
+                setContractSerialNumbers((prev) => ({
+                  ...prev,
+                  [cId]: val,
+                }));
+              }}
+              style={{ width: 100 }}
+            />
+          );
+        },
+      },
     ];
   };
 
@@ -899,7 +946,7 @@ export default function PurchaseIndent() {
 
     try {
       const allIds = (selectedPoForContracts.sale_contracts || []).map((c) =>
-        typeof c === "object" ? c.id || c.sale_contract_id : c,
+        typeof c === "object" ? c.contract_id || c.sale_contract_id || c.id : c,
       );
 
       if (allIds.length <= 1) {
@@ -916,8 +963,16 @@ export default function PurchaseIndent() {
 
       const updatedIds = allIds.filter((id) => id !== contractId);
 
+      const formattedSaleContracts = updatedIds.map((id) => {
+        const srNo = getVehicleSerialNumber(id, selectedPoForContracts);
+        return {
+          contract_id: id,
+          vehicle_serial_number: srNo ? Number(srNo) : null,
+        };
+      });
+
       await updatePurchaseSalesContractOrder(selectedPoForContracts.id, {
-        sale_contracts: updatedIds,
+        sale_contracts: formattedSaleContracts,
       });
 
       setReleasedContractIds((prev) => {
@@ -941,6 +996,52 @@ export default function PurchaseIndent() {
       message.error({
         content: "Failed to release contract",
         key: "release_contract",
+      });
+    }
+  };
+
+  const handleSaveContractVehicles = async () => {
+    if (!selectedPoForContracts) return;
+    try {
+      message.loading({
+        content: "Saving vehicle placements...",
+        key: "save_placement",
+      });
+
+      const list = [];
+      const uniqueSerials = new Set();
+      modalContracts.forEach((c) => {
+        const cId = c.contract_id || c.sale_contract_id || c.id;
+        const srNo = contractSerialNumbers[cId];
+        list.push({
+          contract_id: cId,
+          vehicle_serial_number: srNo ? Number(srNo) : null,
+        });
+        if (srNo) {
+          uniqueSerials.add(Number(srNo));
+        }
+      });
+
+      const uniqueCount = uniqueSerials.size;
+      const finalVehCount = uniqueCount > 0 ? uniqueCount : null;
+
+      await updatePurchaseSalesContractOrder(selectedPoForContracts.id || selectedPoForContracts.key, {
+        sale_contracts: list,
+        number_of_vehicles: finalVehCount,
+        number_of_vehicle: finalVehCount,
+      });
+
+      message.success({
+        content: "Vehicle placements saved successfully!",
+        key: "save_placement",
+      });
+      setIsPoContractsModalOpen(false);
+      fetchPurchaseOrder();
+    } catch (err) {
+      console.error(err);
+      message.error({
+        content: "Failed to save vehicle placements",
+        key: "save_placement",
       });
     }
   };
@@ -969,8 +1070,8 @@ export default function PurchaseIndent() {
         detail.sales_contracts_details ||
         [];
       const linkedIds = (detail.sale_contracts && detail.sale_contracts.length > 0)
-        ? detail.sale_contracts.map((c) => typeof c === "object" ? c.sale_contract_id || c.id : c)
-        : linkedContracts.map((c) => typeof c === "object" ? c.sale_contract_id || c.id : c);
+        ? detail.sale_contracts.map((c) => typeof c === "object" ? c.contract_id || c.sale_contract_id || c.id : c)
+        : linkedContracts.map((c) => typeof c === "object" ? c.contract_id || c.sale_contract_id || c.id : c);
       setSelectedRowKeys(linkedIds);
 
       // Fetch available (Approved) contracts, then merge in already-linked ones
@@ -1011,11 +1112,19 @@ export default function PurchaseIndent() {
     try {
       setSubmitting(true);
 
+      const formattedSaleContracts = selectedRowKeys.map((key) => {
+        const srNo = getVehicleSerialNumber(key, selectedRecord);
+        return {
+          contract_id: key,
+          vehicle_serial_number: srNo ? Number(srNo) : null,
+        };
+      });
+
       const payload = {
         order_date: dayjs().format("YYYY-MM-DD"),
         created_date: poCreatedDate ? poCreatedDate.format("YYYY-MM-DD") : null,
         status: modalMode === "edit" ? statusValue : "Fresh",
-        sale_contracts: selectedRowKeys,
+        sale_contracts: formattedSaleContracts,
         number_of_vehicles: poVehicleCount ? Number(poVehicleCount) : null,
         number_of_vehicle: poVehicleCount ? Number(poVehicleCount) : null,
       };
@@ -2231,14 +2340,7 @@ export default function PurchaseIndent() {
               title="Download PDF"
             />
           ) : (
-            <Button
-              type="primary"
-              size="small"
-              className="!bg-amber-500 !hover:bg-amber-600 !border-none text-xs whitespace-nowrap"
-              onClick={() => handleOpenAddVehicleModal(record)}
-            >
-              Vehicle No.
-            </Button>
+            <span className="text-gray-400 text-xs italic font-medium">Pending</span>
           )}
           {record.status === "Fresh" && (
             <EditOutlined
@@ -2273,8 +2375,8 @@ export default function PurchaseIndent() {
         <span className="text-amber-700 font-semibold">Contract Date</span>
       ),
       dataIndex: "contractDate",
-      width: 80,
-      render: (t) => <span className="text-amber-800">{fmtDate(t)}</span>,
+      width: 95,
+      render: (t) => <span className="text-amber-800 whitespace-nowrap">{fmtDate(t)}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Contract No</span>,
@@ -2345,22 +2447,22 @@ export default function PurchaseIndent() {
     {
       title: <span className="text-amber-700 font-semibold">Valid From</span>,
       dataIndex: "startDate",
-      width: 80,
-      render: (t) => <span className="text-amber-800">{fmtDate(t)}</span>,
+      width: 95,
+      render: (t) => <span className="text-amber-800 whitespace-nowrap">{fmtDate(t)}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Valid To</span>,
       dataIndex: "endDate",
-      width: 80,
-      render: (t) => <span className="text-amber-800">{fmtDate(t)}</span>,
+      width: 95,
+      render: (t) => <span className="text-amber-800 whitespace-nowrap">{fmtDate(t)}</span>,
     },
     {
       title: (
         <span className="text-amber-700 font-semibold">Extended Up To</span>
       ),
       dataIndex: "extendedUpto",
-      width: 75,
-      render: (t) => <span className="text-amber-800">{fmtDate(t)}</span>,
+      width: 95,
+      render: (t) => <span className="text-amber-800 whitespace-nowrap">{fmtDate(t)}</span>,
     },
     {
       title: (
@@ -2502,7 +2604,27 @@ export default function PurchaseIndent() {
           setModalContracts([]);
           setReleasedContractIds(new Set());
         }}
-        footer={null}
+        footer={[
+          <Button
+            key="cancel"
+            onClick={() => {
+              setIsPoContractsModalOpen(false);
+              setSelectedPoForContracts(null);
+              setModalContracts([]);
+              setReleasedContractIds(new Set());
+            }}
+          >
+            Cancel
+          </Button>,
+          <Button
+            key="save"
+            type="primary"
+            onClick={handleSaveContractVehicles}
+            className="!bg-amber-500 !hover:bg-amber-600 !border-none"
+          >
+            Save Vehicles Setup
+          </Button>,
+        ]}
         width={1600}
       >
         <Card
@@ -2536,7 +2658,11 @@ export default function PurchaseIndent() {
               const isReleased = releasedContractIds.has(
                 record.id || record.key,
               );
-              return isReleased ? "!bg-green-100" : "cursor-pointer";
+              if (isReleased) return "!bg-green-100";
+              if (record.link_status === "Removed" || record.link_status?.toLowerCase() === "removed") {
+                return "!bg-red-100";
+              }
+              return "cursor-pointer";
             }}
             className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1"
             size="small"
@@ -2788,6 +2914,7 @@ export default function PurchaseIndent() {
 
       {/* ── Sales Contract Edit Modal — full form, same as SalesSouda.jsx ── */}
       <Modal
+        zIndex={1100}
         title={
           <span className="text-amber-700 text-2xl font-semibold">
             {isContractReadOnly
