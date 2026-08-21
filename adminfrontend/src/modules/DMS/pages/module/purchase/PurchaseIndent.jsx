@@ -357,12 +357,15 @@ export default function PurchaseIndent() {
             contractDetails.length || (item.sale_contracts || []).length,
           total_qty_all_items: totalQty,
           total_indent_qty: totalQty,
-          total_gross_weight_indent: totalGrossWeight,
-          total_purchase_order_value_indent: totalPOValue,
-          grand_total: totalPOValue,
+          total_gross_weight_indent: item.total_gross_weight_indent || totalGrossWeight,
+          total_purchase_order_value_indent: item.total_purchase_order_value_indent || totalPOValue,
+          grand_total: item.total_purchase_order_value_indent || totalPOValue,
           status: item.status || "Fresh",
           number_of_vehicles: item.number_of_vehicles,
           number_of_vehicle: item.number_of_vehicle,
+          total_no_of_vehicles_placed: item.total_no_of_vehicles_placed ?? item.total_no_of_vehicle_placed ?? item.total_vehicles_placed ?? 0,
+          total_gross_weight_placed: item.total_gross_weight_placed ?? 0,
+          total_purchase_order_value_placed: item.total_purchase_order_value_placed ?? item.total_po_value_placed ?? 0,
         };
       });
 
@@ -2299,8 +2302,9 @@ export default function PurchaseIndent() {
           placed
         </span>
       ),
+      dataIndex: "total_no_of_vehicles_placed",
       width: 90,
-      render: () => <span className="text-amber-800">-</span>,
+      render: (t) => <span className="text-amber-800">{t ?? 0}</span>,
     },
     {
       title: (
@@ -2312,8 +2316,11 @@ export default function PurchaseIndent() {
           Placed
         </span>
       ),
+      dataIndex: "total_gross_weight_placed",
       width: 100,
-      render: () => <span className="text-amber-800">-</span>,
+      render: (t) => (
+        <span className="text-amber-800">{Number(t || 0).toFixed(3)}</span>
+      ),
     },
     {
       title: (
@@ -2325,8 +2332,17 @@ export default function PurchaseIndent() {
           (Placed)
         </span>
       ),
+      dataIndex: "total_purchase_order_value_placed",
       width: 110,
-      render: () => <span className="text-amber-800">-</span>,
+      render: (t) => (
+        <span className="text-amber-800">
+          ₹
+          {Number(t || 0).toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
