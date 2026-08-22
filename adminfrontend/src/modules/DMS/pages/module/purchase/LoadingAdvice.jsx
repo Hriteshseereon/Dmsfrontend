@@ -1,4 +1,3 @@
-// LoadingAdvice.js
 import React, { useState, useEffect } from "react";
 import {
   Table,
@@ -6,1058 +5,847 @@ import {
   Button,
   Modal,
   Form,
-  Select,
+  InputNumber,
   DatePicker,
   Row,
   Col,
+  Card,
   message,
+  Tooltip,
 } from "antd";
 import {
   SearchOutlined,
-  EyeOutlined,
   EditOutlined,
   DownloadOutlined,
-  FilterOutlined,
+  SyncOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { exportToExcel } from "../../../../../utils/exportToExcel";
 import {
-  getLoadingAdvice,
-  getLoadingAdviceById,
-  updateLoadingAdvice,
-  getAllVendor,
+  getFreightDetails,
+  createFreightDetails,
+  updateFreightDetails,
 } from "../../../../../api/purchase";
-const { Option } = Select;
 
-const ALL_STATUS = [
-  "Approved",
-  "Dispatched",
-  "In-Transit",
-  "Out for Delivery",
-  "Partially Delivered",
-  "Delivered",
-];
-const SALE_ORDER_STATUS_FLOW = {
-  "In-Transit": ["In-Transit", "Out for Delivery"],
-  "Out for Delivery": ["Out for Delivery", "Delivered"],
-  Delivered: ["Delivered"],
+const parseDateToDayjs = (dateStr) => {
+  if (!dateStr) return null;
+  const parts = dateStr.split(" ")[0].split("-");
+  if (parts.length === 3) {
+    if (parts[0].length === 4) {
+      return dayjs(dateStr);
+    }
+    const d = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const y = parseInt(parts[2], 10);
+    return dayjs(new Date(y, m, d));
+  }
+  return dayjs(dateStr);
 };
 
-const statusFlow = {
-  Pending: ["Pending"],
-
-  Approved: ["Approved", "Dispatched"],
-  Dispatched: ["Dispatched", "In-Transit"],
-  "In-Transit": ["In-Transit", "Out for Delivery"],
-  "Out for Delivery": ["Out for Delivery", "Delivered"],
-  "Partially Delivered": ["Partially Delivered", "Delivered"],
-  Delivered: ["Delivered"],
-};
 export default function LoadingAdvice() {
   const [data, setData] = useState([]);
-  const [deliveryMeta, setDeliveryMeta] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState(null); // "add" | "edit" | null
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const [messageApi, contextHolder] = message.useMessage();
+  const [submitting, setSubmitting] = useState(false);
 
   const [form] = Form.useForm();
-  const [viewForm] = Form.useForm();
+
   useEffect(() => {
-    fetchLoadingAdvice();
+    fetchData();
   }, []);
 
-  const handleSearch = (value) => {
-    setSearchText(value);
-
-    if (!value) {
-      fetchLoadingAdvice();
-      return;
-    }
-
-    const filtered = data.filter((item) =>
-      JSON.stringify(item).toLowerCase().includes(value.toLowerCase()),
-    );
-
-    setData(filtered);
-  };
-  const handleExport = async () => {
+  const fetchData = async () => {
     try {
-      const res = await getLoadingAdvice();
+      setLoading(true);
+      const res = await getFreightDetails();
       const list = res || [];
-
-      const exportRows = [];
-
-      for (const advice of list) {
-        const detail = await getLoadingAdviceById(advice.loading_id);
-
-        detail.items?.forEach((item) => {
-          exportRows.push({
-            // Basic
-            "Advice No": detail.advice_no,
-            "Loading Advice Date": detail.advice_date,
-            Status: detail.status,
-
-            // Company Details
-            "Vendor Name": detail.vendor_name,
-            "Vendor Address": detail.vendor_address,
-            "Contact Person": detail.vendor_contact_person,
-            "Vendor Phone": detail.vendor_phone,
-
-            // Plant Details
-            "Plant Name": detail.plant_name,
-            "Plant Address": detail.plant_address,
-            "Plant Contact Person": detail.plant_contact_person,
-
-            // Item Details
-
-            "Item Name": item.product_name,
-            "Required Qty": item.required_qty,
-            "Actual Qty": item.actual_qty,
-            Variance: item.variance,
-
-            // Transport Details
-            Transporter: detail.transporter_name,
-            "Vehicle No": detail.vehicle_no,
-            "Driver Name": detail.driver_name,
-            "Driver Contact": detail.driver_contact,
-            "Insurance Valid Upto": detail.insurance_valid_upto,
-            "PU Valid Upto": detail.pu_valid_upto,
-            "Fitness Valid Upto": detail.fitness_valid_upto,
-
-            // Loading Details
-            "Vehicle In Time": detail.vehicle_in_time,
-            "Vehicle Out Time": detail.vehicle_out_time,
-            "Tare Weight (KG)": detail.tare_weight_kg,
-            "Net Weight (KG)": detail.net_weight_kg,
-            "Gross Weight (KG)": detail.gross_weight_kg,
-          });
-        });
-      }
-
-      exportToExcel(exportRows, "Loading_Advice_Details", "LoadingAdvice");
+      setData(list.map((item) => ({ ...item, key: item.id })));
     } catch (error) {
-      console.error("Export failed:", error);
-      message.error("Export failed");
+      console.error("Failed to fetch freight details:", error);
+      message.error("Failed to load transport freight details");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const fetchLoadingAdvice = async () => {
-    try {
-      const res = await getLoadingAdvice();
-
-      const formatted = res.map((item) => ({
-        key: item.id,
-        id: item.id,
-
-        // Basic Info
-        advice_no: item.advice_no || "-",
-        lodingadvicedate: item.advice_date || "-",
-        invoiceNo: item.invoice_number || "-",
-        companyName: item.vendor_name || "-",
-        plantName: item.plant_name || "-",
-        status: item.status || "-",
-        vendor_name: item.vendor_name,
-        plant_name: item.plant_name,
-        vendor_address: item.vendor_addresses?.[0]?.address_line1,
-        plant_address: item.plant_details?.address,
-        vendor_gstin: item.vendor_gstin,
-        plant_gstin: item.plant_gstin,
-        // Transport Details ✅ correct fields from API
-        transporter: item.transporter_name || "-",
-        vehicleNo: item.vehicle_number || "-",
-        driverName: item.driver_name || "-",
-        driverContact: item.driver_contact || "-",
-        insuranceValidUpto: item.insurance_valid_upto || null,
-        puValidUpto: item.pu_valid_upto || null,
-        fitnessValidUpto: item.fitness_valid_upto || null,
-
-        // Loading Details
-        vehicleInTime: item.vehicle_in_time || "-",
-        vehicleOutTime: item.vehicle_out_time || "-",
-        tareWeight: item.tare_weight_kg || 0,
-        netWeight: item.net_weight_kg || 0,
-        grossWeight: item.gross_weight_kg || 0,
-
-        itemCode: item.items?.[0]?.hsn_code || "-", // 👈 HSN code
-        itemName: item.items?.[0]?.product_name || "-",
-
-        reqQty: item.items?.[0]?.required_qty || 0,
-        actualQty: item.items?.[0]?.actual_qty || 0,
-        variance: item.items?.[0]?.variance || 0,
-
-        original: item,
-      }));
-
-      setData(formatted);
-    } catch (error) {
-      console.error("Failed to fetch loading advice:", error);
-    }
+  const handleSearch = (e) => {
+    setSearchText(e.target.value);
   };
 
-  const handleOpenEdit = async (record) => {
-    try {
-      const res = await getLoadingAdviceById(record.id);
-
-      form.setFieldsValue({
-        advice_no: res.advice_no,
-        invoiceNo: res.invoice_number,
-        lodingadvicedate: res.advice_date ? dayjs(res.advice_date) : null,
-        status: res.status,
-
-        companyName: res.company_group_name || "",
-        companyAddress: res.vendor_addresses?.[0]?.address_line1 || "",
-        contactPerson: res.vendor_details?.contact_person || "",
-        contactNo: res.vendor_details?.contact_person_no || "",
-
-        plantName: res.plant_name,
-        plantAddress: res.plant_details?.address || "",
-        plantContactPerson: res.vendor_details?.contact_person || "",
-        plantPhone: res.plant_details?.phone_number || "",
-
-        transporter: res.transporter_name,
-        vehicleNo: res.vehicle_number,
-        driverName: res.driver_name,
-        driverContact: res.driver_contact,
-
-        insuranceValidUpto: res.insurance_valid_upto
-          ? dayjs(res.insurance_valid_upto)
-          : null,
-
-        puValidUpto: res.pu_valid_upto ? dayjs(res.pu_valid_upto) : null,
-
-        fitnessValidUpto: res.fitness_valid_upto
-          ? dayjs(res.fitness_valid_upto)
-          : null,
-
-        vehicleInTime: res.vehicle_in_time,
-        vehicleOutTime: res.vehicle_out_time,
-        tareWeight: res.tare_weight_kg,
-        netWeight: res.net_weight_kg,
-
-        items: res.items?.map((itm) => ({
-          id: itm.id,
-          product: itm.product,
-          product_name: itm.product_name,
-          required_qty: itm.required_qty,
-          actual_qty: itm.actual_qty,
-          variance: itm.variance,
-        })),
-
-        // ✅ SALES ORDER MAPPING
-        sale_orders: res.deliveries?.map((delivery) => ({
-          delivery_id: delivery.id,
-          sale_order_no: delivery.sales_order_number,
-          customer_name: delivery.customer_name,
-          delivery_address: delivery.customer_delivery_address,
-          delivery_date: delivery.delivery_date
-            ? dayjs(delivery.delivery_date)
-            : null,
-          status: delivery.status,
-          items: delivery.items?.map((itm) => ({
-            item_id: itm.id,
-            product_name: itm.item_name,
-            qty: itm.order_qty,
-            delivered_qty: itm.delivered_qty,
-          })),
-        })),
-      });
-
-      setSelectedRecord(res);
-      setIsEditModalOpen(true);
-    } catch (error) {
-      console.error("Error fetching by ID:", error);
-      message.error("Failed to load data");
-    }
+  const handleReset = () => {
+    setSearchText("");
   };
-  const handleOpenView = async (record) => {
-    try {
-      const res = await getLoadingAdviceById(record.id);
 
-      viewForm.setFieldsValue({
-        advice_no: res.advice_no,
-        invoiceNo: res.invoice_number,
-        lodingadvicedate: res.advice_date ? dayjs(res.advice_date) : null,
-        status: res.status,
-
-        companyName: res.company_group_name || "",
-        companyAddress: res.vendor_addresses?.[0]?.address_line1 || "",
-        contactPerson: res.vendor_details?.contact_person || "",
-        contactNo: res.vendor_details?.contact_person_no || "",
-
-        plantName: res.plant_name,
-        plantAddress: res.plant_details?.address || "",
-        plantContactPerson: res.vendor_details?.contact_person || "",
-        plantPhone: res.plant_details?.phone_number || "",
-
-        transporter: res.transporter_name,
-        vehicleNo: res.vehicle_number,
-        driverName: res.driver_name,
-        driverContact: res.driver_contact,
-
-        insuranceValidUpto: res.insurance_valid_upto
-          ? dayjs(res.insurance_valid_upto)
-          : null,
-
-        puValidUpto: res.pu_valid_upto ? dayjs(res.pu_valid_upto) : null,
-
-        fitnessValidUpto: res.fitness_valid_upto
-          ? dayjs(res.fitness_valid_upto)
-          : null,
-
-        vehicleInTime: res.vehicle_in_time,
-        vehicleOutTime: res.vehicle_out_time,
-        tareWeight: res.tare_weight_kg,
-        netWeight: res.net_weight_kg,
-
-        items: res.items?.map((itm) => ({
-          id: itm.id,
-          product: itm.product,
-          product_name: itm.product_name,
-          required_qty: itm.required_qty,
-          actual_qty: itm.actual_qty,
-          variance: itm.variance,
-        })),
-
-        sale_orders: res.deliveries?.map((delivery) => ({
-          delivery_id: delivery.id,
-          sale_order_no: delivery.sales_order_number,
-          customer_name: delivery.customer_name,
-          delivery_address: delivery.customer_delivery_address,
-          delivery_date: delivery.delivery_date
-            ? dayjs(delivery.delivery_date)
-            : null,
-          status: delivery.status,
-
-          items: delivery.items?.map((itm) => ({
-            item_id: itm.id,
-            product_name: itm.item_name,
-            qty: itm.order_qty,
-            delivered_qty: itm.delivered_qty,
-          })),
-        })),
-      });
-
-      setSelectedRecord(res);
-      setIsViewModalOpen(true);
-    } catch (error) {
-      console.error("Error fetching loading advice:", error);
-      message.error("Failed to load data");
-    }
+  const handleExport = () => {
+    const exportRows = filteredData.map((item) => ({
+      "PO Number": item.purchase_order_number || "-",
+      "Contract Number": item.sale_contract_number || "-",
+      "Vehicle Details": item.vehicle_details || "-",
+      "Transporter Name": item.transporter_name || "-",
+      "Lorry Receipt No": item.lorry_receipt_no || "-",
+      "Lorry Receipt Date": item.lorry_receipt_date || "-",
+      "Gross Weight Loading Plan": item.gross_weight_loading_plan || "-",
+      "Gross Weight Loaded": item.gross_weight_loaded || "-",
+      "Min Guarantee Weight": item.min_guarantee_weight || "-",
+      Place: item.place || "-",
+      "Freight Rate Agreed": item.freight_rate_agreed || "-",
+      "Freight Rate Placed": item.freight_rate_placed || "-",
+      "Freight Amount": item.freight_amount || "-",
+      "Advance Paid Amount": item.advance_paid_amount || "-",
+      "Claim Shortage": item.claim_shortage || "-",
+      "Claim Shortage Notes":
+        item.claim_shortage_notes || item.claim_shortage_note || "-",
+      "Other Charges": item.other_charges || "-",
+      "Other Charges Notes":
+        item.other_charges_notes || item.other_charges_note || "-",
+      "Balance Payable": item.balance_payable || "-",
+      "Balance Paid": item.balance_paid || "-",
+      "Transport Commission": item.transport_commission || "-",
+    }));
+    exportToExcel(exportRows, "Transport_Freight_Details", "FreightDetails");
   };
-  const handleEdit = async (values) => {
-    try {
-      if (
-        ["Pending Approval"].includes(selectedRecord.status) &&
-        values.status === selectedRecord.status
-      ) {
-        messageApi.warning("Please change status to update");
-        return;
-      }
 
+  const handleOpenAddModal = (record) => {
+    setSelectedRecord(record);
+    setModalMode("add");
+    form.setFieldsValue({
+      lorry_receipt_no: undefined,
+      lorry_receipt_date: record.lorry_receipt_date
+        ? parseDateToDayjs(record.lorry_receipt_date)
+        : dayjs(),
+      gross_weight_loaded: record.gross_weight_loading_plan
+        ? Number(record.gross_weight_loading_plan)
+        : undefined,
+      freight_rate_placed: record.freight_rate_agreed
+        ? Number(record.freight_rate_agreed)
+        : undefined,
+      advance_paid_amount: undefined,
+      claim_shortage: undefined,
+      claim_shortage_notes: undefined,
+      other_charges: undefined,
+      other_charges_notes: undefined,
+      transport_commission: undefined,
+      balance_paid: undefined,
+    });
+  };
+
+  const handleOpenEditModal = (record) => {
+    setSelectedRecord(record);
+    setModalMode("edit");
+    form.setFieldsValue({
+      lorry_receipt_no: record.lorry_receipt_no,
+      lorry_receipt_date: record.lorry_receipt_date
+        ? parseDateToDayjs(record.lorry_receipt_date)
+        : null,
+      gross_weight_loaded: record.gross_weight_loaded
+        ? Number(record.gross_weight_loaded)
+        : undefined,
+      freight_rate_placed: record.freight_rate_placed
+        ? Number(record.freight_rate_placed)
+        : undefined,
+      advance_paid_amount: record.advance_paid_amount
+        ? Number(record.advance_paid_amount)
+        : undefined,
+      claim_shortage: record.claim_shortage
+        ? Number(record.claim_shortage)
+        : undefined,
+      claim_shortage_notes:
+        record.claim_shortage_notes || record.claim_shortage_note,
+      other_charges: record.other_charges
+        ? Number(record.other_charges)
+        : undefined,
+      other_charges_notes:
+        record.other_charges_notes || record.other_charges_note,
+      transport_commission: record.transport_commission
+        ? Number(record.transport_commission)
+        : undefined,
+      balance_paid: record.balance_paid
+        ? Number(record.balance_paid)
+        : undefined,
+    });
+  };
+
+  const handleCloseModal = () => {
+    setModalMode(null);
+    setSelectedRecord(null);
+    form.resetFields();
+  };
+
+  const handleSubmit = async (values) => {
+    try {
+      setSubmitting(true);
       const payload = {
-        status: values.status,
-
-        items: values.items?.map((itm) => ({
-          id: itm.id,
-          actual_qty: Number(itm.actual_qty).toFixed(2),
-          required_qty: Number(itm.required_qty).toFixed(2),
-        })),
-
-        deliveries: values.sale_orders?.map((so) => ({
-          id: so.delivery_id,
-          status: so.status,
-          delivery_date: so.delivery_date
-            ? dayjs(so.delivery_date).format("YYYY-MM-DD")
-            : null,
-
-          items: so.items?.map((itm) => ({
-            id: itm.item_id,
-            delivered_qty: itm.delivered_qty
-              ? Number(itm.delivered_qty).toFixed(3)
-              : "0.000",
-          })),
-        })),
+        lorry_receipt_no: values.lorry_receipt_no,
+        lorry_receipt_date: values.lorry_receipt_date
+          ? values.lorry_receipt_date.format("DD-MM-YYYY")
+          : null,
+        gross_weight_loaded: values.gross_weight_loaded
+          ? Number(values.gross_weight_loaded)
+          : null,
+        freight_rate_placed: values.freight_rate_placed
+          ? Number(values.freight_rate_placed)
+          : null,
+        claim_shortage: values.claim_shortage
+          ? Number(values.claim_shortage)
+          : null,
+        claim_shortage_notes: values.claim_shortage_notes || null,
+        other_charges: values.other_charges
+          ? Number(values.other_charges)
+          : null,
+        other_charges_notes: values.other_charges_notes || null,
       };
 
-      await updateLoadingAdvice(selectedRecord.id, payload);
+      if (modalMode === "edit") {
+        payload.advance_paid_amount = values.advance_paid_amount
+          ? Number(values.advance_paid_amount)
+          : null;
+        payload.transport_commission = values.transport_commission
+          ? Number(values.transport_commission)
+          : null;
+        payload.balance_paid = values.balance_paid ? Number(values.balance_paid) : null;
+      }
 
-      message.success("Updated successfully");
+      if (modalMode === "add") {
+        payload.purchase_order = selectedRecord.purchase_order;
+        payload.sale_contract = selectedRecord.sale_contract;
+        await createFreightDetails(payload);
+        message.success("Freight details added successfully");
+      } else {
+        await updateFreightDetails(selectedRecord.id, payload);
+        message.success("Freight details updated successfully");
+      }
 
-      setIsEditModalOpen(false);
-      form.resetFields();
-      fetchLoadingAdvice();
+      handleCloseModal();
+      fetchData();
     } catch (error) {
-      console.error("Update failed:", error);
-      message.error("Update failed");
+      console.error("Submission failed:", error);
+      message.error("Failed to save freight details");
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const getSaleOrderAllowedStatus = (currentStatus) => {
-    return SALE_ORDER_STATUS_FLOW[currentStatus] || ["In-Transit"];
-  };
+  const filteredData = data.filter((item) => {
+    if (!searchText) return true;
+    const lower = searchText.toLowerCase();
+    return (
+      item.purchase_order_number?.toLowerCase().includes(lower) ||
+      item.sale_contract_number?.toLowerCase().includes(lower) ||
+      item.vehicle_details?.toLowerCase().includes(lower) ||
+      item.transporter_name?.toLowerCase().includes(lower) ||
+      item.place?.toLowerCase().includes(lower) ||
+      item.lorry_receipt_no?.toLowerCase().includes(lower)
+    );
+  });
 
-  // Columns - removed Assign button; Admin can only approve pending ones
   const columns = [
-    {
-      title: <span className="text-amber-700 font-semibold">Advice No</span>,
-      dataIndex: "advice_no",
-      render: (t) => <span className="text-amber-800">{t}</span>,
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Assign No</span>,
-      dataIndex: "invoiceNo",
-      render: (t) => <span className="text-amber-800">{t}</span>,
-    },
-
+    // {
+    //   title: <span className="text-amber-700 font-semibold">PO Number</span>,
+    //   dataIndex: "purchase_order_number",
+    //   width: 110,
+    //   render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+    // },
+    // {
+    //   title: (
+    //     <span className="text-amber-700 font-semibold">Contract Number</span>
+    //   ),
+    //   dataIndex: "sale_contract_number",
+    //   width: 110,
+    //   render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+    // },
     {
       title: (
-        <span className="text-amber-700 font-semibold">
-          Loading Advice Date
+        <span className="text-amber-700 font-semibold">Vehicle Details</span>
+      ),
+      dataIndex: "vehicle_details",
+      width: 100,
+      render: (t) => (
+        <span className="text-amber-800 font-semibold">{t || "-"}</span>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Transport Name</span>
+      ),
+      dataIndex: "transporter_name",
+      width: 100,
+      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Lorry Receipt No</span>
+      ),
+      dataIndex: "lorry_receipt_no",
+      width: 110,
+      render: (t) => (
+        <span
+          className={
+            t
+              ? "bg-green-50 text-green-800 px-1 py-0.5 rounded font-medium border border-green-200"
+              : "text-red-500 font-semibold"
+          }
+        >
+          {t || "Pending"}
         </span>
       ),
-      dataIndex: "lodingadvicedate",
-      render: (t) => <span className="text-amber-800">{t}</span>,
-    },
-
-    // transporter + vehicle/driver columns (display-only)
-    {
-      title: <span className="text-amber-700 font-semibold">Transporter</span>,
-      dataIndex: "transporter",
-      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Vehicle No</span>,
-      dataIndex: "vehicleNo",
-      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Driver</span>,
-      dataIndex: "driverName",
-      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Assignment</span>,
-      width: 180,
-      dataIndex: "status",
-      key: "status",
-      render: (status) => {
-        const colorMap = {
-          Pending: "bg-yellow-100 text-yellow-700",
-
-          "Pending Approval": "bg-orange-100 text-orange-700",
-          Approved: "bg-yellow-100 text-yellow-700",
-          Delivered: " bg-green-100 text-green-700",
-          Dispatched: "bg-blue-100 text-blue-700",
-          "In-Transit": "bg-orange-100 text-orange-700",
-          "Out for Delivery": "bg-purple-100 text-purple-700 ",
-          "Partially Delivered": "bg-blue-100 text-blue-700",
-        };
-
+      title: (
+        <span className="text-amber-700 font-semibold">Lorry Receipt Date</span>
+      ),
+      dataIndex: "lorry_receipt_date",
+      width: 100,
+      render: (t) => {
+        if (!t) return "-";
+        if (t.includes("-") && t.split("-")[0].length === 2) {
+          return <span className="text-amber-800">{t}</span>;
+        }
+        const parsed = parseDateToDayjs(t);
         return (
-          <span
-            className={`px-3 py-1 rounded-full font-semibold inline-block text-sm ${colorMap[status] || ""}`}
-          >
-            {status || "-"}
+          <span className="text-amber-800">
+            {parsed ? parsed.format("DD-MM-YYYY") : t}
           </span>
         );
       },
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Gross Weight Loading Plan
+        </span>
+      ),
+      dataIndex: "gross_weight_loading_plan",
+      width: 90,
+      render: (t) => (
+        <span className="text-amber-800">{t ? Number(t).toFixed(3) : "-"}</span>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Gross Weight Loaded
+        </span>
+      ),
+      dataIndex: "gross_weight_loaded",
+      width: 90,
+      render: (t) => (
+        <span className="text-amber-800">{t ? Number(t).toFixed(3) : "-"}</span>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Min Guarantee Weight
+        </span>
+      ),
+      dataIndex: "min_guarantee_weight",
+      width: 90,
+      render: (t) => (
+        <span className="text-amber-800">{t ? Number(t).toFixed(3) : "-"}</span>
+      ),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Place</span>,
+      dataIndex: "place",
+      width: 90,
+      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Freight Rate Agreed
+        </span>
+      ),
+      dataIndex: "freight_rate_agreed",
+      width: 100,
+      render: (t) => (
+        <span className="text-amber-800">
+          ₹
+          {t
+            ? Number(t).toLocaleString(undefined, { minimumFractionDigits: 2 })
+            : "-"}
+        </span>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Freight Rate Placed
+        </span>
+      ),
+      dataIndex: "freight_rate_placed",
+      width: 100,
+      render: (t) => (
+        <span className="text-amber-800">
+          ₹
+          {t
+            ? Number(t).toLocaleString(undefined, { minimumFractionDigits: 2 })
+            : "-"}
+        </span>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Freight Amount</span>
+      ),
+      dataIndex: "freight_amount",
+      width: 100,
+      render: (t) => (
+        <span className="text-amber-800 font-semibold">
+          ₹
+          {t
+            ? Number(t).toLocaleString(undefined, { minimumFractionDigits: 2 })
+            : "-"}
+        </span>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Advance Paid Amount
+        </span>
+      ),
+      dataIndex: "advance_paid_amount",
+      width: 100,
+      render: (t) => (
+        <span className="text-amber-800">
+          ₹
+          {t
+            ? Number(t).toLocaleString(undefined, { minimumFractionDigits: 2 })
+            : "-"}
+        </span>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Claim / Shortage</span>
+      ),
+      dataIndex: "claim_shortage",
+      width: 100,
+      render: (t, r) => (
+        <Tooltip
+          title={r.claim_shortage_notes || r.claim_shortage_note || "No notes"}
+        >
+          <span className="text-amber-800 font-semibold cursor-pointer">
+            ₹
+            {t
+              ? Number(t).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                })
+              : "0.00"}
+          </span>
+        </Tooltip>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Other Charges</span>
+      ),
+      dataIndex: "other_charges",
+      width: 100,
+      render: (t, r) => (
+        <Tooltip
+          title={r.other_charges_notes || r.other_charges_note || "No notes"}
+        >
+          <span className="text-amber-800 font-semibold cursor-pointer">
+            ₹
+            {t
+              ? Number(t).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                })
+              : "0.00"}
+          </span>
+        </Tooltip>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Balance Payable</span>
+      ),
+      dataIndex: "balance_payable",
+      width: 100,
+      render: (t) => (
+        <span className="text-amber-800 font-semibold">
+          ₹
+          {t
+            ? Number(t).toLocaleString(undefined, { minimumFractionDigits: 2 })
+            : "-"}
+        </span>
+      ),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Balance Paid</span>,
+      dataIndex: "balance_paid",
+      width: 100,
+      render: (t) => (
+        <span className="text-amber-800">
+          ₹
+          {t
+            ? Number(t).toLocaleString(undefined, { minimumFractionDigits: 2 })
+            : "-"}
+        </span>
+      ),
+    },
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">
+          Transport Commission
+        </span>
+      ),
+      dataIndex: "transport_commission",
+      width: 100,
+      render: (t) => (
+        <span className="text-amber-800 font-semibold">
+          ₹
+          {t
+            ? Number(t).toLocaleString(undefined, { minimumFractionDigits: 2 })
+            : "-"}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       key: "actions",
+      width: 100,
+      fixed: "right",
       render: (_, record) => {
-        const restrictedStatus = [
-          "In-Transit",
-          "Out for Delivery",
-          "Partially Delivered",
-          "Delivered",
-        ];
-
-        const showEdit =
-          record.driverName &&
-          record.vehicleNo &&
-          record.driverName !== "-" &&
-          record.vehicleNo !== "-";
-        // !restrictedStatus.includes(record.status); // 👈 hide edit
-
+        const hasLorryReceipt = !!record.lorry_receipt_no;
         return (
-          <div className="flex gap-3">
-            <EyeOutlined
-              className="cursor-pointer! text-blue-500!"
-              onClick={() => handleOpenView(record)}
-            />
-
-            {showEdit && (
-              <EditOutlined
-                className="cursor-pointer! text-red-500!"
-                onClick={() => handleOpenEdit(record)}
-              />
-            )}
-          </div>
+          <Button
+            type="primary"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => {
+              if (hasLorryReceipt) {
+                handleOpenEditModal(record);
+              } else {
+                handleOpenAddModal(record);
+              }
+            }}
+            className={
+              hasLorryReceipt
+                ? "!bg-amber-500 !hover:bg-amber-600 !border-none text-xs"
+                : "!bg-emerald-600 !hover:bg-emerald-700 !border-none text-xs"
+            }
+          >
+            {hasLorryReceipt ? "Edit" : "Add Freight"}
+          </Button>
         );
       },
     },
   ];
-  const getAllowedStatus = (formInstance) => {
-    const currentStatus = formInstance.getFieldValue("status");
-    const driver = formInstance.getFieldValue("driverName");
-    const vehicle = formInstance.getFieldValue("vehicleNo");
-    const items = formInstance.getFieldValue("items") || [];
-
-    const hasDriverVehicle =
-      driver && vehicle && driver !== "-" && vehicle !== "-";
-
-    const hasActualQty = items.some((itm) => Number(itm.actual_qty) > 0);
-
-    // ❌ No driver/vehicle → restrict
-    if (!hasDriverVehicle) {
-      return ["Pending"];
-    }
-
-    // ❌ Driver present but no actual qty → only till Approved
-    if (hasDriverVehicle && !hasActualQty) {
-      return ["Approved"];
-    }
-
-    // ✅ ⭐ SPECIAL CASE (your requirement)
-    if (currentStatus === "Approved" && hasActualQty) {
-      return ALL_STATUS; // allow everything
-    }
-
-    // ✅ Default flow
-    return statusFlow[currentStatus] || [];
-  };
-  const renderFormFields = (disabled = false, formInstance) => {
-    const status = formInstance.getFieldValue("status");
-
-    const isSalesDisabled = [
-      "In-Transit",
-      "Out for Delivery",
-      "Partially Delivered",
-      "Delivered",
-    ].includes(status);
-
-    return (
-      <>
-        {contextHolder}
-
-        {/* Date and Order */}
-        <Row gutter={16}>
-          <Col span={6}>
-            <Form.Item label="Advice No" name="advice_no">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Assign No" name="invoiceNo">
-              <Select placeholder="Select assign No" disabled showSearch>
-                {data.map((item) => (
-                  <Option key={item.invoiceNo} value={item.invoiceNo}>
-                    {item.invoiceNo}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item
-              label="Loading Advice Date"
-              name="lodingadvicedate"
-              rules={[{ required: true }]}
-            >
-              <DatePicker className="w-full" disabled format="YYYY-MM-DD" />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item
-              label="Status"
-              name="status"
-              rules={[{ required: true }]}
-            >
-              <Select
-                placeholder="Select Status"
-                disabled={[
-                  "Dispatched",
-                  "In-Transit",
-                  "Out for Delivery",
-                  "Partially Delivered",
-                  "Delivered",
-                ].includes(formInstance.getFieldValue("status"))}
-              >
-                {" "}
-                {getAllowedStatus(formInstance).map((status) => (
-                  <Option key={status} value={status}>
-                    {status}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </Col>
-        </Row>
-        {/* Item Details */}
-        <Row gutter={24} className="mt-2">
-          <Col span={24}>
-            <h6 className="text-amber-600 ">Items Details</h6>
-          </Col>
-
-          <Form.List name="items">
-            {(fields) => (
-              <>
-                {fields.map(({ key, name }) => (
-                  <Row
-                    gutter={16}
-                    key={key}
-                    style={{ width: "100%" }}
-                    className="mt-2 ml-2! mr-2! border border-amber-200 rounded-lg p-2"
-                  >
-                    <Col span={6}>
-                      <Form.Item
-                        label="Item Name"
-                        name={[name, "product_name"]}
-                      >
-                        <Input disabled className="w-full!" />
-                      </Form.Item>
-                    </Col>
-
-                    <Col span={6}>
-                      <Form.Item label="Req. Qty" name={[name, "required_qty"]}>
-                        <Input disabled className="w-full!" />
-                      </Form.Item>
-                    </Col>
-
-                    <Col span={6}>
-                      <Form.Item label="Actual Qty" name={[name, "actual_qty"]}>
-                        <Input disabled className="w-full!" />
-                      </Form.Item>
-                    </Col>
-                    <Col span={6}>
-                      <Form.Item label="Variance" name={[name, "variance"]}>
-                        <Input disabled className="w-full!" />
-                      </Form.Item>
-                    </Col>
-                  </Row>
-                ))}
-              </>
-            )}
-          </Form.List>
-        </Row>
-        {[
-          "Dispatched",
-          "In-Transit",
-          "Out for Delivery",
-          "Partially Delivered",
-          "Delivered",
-        ].includes(formInstance.getFieldValue("status")) && (
-          <>
-            <h6 className="text-amber-500 pb-2 font-semibold">
-              Sale Order Details
-            </h6>
-
-            <Form.List name="sale_orders">
-              {(fields) => (
-                <>
-                  {fields.map(({ key, name }) => (
-                    <div
-                      key={key}
-                      className="border border-amber-200 rounded-lg p-3 mb-3"
-                    >
-                      <Row gutter={24}>
-                        <Col span={6}>
-                          <Form.Item
-                            label="Sale Order No"
-                            name={[name, "sale_order_no"]}
-                          >
-                            <Input disabled />
-                          </Form.Item>
-                        </Col>
-
-                        <Col span={6}>
-                          <Form.Item
-                            label="Customer Name"
-                            name={[name, "customer_name"]}
-                          >
-                            <Input disabled />
-                          </Form.Item>
-                        </Col>
-
-                        <Col span={6}>
-                          <Form.Item
-                            label="Delivery Address"
-                            name={[name, "delivery_address"]}
-                          >
-                            <Input disabled />
-                          </Form.Item>
-                        </Col>
-                        <Col span={6}>
-                          <Form.Item
-                            label="Delivery Date"
-                            name={[name, "delivery_date"]}
-                            rules={[{ required: true }]}
-                          >
-                            <DatePicker
-                              className="w-full"
-                              disabled={isSalesDisabled}
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col span={6}>
-                          <Form.Item
-                            label="Status"
-                            name={[name, "status"]}
-                            rules={[{ required: true }]}
-                          >
-                            <Select disabled={disabled}>
-                              {getSaleOrderAllowedStatus(
-                                formInstance.getFieldValue([
-                                  "sale_orders",
-                                  name,
-                                  "status",
-                                ]),
-                              ).map((st) => (
-                                <Option key={st} value={st}>
-                                  {st}
-                                </Option>
-                              ))}
-                            </Select>
-                          </Form.Item>
-                        </Col>
-                      </Row>
-
-                      <Form.List name={[name, "items"]}>
-                        {(itemFields) => (
-                          <>
-                            {itemFields.map(({ key: k, name: n }) => (
-                              <Row gutter={24} key={k}>
-                                <Col span={6}>
-                                  <Form.Item
-                                    label="Item"
-                                    name={[n, "product_name"]}
-                                  >
-                                    <Input disabled />
-                                  </Form.Item>
-                                </Col>
-
-                                <Col span={6}>
-                                  <Form.Item label="Quantity" name={[n, "qty"]}>
-                                    <Input disabled />
-                                  </Form.Item>
-                                </Col>
-
-                                <Col span={6}>
-                                  <Form.Item
-                                    label="Delivered Qty"
-                                    name={[n, "delivered_qty"]}
-                                    rules={[
-                                      ({ getFieldValue }) => ({
-                                        validator(_, value) {
-                                          const orderQty = Number(
-                                            getFieldValue([
-                                              "sale_orders",
-                                              name,
-                                              "items",
-                                              n,
-                                              "qty",
-                                            ]),
-                                          );
-
-                                          const actualItems =
-                                            getFieldValue("items") || [];
-
-                                          const actualQty = Number(
-                                            actualItems[0]?.actual_qty || 0,
-                                          );
-
-                                          const allOrders =
-                                            getFieldValue("sale_orders") || [];
-
-                                          let totalDelivered = 0;
-
-                                          allOrders.forEach((so) => {
-                                            so.items?.forEach((it) => {
-                                              totalDelivered += Number(
-                                                it.delivered_qty || 0,
-                                              );
-                                            });
-                                          });
-
-                                          if (
-                                            value &&
-                                            Number(value) > orderQty
-                                          ) {
-                                            return Promise.reject(
-                                              new Error(
-                                                `Delivered qty cannot exceed order qty (${orderQty})`,
-                                              ),
-                                            );
-                                          }
-
-                                          if (totalDelivered > actualQty) {
-                                            return Promise.reject(
-                                              new Error(
-                                                `Total delivered qty cannot exceed actual qty (${actualQty})`,
-                                              ),
-                                            );
-                                          }
-
-                                          return Promise.resolve();
-                                        },
-                                      }),
-                                    ]}
-                                  >
-                                    <Input disabled={isSalesDisabled} />
-                                  </Form.Item>
-                                </Col>
-                              </Row>
-                            ))}
-                          </>
-                        )}
-                      </Form.List>
-                    </div>
-                  ))}
-                </>
-              )}
-            </Form.List>
-          </>
-        )}
-        {/* Company Details */}
-        <Row gutter={24}>
-          <Col span={24}>
-            <h6 className="text-amber-600 ">Vendor Details</h6>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item
-              label="Vendor Name"
-              name="companyName"
-              rules={[{ required: true }]}
-            >
-              <Input disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Address" name="companyAddress">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Phone" name="contactNo">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Contact Person" name="contactPerson">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        {/* Plant */}
-        <Row gutter={24} className="mt-2">
-          <Col span={24}>
-            <h6 className="text-amber-600  "> Plant Details</h6>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Plant Name" name="plantName">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Address" name="plantAddress">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Contact Person" name="plantContactPerson">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-          <Col span={6}>
-            <Form.Item label="Phone" name="plantPhone">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        {/* Transport Details (display-only) */}
-        <Row gutter={24} className="mt-2">
-          <Col span={24}>
-            <h6 className="text-amber-600 "> Transport Details </h6>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Transporter" name="transporter">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Vehicle No" name="vehicleNo">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Driver Name" name="driverName">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Driver Contact" name="driverContact">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Insurance Valid Upto" name="insuranceValidUpto">
-              <DatePicker className="w-full" format="DD-MM-YYYY" disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="PU Valid Upto" name="puValidUpto">
-              <DatePicker className="w-full" format="DD-MM-YYYY" disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Fitness Valid Upto" name="fitnessValidUpto">
-              <DatePicker className="w-full" format="DD-MM-YYYY" disabled />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        {/* Loading Details */}
-        <Row gutter={24} className="mt-2">
-          <Col span={24}>
-            <h6 className="text-amber-600 "> Loading Details</h6>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Vehicle In Time" name="vehicleInTime">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Vehicle Out Time" name="vehicleOutTime">
-              <Input disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Tare Weight (KG)" name="tareWeight">
-              <Input type="number" disabled />
-            </Form.Item>
-          </Col>
-
-          <Col span={6}>
-            <Form.Item label="Net Weight (KG)" name="netWeight">
-              <Input type="number" disabled />
-            </Form.Item>
-          </Col>
-        </Row>
-      </>
-    );
-  };
 
   return (
-    <div>
+    <div className="p-4 bg-white rounded-lg shadow max-w-full overflow-hidden">
+      {/* Controls Bar */}
       <div className="flex justify-between items-center mb-4">
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-96">
           <Input
-            prefix={<SearchOutlined className="text-amber-600!" />}
-            placeholder="Search..."
-            className="w-64! border-amber-300! focus:border-amber-500!"
+            prefix={<SearchOutlined className="text-amber-600" />}
+            placeholder="Search by PO No, Vehicle, Transporter..."
             value={searchText}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={handleSearch}
+            allowClear
+            className="border-amber-300 hover:border-amber-400 focus:border-amber-500 rounded"
           />
           <Button
-            icon={<FilterOutlined />}
-            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-            onClick={() => handleSearch("")}
+            onClick={handleReset}
+            className="border-amber-400 text-amber-700 hover:bg-amber-100"
           >
             Reset
           </Button>
         </div>
-
-        <div className="flex gap-2">
+        <div>
           <Button
+            type="primary"
             icon={<DownloadOutlined />}
             onClick={handleExport}
-            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            className="!bg-emerald-600 !hover:bg-emerald-700 !border-none rounded font-medium"
           >
-            Export
+            Export to Excel
           </Button>
-
-          {/* Add New removed as requested */}
+          <Tooltip title="Reload records">
+            <Button
+              icon={<SyncOutlined spin={loading} />}
+              onClick={fetchData}
+              className="ml-2 border-amber-300 hover:border-amber-400 text-amber-700 rounded"
+            />
+          </Tooltip>
         </div>
       </div>
 
-      <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
-        <h2 className="text-lg font-semibold text-amber-700 mb-0">
-          Loading Advice
-        </h2>
-        <p className="text-amber-600 mb-3">
-          Incoming loading advice; transporter details come from Purchase Indent
-        </p>
-
+      {/* Table Container */}
+      <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white mt-4">
         <Table
           columns={columns}
-          dataSource={data}
+          dataSource={filteredData}
+          loading={loading}
           pagination={false}
-          scroll={{ y: 300 }}
-          rowKey="key"
+          scroll={{ y: "calc(100vh - 250px)", x: 2000 }}
+          rowKey="id"
+          size="small"
+          className="[&_.ant-table-cell]:!px-1 [&_.ant-table-cell]:!py-1 [&_.ant-table-thead_th]:!py-1.5"
         />
       </div>
 
-      {/* Edit Modal (admin can view/edit admin-level fields incl. approve status) */}
+      {/* Add / Edit Modal */}
       <Modal
         title={
-          <span className="text-amber-700 text-2xl font-semibold">
-            Edit Loading Advice
+          <span className="text-amber-700 text-xl font-semibold">
+            {modalMode === "add"
+              ? "Add Transport Freight Details"
+              : "Update Transport Freight Details"}
           </span>
         }
-        open={isEditModalOpen}
-        onCancel={() => setIsEditModalOpen(false)}
+        open={modalMode !== null}
+        onCancel={handleCloseModal}
         footer={null}
-        width={1200}
+        width={750}
+        zIndex={1100}
       >
-        <Form layout="vertical" form={form} onFinish={handleEdit}>
-          {renderFormFields(false, form)}
-          <div className="flex justify-end mt-4">
-            <Button
-              htmlType="submit"
-              className="bg-amber-500 hover:bg-amber-600 text-white border-none"
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+          className="mt-4"
+        >
+          {selectedRecord && (
+            <Card
+              size="small"
+              className="mb-4 border-amber-200 bg-amber-50/20"
+              title="Record Context"
             >
-              Update
+              <Row gutter={12}>
+                <Col span={8}>
+                  <div className="text-xs text-gray-500">PO Number</div>
+                  <div className="text-amber-800 font-semibold">
+                    {selectedRecord.purchase_order_number || "-"}
+                  </div>
+                </Col>
+                <Col span={8}>
+                  <div className="text-xs text-gray-500">Contract Number</div>
+                  <div className="text-amber-800 font-semibold">
+                    {selectedRecord.sale_contract_number || "-"}
+                  </div>
+                </Col>
+                <Col span={8}>
+                  <div className="text-xs text-gray-500">Vehicle Details</div>
+                  <div className="text-amber-800 font-semibold">
+                    {selectedRecord.vehicle_details || "-"}
+                  </div>
+                </Col>
+              </Row>
+              <Row gutter={12} className="mt-2">
+                <Col span={8}>
+                  <div className="text-xs text-gray-500">Transporter Name</div>
+                  <div className="text-amber-800 font-semibold">
+                    {selectedRecord.transporter_name || "-"}
+                  </div>
+                </Col>
+                <Col span={8}>
+                  <div className="text-xs text-gray-500">
+                    Freight Rate Agreed
+                  </div>
+                  <div className="text-amber-800 font-semibold">
+                    ₹{selectedRecord.freight_rate_agreed || "-"}
+                  </div>
+                </Col>
+                <Col span={8}>
+                  <div className="text-xs text-gray-500">
+                    Min Guarantee Weight
+                  </div>
+                  <div className="text-amber-800 font-semibold">
+                    {selectedRecord.min_guarantee_weight || "-"}
+                  </div>
+                </Col>
+              </Row>
+            </Card>
+          )}
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="lorry_receipt_no"
+                label="Lorry Receipt No"
+                rules={[
+                  {
+                    required: true,
+                    message: "Please input Lorry Receipt Number!",
+                  },
+                ]}
+              >
+                <Input placeholder="Enter Lorry Receipt Number" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="lorry_receipt_date"
+                label="Lorry Receipt Date"
+                rules={[
+                  {
+                    required: true,
+                    message: "Please select Lorry Receipt Date!",
+                  },
+                ]}
+              >
+                <DatePicker className="w-full" format="YYYY-MM-DD" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="gross_weight_loaded"
+                label="Gross Weight Loaded (Ton)"
+                rules={[
+                  { required: true, message: "Please input loaded weight!" },
+                ]}
+              >
+                <InputNumber
+                  className="w-full"
+                  min={0}
+                  precision={3}
+                  placeholder="Loaded Weight"
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="freight_rate_placed"
+                label="Freight Rate Placed (₹)"
+                rules={[
+                  {
+                    required: true,
+                    message: "Please input placed freight rate!",
+                  },
+                ]}
+              >
+                <InputNumber
+                  className="w-full"
+                  min={0}
+                  precision={2}
+                  placeholder="Agreed freight rate"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {modalMode === "edit" && (
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  name="advance_paid_amount"
+                  label="Advance Paid Amount (₹)"
+                >
+                  <InputNumber
+                    className="w-full"
+                    min={0}
+                    precision={2}
+                    placeholder="Advance Amount"
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="transport_commission"
+                  label="Transport Commission (₹)"
+                >
+                  <InputNumber
+                    className="w-full"
+                    min={0}
+                    precision={2}
+                    placeholder="Transport Commission"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
+
+          <Card
+            size="small"
+            title="Shortage & Deductions"
+            className="mb-4 border-rose-200 bg-rose-50/5"
+          >
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="claim_shortage" label="Claim Shortage (₹)">
+                  <InputNumber
+                    className="w-full"
+                    min={0}
+                    precision={2}
+                    placeholder="Deduction amount"
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="claim_shortage_notes"
+                  label="Claim Shortage Notes"
+                >
+                  <Input placeholder="Reason for deduction" />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+
+          <Card
+            size="small"
+            title="Other Charges"
+            className="mb-4 border-amber-200 bg-amber-50/5"
+          >
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="other_charges" label="Other Charges (₹)">
+                  <InputNumber
+                    className="w-full"
+                    min={0}
+                    precision={2}
+                    placeholder="Other charges"
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="other_charges_notes"
+                  label="Other Charges Notes"
+                >
+                  <Input placeholder="Notes for other charges" />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+
+          {modalMode === "edit" && (
+            <Row gutter={16}>
+              <Col span={24}>
+                <Form.Item name="balance_paid" label="Balance Paid (₹)">
+                  <InputNumber
+                    className="w-full"
+                    min={0}
+                    precision={2}
+                    placeholder="Balance paid amount"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
+
+          <div className="flex justify-end gap-2 mt-4">
+            <Button onClick={handleCloseModal}>Cancel</Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={submitting}
+              className="!bg-amber-500 !hover:bg-amber-600 !border-none"
+            >
+              {modalMode === "add"
+                ? "Save Freight Details"
+                : "Update Freight Details"}
             </Button>
           </div>
-        </Form>
-      </Modal>
-
-      {/* View Modal */}
-      <Modal
-        title={
-          <span className="text-amber-700 text-2xl font-semibold">
-            View Loading Advice
-          </span>
-        }
-        open={isViewModalOpen}
-        onCancel={() => setIsViewModalOpen(false)}
-        footer={null}
-        width={1200}
-      >
-        <Form layout="vertical" form={viewForm}>
-          {renderFormFields(true, viewForm)}
         </Form>
       </Modal>
     </div>

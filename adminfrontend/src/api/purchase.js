@@ -505,3 +505,27 @@ export const updateVehiclePlacement = async (id, formData) => {
   });
   return res.data;
 };
+
+export const getFreightDetails = async () => {
+  const { currentOrgId, selectedFY } = useSessionStore.getState();
+  const res = await api.get("/transport/freight-details/", {
+    params: { organisation: currentOrgId, financial_year: selectedFY },
+  });
+  return res.data;
+};
+
+export const createFreightDetails = async (payload) => {
+  const { currentOrgId, selectedFY } = useSessionStore.getState();
+  const res = await api.post("/transport/freight-details/", payload, {
+    params: { organisation: currentOrgId, financial_year: selectedFY },
+  });
+  return res.data;
+};
+
+export const updateFreightDetails = async (id, payload) => {
+  const { currentOrgId, selectedFY } = useSessionStore.getState();
+  const res = await api.patch(`/transport/freight-details/${id}/`, payload, {
+    params: { organisation: currentOrgId, financial_year: selectedFY },
+  });
+  return res.data;
+};
