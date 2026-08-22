@@ -204,13 +204,13 @@ export default function LoadingAdvice() {
         payload.transport_commission = values.transport_commission
           ? Number(values.transport_commission)
           : null;
-        payload.balance_paid = values.balance_paid ? Number(values.balance_paid) : null;
+        payload.balance_paid = values.balance_paid
+          ? Number(values.balance_paid)
+          : null;
       }
 
       if (modalMode === "add") {
-        payload.purchase_order = selectedRecord.purchase_order;
-        payload.sale_contract = selectedRecord.sale_contract;
-        await createFreightDetails(payload);
+        await updateFreightDetails(selectedRecord.id, payload);
         message.success("Freight details added successfully");
       } else {
         await updateFreightDetails(selectedRecord.id, payload);
@@ -349,7 +349,7 @@ export default function LoadingAdvice() {
     {
       title: <span className="text-amber-700 font-semibold">Place</span>,
       dataIndex: "place",
-      width: 90,
+      width: 95,
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
     {
@@ -359,7 +359,7 @@ export default function LoadingAdvice() {
         </span>
       ),
       dataIndex: "freight_rate_agreed",
-      width: 100,
+      width: 90,
       render: (t) => (
         <span className="text-amber-800">
           ₹
@@ -376,7 +376,7 @@ export default function LoadingAdvice() {
         </span>
       ),
       dataIndex: "freight_rate_placed",
-      width: 100,
+      width: 90,
       render: (t) => (
         <span className="text-amber-800">
           ₹
@@ -391,7 +391,7 @@ export default function LoadingAdvice() {
         <span className="text-amber-700 font-semibold">Freight Amount</span>
       ),
       dataIndex: "freight_amount",
-      width: 100,
+      width: 90,
       render: (t) => (
         <span className="text-amber-800 font-semibold">
           ₹
@@ -408,7 +408,7 @@ export default function LoadingAdvice() {
         </span>
       ),
       dataIndex: "advance_paid_amount",
-      width: 100,
+      width: 90,
       render: (t) => (
         <span className="text-amber-800">
           ₹
@@ -423,7 +423,7 @@ export default function LoadingAdvice() {
         <span className="text-amber-700 font-semibold">Claim / Shortage</span>
       ),
       dataIndex: "claim_shortage",
-      width: 100,
+      width: 80,
       render: (t, r) => (
         <Tooltip
           title={r.claim_shortage_notes || r.claim_shortage_note || "No notes"}
@@ -444,7 +444,7 @@ export default function LoadingAdvice() {
         <span className="text-amber-700 font-semibold">Other Charges</span>
       ),
       dataIndex: "other_charges",
-      width: 100,
+      width: 80,
       render: (t, r) => (
         <Tooltip
           title={r.other_charges_notes || r.other_charges_note || "No notes"}
@@ -465,7 +465,7 @@ export default function LoadingAdvice() {
         <span className="text-amber-700 font-semibold">Balance Payable</span>
       ),
       dataIndex: "balance_payable",
-      width: 100,
+      width: 90,
       render: (t) => (
         <span className="text-amber-800 font-semibold">
           ₹
@@ -478,7 +478,7 @@ export default function LoadingAdvice() {
     {
       title: <span className="text-amber-700 font-semibold">Balance Paid</span>,
       dataIndex: "balance_paid",
-      width: 100,
+      width: 80,
       render: (t) => (
         <span className="text-amber-800">
           ₹
@@ -495,7 +495,7 @@ export default function LoadingAdvice() {
         </span>
       ),
       dataIndex: "transport_commission",
-      width: 100,
+      width: 90,
       render: (t) => (
         <span className="text-amber-800 font-semibold">
           ₹
@@ -515,8 +515,6 @@ export default function LoadingAdvice() {
         return (
           <Button
             type="primary"
-            size="small"
-            icon={<EditOutlined />}
             onClick={() => {
               if (hasLorryReceipt) {
                 handleOpenEditModal(record);
@@ -526,8 +524,8 @@ export default function LoadingAdvice() {
             }}
             className={
               hasLorryReceipt
-                ? "!bg-amber-500 !hover:bg-amber-600 !border-none text-xs"
-                : "!bg-emerald-600 !hover:bg-emerald-700 !border-none text-xs"
+                ? "!h-6 !px-2 !py-0 !text-[10px] !bg-amber-500 !hover:bg-amber-600 !border-none"
+                : "!h-6 !px-2 !py-0 !text-[10px] !bg-emerald-600 !hover:bg-emerald-700 !border-none"
             }
           >
             {hasLorryReceipt ? "Edit" : "Add Freight"}
@@ -583,7 +581,7 @@ export default function LoadingAdvice() {
           dataSource={filteredData}
           loading={loading}
           pagination={false}
-          scroll={{ y: "calc(100vh - 250px)", x: 2000 }}
+          scroll={{ y: "calc(100vh - 250px)", x: 1650 }}
           rowKey="id"
           size="small"
           className="[&_.ant-table-cell]:!px-1 [&_.ant-table-cell]:!py-1 [&_.ant-table-thead_th]:!py-1.5"
@@ -690,7 +688,7 @@ export default function LoadingAdvice() {
                   },
                 ]}
               >
-                <DatePicker className="w-full" format="YYYY-MM-DD" />
+                <DatePicker className="w-full" format="DD-MM-YYYY" />
               </Form.Item>
             </Col>
           </Row>
@@ -732,37 +730,6 @@ export default function LoadingAdvice() {
               </Form.Item>
             </Col>
           </Row>
-
-          {modalMode === "edit" && (
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  name="advance_paid_amount"
-                  label="Advance Paid Amount (₹)"
-                >
-                  <InputNumber
-                    className="w-full"
-                    min={0}
-                    precision={2}
-                    placeholder="Advance Amount"
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  name="transport_commission"
-                  label="Transport Commission (₹)"
-                >
-                  <InputNumber
-                    className="w-full"
-                    min={0}
-                    precision={2}
-                    placeholder="Transport Commission"
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-          )}
 
           <Card
             size="small"
@@ -817,21 +784,6 @@ export default function LoadingAdvice() {
               </Col>
             </Row>
           </Card>
-
-          {modalMode === "edit" && (
-            <Row gutter={16}>
-              <Col span={24}>
-                <Form.Item name="balance_paid" label="Balance Paid (₹)">
-                  <InputNumber
-                    className="w-full"
-                    min={0}
-                    precision={2}
-                    placeholder="Balance paid amount"
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-          )}
 
           <div className="flex justify-end gap-2 mt-4">
             <Button onClick={handleCloseModal}>Cancel</Button>
