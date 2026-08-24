@@ -1446,7 +1446,9 @@ export default function VehiclePlacements() {
       render: (t) => {
         const drv = drivers.find((x) => x.id === t);
         return (
-          <span className="text-amber-800">{drv ? drv.driver_name : "-"}</span>
+          <span className={drv ? "text-amber-800" : "text-red-500 font-semibold"}>
+            {drv ? drv.driver_name : "Pending"}
+          </span>
         );
       },
     },
@@ -1456,7 +1458,11 @@ export default function VehiclePlacements() {
       ),
       dataIndex: "passing_weight",
       width: 80,
-      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+      render: (t) => (
+        <span className={t ? "text-amber-800" : "text-red-500 font-semibold"}>
+          {t || "Pending"}
+        </span>
+      ),
     },
     {
       title: (
@@ -1465,7 +1471,9 @@ export default function VehiclePlacements() {
       dataIndex: "min_guarantee_weight",
       width: 110,
       render: (t) => (
-        <span className="text-amber-800 font-medium">{t || "-"}</span>
+        <span className={t ? "text-amber-800 font-medium" : "text-red-500 font-semibold"}>
+          {t || "Pending"}
+        </span>
       ),
     },
     {
@@ -1477,7 +1485,7 @@ export default function VehiclePlacements() {
         if (record.photo_2) docs.push({ name: "Doc 2", url: record.photo_2 });
         if (record.photo_3) docs.push({ name: "Doc 3", url: record.photo_3 });
         if (record.photo_4) docs.push({ name: "Doc 4", url: record.photo_4 });
-        if (docs.length === 0) return <span className="text-gray-400">-</span>;
+        if (docs.length === 0) return <span className="text-red-500 font-semibold">Pending</span>;
         return (
           <Space size="small">
             {docs.map((d, idx) => (
@@ -1512,16 +1520,18 @@ export default function VehiclePlacements() {
             >
               Edit
             </Button>
-            <Button
-              danger
-              size="small"
-              icon={<SafetyOutlined />}
-              onClick={() => handleReleaseContract(record)}
-              disabled={isReleased}
-              className="text-xs"
-            >
-              {isReleased ? "Released" : "Release"}
-            </Button>
+            {!record.vehicle && (
+              <Button
+                danger
+                size="small"
+                icon={<SafetyOutlined />}
+                onClick={() => handleReleaseContract(record)}
+                disabled={isReleased}
+                className="text-xs"
+              >
+                {isReleased ? "Released" : "Release"}
+              </Button>
+            )}
           </div>
         );
       },
