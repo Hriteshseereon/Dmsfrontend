@@ -111,6 +111,8 @@ export default function VehiclePlacements() {
 
   // Released contract IDs
   const [releasedContractIds, setReleasedContractIds] = useState(new Set());
+  // Cancelled placement IDs (frontend only)
+  const [cancelledRecordIds, setCancelledRecordIds] = useState(new Set());
 
   // Bulk Selection and Contract View States
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
@@ -1508,6 +1510,7 @@ export default function VehiclePlacements() {
       width: 150,
       render: (_, record) => {
         const isReleased = releasedContractIds.has(record.id);
+        const isCancelled = cancelledRecordIds.has(record.id);
         return (
           <div className="flex gap-2">
             <Button
@@ -1520,7 +1523,7 @@ export default function VehiclePlacements() {
             >
               Edit
             </Button>
-            {!record.vehicle && (
+            {(!record.vehicle || isCancelled || isReleased) ? (
               <Button
                 danger
                 size="small"
@@ -1530,6 +1533,21 @@ export default function VehiclePlacements() {
                 className="text-xs"
               >
                 {isReleased ? "Released" : "Release"}
+              </Button>
+            ) : (
+              <Button
+                danger
+                size="small"
+                onClick={() => {
+                  setCancelledRecordIds((prev) => {
+                    const next = new Set(prev);
+                    next.add(record.id);
+                    return next;
+                  });
+                }}
+                className="text-xs"
+              >
+                Cancel
               </Button>
             )}
           </div>
