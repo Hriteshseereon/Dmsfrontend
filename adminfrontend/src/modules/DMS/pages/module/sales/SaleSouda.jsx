@@ -1631,11 +1631,21 @@ export default function SalesSouda() {
       console.log("Sales contract created successfully:", row);
     } catch (error) {
       console.error("Failed to create sales contract", error);
+
       // 🔍 Log: error response
       console.error("Error response:", error.response?.data);
-      alert(
-        error?.response?.data?.message || "Failed to create Sales Contract",
-      );
+      const errorData = error?.response?.data;
+      let errorMessage = "Failed to create Sales Contract";
+      if (errorData?.created_date) {
+        errorMessage = Array.isArray(errorData.created_date)
+          ? errorData.created_date[0]
+          : errorData.created_date;
+      } else if (errorData?.message) {
+        errorMessage = errorData.message;
+      } else if (errorData?.error) {
+        errorMessage = errorData.error;
+      }
+      alert(errorMessage);
     }
   };
 

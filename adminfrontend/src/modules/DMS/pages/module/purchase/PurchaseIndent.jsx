@@ -1847,6 +1847,12 @@ export default function PurchaseIndent() {
                       placeholder="Select Item"
                       showSearch
                       optionFilterProp="children"
+                      filterOption={(input, option) =>
+                        (option?.children ?? "")
+                          .toLowerCase()
+                          .includes(input.toLowerCase())
+                      }
+                      autoClearSearchValue={false}
                       open={openItemIndex === field.name}
                       onFocus={() => setOpenItemIndex?.(field.name)}
                       onDropdownVisibleChange={(visible) => {
@@ -3223,8 +3229,8 @@ export default function PurchaseIndent() {
           >
             <ItemsTable
               form={contractForm}
-              allowRemove={false}
-              allowAdd={false}
+              allowRemove={!isContractReadOnly}
+              allowAdd={!isContractReadOnly}
               productList={vendorProductsMap[selectedPlantId] || []}
               openItemIndex={editItemDropdownIndex}
               setOpenItemIndex={setEditItemDropdownIndex}
