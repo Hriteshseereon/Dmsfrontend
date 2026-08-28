@@ -32,6 +32,7 @@ import {
   getStateOptions,
   getDistrictOptions,
   getCityOptions,
+  getStateIsoByName,
 } from "../../../../../../utils/locationHelper";
 
 export default function FreightMaster() {
@@ -50,17 +51,20 @@ export default function FreightMaster() {
 
   // Cascading location states
   const [selCountryIso, setSelCountryIso] = useState("IN");
-  const [selState, setSelState] = useState("Odisha");
-  const [selDispatchDistrict, setSelDispatchDistrict] = useState(null);
+  const [selState, setSelState] = useState("West Bengal");
+  const [selDeliveryState, setSelDeliveryState] = useState("Odisha");
+  const [selDispatchDistrict, setSelDispatchDistrict] = useState("Purba Medinipur");
   const [selDeliveryDistrict, setSelDeliveryDistrict] = useState(null);
 
   const handleCountryChange = (isoCode) => {
     setSelCountryIso(isoCode);
     setSelState(null);
+    setSelDeliveryState(null);
     setSelDispatchDistrict(null);
     setSelDeliveryDistrict(null);
     addForm.setFieldsValue({
       state: undefined,
+      delivery_state: undefined,
       dispatch_district: undefined,
       dispatch_from: undefined,
       delivery_district: undefined,
@@ -71,11 +75,17 @@ export default function FreightMaster() {
   const handleStateChange = (isoCode, option) => {
     setSelState(option.label);
     setSelDispatchDistrict(null);
-    setSelDeliveryDistrict(null);
     addForm.setFieldsValue({
       dispatch_district: undefined,
       dispatch_from: undefined,
-      delivery_district: undefined,
+    });
+  };
+
+  const handleDeliveryStateChange = (isoCode, option) => {
+    setSelDeliveryState(option.label);
+    setSelDeliveryDistrict(null);
+    addForm.setFieldsValue({
+      district: undefined,
       city: undefined,
     });
   };
@@ -122,9 +132,19 @@ export default function FreightMaster() {
       message.success("Freight rate added successfully");
       setAddOpen(false);
       addForm.resetFields();
+      const stateIso = getStateIsoByName("IN", "West Bengal") || "WB";
+      const deliveryStateIso = getStateIsoByName("IN", "Odisha") || "OD";
+      addForm.setFieldsValue({
+        country: "IN",
+        state: stateIso,
+        dispatch_district: "Purba Medinipur",
+        dispatch_from: "Haldia",
+        delivery_state: deliveryStateIso,
+      });
       setSelCountryIso("IN");
-      setSelState("Odisha");
-      setSelDispatchDistrict(null);
+      setSelState("West Bengal");
+      setSelDeliveryState("Odisha");
+      setSelDispatchDistrict("Purba Medinipur");
       setSelDeliveryDistrict(null);
       fetchFreightRates();
     } catch (err) {
@@ -273,15 +293,21 @@ export default function FreightMaster() {
           icon={<PlusOutlined />}
           onClick={() => {
             setAddOpen(true);
+            const stateIso = getStateIsoByName("IN", "West Bengal") || "WB";
+            const deliveryStateIso = getStateIsoByName("IN", "Odisha") || "OD";
 
             addForm.setFieldsValue({
               country: "IN",
-              state: "Odisha",
+              state: stateIso,
+              dispatch_district: "Purba Medinipur",
+              dispatch_from: "Haldia",
+              delivery_state: deliveryStateIso,
             });
 
             setSelCountryIso("IN");
-            setSelState("Odisha");
-            setSelDispatchDistrict(null);
+            setSelState("West Bengal");
+            setSelDeliveryState("Odisha");
+            setSelDispatchDistrict("Purba Medinipur");
             setSelDeliveryDistrict(null);
           }}
           className="bg-amber-500! hover:bg-amber-600! border-none!"
@@ -314,9 +340,19 @@ export default function FreightMaster() {
         onCancel={() => {
           setAddOpen(false);
           addForm.resetFields();
+          const stateIso = getStateIsoByName("IN", "West Bengal") || "WB";
+          const deliveryStateIso = getStateIsoByName("IN", "Odisha") || "OD";
+          addForm.setFieldsValue({
+            country: "IN",
+            state: stateIso,
+            dispatch_district: "Purba Medinipur",
+            dispatch_from: "Haldia",
+            delivery_state: deliveryStateIso,
+          });
           setSelCountryIso("IN");
-          setSelState("Odisha");
-          setSelDispatchDistrict(null);
+          setSelState("West Bengal");
+          setSelDeliveryState("Odisha");
+          setSelDispatchDistrict("Purba Medinipur");
           setSelDeliveryDistrict(null);
         }}
         footer={null}
@@ -394,6 +430,24 @@ export default function FreightMaster() {
             </Form.Item>
 
             <Form.Item
+              name="delivery_state"
+              label="Delivery State"
+              rules={[{ required: true, message: "Please select delivery state" }]}
+              className="!mb-3"
+            >
+              <Select
+                placeholder={
+                  selCountryIso ? "Select delivery state" : "Select country first"
+                }
+                showSearch
+                optionFilterProp="label"
+                disabled={!selCountryIso}
+                options={getStateOptions(selCountryIso)}
+                onChange={handleDeliveryStateChange}
+              />
+            </Form.Item>
+
+            <Form.Item
               name="district"
               label="Delivery District"
               rules={[{ required: true, message: "Please select delivery district" }]}
@@ -401,12 +455,12 @@ export default function FreightMaster() {
             >
               <Select
                 placeholder={
-                  selState ? "Select delivery district" : "Select state first"
+                  selDeliveryState ? "Select delivery district" : "Select delivery state first"
                 }
                 showSearch
                 optionFilterProp="label"
-                disabled={!selState}
-                options={getDistrictOptions(selState)}
+                disabled={!selDeliveryState}
+                options={getDistrictOptions(selDeliveryState)}
                 onChange={handleDeliveryDistrictChange}
               />
             </Form.Item>
@@ -423,7 +477,7 @@ export default function FreightMaster() {
                 showSearch
                 optionFilterProp="label"
                 disabled={!selDeliveryDistrict}
-                options={getCityOptions(selState, selDeliveryDistrict)}
+                options={getCityOptions(selDeliveryState, selDeliveryDistrict)}
               />
             </Form.Item>
             <Form.Item
@@ -446,9 +500,19 @@ export default function FreightMaster() {
               onClick={() => {
                 setAddOpen(false);
                 addForm.resetFields();
+                const stateIso = getStateIsoByName("IN", "West Bengal") || "WB";
+                const deliveryStateIso = getStateIsoByName("IN", "Odisha") || "OD";
+                addForm.setFieldsValue({
+                  country: "IN",
+                  state: stateIso,
+                  dispatch_district: "Purba Medinipur",
+                  dispatch_from: "Haldia",
+                  delivery_state: deliveryStateIso,
+                });
                 setSelCountryIso("IN");
-                setSelState("Odisha");
-                setSelDispatchDistrict(null);
+                setSelState("West Bengal");
+                setSelDeliveryState("Odisha");
+                setSelDispatchDistrict("Purba Medinipur");
                 setSelDeliveryDistrict(null);
               }}
             >
