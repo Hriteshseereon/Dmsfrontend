@@ -790,11 +790,13 @@ export default function LoadingAdvice() {
                       type="number"
                       controls={false}
                       maxLength={5}
-                      onFocus={(e) => e.target.select()}
+                      onFocus={(e) => e?.target?.select?.()}
                       onInput={(e) => {
-                        e.target.value = e.target.value
-                          .replace(/\D/g, "")
-                          .slice(0, 5);
+                        if (e?.target) {
+                          e.target.value = e.target.value
+                            .replace(/\D/g, "")
+                            .slice(0, 5);
+                        }
                       }}
                       onChange={(value) => {
                         recalculateRow(field.name, undefined, { qty: value });
@@ -820,9 +822,11 @@ export default function LoadingAdvice() {
                       controls={false}
                       maxLength={5}
                       onInput={(e) => {
-                        e.target.value = e.target.value
-                          .replace(/\D/g, "")
-                          .slice(0, 5);
+                        if (e?.target) {
+                          e.target.value = e.target.value
+                            .replace(/\D/g, "")
+                            .slice(0, 5);
+                        }
                       }}
                       onChange={(value) => {
                         recalculateRow(field.name, undefined, {
