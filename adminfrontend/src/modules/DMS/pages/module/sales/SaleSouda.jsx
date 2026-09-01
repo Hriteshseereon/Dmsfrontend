@@ -1699,11 +1699,30 @@ export default function SalesSouda() {
             gst_percentage: Number(it.gstPercent || 0),
           };
         });
+      const selectedCustomer = customers.find(
+        (c) => c.customer_id === values.customerId,
+      );
+
       const payload = {
-        customer_id: selectedRecord.customerId, // Use ID from record
-        customer_email: values.customerEmail,
-        customer_mobile: values.customerMobile || 123456789,
-        location: values.customerAddress || null, // ✅
+        customer_id: values.customerId || selectedRecord.customerId, // Use newly selected customer ID from form values
+        customer_email:
+          values.customerEmail ||
+          selectedCustomer?.email_address ||
+          selectedCustomer?.email ||
+          selectedRecord?.customerEmail ||
+          "",
+        customer_mobile:
+          values.customerMobile ||
+          selectedCustomer?.mobile_number ||
+          selectedCustomer?.phone_number ||
+          selectedCustomer?.whatsapp_number ||
+          selectedRecord?.customerMobile ||
+          123456789,
+        location:
+          values.customerAddress ||
+          selectedCustomer?.city ||
+          selectedRecord?.customerAddress ||
+          null, // ✅
         plant_id: values.plantId || null, // ✅
 
         broker_id:
@@ -1762,15 +1781,30 @@ export default function SalesSouda() {
                 ...mapApiRecordToForm(res || {}), // reuse mapper if possible or manually map
                 key: d.key,
                 // Manually update core fields if mapper return structure differs slightly for table
-                saleContractNumber: res.sale_contract_number,
-                customer: res.customer_name,
-                location: res.location, // 👈 add karo
-                brokerName: res.broker_name || "Direct",
-                startDate: res.from_date,
-                endDate: res.to_date,
-                status: res.status,
-                grandTotal: res.grand_total,
-                items: res.items,
+                saleContractNumber:
+                  res.sale_contract_number || d.saleContractNumber,
+                customer:
+                  res.customer_business_name ||
+                  res.customer_name ||
+                  selectedCustomer?.business_name ||
+                  d.customer,
+                customerEmail:
+                  res.customer_email ||
+                  selectedCustomer?.email_address ||
+                  selectedCustomer?.email ||
+                  d.customerEmail,
+                customerMobile:
+                  res.customer_mobile ||
+                  selectedCustomer?.mobile_number ||
+                  selectedCustomer?.phone_number ||
+                  d.customerMobile,
+                location: res.location || d.location, // 👈 add karo
+                brokerName: res.broker_name || d.brokerName || "Direct",
+                startDate: res.from_date || d.startDate,
+                endDate: res.to_date || d.endDate,
+                status: res.status || d.status,
+                grandTotal: res.grand_total || d.grandTotal,
+                items: res.items || d.items,
               }
             : d,
         ),
@@ -1780,6 +1814,7 @@ export default function SalesSouda() {
       editForm.resetFields();
       setSelectedRecord(null);
       alert("Contract updated successfully"); // Optional
+      fetchSalesContracts();
     } catch (err) {
       console.error("Failed to update contract", err);
       alert(err?.response?.data?.message || "Failed to update Sales Contract");
@@ -2484,10 +2519,18 @@ export default function SalesSouda() {
                       );
                       if (selectedCustomer) {
                         editForm.setFieldsValue({
-                          // 👈 sahi form
                           customerAddress: [selectedCustomer.city]
                             .filter(Boolean)
                             .join(", "),
+                          customerMobile:
+                            selectedCustomer.mobile_number ||
+                            selectedCustomer.phone_number ||
+                            selectedCustomer.whatsapp_number ||
+                            "",
+                          customerEmail:
+                            selectedCustomer.email_address ||
+                            selectedCustomer.email ||
+                            "",
                         });
                       }
                     }}
