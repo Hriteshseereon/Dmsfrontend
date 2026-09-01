@@ -529,3 +529,72 @@ export const updateFreightDetails = async (id, payload) => {
   });
   return res.data;
 };
+
+// Purchase Entry Workflow endpoints
+export const getInvoiceSuppliers = async () => {
+  const res = await api.get("/purchase/invoices/suppliers/");
+  return res.data;
+};
+
+export const getAvailableVehicles = async (vehicleNo = "") => {
+  const res = await api.get("/purchase/invoices/available-vehicles/", {
+    params: vehicleNo ? { vehicle_no: vehicleNo } : {},
+  });
+  return res.data;
+};
+
+export const getSoudaRates = async (vendorId, itemName) => {
+  const res = await api.get("/purchase/invoices/souda-rates/", {
+    params: { vendor: vendorId, item_name: itemName },
+  });
+  return res.data;
+};
+
+export const getFreightLocations = async (place) => {
+  const res = await api.get("/purchase/invoices/freight-locations/", {
+    params: { place },
+  });
+  return res.data;
+};
+
+export const getPurchaseInvoices = async (filters = {}) => {
+  const res = await api.get("/purchase/invoices/", {
+    params: { ...filters },
+  });
+  return res.data;
+};
+
+export const createPurchaseInvoice = async (payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  
+  const hasFile =
+    payload.invoice_copy instanceof File ||
+    (payload.invoice_copy &&
+      typeof payload.invoice_copy === "object" &&
+      payload.invoice_copy.originFileObj);
+      
+  let dataToPost = payload;
+  let headers = {};
+  
+  if (hasFile) {
+    const formData = new FormData();
+    Object.keys(payload).forEach((key) => {
+      if (key === "items") {
+        formData.append(key, JSON.stringify(payload[key]));
+      } else if (key === "invoice_copy") {
+        const fileObj = payload[key].originFileObj || payload[key];
+        formData.append(key, fileObj);
+      } else {
+        formData.append(key, payload[key]);
+      }
+    });
+    dataToPost = formData;
+    headers["Content-Type"] = "multipart/form-data";
+  }
+  
+  const res = await api.post("/purchase/invoices/", dataToPost, {
+    params: { organisation: currentOrgId },
+    headers,
+  });
+  return res.data;
+};
