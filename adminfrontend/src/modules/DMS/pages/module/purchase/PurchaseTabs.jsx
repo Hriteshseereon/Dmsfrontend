@@ -44,13 +44,13 @@ export const PURCHASE_TAB_DEFINITIONS = [
   },
   {
     id: "invoice",
-    label: "Purchase Invoice",
+    label: "Purchase Invoice Entry",
     path: "invoice",
     Icon: FaFileInvoice,
   },
   {
     id: "return",
-    label: "Return",
+    label: "purchase Intransit",
     path: "return",
     Icon: FaUndo,
   },
