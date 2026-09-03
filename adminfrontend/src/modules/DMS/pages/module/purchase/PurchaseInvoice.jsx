@@ -118,20 +118,17 @@ export default function VehiclePlacements() {
   // Cancelled placement IDs (frontend only)
   const [cancelledRecordIds, setCancelledRecordIds] = useState(new Set());
 
-  // Release error popup modal state
-  const [releaseErrorModal, setReleaseErrorModal] = useState({
+  // Extend Single Contract modal state on release
+  const [extendSingleModal, setExtendSingleModal] = useState({
     open: false,
-    title: "",
-    message: "",
-    details: "",
-    isExpired: false,
-    contracts: [],
-    poId: null,
+    contractId: null,
+    contractNumber: "",
+    customerName: "",
+    extendedUpto: null,
     record: null,
+    blockingContracts: [],
   });
-  const [bulkExtendDate, setBulkExtendDate] = useState(null);
   const [extendingLoading, setExtendingLoading] = useState(false);
-  const [contractExtendDateMap, setContractExtendDateMap] = useState({});
 
   // Bulk Selection and Contract View States
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
@@ -1271,7 +1268,6 @@ export default function VehiclePlacements() {
       return;
     }
 
-    let poDetail = null;
     try {
       message.loading({
         content: "Releasing contract...",
@@ -1280,7 +1276,7 @@ export default function VehiclePlacements() {
 
       // Fetch the full PO details to get its exact current list of sale contracts
       const poRes = await getPurchaseSalesContractOrderById(poId);
-      poDetail = poRes?.data || poRes;
+      const poDetail = poRes?.data || poRes;
 
       const allContracts = poDetail.sale_contracts || [];
       const allIds = allContracts.map((c) =>
@@ -1393,174 +1389,91 @@ export default function VehiclePlacements() {
 
       // Extract contract numbers mentioned in error (e.g. ['HA-26-0043', ...])
       const rawMatches = errorMsg.match(/['"]([A-Za-z0-9\-_/]+)['"]/g) || [];
-      const extractedNumbers = rawMatches.map((m) => m.replace(/['"]/g, "").trim());
+      const extractedNumbers = rawMatches.map((m) =>
+        m.replace(/['"]/g, "").trim(),
+      );
 
-      const poContracts = poDetail?.sale_contracts || [];
-      const expiredContracts = [];
-
-      poContracts.forEach((c) => {
-        const cNum = c.sale_contract_number || c.contract_number || c.souda_number || c.number;
-        const cId = c.sale_contract_id || c.contract_id || c.id;
-        if (extractedNumbers.length > 0) {
-          if (extractedNumbers.includes(cNum) || extractedNumbers.includes(cId)) {
-            expiredContracts.push({
-              id: cId,
-              contract_number: cNum || cId,
-              customer_name: c.customer_business_name || c.customer_name || record.customer_name || "",
-              to_date: c.to_date,
-              extended_upto: c.extended_upto,
-              status: c.status || "Pending",
-            });
-          }
-        } else {
-          expiredContracts.push({
-            id: cId,
-            contract_number: cNum || cId,
-            customer_name: c.customer_business_name || c.customer_name || record.customer_name || "",
-            to_date: c.to_date,
-            extended_upto: c.extended_upto,
-            status: c.status || "Pending",
-          });
-        }
-      });
-
-      // If any extracted numbers were not in poContracts, add them directly
-      extractedNumbers.forEach((num) => {
-        if (!expiredContracts.some((e) => e.contract_number === num || e.id === num)) {
-          expiredContracts.push({
-            id: num,
-            contract_number: num,
-            customer_name: record.customer_name || "",
-            to_date: null,
-            extended_upto: null,
-            status: "Expired",
-          });
-        }
-      });
-
-      if (expiredContracts.length === 0) {
-        expiredContracts.push({
-          id: contractId,
-          contract_number: record.sale_contract_number || record.sale_contract || contractId,
-          customer_name: record.customer_name || "",
-          to_date: record.to_date,
-          extended_upto: record.extended_upto,
-          status: "Pending Extension",
+      if (isContractExpiredOrUnapproved) {
+        setExtendSingleModal({
+          open: true,
+          contractId,
+          contractNumber:
+            record.sale_contract_number ||
+            record.sale_contract ||
+            contractId,
+          customerName:
+            record.customer_business_name || record.customer_name || "",
+          extendedUpto: dayjs().add(1, "month"),
+          record,
+          blockingContracts: extractedNumbers,
+        });
+      } else {
+        message.error({
+          content: errorMsg,
+          duration: 5,
         });
       }
-
-      setReleaseErrorModal({
-        open: true,
-        title: isContractExpiredOrUnapproved
-          ? "Contract Expired / Action Required"
-          : "Failed to Release Contract",
-        message: isContractExpiredOrUnapproved
-          ? "The following sale contract(s) on this Purchase Order are expired or unapproved. You can extend their validity below to proceed with the release."
-          : "Unable to release contract due to an error.",
-        details: errorMsg,
-        isExpired: isContractExpiredOrUnapproved,
-        contracts: expiredContracts,
-        poId,
-        record,
-      });
-
-      message.error({
-        content: isContractExpiredOrUnapproved
-          ? "Contract(s) expired. Please extend validity to release."
-          : errorMsg,
-        duration: 5,
-      });
     }
   };
 
-  const handleQuickExtendSingle = async (contractItem, newDate) => {
-    if (!newDate) {
-      message.warning("Please select an extended date.");
+  const handleExtendAndRelease = async () => {
+    if (!extendSingleModal.extendedUpto) {
+      message.warning("Please select a date to extend the contract.");
       return;
     }
     try {
       setExtendingLoading(true);
-      const formattedDate = dayjs(newDate).format("YYYY-MM-DD");
-      const cId = contractItem.id || contractItem.contract_number;
+      const formattedDate = dayjs(extendSingleModal.extendedUpto).format(
+        "YYYY-MM-DD",
+      );
 
-      await updateSalesContract(cId, {
+      message.loading({
+        content: `Extending contract ${extendSingleModal.contractNumber}...`,
+        key: "extend_release",
+      });
+
+      // 1. Extend this particular contract
+      await updateSalesContract(extendSingleModal.contractId, {
         extended_upto: formattedDate,
         status: "Approved",
       });
 
-      message.success(
-        `Contract ${contractItem.contract_number} extended successfully to ${formattedDate}!`,
-      );
-
-      // Update in modal state
-      setReleaseErrorModal((prev) => ({
-        ...prev,
-        contracts: (prev.contracts || []).map((c) =>
-          c.id === contractItem.id ||
-          c.contract_number === contractItem.contract_number
-            ? { ...c, extended_upto: formattedDate, isExtended: true }
-            : c,
-        ),
-      }));
-    } catch (err) {
-      console.error("Extend single error:", err);
-      message.error(
-        err?.response?.data?.message ||
-          err?.message ||
-          "Failed to extend contract",
-      );
-    } finally {
-      setExtendingLoading(false);
-    }
-  };
-
-  const handleBulkExtendAll = async (extendDate) => {
-    if (!extendDate) {
-      message.warning("Please select a date to extend to.");
-      return;
-    }
-    try {
-      setExtendingLoading(true);
-      const formattedDate = dayjs(extendDate).format("YYYY-MM-DD");
-      const contractsToExtend = releaseErrorModal.contracts || [];
-
-      message.loading({
-        content: `Extending ${contractsToExtend.length} contract(s)...`,
-        key: "bulk_extend",
-      });
-
-      let successCount = 0;
-      for (const c of contractsToExtend) {
-        const cId = c.id || c.contract_number;
-        try {
-          await updateSalesContract(cId, {
-            extended_upto: formattedDate,
-            status: "Approved",
-          });
-          successCount++;
-        } catch (e) {
-          console.error(`Failed to extend contract ${cId}`, e);
+      // 2. Also extend any other blocking contracts on this PO so PO update succeeds
+      if (extendSingleModal.blockingContracts?.length > 0) {
+        for (const num of extendSingleModal.blockingContracts) {
+          try {
+            await updateSalesContract(num, {
+              extended_upto: formattedDate,
+              status: "Approved",
+            });
+          } catch (e) {
+            console.error(`Failed to extend blocking contract ${num}`, e);
+          }
         }
       }
 
       message.success({
-        content: `${successCount} contract(s) extended successfully! Retrying release...`,
-        key: "bulk_extend",
+        content: `Contract ${extendSingleModal.contractNumber} extended successfully! Releasing...`,
+        key: "extend_release",
       });
 
-      setReleaseErrorModal((prev) => ({ ...prev, open: false }));
+      const rec = extendSingleModal.record;
+      setExtendSingleModal((prev) => ({ ...prev, open: false }));
 
-      // Automatically retry releasing the contract!
-      if (releaseErrorModal.record) {
+      // 3. Retry release
+      if (rec) {
         setTimeout(() => {
-          handleReleaseContract(releaseErrorModal.record);
-        }, 500);
+          handleReleaseContract(rec);
+        }, 400);
       }
     } catch (err) {
-      console.error("Bulk extend error:", err);
+      console.error("Extend and release error:", err);
       message.error({
-        content: "Failed to extend some contracts.",
-        key: "bulk_extend",
+        content:
+          err?.response?.data?.message ||
+          err?.message ||
+          "Failed to extend contract",
+        key: "extend_release",
       });
     } finally {
       setExtendingLoading(false);
@@ -2798,208 +2711,82 @@ export default function VehiclePlacements() {
         </Form>
       </Modal>
 
-      {/* Release Error / Expired Contract Alert & Quick Extension Modal */}
+      {/* Extend Particular Sale Contract Modal */}
       <Modal
-        open={releaseErrorModal.open}
+        open={extendSingleModal.open}
         onCancel={() =>
-          setReleaseErrorModal((prev) => ({ ...prev, open: false }))
+          setExtendSingleModal((prev) => ({ ...prev, open: false }))
         }
         footer={[
           <Button
-            key="close"
+            key="cancel"
             onClick={() =>
-              setReleaseErrorModal((prev) => ({ ...prev, open: false }))
+              setExtendSingleModal((prev) => ({ ...prev, open: false }))
             }
             className="border-gray-300!"
           >
-            Close
+            Cancel
           </Button>,
-          releaseErrorModal.isExpired && (
-            <Button
-              key="retry"
-              type="primary"
-              icon={<ReloadOutlined />}
-              className="bg-amber-500! hover:bg-amber-600! border-none! text-white! font-semibold"
-              onClick={() => {
-                setReleaseErrorModal((prev) => ({ ...prev, open: false }));
-                if (releaseErrorModal.record) {
-                  handleReleaseContract(releaseErrorModal.record);
-                }
-              }}
-            >
-              Retry Release
-            </Button>
-          ),
+          <Button
+            key="submit"
+            type="primary"
+            loading={extendingLoading}
+            className="bg-amber-500! hover:bg-amber-600! border-none! text-white! font-semibold"
+            onClick={handleExtendAndRelease}
+          >
+            Extend & Release
+          </Button>,
         ]}
-        width={780}
+        width={460}
         centered
         title={
           <div className="flex items-center gap-2">
-            <span
-              className={
-                releaseErrorModal.isExpired
-                  ? "text-amber-600 text-lg font-bold"
-                  : "text-red-600 text-lg font-bold"
-              }
-            >
-              {releaseErrorModal.title || "Contract Status Alert"}
+            <span className="text-amber-700 text-lg font-bold">
+              Extend Sale Contract
             </span>
+            <Tag color="blue" className="font-bold">
+              {extendSingleModal.contractNumber}
+            </Tag>
           </div>
         }
       >
-        <div className="py-2">
-          <p className="text-sm font-medium text-gray-700 mb-3">
-            {releaseErrorModal.message}
+        <div className="py-2 space-y-4">
+          <p className="text-xs text-gray-600">
+            This sale contract requires a validity date extension before it can be released.
           </p>
 
-          {releaseErrorModal.isExpired &&
-            releaseErrorModal.contracts?.length > 0 && (
-              <div className="space-y-4">
-                {/* Quick Bulk Extension Bar */}
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-amber-800 text-xs">
-                      Extend ALL contracts to:
-                    </span>
-                    <AppDatePicker
-                      style={{ width: 150 }}
-                      value={bulkExtendDate}
-                      onChange={(date) => setBulkExtendDate(date)}
-                      placeholder="Select Date"
-                    />
-                  </div>
-                  <Button
-                    type="primary"
-                    size="middle"
-                    loading={extendingLoading}
-                    disabled={!bulkExtendDate}
-                    className="bg-amber-500! hover:bg-amber-600! border-none! text-white! font-semibold"
-                    onClick={() => handleBulkExtendAll(bulkExtendDate)}
-                  >
-                    Extend All & Release Now
-                  </Button>
-                </div>
-
-                {/* Expired Contracts Table */}
-                <div className="border border-amber-200 rounded-lg overflow-hidden">
-                  <Table
-                    dataSource={releaseErrorModal.contracts}
-                    rowKey={(r) => r.id || r.contract_number}
-                    pagination={false}
-                    size="small"
-                    columns={[
-                      {
-                        title: "Contract No",
-                        dataIndex: "contract_number",
-                        render: (text) => (
-                          <Tag color="blue" className="font-bold">
-                            {text}
-                          </Tag>
-                        ),
-                      },
-                      {
-                        title: "Customer",
-                        dataIndex: "customer_name",
-                        render: (text) => (
-                          <span className="text-xs text-gray-700">
-                            {text || "-"}
-                          </span>
-                        ),
-                      },
-                      {
-                        title: "Current Validity",
-                        key: "validity",
-                        render: (_, r) => (
-                          <span className="text-xs text-gray-600">
-                            {r.extended_upto
-                              ? `Ext: ${fmtDate(r.extended_upto)}`
-                              : r.to_date
-                              ? fmtDate(r.to_date)
-                              : "-"}
-                          </span>
-                        ),
-                      },
-                      {
-                        title: "Status",
-                        key: "status",
-                        render: (_, r) =>
-                          r.isExtended ? (
-                            <Tag color="success">Extended</Tag>
-                          ) : (
-                            <Tag color="error">Expired</Tag>
-                          ),
-                      },
-                      {
-                        title: "Extend Date",
-                        key: "extend_action",
-                        width: 220,
-                        render: (_, r) => {
-                          const targetKey = r.id || r.contract_number;
-                          const dateVal = contractExtendDateMap[targetKey];
-                          return (
-                            <div className="flex items-center gap-1">
-                              <AppDatePicker
-                                size="small"
-                                style={{ width: 120 }}
-                                value={dateVal}
-                                onChange={(d) =>
-                                  setContractExtendDateMap((prev) => ({
-                                    ...prev,
-                                    [targetKey]: d,
-                                  }))
-                                }
-                                placeholder="New Date"
-                              />
-                              <Button
-                                size="small"
-                                type="primary"
-                                loading={extendingLoading}
-                                disabled={!dateVal}
-                                className="bg-amber-500! hover:bg-amber-600! border-none! text-white! text-xs"
-                                onClick={() =>
-                                  handleQuickExtendSingle(r, dateVal)
-                                }
-                              >
-                                Extend
-                              </Button>
-                            </div>
-                          );
-                        },
-                      },
-                      {
-                        title: "Edit",
-                        key: "edit",
-                        width: 70,
-                        render: (_, r) => (
-                          <Tooltip title="Open full contract editor">
-                            <Button
-                              size="small"
-                              icon={<EditOutlined />}
-                              className="border-amber-400! text-amber-700! hover:bg-amber-50!"
-                              onClick={() => {
-                                setReleaseErrorModal((prev) => ({
-                                  ...prev,
-                                  open: false,
-                                }));
-                                openEditSalesContract(
-                                  r.id || r.contract_number,
-                                );
-                              }}
-                            />
-                          </Tooltip>
-                        ),
-                      },
-                    ]}
-                  />
-                </div>
+          <div className="bg-amber-50/70 border border-amber-200 rounded p-3 text-xs space-y-1">
+            <div className="text-amber-900">
+              <span className="font-semibold text-gray-700">Contract No:</span>{" "}
+              <span className="font-bold">
+                {extendSingleModal.contractNumber}
+              </span>
+            </div>
+            {extendSingleModal.customerName && (
+              <div className="text-amber-900">
+                <span className="font-semibold text-gray-700">Customer:</span>{" "}
+                {extendSingleModal.customerName}
               </div>
             )}
+          </div>
 
-          {releaseErrorModal.details && (
-            <div className="mt-3 p-2 bg-gray-50 rounded border border-gray-200 text-xs text-gray-500 font-mono break-all">
-              {releaseErrorModal.details}
-            </div>
-          )}
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">
+              Extend Validity Upto <span className="text-red-500">*</span>
+            </label>
+            <AppDatePicker
+              className="w-full!"
+              style={{ width: "100%" }}
+              value={extendSingleModal.extendedUpto}
+              onChange={(date) =>
+                setExtendSingleModal((prev) => ({
+                  ...prev,
+                  extendedUpto: date,
+                }))
+              }
+              placeholder="Select extended date"
+            />
+          </div>
         </div>
       </Modal>
     </div>
