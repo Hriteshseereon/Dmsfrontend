@@ -27,6 +27,7 @@ import {
   SendOutlined,
   TruckOutlined,
   DeleteOutlined,
+  SafetyOutlined,
 } from "@ant-design/icons";
 
 import { exportToExcel } from "../../../../../utils/exportToExcel";
@@ -137,6 +138,92 @@ export default function PurchaseIndent() {
   const [vehicleCountInput, setVehicleCountInput] = useState(null);
   const [poVehicleCount, setPoVehicleCount] = useState(null);
   const [contractSerialNumbers, setContractSerialNumbers] = useState({});
+
+  // Release error popup modal state
+  const [releaseErrorModal, setReleaseErrorModal] = useState({
+    open: false,
+    title: "",
+    message: "",
+    details: "",
+    isExpired: false,
+  });
+
+  const extractContractErrorInfo = (err, defaultMsg = "Operation failed") => {
+    const errorData = err?.response?.data;
+    let errorMsg = "";
+    let isContractExpiredOrUnapproved = false;
+
+    if (errorData) {
+      if (typeof errorData === "string") {
+        errorMsg = errorData;
+      } else if (errorData.sale_contracts) {
+        if (
+          typeof errorData.sale_contracts === "object" &&
+          !Array.isArray(errorData.sale_contracts)
+        ) {
+          errorMsg =
+            errorData.sale_contracts.status ||
+            Object.values(errorData.sale_contracts)
+              .map((v) => (Array.isArray(v) ? v.join(", ") : String(v)))
+              .join(" | ");
+        } else if (Array.isArray(errorData.sale_contracts)) {
+          errorMsg = errorData.sale_contracts.join(", ");
+        } else if (typeof errorData.sale_contracts === "string") {
+          errorMsg = errorData.sale_contracts;
+        }
+      } else if (errorData.message) {
+        errorMsg =
+          typeof errorData.message === "object"
+            ? JSON.stringify(errorData.message)
+            : String(errorData.message);
+      } else if (errorData.detail) {
+        errorMsg =
+          typeof errorData.detail === "object"
+            ? JSON.stringify(errorData.detail)
+            : String(errorData.detail);
+      } else if (errorData.error) {
+        errorMsg =
+          typeof errorData.error === "object"
+            ? JSON.stringify(errorData.error)
+            : String(errorData.error);
+      } else if (errorData.non_field_errors) {
+        errorMsg = Array.isArray(errorData.non_field_errors)
+          ? errorData.non_field_errors.join(", ")
+          : String(errorData.non_field_errors);
+      } else if (typeof errorData === "object") {
+        const parts = [];
+        Object.entries(errorData).forEach(([k, v]) => {
+          if (typeof v === "object" && v !== null) {
+            Object.entries(v).forEach(([subK, subV]) => {
+              parts.push(
+                `${subK}: ${Array.isArray(subV) ? subV.join(", ") : subV}`,
+              );
+            });
+          } else {
+            parts.push(`${k}: ${Array.isArray(v) ? v.join(", ") : v}`);
+          }
+        });
+        errorMsg = parts.join(" | ");
+      }
+    }
+
+    if (!errorMsg) {
+      errorMsg = err?.message || defaultMsg;
+    }
+
+    const lowerMsg = errorMsg.toLowerCase();
+    if (
+      lowerMsg.includes("only approved sale contracts") ||
+      lowerMsg.includes("approved") ||
+      lowerMsg.includes("expired") ||
+      lowerMsg.includes("expire") ||
+      lowerMsg.includes("valid")
+    ) {
+      isContractExpiredOrUnapproved = true;
+    }
+
+    return { errorMsg, isContractExpiredOrUnapproved };
+  };
 
   const getVehicleSerialNumber = (contractId, detail) => {
     if (!detail) return null;
@@ -941,6 +1028,26 @@ export default function PurchaseIndent() {
           );
         },
       },
+      {
+        title: <span className="text-amber-700 font-semibold">Actions</span>,
+        width: 100,
+        render: (_, record) => {
+          const cId = record.id || record.key;
+          const isReleased = releasedContractIds.has(cId);
+          return (
+            <Button
+              danger
+              size="small"
+              icon={<SafetyOutlined />}
+              onClick={() => handleReleaseContract(cId)}
+              disabled={isReleased}
+              className="text-xs"
+            >
+              {isReleased ? "Released" : "Release"}
+            </Button>
+          );
+        },
+      },
     ];
   };
 
@@ -995,11 +1102,39 @@ export default function PurchaseIndent() {
       });
       fetchPurchaseOrder();
     } catch (err) {
-      console.error(err);
-      message.error({
-        content: "Failed to release contract",
-        key: "release_contract",
-      });
+      console.error("Release contract error:", err);
+      message.destroy("release_contract");
+
+      const { errorMsg, isContractExpiredOrUnapproved } = extractContractErrorInfo(
+        err,
+        "Failed to release contract",
+      );
+
+      if (isContractExpiredOrUnapproved) {
+        setReleaseErrorModal({
+          open: true,
+          title: "Contract Expired / Action Required",
+          message: "Your contract is expired, please extend it.",
+          details: errorMsg,
+          isExpired: true,
+        });
+        message.error({
+          content: "Your contract is expired, please extend it.",
+          duration: 5,
+        });
+      } else {
+        setReleaseErrorModal({
+          open: true,
+          title: "Failed to Release Contract",
+          message: "Unable to release contract due to an error.",
+          details: errorMsg,
+          isExpired: false,
+        });
+        message.error({
+          content: errorMsg,
+          duration: 5,
+        });
+      }
     }
   };
 
@@ -1041,11 +1176,39 @@ export default function PurchaseIndent() {
       setIsPoContractsModalOpen(false);
       fetchPurchaseOrder();
     } catch (err) {
-      console.error(err);
-      message.error({
-        content: "Failed to save vehicle placements",
-        key: "save_placement",
-      });
+      console.error("Save placement error:", err);
+      message.destroy("save_placement");
+
+      const { errorMsg, isContractExpiredOrUnapproved } = extractContractErrorInfo(
+        err,
+        "Failed to save vehicle placements",
+      );
+
+      if (isContractExpiredOrUnapproved) {
+        setReleaseErrorModal({
+          open: true,
+          title: "Contract Expired / Action Required",
+          message: "Your contract is expired, please extend it.",
+          details: errorMsg,
+          isExpired: true,
+        });
+        message.error({
+          content: "Your contract is expired, please extend it.",
+          duration: 5,
+        });
+      } else {
+        setReleaseErrorModal({
+          open: true,
+          title: "Failed to Save Placements",
+          message: "Unable to save vehicle placements due to an error.",
+          details: errorMsg,
+          isExpired: false,
+        });
+        message.error({
+          content: errorMsg,
+          duration: 5,
+        });
+      }
     }
   };
   const openEditModal = async (record) => {
@@ -1143,8 +1306,27 @@ export default function PurchaseIndent() {
       closeModal();
       fetchPurchaseOrder();
     } catch (err) {
-      console.error(err);
-      message.error("Something went wrong");
+      console.error("Purchase order submit error:", err);
+      const { errorMsg, isContractExpiredOrUnapproved } = extractContractErrorInfo(
+        err,
+        "Failed to submit purchase order",
+      );
+
+      if (isContractExpiredOrUnapproved) {
+        setReleaseErrorModal({
+          open: true,
+          title: "Contract Expired / Action Required",
+          message: "Your contract is expired, please extend it.",
+          details: errorMsg,
+          isExpired: true,
+        });
+        message.error({
+          content: "Your contract is expired, please extend it.",
+          duration: 5,
+        });
+      } else {
+        message.error(errorMsg);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -3534,6 +3716,52 @@ export default function PurchaseIndent() {
           >
             Save
           </Button>
+        </div>
+      </Modal>
+
+      {/* Release Error / Expired Contract Alert Modal */}
+      <Modal
+        open={releaseErrorModal.open}
+        onCancel={() =>
+          setReleaseErrorModal((prev) => ({ ...prev, open: false }))
+        }
+        footer={[
+          <Button
+            key="ok"
+            type="primary"
+            className={
+              releaseErrorModal.isExpired
+                ? "!bg-amber-500 !hover:bg-amber-600 !border-none text-white font-semibold px-6"
+                : "!bg-red-500 !hover:bg-red-600 !border-none text-white font-semibold px-6"
+            }
+            onClick={() =>
+              setReleaseErrorModal((prev) => ({ ...prev, open: false }))
+            }
+          >
+            OK
+          </Button>,
+        ]}
+        width={460}
+        centered
+        title={
+          <div className="flex items-center gap-2">
+            <span
+              className={
+                releaseErrorModal.isExpired
+                  ? "text-amber-600 text-lg font-bold"
+                  : "text-red-600 text-lg font-bold"
+              }
+            >
+              {releaseErrorModal.title || "Contract Status Alert"}
+            </span>
+          </div>
+        }
+      >
+        <div className="py-4">
+          <p className="text-base font-semibold text-gray-800">
+            {releaseErrorModal.message ||
+              "Your contract is expired, please extend it."}
+          </p>
         </div>
       </Modal>
     </div>

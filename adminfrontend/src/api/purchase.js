@@ -277,29 +277,15 @@ export const addPurchaseInvoice = async (payload) => {
   });
   return res.data;
 }
-//fetch Transport Assignments by id
+//fetch Purchase Invoice by id
 export const getPurchaseInvoiceById = async (invoiceId) => {
-  const { currentOrgId,selectedFY } = useSessionStore.getState();
+  const { currentOrgId, selectedFY } = useSessionStore.getState();
   const res = await api.get(`/purchase/invoices/${invoiceId}/`, {
     params: { organisation: currentOrgId, financial_year: selectedFY }
   });
   return res.data;
 };
-//update Transport Assignments
-export const updatePurchaseInvoice = async (invoiceId, payload) => {
-  const { currentOrgId,selectedFY } = useSessionStore.getState(); 
-  const res = await api.put(
-    `/purchase/invoices/${invoiceId}/`,
-    payload,
-    {
-      params: {
-        organisation: currentOrgId, 
-        financial_year: selectedFY,
-      },
-    }
-  );
-  return res.data;
-}
+
 
 //Assign dropdown
 export const getAllTransport = async () => {
@@ -597,4 +583,40 @@ export const createPurchaseInvoice = async (payload) => {
     headers,
   });
   return res.data;
-};
+};
+
+export const updatePurchaseInvoice = async (id, payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+
+  const hasFile =
+    payload.invoice_copy instanceof File ||
+    (payload.invoice_copy &&
+      typeof payload.invoice_copy === "object" &&
+      payload.invoice_copy.originFileObj);
+
+  let dataToPost = payload;
+  let headers = {};
+
+  if (hasFile) {
+    const formData = new FormData();
+    Object.keys(payload).forEach((key) => {
+      if (key === "items") {
+        formData.append(key, JSON.stringify(payload[key]));
+      } else if (key === "invoice_copy") {
+        const fileObj = payload[key].originFileObj || payload[key];
+        formData.append(key, fileObj);
+      } else if (payload[key] !== undefined && payload[key] !== null) {
+        formData.append(key, payload[key]);
+      }
+    });
+    dataToPost = formData;
+    headers["Content-Type"] = "multipart/form-data";
+  }
+
+  const res = await api.patch(`/purchase/invoices/${id}/`, dataToPost, {
+    params: { organisation: currentOrgId },
+    headers,
+  });
+  return res.data;
+};
+
