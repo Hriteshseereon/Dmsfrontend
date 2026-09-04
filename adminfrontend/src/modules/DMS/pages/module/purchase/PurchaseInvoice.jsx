@@ -1331,6 +1331,17 @@ export default function VehiclePlacements() {
       const poRes = await getPurchaseSalesContractOrderById(poId);
       const poDetail = poRes?.data || poRes;
 
+      const getContractId = (c) => {
+        if (!c) return null;
+        if (typeof c === "string") return c;
+        return c.contract_id || c.sale_contract_id || c.id || null;
+      };
+
+      const getContractNumber = (c) => {
+        if (!c || typeof c !== "object") return null;
+        return c.sale_contract_number || c.contract_number || c.saleContractNumber || null;
+      };
+
       const rawContracts =
         poDetail.sale_contracts && poDetail.sale_contracts.length > 0
           ? poDetail.sale_contracts
@@ -1339,23 +1350,12 @@ export default function VehiclePlacements() {
             poDetail.sale_contracts_details ||
             [];
 
-      if (rawContracts.length <= 1) {
-        message.warning(
-          "At least one sale contract is required. You cannot release the last contract of a purchase order.",
-        );
-        return;
-      }
-
-      // Filter out the target contract to release
+      // Filter out:
+      // 1. Current contract to release
+      // 2. Any contract already released previously
       const remainingContracts = rawContracts.filter((c) => {
-        const cId =
-          typeof c === "object"
-            ? c.contract_id || c.sale_contract_id || c.id
-            : c;
-        const cNumber =
-          typeof c === "object"
-            ? c.sale_contract_number || c.contract_number || c.saleContractNumber
-            : null;
+        const cId = getContractId(c);
+        const cNumber = getContractNumber(c);
 
         const isMatchById =
           targetContractId &&
@@ -1368,8 +1368,20 @@ export default function VehiclePlacements() {
           String(cNumber).toLowerCase() ===
             String(targetContractNumber).toLowerCase();
 
-        return !(isMatchById || isMatchByNumber);
+        const isAlreadyReleased =
+          cId &&
+          (releasedContractIds.has(cId) ||
+            releasedContractIds.has(String(cId).toLowerCase()));
+
+        return !(isMatchById || isMatchByNumber || isAlreadyReleased);
       });
+
+      if (rawContracts.length <= 1 || remainingContracts.length === 0) {
+        message.warning(
+          "At least one sale contract is required. You cannot release the last contract of a purchase order.",
+        );
+        return;
+      }
 
       if (remainingContracts.length === rawContracts.length) {
         message.warning("Contract not found in this purchase order.");
@@ -1378,10 +1390,7 @@ export default function VehiclePlacements() {
 
       // Format remaining contracts as objects with contract_id and vehicle_serial_number
       const formattedSaleContracts = remainingContracts.map((c) => {
-        const cId =
-          typeof c === "object"
-            ? c.contract_id || c.sale_contract_id || c.id
-            : c;
+        const cId = getContractId(c);
         const srNo =
           (typeof c === "object" ? c.vehicle_serial_number : null) ??
           getVehicleSerialNumber(cId, poDetail);
@@ -1397,10 +1406,18 @@ export default function VehiclePlacements() {
         sale_contracts: formattedSaleContracts,
       });
 
-      // Track released state locally using the placement record's id
+      // Track released state locally using placement record's id and contract ID
       setReleasedContractIds((prev) => {
         const next = new Set(prev);
-        next.add(record.id);
+        if (record.id) next.add(record.id);
+        if (targetContractId) {
+          next.add(targetContractId);
+          next.add(String(targetContractId).toLowerCase());
+        }
+        if (record.sale_contract) {
+          next.add(record.sale_contract);
+          next.add(String(record.sale_contract).toLowerCase());
+        }
         return next;
       });
 
@@ -1855,7 +1872,12 @@ export default function VehiclePlacements() {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       width: 150,
       render: (_, record) => {
-        const isReleased = releasedContractIds.has(record.id);
+        const isReleased =
+          releasedContractIds.has(record.id) ||
+          (record.sale_contract_id &&
+            releasedContractIds.has(record.sale_contract_id)) ||
+          (record.sale_contract &&
+            releasedContractIds.has(record.sale_contract));
         const isCancelled = cancelledRecordIds.has(record.id);
         return (
           <div className="flex gap-2">
