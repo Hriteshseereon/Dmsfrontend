@@ -126,7 +126,7 @@ export default function VehiclePlacements() {
     customerName: "",
     extendedUpto: null,
     record: null,
-    blockingContracts: [],
+    blockingContractIds: [],
   });
   const [extendingLoading, setExtendingLoading] = useState(false);
 
@@ -1259,11 +1259,64 @@ export default function VehiclePlacements() {
     }
   };
 
-  const handleReleaseContract = async (record) => {
-    const poId = record.purchase_order;
-    const contractId = record.sale_contract_id || record.sale_contract;
+  const getVehicleSerialNumber = (contractId, detail) => {
+    if (!detail) return null;
+    const scList = detail.sale_contracts || [];
+    const matched = scList.find(
+      (c) =>
+        typeof c === "object" &&
+        (c?.contract_id === contractId ||
+          c?.sale_contract_id === contractId ||
+          c?.id === contractId),
+    );
+    if (
+      matched &&
+      matched.vehicle_serial_number !== undefined &&
+      matched.vehicle_serial_number !== null
+    ) {
+      return matched.vehicle_serial_number;
+    }
+    const detailsList =
+      detail.sale_contract_details ||
+      detail.sales_contract_details ||
+      detail.sale_contracts_details ||
+      detail.sales_contracts ||
+      [];
+    const matchedDetail = detailsList.find(
+      (c) =>
+        c?.contract_id === contractId ||
+        c?.sale_contract_id === contractId ||
+        c?.id === contractId,
+    );
+    if (
+      matchedDetail &&
+      matchedDetail.vehicle_serial_number !== undefined &&
+      matchedDetail.vehicle_serial_number !== null
+    ) {
+      return matchedDetail.vehicle_serial_number;
+    }
+    return null;
+  };
 
-    if (!poId || !contractId) {
+  const handleReleaseContract = async (record) => {
+    const poId =
+      typeof record.purchase_order === "object"
+        ? record.purchase_order?.id || record.purchase_order?.purchase_order_id
+        : record.purchase_order;
+
+    const targetContractId =
+      record.sale_contract_id ||
+      (typeof record.sale_contract === "object"
+        ? record.sale_contract?.sale_contract_id || record.sale_contract?.id
+        : record.sale_contract);
+
+    const targetContractNumber =
+      record.sale_contract_number ||
+      (typeof record.sale_contract === "object"
+        ? record.sale_contract?.sale_contract_number
+        : null);
+
+    if (!poId || (!targetContractId && !targetContractNumber)) {
       message.warning("Missing purchase order or sale contract information.");
       return;
     }
@@ -1278,24 +1331,70 @@ export default function VehiclePlacements() {
       const poRes = await getPurchaseSalesContractOrderById(poId);
       const poDetail = poRes?.data || poRes;
 
-      const allContracts = poDetail.sale_contracts || [];
-      const allIds = allContracts.map((c) =>
-        typeof c === "object" ? c.sale_contract_id || c.contract_id || c.id : c,
-      );
+      const rawContracts =
+        poDetail.sale_contracts && poDetail.sale_contracts.length > 0
+          ? poDetail.sale_contracts
+          : poDetail.sale_contract_details ||
+            poDetail.sales_contract_details ||
+            poDetail.sale_contracts_details ||
+            [];
 
-      if (allIds.length <= 1) {
+      if (rawContracts.length <= 1) {
         message.warning(
           "At least one sale contract is required. You cannot release the last contract of a purchase order.",
         );
         return;
       }
 
-      // Filter out the contract we want to release
-      const updatedIds = allIds.filter((id) => id !== contractId);
+      // Filter out the target contract to release
+      const remainingContracts = rawContracts.filter((c) => {
+        const cId =
+          typeof c === "object"
+            ? c.contract_id || c.sale_contract_id || c.id
+            : c;
+        const cNumber =
+          typeof c === "object"
+            ? c.sale_contract_number || c.contract_number || c.saleContractNumber
+            : null;
+
+        const isMatchById =
+          targetContractId &&
+          cId &&
+          String(cId).toLowerCase() === String(targetContractId).toLowerCase();
+
+        const isMatchByNumber =
+          targetContractNumber &&
+          cNumber &&
+          String(cNumber).toLowerCase() ===
+            String(targetContractNumber).toLowerCase();
+
+        return !(isMatchById || isMatchByNumber);
+      });
+
+      if (remainingContracts.length === rawContracts.length) {
+        message.warning("Contract not found in this purchase order.");
+        return;
+      }
+
+      // Format remaining contracts as objects with contract_id and vehicle_serial_number
+      const formattedSaleContracts = remainingContracts.map((c) => {
+        const cId =
+          typeof c === "object"
+            ? c.contract_id || c.sale_contract_id || c.id
+            : c;
+        const srNo =
+          (typeof c === "object" ? c.vehicle_serial_number : null) ??
+          getVehicleSerialNumber(cId, poDetail);
+
+        return {
+          contract_id: cId,
+          vehicle_serial_number: srNo ? Number(srNo) : null,
+        };
+      });
 
       // Update the PO on the backend
       await updatePurchaseSalesContractOrder(poId, {
-        sale_contracts: updatedIds,
+        sale_contracts: formattedSaleContracts,
       });
 
       // Track released state locally using the placement record's id
@@ -1379,33 +1478,78 @@ export default function VehiclePlacements() {
       const lowerMsg = errorMsg.toLowerCase();
       if (
         lowerMsg.includes("only approved sale contracts") ||
-        lowerMsg.includes("approved") ||
         lowerMsg.includes("expired") ||
         lowerMsg.includes("expire") ||
-        lowerMsg.includes("valid")
+        lowerMsg.includes("validity") ||
+        lowerMsg.includes("not approved")
       ) {
         isContractExpiredOrUnapproved = true;
       }
 
-      // Extract contract numbers mentioned in error (e.g. ['HA-26-0043', ...])
-      const rawMatches = errorMsg.match(/['"]([A-Za-z0-9\-_/]+)['"]/g) || [];
-      const extractedNumbers = rawMatches.map((m) =>
-        m.replace(/['"]/g, "").trim(),
-      );
-
       if (isContractExpiredOrUnapproved) {
+        // Build contract number -> UUID map from PO details if available
+        const contractNumberToIdMap = {};
+        try {
+          const poRes = await getPurchaseSalesContractOrderById(poId);
+          const poDetail = poRes?.data || poRes;
+          const allDetails = [
+            ...(poDetail?.sale_contract_details || []),
+            ...(poDetail?.sales_contract_details || []),
+            ...(poDetail?.sale_contracts_details || []),
+            ...(poDetail?.sales_contracts || []),
+          ];
+          allDetails.forEach((cd) => {
+            const num = cd.sale_contract_number || cd.contract_number;
+            const id = cd.sale_contract_id || cd.contract_id || cd.id;
+            if (num && id) {
+              contractNumberToIdMap[String(num).trim().toLowerCase()] = id;
+            }
+          });
+        } catch (e) {
+          console.warn("Could not load PO details for error mapping", e);
+        }
+
+        // Extract contract numbers mentioned in error (e.g. ['HA-26-0043', ...])
+        const rawMatches = errorMsg.match(/['"]([A-Za-z0-9\-_/]+)['"]/g) || [];
+        const extractedNumbers = rawMatches.map((m) =>
+          m.replace(/['"]/g, "").trim(),
+        );
+
+        // Convert extracted numbers to valid UUIDs
+        const resolvedBlockingIds = [];
+        extractedNumbers.forEach((num) => {
+          const mappedId = contractNumberToIdMap[num.toLowerCase()];
+          if (mappedId) {
+            resolvedBlockingIds.push(mappedId);
+          } else if (
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+              num,
+            )
+          ) {
+            resolvedBlockingIds.push(num);
+          }
+        });
+
+        const effectiveContractId =
+          targetContractId ||
+          contractNumberToIdMap[
+            String(record.sale_contract_number || "").toLowerCase()
+          ] ||
+          resolvedBlockingIds[0] ||
+          null;
+
         setExtendSingleModal({
           open: true,
-          contractId,
+          contractId: effectiveContractId,
           contractNumber:
             record.sale_contract_number ||
             record.sale_contract ||
-            contractId,
+            effectiveContractId,
           customerName:
             record.customer_business_name || record.customer_name || "",
           extendedUpto: dayjs().add(1, "month"),
           record,
-          blockingContracts: extractedNumbers,
+          blockingContractIds: resolvedBlockingIds,
         });
       } else {
         message.error({
@@ -1432,28 +1576,47 @@ export default function VehiclePlacements() {
         key: "extend_release",
       });
 
-      // 1. Extend this particular contract
-      await updateSalesContract(extendSingleModal.contractId, {
-        extended_upto: formattedDate,
-        status: "Approved",
-      });
+      // 1. Extend this particular contract (if valid UUID)
+      if (
+        extendSingleModal.contractId &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          String(extendSingleModal.contractId),
+        )
+      ) {
+        try {
+          await updateSalesContract(extendSingleModal.contractId, {
+            extended_upto: formattedDate,
+            status: "Approved",
+          });
+        } catch (e) {
+          console.error("Failed to extend main contract", e);
+        }
+      }
 
-      // 2. Also extend any other blocking contracts on this PO so PO update succeeds
-      if (extendSingleModal.blockingContracts?.length > 0) {
-        for (const num of extendSingleModal.blockingContracts) {
-          try {
-            await updateSalesContract(num, {
-              extended_upto: formattedDate,
-              status: "Approved",
-            });
-          } catch (e) {
-            console.error(`Failed to extend blocking contract ${num}`, e);
+      // 2. Also extend any other blocking contracts on this PO by their resolved UUIDs
+      if (extendSingleModal.blockingContractIds?.length > 0) {
+        for (const bId of extendSingleModal.blockingContractIds) {
+          if (
+            bId &&
+            bId !== extendSingleModal.contractId &&
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+              String(bId),
+            )
+          ) {
+            try {
+              await updateSalesContract(bId, {
+                extended_upto: formattedDate,
+                status: "Approved",
+              });
+            } catch (e) {
+              console.error(`Failed to extend blocking contract ${bId}`, e);
+            }
           }
         }
       }
 
       message.success({
-        content: `Contract ${extendSingleModal.contractNumber} extended successfully! Releasing...`,
+        content: `Contract extended successfully! Releasing...`,
         key: "extend_release",
       });
 
