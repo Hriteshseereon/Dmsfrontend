@@ -1351,9 +1351,21 @@ export default function VehiclePlacements() {
             [];
 
       // Filter out:
-      // 1. Current contract to release
-      // 2. Any contract already released previously
+      // 1. Contracts with link_status === "Removed" / "removed"
+      // 2. Current contract to release
+      // 3. Any contract already released previously in session
       const remainingContracts = rawContracts.filter((c) => {
+        if (!c) return false;
+        if (typeof c === "object") {
+          const status = c.link_status || c.linkStatus;
+          if (status && String(status).toLowerCase() === "removed") {
+            return false;
+          }
+          if (c.is_active === false) {
+            return false;
+          }
+        }
+
         const cId = getContractId(c);
         const cNumber = getContractNumber(c);
 
@@ -1666,6 +1678,12 @@ export default function VehiclePlacements() {
   };
 
   const filteredData = data.filter((item) => {
+    if (
+      item.link_status === "Removed" ||
+      item.link_status?.toLowerCase() === "removed"
+    ) {
+      return false;
+    }
     if (!searchText) return true;
     const lower = searchText.toLowerCase();
     return (
