@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Table,
   Input,
@@ -20,6 +20,7 @@ import {
   SyncOutlined,
   FileExcelOutlined,
   EditOutlined,
+  EyeOutlined,
   SafetyOutlined,
   DeleteOutlined,
   ReloadOutlined,
@@ -36,6 +37,7 @@ import {
   getAllTransport,
   updatePurchaseSalesContractOrder,
   getPurchaseSalesContractOrderById,
+  getFreightDetails,
 } from "../../../../../api/purchase";
 import {
   getAllVehicles,
@@ -117,6 +119,11 @@ export default function VehiclePlacements() {
   const [releasedContractIds, setReleasedContractIds] = useState(new Set());
   // Cancelled placement IDs (frontend only)
   const [cancelledRecordIds, setCancelledRecordIds] = useState(new Set());
+
+  // Freight Details (for LR number check)
+  const [freightDetails, setFreightDetails] = useState([]);
+  // Selected Merged PO for detail modal drill-down
+  const [selectedMergedPo, setSelectedMergedPo] = useState(null);
 
   // Extend Single Contract modal state on release
   const [extendSingleModal, setExtendSingleModal] = useState({
@@ -244,9 +251,25 @@ export default function VehiclePlacements() {
   const fetchPlacements = async () => {
     try {
       setLoading(true);
-      const res = await getVehiclePlacements();
-      const list = Array.isArray(res) ? res : res?.data || [];
+      const [placementRes, freightRes] = await Promise.allSettled([
+        getVehiclePlacements(),
+        getFreightDetails(),
+      ]);
+      const list =
+        placementRes.status === "fulfilled"
+          ? Array.isArray(placementRes.value)
+            ? placementRes.value
+            : placementRes.value?.data || []
+          : [];
+      const freightList =
+        freightRes.status === "fulfilled"
+          ? Array.isArray(freightRes.value)
+            ? freightRes.value
+            : freightRes.value?.data || []
+          : [];
+
       setData(list);
+      setFreightDetails(freightList);
     } catch (err) {
       console.error(err);
       message.error("Failed to load vehicle placements data");
@@ -280,7 +303,17 @@ export default function VehiclePlacements() {
   const handleOpenBulkEdit = () => {
     setIsBulkEdit(true);
     setEditingRecord(null);
-    const firstSelected = data.find((item) => item.id === selectedRowKeys[0]);
+    const firstKey = selectedRowKeys[0];
+    const foundInProcessed = processedTableData.find(
+      (item) => item.id === firstKey,
+    );
+    const firstSelected =
+      foundInProcessed &&
+      foundInProcessed.isMergedRow &&
+      foundInProcessed.underlyingRecords
+        ? foundInProcessed.underlyingRecords[0]
+        : data.find((item) => item.id === firstKey) || foundInProcessed;
+
     if (firstSelected) {
       editForm.setFieldsValue({
         transporter: firstSelected.transporter || undefined,
@@ -1199,7 +1232,23 @@ export default function VehiclePlacements() {
   const handleEditFinish = async (values) => {
     try {
       setSubmitting(true);
-      const targetIds = isBulkEdit ? selectedRowKeys : [editingRecord.id];
+      let targetIds = [];
+      if (isBulkEdit) {
+        selectedRowKeys.forEach((key) => {
+          const merged = processedTableData.find(
+            (r) => r.id === key && r.isMergedRow,
+          );
+          if (merged && merged.underlyingRecords) {
+            merged.underlyingRecords.forEach((ur) => targetIds.push(ur.id));
+          } else {
+            targetIds.push(key);
+          }
+        });
+      } else {
+        targetIds = [editingRecord.id];
+      }
+      targetIds = [...new Set(targetIds)];
+
       message.loading({
         content: `Updating ${targetIds.length} placement(s)...`,
         key: "update_placement",
@@ -1673,27 +1722,238 @@ export default function VehiclePlacements() {
   };
 
 
-  const handleExport = () => {
-    exportToExcel(filteredData, columns, "Vehicle_Placements");
+  const getFirstName = (name) => {
+    if (!name || typeof name !== "string") return "-";
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === "-") return "-";
+    return trimmed.split(/\s+/)[0];
   };
 
-  const filteredData = data.filter((item) => {
+  const hasLrCreated = (item, freights) => {
+    if (!item) return false;
     if (
-      item.link_status === "Removed" ||
-      item.link_status?.toLowerCase() === "removed"
+      item.lorry_receipt_no &&
+      String(item.lorry_receipt_no).trim() !== "" &&
+      String(item.lorry_receipt_no).toLowerCase() !== "pending" &&
+      String(item.lorry_receipt_no).trim() !== "-"
     ) {
-      return false;
+      return true;
     }
-    if (!searchText) return true;
-    const lower = searchText.toLowerCase();
-    return (
-      item.purchase_order_number?.toLowerCase().includes(lower) ||
-      item.sale_contract_number?.toLowerCase().includes(lower) ||
-      item.customer_name?.toLowerCase().includes(lower) ||
-      item.plant_name?.toLowerCase().includes(lower) ||
-      item.place?.toLowerCase().includes(lower)
+
+    if (!freights || freights.length === 0) return false;
+
+    const matchingFreight = freights.find((f) => {
+      if (
+        f.vehicle_placement &&
+        (f.vehicle_placement === item.id || f.vehicle_placement?.id === item.id)
+      ) {
+        return true;
+      }
+      if (
+        f.purchase_order_number &&
+        item.purchase_order_number &&
+        f.purchase_order_number === item.purchase_order_number &&
+        f.sale_contract_number &&
+        item.sale_contract_number &&
+        f.sale_contract_number === item.sale_contract_number
+      ) {
+        return true;
+      }
+      if (
+        f.purchase_order &&
+        item.purchase_order &&
+        f.purchase_order === item.purchase_order &&
+        (f.sale_contract === item.sale_contract ||
+          f.sale_contract_id === item.sale_contract_id)
+      ) {
+        return true;
+      }
+      return false;
+    });
+
+    if (matchingFreight) {
+      const lr = matchingFreight.lorry_receipt_no;
+      return Boolean(
+        lr &&
+          String(lr).trim() !== "" &&
+          String(lr).toLowerCase() !== "pending" &&
+          String(lr).trim() !== "-",
+      );
+    }
+
+    return false;
+  };
+
+  const isPlacementPlaced = (item) => {
+    return Boolean(
+      item &&
+        (item.vehicle ||
+          item.transporter ||
+          item.is_placed ||
+          (item.placement_status &&
+            item.placement_status.toLowerCase() === "placed") ||
+          (item.status && item.status.toLowerCase() === "placed")),
     );
-  });
+  };
+
+  const filteredData = useMemo(() => {
+    return data.filter((item) => {
+      if (
+        item.link_status === "Removed" ||
+        item.link_status?.toLowerCase() === "removed"
+      ) {
+        return false;
+      }
+      if (!searchText) return true;
+      const lower = searchText.toLowerCase();
+      const trans = transporters.find((x) => x.id === item.transporter);
+      const drv = drivers.find((x) => x.id === item.driver);
+      const veh = vehicles.find((x) => x.id === item.vehicle);
+      return (
+        item.purchase_order_number?.toLowerCase().includes(lower) ||
+        item.sale_contract_number?.toLowerCase().includes(lower) ||
+        item.customer_name?.toLowerCase().includes(lower) ||
+        item.customer_business_name?.toLowerCase().includes(lower) ||
+        item.plant_name?.toLowerCase().includes(lower) ||
+        item.place?.toLowerCase().includes(lower) ||
+        item.broker_name?.toLowerCase().includes(lower) ||
+        trans?.name?.toLowerCase().includes(lower) ||
+        trans?.registered_name?.toLowerCase().includes(lower) ||
+        drv?.driver_name?.toLowerCase().includes(lower) ||
+        veh?.vehicle_number?.toLowerCase().includes(lower)
+      );
+    });
+  }, [data, searchText, transporters, drivers, vehicles]);
+
+  const processedTableData = useMemo(() => {
+    const poGroups = new Map();
+    filteredData.forEach((item) => {
+      const poKey =
+        item.purchase_order_number || item.purchase_order || item.id;
+      if (!poGroups.has(poKey)) {
+        poGroups.set(poKey, []);
+      }
+      poGroups.get(poKey).push(item);
+    });
+
+    const result = [];
+    poGroups.forEach((groupItems, poKey) => {
+      const isAllPlaced =
+        groupItems.length > 0 &&
+        groupItems.every((it) => isPlacementPlaced(it));
+      const isAllLrCreated =
+        groupItems.length > 0 &&
+        groupItems.every((it) => hasLrCreated(it, freightDetails));
+
+      if (groupItems.length > 1 && isAllPlaced && isAllLrCreated) {
+        const first = groupItems[0];
+        const totalQty = groupItems.reduce(
+          (sum, it) => sum + Number(it.qty || 0),
+          0,
+        );
+        const totalGrossWeight = groupItems.reduce(
+          (sum, it) => sum + Number(it.gross_weight_ton || 0),
+          0,
+        );
+
+        result.push({
+          ...first,
+          key: `merged_po_${poKey}`,
+          id: `merged_po_${poKey}`,
+          isMergedRow: true,
+          underlyingRecords: groupItems,
+          vehicleCount: groupItems.length,
+          purchase_order_number: first.purchase_order_number,
+          purchase_order_date: first.purchase_order_date,
+          plant_name: first.plant_name,
+          customer_business_name:
+            first.customer_business_name || first.customer_name,
+          place: first.place,
+          broker_name: "-",
+          qty: totalQty,
+          gross_weight_ton: totalGrossWeight,
+          sale_contract_number: "-",
+          sale_contract_date: "-",
+          transporter: "-",
+          vehicle: "-",
+          driver: "-",
+          passing_weight: "-",
+          min_guarantee_weight: "-",
+          photo_1: null,
+          photo_2: null,
+          photo_3: null,
+          photo_4: null,
+        });
+      } else {
+        groupItems.forEach((it) => {
+          result.push({
+            ...it,
+            isMergedRow: false,
+          });
+        });
+      }
+    });
+
+    return result;
+  }, [filteredData, freightDetails, transporters, vehicles, drivers]);
+
+  const handleExport = () => {
+    const exportRows = [];
+    processedTableData.forEach((row) => {
+      if (row.isMergedRow && row.underlyingRecords) {
+        row.underlyingRecords.forEach((item) => {
+          const trans = transporters.find((x) => x.id === item.transporter);
+          const veh = vehicles.find((x) => x.id === item.vehicle);
+          const drv = drivers.find((x) => x.id === item.driver);
+          exportRows.push({
+            "Purchase Order No": item.purchase_order_number || "-",
+            "Purchase Order Date": fmtDate(item.purchase_order_date),
+            "Sale Contract No": item.sale_contract_number || "-",
+            "Sale Contract Date": fmtDate(item.sale_contract_date),
+            "Plant Name": item.plant_name || "-",
+            "Customer Name":
+              item.customer_business_name || item.customer_name || "-",
+            Place: item.place || "-",
+            "Broker Name": getFirstName(item.broker_name),
+            QTY: item.qty || "-",
+            "Gross Weight (Ton)": item.gross_weight_ton || "-",
+            "Transport Name": trans
+              ? getFirstName(trans.registered_name || trans.name)
+              : "Pending",
+            "Vehicle Details": veh ? veh.vehicle_number : "Pending",
+            "Driver Name": drv ? getFirstName(drv.driver_name) : "Pending",
+            "Passing Weight": item.passing_weight || "Pending",
+            "Min Guarantee": item.min_guarantee_weight || "Pending",
+          });
+        });
+      } else {
+        const trans = transporters.find((x) => x.id === row.transporter);
+        const veh = vehicles.find((x) => x.id === row.vehicle);
+        const drv = drivers.find((x) => x.id === row.driver);
+        exportRows.push({
+          "Purchase Order No": row.purchase_order_number || "-",
+          "Purchase Order Date": fmtDate(row.purchase_order_date),
+          "Sale Contract No": row.sale_contract_number || "-",
+          "Sale Contract Date": fmtDate(row.sale_contract_date),
+          "Plant Name": row.plant_name || "-",
+          "Customer Name":
+            row.customer_business_name || row.customer_name || "-",
+          Place: row.place || "-",
+          "Broker Name": getFirstName(row.broker_name),
+          QTY: row.qty || "-",
+          "Gross Weight (Ton)": row.gross_weight_ton || "-",
+          "Transport Name": trans
+            ? getFirstName(trans.registered_name || trans.name)
+            : "Pending",
+          "Vehicle Details": veh ? veh.vehicle_number : "Pending",
+          "Driver Name": drv ? getFirstName(drv.driver_name) : "Pending",
+          "Passing Weight": row.passing_weight || "Pending",
+          "Min Guarantee": row.min_guarantee_weight || "Pending",
+        });
+      }
+    });
+    exportToExcel(exportRows, "Vehicle_Placements");
+  };
 
   const columns = [
     {
@@ -1701,10 +1961,25 @@ export default function VehiclePlacements() {
         <span className="text-amber-700 font-semibold">Purchase Order No.</span>
       ),
       dataIndex: "purchase_order_number",
-      width: 110,
-      render: (t) => (
-        <span className="text-amber-800 font-medium">{t || "-"}</span>
-      ),
+      width: 130,
+      render: (t, record) => {
+        if (record.isMergedRow) {
+          return (
+            <div className="flex flex-col gap-0.5">
+              <span
+                className="text-amber-900 font-bold hover:underline cursor-pointer"
+                onClick={() => setSelectedMergedPo(record)}
+              >
+                {t || "-"}
+              </span>
+              <span className="inline-block bg-emerald-100 text-emerald-800 text-[10px] font-semibold px-1.5 py-0.5 rounded border border-emerald-300 w-fit">
+                {record.vehicleCount} Vehicles Placed & LR
+              </span>
+            </div>
+          );
+        }
+        return <span className="text-amber-800 font-medium">{t || "-"}</span>;
+      },
     },
     {
       title: (
@@ -1722,15 +1997,24 @@ export default function VehiclePlacements() {
       ),
       dataIndex: "sale_contract_number",
       width: 110,
-      render: (t, record) => (
-        <span
-          className="bg-blue-500 text-white font-semibold px-2 py-1 rounded cursor-pointer block text-center hover:bg-blue-600"
-          onDoubleClick={() => openEditSalesContract(record)}
-          title="Double click to edit contract"
-        >
-          {t || "-"}
-        </span>
-      ),
+      render: (t, record) => {
+        if (record.isMergedRow) {
+          return (
+            <span className="text-gray-400 font-medium block text-center">
+              -
+            </span>
+          );
+        }
+        return (
+          <span
+            className="bg-blue-500 text-white font-semibold px-2 py-1 rounded cursor-pointer block text-center hover:bg-blue-600"
+            onDoubleClick={() => openEditSalesContract(record)}
+            title="Double click to edit contract"
+          >
+            {t || "-"}
+          </span>
+        );
+      },
     },
     {
       title: (
@@ -1738,7 +2022,16 @@ export default function VehiclePlacements() {
       ),
       dataIndex: "sale_contract_date",
       width: 90,
-      render: (t) => <span className="text-amber-800">{fmtDate(t)}</span>,
+      render: (t, record) => {
+        if (record.isMergedRow) {
+          return (
+            <span className="text-gray-400 font-medium block text-center">
+              -
+            </span>
+          );
+        }
+        return <span className="text-amber-800">{fmtDate(t)}</span>;
+      },
     },
     {
       title: <span className="text-amber-700 font-semibold">Plant Name</span>,
@@ -1753,9 +2046,9 @@ export default function VehiclePlacements() {
       dataIndex: "customer_business_name",
       width: 120,
       ellipsis: true,
-      render: (t) => (
-        <span className="text-amber-800" title={t}>
-          {t || "-"}
+      render: (t, record) => (
+        <span className="text-amber-800" title={t || record.customer_name}>
+          {t || record.customer_name || "-"}
         </span>
       ),
     },
@@ -1770,14 +2063,31 @@ export default function VehiclePlacements() {
       title: <span className="text-amber-700 font-semibold">Broker Name</span>,
       dataIndex: "broker_name",
       width: 90,
-      render: (t) => <span className="text-amber-800">{t || "DIRECT"}</span>,
+      render: (t, record) => {
+        if (record.isMergedRow) {
+          return (
+            <span className="text-gray-400 font-medium block text-center">
+              -
+            </span>
+          );
+        }
+        if (!t || t === "-") return <span className="text-amber-800">DIRECT</span>;
+        const name = t === "DIRECT" ? "Direct" : getFirstName(t);
+        return <span className="text-amber-800">{name}</span>;
+      },
     },
     {
       title: <span className="text-amber-700 font-semibold">QTY</span>,
       dataIndex: "qty",
       width: 60,
-      render: (t) => (
-        <span className="text-amber-800 font-semibold">{t || "-"}</span>
+      render: (t, record) => (
+        <span
+          className={`text-amber-800 font-semibold ${
+            record.isMergedRow ? "font-bold text-amber-900" : ""
+          }`}
+        >
+          {t || "-"}
+        </span>
       ),
     },
     {
@@ -1790,19 +2100,41 @@ export default function VehiclePlacements() {
       ),
       dataIndex: "gross_weight_ton",
       width: 90,
-      render: (t) => <span className="text-amber-800">{t || "-"}</span>,
+      render: (t, record) => (
+        <span
+          className={`text-amber-800 ${
+            record.isMergedRow ? "font-bold text-amber-900" : ""
+          }`}
+        >
+          {t !== null && t !== undefined && t !== ""
+            ? Number(t).toFixed(3)
+            : "-"}
+        </span>
+      ),
     },
     {
       title: (
         <span className="text-amber-700 font-semibold">Transport Name</span>
       ),
       dataIndex: "transporter",
-      width: 120,
+      width: 110,
       render: (t, record) => {
+        if (record.isMergedRow) {
+          return (
+            <span className="text-gray-400 font-medium block text-center">
+              -
+            </span>
+          );
+        }
         const trans = transporters.find((x) => x.id === t);
+        const rawName = trans ? trans.registered_name || trans.name : null;
         return (
-          <span className={trans ? "text-amber-800" : "text-red-500 font-semibold"}>
-            {trans ? trans.registered_name || trans.name : "Pending"}
+          <span
+            className={
+              rawName ? "text-amber-800" : "text-red-500 font-semibold"
+            }
+          >
+            {rawName ? getFirstName(rawName) : "Pending"}
           </span>
         );
       },
@@ -1813,10 +2145,19 @@ export default function VehiclePlacements() {
       ),
       dataIndex: "vehicle",
       width: 100,
-      render: (t) => {
+      render: (t, record) => {
+        if (record.isMergedRow) {
+          return (
+            <span className="text-gray-400 font-medium block text-center">
+              -
+            </span>
+          );
+        }
         const veh = vehicles.find((x) => x.id === t);
         return (
-          <span className={veh ? "text-amber-800" : "text-red-500 font-semibold"}>
+          <span
+            className={veh ? "text-amber-800" : "text-red-500 font-semibold"}
+          >
             {veh ? veh.vehicle_number : "Pending"}
           </span>
         );
@@ -1826,11 +2167,27 @@ export default function VehiclePlacements() {
       title: <span className="text-amber-700 font-semibold">Driver Name</span>,
       dataIndex: "driver",
       width: 100,
-      render: (t) => {
+      render: (t, record) => {
+        if (record.isMergedRow) {
+          return (
+            <span className="text-gray-400 font-medium block text-center">
+              -
+            </span>
+          );
+        }
         const drv = drivers.find((x) => x.id === t);
+        const rawName = drv
+          ? drv.driver_name
+          : typeof t === "string" && t
+            ? t
+            : null;
         return (
-          <span className={drv ? "text-amber-800" : "text-red-500 font-semibold"}>
-            {drv ? drv.driver_name : "Pending"}
+          <span
+            className={
+              rawName ? "text-amber-800" : "text-red-500 font-semibold"
+            }
+          >
+            {rawName ? getFirstName(rawName) : "Pending"}
           </span>
         );
       },
@@ -1841,34 +2198,66 @@ export default function VehiclePlacements() {
       ),
       dataIndex: "passing_weight",
       width: 80,
-      render: (t) => (
-        <span className={t ? "text-amber-800" : "text-red-500 font-semibold"}>
-          {t || "Pending"}
-        </span>
-      ),
+      render: (t, record) => {
+        if (record.isMergedRow) {
+          return (
+            <span className="text-gray-400 font-medium block text-center">
+              -
+            </span>
+          );
+        }
+        return (
+          <span
+            className={t ? "text-amber-800" : "text-red-500 font-semibold"}
+          >
+            {t || "Pending"}
+          </span>
+        );
+      },
     },
     {
       title: (
         <span className="text-amber-700 font-semibold">Min Guarantee</span>
       ),
       dataIndex: "min_guarantee_weight",
-      width: 110,
-      render: (t) => (
-        <span className={t ? "text-amber-800 font-medium" : "text-red-500 font-semibold"}>
-          {t || "Pending"}
-        </span>
-      ),
+      width: 100,
+      render: (t, record) => {
+        if (record.isMergedRow) {
+          return (
+            <span className="text-gray-400 font-medium block text-center">
+              -
+            </span>
+          );
+        }
+        return (
+          <span
+            className={
+              t ? "text-amber-800 font-medium" : "text-red-500 font-semibold"
+            }
+          >
+            {t || "Pending"}
+          </span>
+        );
+      },
     },
     {
       title: <span className="text-amber-700 font-semibold">Documents</span>,
       width: 90,
       render: (_, record) => {
+        if (record.isMergedRow) {
+          return (
+            <span className="text-gray-400 font-medium block text-center">
+              -
+            </span>
+          );
+        }
         const docs = [];
         if (record.photo_1) docs.push({ name: "Doc 1", url: record.photo_1 });
         if (record.photo_2) docs.push({ name: "Doc 2", url: record.photo_2 });
         if (record.photo_3) docs.push({ name: "Doc 3", url: record.photo_3 });
         if (record.photo_4) docs.push({ name: "Doc 4", url: record.photo_4 });
-        if (docs.length === 0) return <span className="text-red-500 font-semibold">Pending</span>;
+        if (docs.length === 0)
+          return <span className="text-red-500 font-semibold">Pending</span>;
         return (
           <Space size="small">
             {docs.map((d, idx) => (
@@ -1890,6 +2279,20 @@ export default function VehiclePlacements() {
       title: <span className="text-amber-700 font-semibold">Actions</span>,
       width: 150,
       render: (_, record) => {
+        if (record.isMergedRow) {
+          return (
+            <Button
+              type="primary"
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={() => setSelectedMergedPo(record)}
+              className="!bg-emerald-600 !hover:bg-emerald-700 !border-none text-xs font-medium"
+            >
+              View ({record.vehicleCount})
+            </Button>
+          );
+        }
+
         const isReleased =
           releasedContractIds.has(record.id) ||
           (record.sale_contract_id &&
@@ -1909,7 +2312,7 @@ export default function VehiclePlacements() {
             >
               Edit
             </Button>
-            {(!record.vehicle || isCancelled || isReleased) ? (
+            {!record.vehicle || isCancelled || isReleased ? (
               <Button
                 danger
                 size="small"
@@ -1999,20 +2402,118 @@ export default function VehiclePlacements() {
           }),
         }}
         columns={columns}
-        dataSource={filteredData}
+        dataSource={processedTableData}
         loading={loading}
         pagination={false}
         scroll={{ y: "calc(100vh - 250px)" }}
         rowKey="id"
         size="small"
+        onRow={(record) => ({
+          onDoubleClick: () => {
+            if (record.isMergedRow) {
+              setSelectedMergedPo(record);
+            }
+          },
+        })}
         rowClassName={(record) => {
+          if (record.isMergedRow) {
+            return "cursor-pointer !bg-emerald-50/70 hover:!bg-emerald-100/90";
+          }
           if (releasedContractIds.has(record.id)) {
-            return "!bg-green-50";
+            return "!bg-red-100 hover:!bg-red-200";
           }
           return "";
         }}
         className="[&_.ant-table-cell]:!px-1.5 [&_.ant-table-cell]:!py-1 [&_.ant-table-thead_th]:!py-1.5 border border-gray-100 rounded-b-lg shadow-sm"
       />
+
+      {/* Merged PO Vehicles Detail Modal */}
+      <Modal
+        title={
+          <div className="flex items-center gap-3">
+            <span className="text-amber-700 text-xl font-semibold">
+              Purchase Order Placements: {selectedMergedPo?.purchase_order_number}
+            </span>
+            <Tag color="green" className="text-xs font-semibold">
+              {selectedMergedPo?.underlyingRecords?.length || 0} Vehicles Placed & LR Generated
+            </Tag>
+          </div>
+        }
+        open={Boolean(selectedMergedPo)}
+        onCancel={() => setSelectedMergedPo(null)}
+        footer={[
+          <Button key="close" onClick={() => setSelectedMergedPo(null)}>
+            Close
+          </Button>,
+        ]}
+        width={1650}
+        style={{ top: 20 }}
+      >
+        <div className="mb-3 p-3 bg-amber-50 rounded-md border border-amber-200 flex flex-wrap gap-6 text-sm">
+          <div>
+            <span className="text-gray-500">PO Number: </span>
+            <span className="font-semibold text-amber-800">
+              {selectedMergedPo?.purchase_order_number}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-500">PO Date: </span>
+            <span className="font-semibold text-amber-800">
+              {fmtDate(selectedMergedPo?.purchase_order_date)}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-500">Customer: </span>
+            <span className="font-semibold text-amber-800">
+              {selectedMergedPo?.customer_business_name ||
+                selectedMergedPo?.customer_name}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-500">Plant: </span>
+            <span className="font-semibold text-amber-800">
+              {selectedMergedPo?.plant_name}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-500">Place: </span>
+            <span className="font-semibold text-amber-800">
+              {selectedMergedPo?.place}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-500">Total QTY: </span>
+            <span className="font-semibold text-amber-800">
+              {selectedMergedPo?.qty}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-500">Total Weight (Ton): </span>
+            <span className="font-semibold text-amber-800">
+              {Number(selectedMergedPo?.gross_weight_ton || 0).toFixed(3)}
+            </span>
+          </div>
+        </div>
+
+        <Table
+          columns={columns}
+          dataSource={(selectedMergedPo?.underlyingRecords || []).map((rec) => {
+            const fresh = data.find((d) => d.id === rec.id) || rec;
+            return { ...fresh, isMergedRow: false };
+          })}
+          pagination={false}
+          scroll={{ y: 500, x: 1500 }}
+          rowKey="id"
+          size="small"
+          rowClassName={(record) => {
+            if (releasedContractIds.has(record.id)) {
+              return "!bg-red-100 hover:!bg-red-200";
+            }
+            return "";
+          }}
+          className="[&_.ant-table-cell]:!px-1.5 [&_.ant-table-cell]:!py-1 [&_.ant-table-thead_th]:!py-1.5 border border-gray-200 rounded shadow-sm"
+        />
+      </Modal>
 
       {/* Edit placement details modal */}
       <Modal

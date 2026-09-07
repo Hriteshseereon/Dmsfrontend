@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Table,
   Input,
@@ -83,6 +83,9 @@ export default function PurchaseInvoice() {
   // Modal and Form controls
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [editingRecordDocUrl, setEditingRecordDocUrl] = useState(null);
+  const [supplierInvoicesModalOpen, setSupplierInvoicesModalOpen] = useState(false);
+  const [selectedMergedSupplier, setSelectedMergedSupplier] = useState(null);
   const [viewModal, setViewModal] = useState(false);
   const [viewRecord, setViewRecord] = useState(null);
   const [form] = Form.useForm();
@@ -105,6 +108,108 @@ export default function PurchaseInvoice() {
   const rateSelectRefs = useRef([]);
 
   const selectedFY = useSelectedFinancialYear();
+
+  // Helper to determine if an invoice has all 3 required elements complete:
+  // 1. E-waybill No, 2. E-waybill Date, 3. Uploaded Document
+  const isInvoiceComplete = (inv) => {
+    const hasEwaybillNo = Boolean(
+      inv.ewaybill_no &&
+      String(inv.ewaybill_no).trim() !== "" &&
+      String(inv.ewaybill_no).toLowerCase() !== "pending"
+    );
+    const hasEwaybillDate = Boolean(inv.ewaybill_date);
+    const hasDoc = Boolean(
+      inv.invoice_upload_status === "Uploaded" ||
+      inv.invoice_copy_url ||
+      inv.invoice_copy ||
+      inv.file
+    );
+    return hasEwaybillNo && hasEwaybillDate && hasDoc;
+  };
+
+  // Grouping and merging logic
+  const processedTableData = useMemo(() => {
+    const supplierGroups = {};
+    const pendingList = [];
+
+    (data || []).forEach((item) => {
+      const isComplete = isInvoiceComplete(item);
+      if (!isComplete) {
+        // If any required field is pending, show individually
+        pendingList.push({
+          ...item,
+          isMergedRow: false,
+        });
+      } else {
+        // Candidate for supplier grouping
+        const supplierKey = String(item.vendor || item.supplier_name || "unknown").trim();
+        if (!supplierGroups[supplierKey]) {
+          supplierGroups[supplierKey] = {
+            vendor: item.vendor,
+            supplier_name: item.supplier_name || item.vendor_name || "",
+            place: item.place || "",
+            items: [],
+          };
+        }
+        supplierGroups[supplierKey].items.push(item);
+      }
+    });
+
+    const result = [];
+
+    // For suppliers with complete invoices:
+    Object.keys(supplierGroups).forEach((key) => {
+      const group = supplierGroups[key];
+      if (group.items.length >= 2) {
+        // Merge into single supplier row
+        const totalQty = group.items.reduce(
+          (sum, i) => sum + Number(i.total_qty || 0),
+          0
+        );
+        const totalAmount = group.items.reduce(
+          (sum, i) => sum + Number(i.total_amount || 0),
+          0
+        );
+        const totalNetWeight = group.items.reduce(
+          (sum, i) => sum + Number(i.total_net_weight || 0),
+          0
+        );
+
+        result.push({
+          id: `merged_supplier_${key}`,
+          isMergedRow: true,
+          supplier_name: group.supplier_name,
+          vendor: group.vendor,
+          place: group.place,
+          lr_no: "-",
+          lr_date: null,
+          transport_name: "-",
+          vehicle_no: `${group.items.length} Vehicles`,
+          ewaybill_no: "All Uploaded",
+          ewaybill_date: null,
+          invoice_no: `${group.items.length} Invoices`,
+          invoice_date: null,
+          total_qty: Number(totalQty.toFixed(3)),
+          total_amount: Number(totalAmount.toFixed(2)),
+          total_net_weight: Number(totalNetWeight.toFixed(3)),
+          payment_due_date: null,
+          invoice_upload_status: "Uploaded",
+          underlyingRecords: group.items,
+        });
+      } else if (group.items.length === 1) {
+        // Single invoice remains individual row
+        result.push({
+          ...group.items[0],
+          isMergedRow: false,
+        });
+      }
+    });
+
+    // Add pending list
+    result.push(...pendingList);
+
+    return result;
+  }, [data]);
 
   useEffect(() => {
     fetchInvoices();
@@ -426,6 +531,7 @@ export default function PurchaseInvoice() {
 
   const openAddModal = () => {
     setEditingId(null);
+    setEditingRecordDocUrl(null);
     form.resetFields();
     form.setFieldsValue({
       dispatch_from: "Haldia",
@@ -440,6 +546,7 @@ export default function PurchaseInvoice() {
 
   const handleEdit = async (record) => {
     setEditingId(record.id);
+    setEditingRecordDocUrl(record.invoice_copy_url || record.invoice_copy || record.file || null);
     form.resetFields();
 
     const formattedItems = (record.items || []).map((item) => {
@@ -547,6 +654,36 @@ export default function PurchaseInvoice() {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
+
+      // Duplicate check for purchase invoice number and e-waybill number when adding new
+      if (!editingId) {
+        const enteredInvoiceNo = String(values.invoice_no || "").trim().toLowerCase();
+        if (enteredInvoiceNo) {
+          const isDuplicateInvoice = data.some(
+            (inv) =>
+              inv.invoice_no &&
+              String(inv.invoice_no).trim().toLowerCase() === enteredInvoiceNo
+          );
+          if (isDuplicateInvoice) {
+            message.error(`Purchase Invoice No "${values.invoice_no}" already exists!`);
+            return;
+          }
+        }
+
+        const enteredEwaybillNo = String(values.ewaybill_no || "").trim().toLowerCase();
+        if (enteredEwaybillNo && enteredEwaybillNo !== "pending") {
+          const isDuplicateEwaybill = data.some(
+            (inv) =>
+              inv.ewaybill_no &&
+              String(inv.ewaybill_no).trim().toLowerCase() === enteredEwaybillNo
+          );
+          if (isDuplicateEwaybill) {
+            message.error(`E-waybill No "${values.ewaybill_no}" already exists!`);
+            return;
+          }
+        }
+      }
+
       setSubmitting(true);
 
       const formattedPayload = {
@@ -600,6 +737,7 @@ export default function PurchaseInvoice() {
 
       setModalOpen(false);
       setEditingId(null);
+      setEditingRecordDocUrl(null);
       fetchInvoices();
     } catch (error) {
       console.error("Submit Error:", error);
@@ -650,11 +788,224 @@ export default function PurchaseInvoice() {
     {
       title: <span className="text-amber-700 font-semibold">Supplier Name</span>,
       dataIndex: "supplier_name",
-      render: (text) => <span className="text-amber-900 font-medium">{text}</span>,
+      render: (text, record) => {
+        const firstName = String(text || "").trim().split(" ")[0] || "-";
+        if (record.isMergedRow) {
+          return (
+            <Tooltip title={`Supplier: ${text} (Double-click row to view all)`}>
+              <span
+                className="cursor-pointer font-bold text-amber-900 hover:text-amber-600"
+                onClick={() => {
+                  setSelectedMergedSupplier(record);
+                  setSupplierInvoicesModalOpen(true);
+                }}
+              >
+                {firstName}
+              </span>
+            </Tooltip>
+          );
+        }
+        return (
+          <Tooltip title={text}>
+            <span className="text-amber-900 font-medium">{firstName}</span>
+          </Tooltip>
+        );
+      },
     },
     {
       title: <span className="text-amber-700 font-semibold">Place</span>,
       dataIndex: "place",
+      width: 140,
+      render: (text) => (
+        <span className="whitespace-nowrap font-medium text-gray-700">
+          {text || "-"}
+        </span>
+      ),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">LR No</span>,
+      dataIndex: "lr_no",
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">LR Date</span>,
+      dataIndex: "lr_date",
+      render: (val) => fmtDate(val),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Transport Name</span>,
+      dataIndex: "transport_name",
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Vehicle No</span>,
+      dataIndex: "vehicle_no",
+      render: (text, record) =>
+        record.isMergedRow ? (
+          <Tag color="cyan">{text}</Tag>
+        ) : (
+          <Tag color="warning">{text}</Tag>
+        ),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">E-waybill No</span>,
+      dataIndex: "ewaybill_no",
+      render: (text, record) => {
+        if (record.isMergedRow) {
+          return <Tag color="success">All Uploaded</Tag>;
+        }
+        return text ? (
+          <span className="font-medium text-gray-800">{text}</span>
+        ) : (
+          <Tag color="error">Pending</Tag>
+        );
+      },
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">E-waybill Date</span>,
+      dataIndex: "ewaybill_date",
+      render: (val, record) => {
+        if (record.isMergedRow) {
+          return <span className="text-gray-400 font-medium">-</span>;
+        }
+        return val ? (
+          <span>{fmtDate(val)}</span>
+        ) : (
+          <Tag color="error">Pending</Tag>
+        );
+      },
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Invoice No</span>,
+      dataIndex: "invoice_no",
+      render: (text, record) =>
+        record.isMergedRow ? (
+          <Tag color="purple">{text}</Tag>
+        ) : (
+          <span>{text}</span>
+        ),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Invoice Date</span>,
+      dataIndex: "invoice_date",
+      render: (val, record) => (record.isMergedRow ? "-" : fmtDate(val)),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Total Qty</span>,
+      dataIndex: "total_qty",
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Total Amount</span>,
+      dataIndex: "total_amount",
+      render: (val) => `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Total Net Wt</span>,
+      dataIndex: "total_net_weight",
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Payment Due Date</span>,
+      dataIndex: "payment_due_date",
+      render: (val, record) => (record.isMergedRow ? "-" : fmtDate(val)),
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Status</span>,
+      dataIndex: "invoice_upload_status",
+      render: (status, record) => {
+        if (record.isMergedRow) {
+          return (
+            <Tag color="success">
+              Consolidated ({record.underlyingRecords?.length || 0})
+            </Tag>
+          );
+        }
+        return (
+          <Tag color={status === "Uploaded" ? "success" : "default"}>
+            {status || "Pending"}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Actions</span>,
+      key: "actions",
+      fixed: "right",
+      width: 160,
+      render: (_, record) => {
+        if (record.isMergedRow) {
+          return (
+            <Button
+              size="small"
+              type="primary"
+              icon={<EyeOutlined />}
+              className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
+              onClick={() => {
+                setSelectedMergedSupplier(record);
+                setSupplierInvoicesModalOpen(true);
+              }}
+            >
+              View Invoices ({record.underlyingRecords?.length || 0})
+            </Button>
+          );
+        }
+        return (
+          <Space size="small">
+            <Tooltip title="Edit Invoice">
+              <Button
+                type="primary"
+                size="small"
+                icon={<EditOutlined />}
+                className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
+                onClick={() => handleEdit(record)}
+              >
+                Edit
+              </Button>
+            </Tooltip>
+            <Tooltip title="View details">
+              <Button
+                size="small"
+                icon={<EyeOutlined />}
+                className="text-blue-500 hover:text-blue-700 border-blue-300!"
+                onClick={() => {
+                  setViewRecord(record);
+                  setViewModal(true);
+                }}
+              />
+            </Tooltip>
+            <Tooltip title="Print/Download Invoice Copy">
+              <Button
+                size="small"
+                icon={<PrinterOutlined />}
+                className="text-amber-600 hover:text-amber-800 border-amber-300!"
+                onClick={() => handlePrint(record)}
+              />
+            </Tooltip>
+          </Space>
+        );
+      },
+    },
+  ];
+
+  const supplierDetailColumns = [
+    {
+      title: <span className="text-amber-700 font-semibold">Supplier Name</span>,
+      dataIndex: "supplier_name",
+      render: (text) => {
+        const firstName = String(text || "").trim().split(" ")[0] || "-";
+        return (
+          <Tooltip title={text}>
+            <span className="text-amber-900 font-medium">{firstName}</span>
+          </Tooltip>
+        );
+      },
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Place</span>,
+      dataIndex: "place",
+      width: 140,
+      render: (text) => (
+        <span className="whitespace-nowrap font-medium text-gray-700">
+          {text || "-"}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">LR No</span>,
@@ -687,16 +1038,12 @@ export default function PurchaseInvoice() {
     {
       title: <span className="text-amber-700 font-semibold">E-waybill Date</span>,
       dataIndex: "ewaybill_date",
-      render: (val) =>
-        val ? (
-          <span>{fmtDate(val)}</span>
-        ) : (
-          <Tag color="error">Pending</Tag>
-        ),
+      render: (val) => (val ? <span>{fmtDate(val)}</span> : <Tag color="error">Pending</Tag>),
     },
     {
       title: <span className="text-amber-700 font-semibold">Invoice No</span>,
       dataIndex: "invoice_no",
+      render: (text) => <span className="font-semibold text-gray-800">{text}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Invoice Date</span>,
@@ -710,7 +1057,8 @@ export default function PurchaseInvoice() {
     {
       title: <span className="text-amber-700 font-semibold">Total Amount</span>,
       dataIndex: "total_amount",
-      render: (val) => `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      render: (val) =>
+        `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
     },
     {
       title: <span className="text-amber-700 font-semibold">Total Net Wt</span>,
@@ -743,7 +1091,10 @@ export default function PurchaseInvoice() {
               size="small"
               icon={<EditOutlined />}
               className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
-              onClick={() => handleEdit(record)}
+              onClick={() => {
+                setSupplierInvoicesModalOpen(false);
+                handleEdit(record);
+              }}
             >
               Edit
             </Button>
@@ -770,7 +1121,6 @@ export default function PurchaseInvoice() {
         </Space>
       ),
     },
-
   ];
 
   return (
@@ -821,12 +1171,21 @@ export default function PurchaseInvoice() {
 
         <Table
           columns={columns}
-          dataSource={data}
+          dataSource={processedTableData}
           loading={loading}
           rowKey="id"
           pagination={{ pageSize: 10 }}
           className="border-amber-100"
           scroll={{ x: 1300 }}
+          onRow={(record) => ({
+            onDoubleClick: () => {
+              if (record.isMergedRow) {
+                setSelectedMergedSupplier(record);
+                setSupplierInvoicesModalOpen(true);
+              }
+            },
+            className: record.isMergedRow ? "cursor-pointer hover:bg-amber-50/50" : "",
+          })}
         />
       </div>
 
@@ -866,7 +1225,21 @@ export default function PurchaseInvoice() {
         width={1400}
         destroyOnClose
       >
-        <Form form={form} layout="vertical" initialValues={{ dispatch_from: "Haldia" }}>
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={{ dispatch_from: "Haldia" }}
+          onValuesChange={(changedValues) => {
+            if (changedValues.invoice_date) {
+              const invDate = parseApiDate(changedValues.invoice_date);
+              if (invDate && invDate.isValid()) {
+                form.setFieldsValue({
+                  payment_due_date: invDate.add(10, "day"),
+                });
+              }
+            }
+          }}
+        >
           {/* Header Info Block */}
           <Card
             size="small"
@@ -1012,6 +1385,16 @@ export default function PurchaseInvoice() {
                     disabledDate={(current) =>
                       createFinancialYearDisabledDate(selectedFY)(current)
                     }
+                    onChange={(date) => {
+                      if (date) {
+                        const parsed = parseApiDate(date);
+                        if (parsed && parsed.isValid()) {
+                          form.setFieldsValue({
+                            payment_due_date: parsed.add(10, "day"),
+                          });
+                        }
+                      }
+                    }}
                     onTabComplete={() => {
                       setTimeout(() => paymentDueDateRef.current?.focus(), 50);
                     }}
@@ -1053,13 +1436,12 @@ export default function PurchaseInvoice() {
               <Col span={2}>Unit</Col>
               <Col span={2}>Net Wt (Ton)</Col>
               <Col span={1}>GST %</Col>
-              <Col span={4}>Rate Selection (Available Soudas)</Col>
+              <Col span={5}>Rate Selection (Available Soudas)</Col>
               <Col span={2}>Taxable Amt</Col>
               <Col span={1}>SGST</Col>
               <Col span={1}>CGST</Col>
               <Col span={2}>IGST</Col>
               <Col span={2}>Total Amount</Col>
-              <Col span={1}></Col>
             </Row>
 
             <Form.List name="items">
@@ -1109,7 +1491,7 @@ export default function PurchaseInvoice() {
                         </Form.Item>
                       </Col>
 
-                      <Col span={4}>
+                      <Col span={5}>
                         <Form.Item
                           name={[field.name, "rate"]}
                           style={{ marginBottom: 0 }}
@@ -1221,20 +1603,6 @@ export default function PurchaseInvoice() {
                           <InputNumber disabled className="w-full bg-gray-50!" precision={2} />
                         </Form.Item>
                       </Col>
-
-                      <Col span={1} className="text-center">
-                        {fields.length > 1 && (
-                          <Tooltip title="Remove split item">
-                            <Button
-                              type="text"
-                              danger
-                              icon={<DeleteOutlined />}
-                              size="small"
-                              onClick={() => handleRemoveItem(field.name)}
-                            />
-                          </Tooltip>
-                        )}
-                      </Col>
                     </Row>
                   );
                 })
@@ -1255,7 +1623,7 @@ export default function PurchaseInvoice() {
               <Col span={2}></Col>
               <Col span={2}></Col>
               <Col span={1}></Col>
-              <Col span={4}></Col>
+              <Col span={5}></Col>
               <Col span={2}>
                 <Form.Item name="total_taxable_amount" style={{ marginBottom: 0 }}>
                   <InputNumber disabled className="w-full bg-gray-100! font-semibold" precision={2} />
@@ -1273,7 +1641,6 @@ export default function PurchaseInvoice() {
                   <InputNumber disabled className="w-full bg-gray-100! font-semibold" precision={2} />
                 </Form.Item>
               </Col>
-              <Col span={1}></Col>
             </Row>
           </Card>
 
@@ -1300,20 +1667,53 @@ export default function PurchaseInvoice() {
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label={<span className="text-amber-700">Upload Invoice Copy</span>}>
-                  <Upload
-                    beforeUpload={(file) => {
-                      setFileList([file]);
-                      return false;
-                    }}
-                    onRemove={() => setFileList([])}
-                    fileList={fileList}
-                    maxCount={1}
+                <Form.Item label={<span className="text-amber-700 font-semibold">Upload Invoice Copy</span>}>
+                  <div
+                    style={
+                      editingId && !fileList.length && !editingRecordDocUrl
+                        ? {
+                            border: "2px dashed #EF4444",
+                            backgroundColor: "#FEF2F2",
+                            borderRadius: "6px",
+                            padding: "6px 8px",
+                          }
+                        : {}
+                    }
                   >
-                    <Button icon={<UploadOutlined />} className="w-full border-amber-300!">
-                      Choose File
-                    </Button>
-                  </Upload>
+                    {editingId && !fileList.length && !editingRecordDocUrl && (
+                      <div className="flex items-center justify-between mb-1">
+                        <Tag color="error" className="text-[10px] leading-tight px-1 py-0 m-0">
+                          Pending Upload
+                        </Tag>
+                        <span className="text-red-500 font-semibold text-[10px]">Required!</span>
+                      </div>
+                    )}
+                    <Upload
+                      beforeUpload={(file) => {
+                        setFileList([file]);
+                        return false;
+                      }}
+                      onRemove={() => setFileList([])}
+                      fileList={fileList}
+                      maxCount={1}
+                    >
+                      <Button icon={<UploadOutlined />} className="w-full border-amber-300!">
+                        {editingRecordDocUrl && !fileList.length ? "Change File" : "Choose File"}
+                      </Button>
+                    </Upload>
+                    {editingRecordDocUrl && !fileList.length && (
+                      <div className="mt-1 text-xs">
+                        <a
+                          href={editingRecordDocUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-600 font-semibold hover:underline"
+                        >
+                          View Current Document
+                        </a>
+                      </div>
+                    )}
+                  </div>
                 </Form.Item>
               </Col>
               <Col span={3}>
@@ -1507,6 +1907,49 @@ export default function PurchaseInvoice() {
             )}
           </div>
         )}
+      </Modal>
+
+      {/* SUPPLIER MERGED INVOICES DRILL-DOWN MODAL */}
+      <Modal
+        title={
+          <div className="flex items-center justify-between pr-8">
+            <span className="text-amber-800 text-2xl font-bold">
+              Supplier Invoices: {selectedMergedSupplier?.supplier_name}
+            </span>
+            <Tag color="orange" className="text-sm px-3 py-1 font-semibold">
+              {selectedMergedSupplier?.underlyingRecords?.length || 0} Invoices Consolidated
+            </Tag>
+          </div>
+        }
+        open={supplierInvoicesModalOpen}
+        onCancel={() => setSupplierInvoicesModalOpen(false)}
+        footer={[
+          <Button
+            key="close"
+            onClick={() => setSupplierInvoicesModalOpen(false)}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
+            Close
+          </Button>,
+        ]}
+        width="95vw"
+        style={{ top: 20, maxWidth: 1650 }}
+        styles={{ body: { padding: "16px 20px" } }}
+        destroyOnClose
+      >
+        <div className="mb-4 text-sm text-gray-600 bg-amber-50/60 p-2.5 rounded border border-amber-200/70">
+          Showing all underlying purchase invoice entries for{" "}
+          <strong className="text-amber-900 text-base">{selectedMergedSupplier?.supplier_name}</strong>
+        </div>
+        <Table
+          columns={supplierDetailColumns}
+          dataSource={selectedMergedSupplier?.underlyingRecords || []}
+          rowKey="id"
+          pagination={{ pageSize: 10 }}
+          size="middle"
+          className="border border-amber-200 rounded-lg shadow-sm"
+          scroll={{ x: 1500 }}
+        />
       </Modal>
     </div>
   );

@@ -35,14 +35,14 @@ export const SALES_TAB_DEFINITIONS = [
     Icon: FaBoxOpen,
     Component: SaleSouda,
   },
-  {
-    id: "orders",
-    label: "Sale Orders",
-    path: "orders",
-    Icon: FaShoppingCart,
-    Component: SaleOrders,
-  },
- 
+  // {
+  //   id: "orders",
+  //   label: "Sale Orders",
+  //   path: "orders",
+  //   Icon: FaShoppingCart,
+  //   Component: SaleOrders,
+  // },
+
   {
     id: "saleinvoice",
     label: "Sale Invoice",
@@ -57,29 +57,26 @@ export const SALES_TAB_DEFINITIONS = [
   //   Icon: FaTruck,
   //   Component: LoadingDetails,
   // },
- 
-  {
-    id: "dispute",
-    label: "Sale Dispute",
-    path: "dispute",
-    Icon: FaUndo,
-    Component: SalesDispute,
 
-  },
-  {
-    id: "wallet",
-    label: "Wallet",
-    path: "wallet",
-    Icon: FaWallet,
-    Component: Wallet,
-  }
+  // {
+  //   id: "dispute",
+  //   label: "Sale Dispute",
+  //   path: "dispute",
+  //   Icon: FaUndo,
+  //   Component: SalesDispute,
 
+  // },
+  // {
+  //   id: "wallet",
+  //   label: "Wallet",
+  //   path: "wallet",
+  //   Icon: FaWallet,
+  //   Component: Wallet,
+  // }
 ];
 
 const normalize = (values = []) =>
-  values
-    .map((value) => value?.toLowerCase())
-    .filter(Boolean);
+  values.map((value) => value?.toLowerCase()).filter(Boolean);
 
 export const getVisibleSalesTabs = (allowedTabs) => {
   const normalized = new Set(normalize(allowedTabs));
@@ -97,7 +94,7 @@ export default function SaleTabs({ allowedTabs }) {
 
   const visibleTabs = useMemo(
     () => getVisibleSalesTabs(allowedTabs),
-    [allowedTabs]
+    [allowedTabs],
   );
   const defaultTab = visibleTabs[0];
 
@@ -111,9 +108,11 @@ export default function SaleTabs({ allowedTabs }) {
   const allowedSegments = useMemo(
     () =>
       new Set(
-        visibleTabs.map((tab) => (tab.path === "" ? "" : tab.path.toLowerCase()))
+        visibleTabs.map((tab) =>
+          tab.path === "" ? "" : tab.path.toLowerCase(),
+        ),
       ),
-    [visibleTabs]
+    [visibleTabs],
   );
 
   const derivedActiveTab = useMemo(() => {
@@ -121,7 +120,7 @@ export default function SaleTabs({ allowedTabs }) {
       visibleTabs.find(
         (tab) =>
           (tab.path === "" && currentSegment === "") ||
-          tab.path === currentSegment
+          tab.path === currentSegment,
       ) || defaultTab;
     return match?.id || "";
   }, [currentSegment, defaultTab, visibleTabs]);
