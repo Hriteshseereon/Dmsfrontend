@@ -44,6 +44,7 @@ import {
   addAssignment,
   updatePurchaseSalesContractOrder,
   downloadPurchaseOrderPDF,
+  getVehiclePlacements,
 } from "../../../../../api/purchase";
 import {
   getSalesContractById,
@@ -316,6 +317,7 @@ export default function PurchaseIndent() {
   const [selectedPoForContracts, setSelectedPoForContracts] = useState(null);
   const [modalContracts, setModalContracts] = useState([]);
   const [releasedContractIds, setReleasedContractIds] = useState(new Set());
+  const [placedContractIds, setPlacedContractIds] = useState(new Set());
   const [poContractsLoading, setPoContractsLoading] = useState(false);
   const [isContractReadOnly, setIsContractReadOnly] = useState(false);
   useEffect(() => {
@@ -572,6 +574,8 @@ export default function PurchaseIndent() {
       // whatsapp/edit) hit the wrong record.
       key: contract.contract_id || contract.sale_contract_id || contract.id || index + 1,
       id: contract.contract_id || contract.sale_contract_id || contract.id,
+      sale_contract_id: contract.sale_contract_id,
+      contract_id: contract.contract_id,
       saleContractNumber:
         contract.sale_contract_number || contract.contract_number || "-",
       customer:
@@ -593,7 +597,69 @@ export default function PurchaseIndent() {
       grandTotal:
         contract.grand_total || contract.total_amount || contract.totalAmount,
       link_status: contract.link_status || contract.linkStatus || "Active",
+      is_placed: Boolean(
+        contract.is_placed ||
+        contract.isPlaced ||
+        contract.placed ||
+        contract.vehicle ||
+        contract.transporter ||
+        contract.driver ||
+        (contract.placement_status &&
+          contract.placement_status.toLowerCase() === "placed") ||
+        (contract.status &&
+          contract.status.toLowerCase() === "placed")
+      ),
+      transporter: contract.transporter || contract.transporter_name || null,
+      vehicle: contract.vehicle || contract.vehicle_number || null,
+      driver: contract.driver || contract.driver_name || null,
+      vehicle_serial_number: contract.vehicle_serial_number,
+      placement_status: contract.placement_status,
+      rawContract: contract,
     };
+  };
+
+  const getContractRowClassName = (record) => {
+    const cId = record.id || record.key;
+    const isReleased =
+      releasedContractIds.has(cId) ||
+      (record.sale_contract_id &&
+        releasedContractIds.has(record.sale_contract_id)) ||
+      (record.contract_id &&
+        releasedContractIds.has(record.contract_id)) ||
+      record.link_status === "Removed" ||
+      record.link_status?.toLowerCase() === "removed" ||
+      record.status === "Released" ||
+      record.status?.toLowerCase() === "released";
+
+    if (isReleased) {
+      return "contract-row-released !bg-red-100 hover:!bg-red-200";
+    }
+
+    const isPlaced =
+      placedContractIds.has(cId) ||
+      (record.sale_contract_id &&
+        placedContractIds.has(record.sale_contract_id)) ||
+      (record.contract_id &&
+        placedContractIds.has(record.contract_id)) ||
+      Boolean(
+        record.is_placed ||
+        record.isPlaced ||
+        record.placed ||
+        record.vehicle ||
+        record.transporter ||
+        record.driver ||
+        (record.placement_status &&
+          record.placement_status.toLowerCase() === "placed") ||
+        (record.status &&
+          record.status.toLowerCase() === "placed") ||
+        record.status === "TransportAssign"
+      );
+
+    if (isPlaced) {
+      return "contract-row-placed !bg-green-100 hover:!bg-green-200";
+    }
+
+    return "cursor-pointer";
   };
 
   // ---------------------------------------------------------------
@@ -957,11 +1023,42 @@ export default function PurchaseIndent() {
   const openViewModal = async (record) => {
     try {
       setLoading(true);
-      const res = await getPurchaseSalesContractOrderById(
-        record.id || record.key,
-      );
-      const detail = res?.data || res;
+      const [res, placementRes] = await Promise.allSettled([
+        getPurchaseSalesContractOrderById(record.id || record.key),
+        getVehiclePlacements(),
+      ]);
+      const detail =
+        res.status === "fulfilled" ? res.value?.data || res.value : null;
+      if (!detail) {
+        throw new Error("Failed to load purchase order details");
+      }
       setSelectedRecord(detail);
+
+      const placementsList =
+        placementRes.status === "fulfilled"
+          ? Array.isArray(placementRes.value)
+            ? placementRes.value
+            : placementRes.value?.data || []
+          : [];
+
+      const placedSet = new Set();
+      placementsList.forEach((p) => {
+        const isPlPlaced = Boolean(
+          p.is_placed ||
+            p.vehicle ||
+            p.transporter ||
+            p.driver ||
+            (p.placement_status &&
+              p.placement_status.toLowerCase() === "placed") ||
+            (p.status && p.status.toLowerCase() === "placed"),
+        );
+        if (isPlPlaced) {
+          if (p.sale_contract) placedSet.add(p.sale_contract);
+          if (p.sale_contract_id) placedSet.add(p.sale_contract_id);
+          if (p.id) placedSet.add(p.id);
+        }
+      });
+      setPlacedContractIds(placedSet);
       setModalMode("view");
     } catch (err) {
       console.error(err);
@@ -975,12 +1072,19 @@ export default function PurchaseIndent() {
       setPoContractsLoading(true);
       setIsPoContractsModalOpen(true);
       setReleasedContractIds(new Set());
+      setPlacedContractIds(new Set());
       setModalContracts([]);
 
-      const res = await getPurchaseSalesContractOrderById(
-        record.id || record.key,
-      );
-      const detail = res?.data || res;
+      const [res, placementRes] = await Promise.allSettled([
+        getPurchaseSalesContractOrderById(record.id || record.key),
+        getVehiclePlacements(),
+      ]);
+
+      const detail =
+        res.status === "fulfilled" ? res.value?.data || res.value : null;
+      if (!detail) {
+        throw new Error("Failed to load purchase order details");
+      }
       setSelectedPoForContracts(detail);
 
       const linkedContracts =
@@ -991,6 +1095,32 @@ export default function PurchaseIndent() {
         detail.sale_contracts ||
         [];
       setModalContracts(linkedContracts);
+
+      const placementsList =
+        placementRes.status === "fulfilled"
+          ? Array.isArray(placementRes.value)
+            ? placementRes.value
+            : placementRes.value?.data || []
+          : [];
+
+      const placedSet = new Set();
+      placementsList.forEach((p) => {
+        const isPlPlaced = Boolean(
+          p.is_placed ||
+            p.vehicle ||
+            p.transporter ||
+            p.driver ||
+            (p.placement_status &&
+              p.placement_status.toLowerCase() === "placed") ||
+            (p.status && p.status.toLowerCase() === "placed"),
+        );
+        if (isPlPlaced) {
+          if (p.sale_contract) placedSet.add(p.sale_contract);
+          if (p.sale_contract_id) placedSet.add(p.sale_contract_id);
+          if (p.id) placedSet.add(p.id);
+        }
+      });
+      setPlacedContractIds(placedSet);
 
       const serials = {};
       linkedContracts.forEach((c) => {
@@ -2899,6 +3029,7 @@ export default function PurchaseIndent() {
           setSelectedPoForContracts(null);
           setModalContracts([]);
           setReleasedContractIds(new Set());
+          setPlacedContractIds(new Set());
         }}
         footer={[
           <Button
@@ -2908,6 +3039,7 @@ export default function PurchaseIndent() {
               setSelectedPoForContracts(null);
               setModalContracts([]);
               setReleasedContractIds(new Set());
+              setPlacedContractIds(new Set());
             }}
           >
             Cancel
@@ -2945,22 +3077,22 @@ export default function PurchaseIndent() {
             rowKey="key"
             onRow={(record) => ({
               onDoubleClick: () => {
-                if (!releasedContractIds.has(record.id || record.key)) {
+                const cId = record.id || record.key;
+                const isReleased =
+                  releasedContractIds.has(cId) ||
+                  (record.sale_contract_id &&
+                    releasedContractIds.has(record.sale_contract_id)) ||
+                  (record.contract_id &&
+                    releasedContractIds.has(record.contract_id)) ||
+                  record.link_status === "Removed" ||
+                  record.link_status?.toLowerCase() === "removed";
+                if (!isReleased) {
                   openEditSalesContract(record);
                 }
               },
             })}
-            rowClassName={(record) => {
-              const isReleased = releasedContractIds.has(
-                record.id || record.key,
-              );
-              if (isReleased) return "!bg-green-100";
-              if (record.link_status === "Removed" || record.link_status?.toLowerCase() === "removed") {
-                return "!bg-red-100";
-              }
-              return "cursor-pointer";
-            }}
-            className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1"
+            rowClassName={getContractRowClassName}
+            className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1 [&_tr.contract-row-released_td]:!bg-red-100 [&_tr.contract-row-released:hover_td]:!bg-red-200 [&_tr.contract-row-placed_td]:!bg-green-100 [&_tr.contract-row-placed:hover_td]:!bg-green-200"
             size="small"
           />
         </Card>
@@ -3199,8 +3331,8 @@ export default function PurchaseIndent() {
                 onRow={(record) => ({
                   onDoubleClick: () => openEditSalesContract(record),
                 })}
-                rowClassName={() => "cursor-pointer"}
-                className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1"
+                rowClassName={getContractRowClassName}
+                className="[&_.ant-table-cell]:!px-2 [&_.ant-table-cell]:!py-1 [&_tr.contract-row-released_td]:!bg-red-100 [&_tr.contract-row-released:hover_td]:!bg-red-200 [&_tr.contract-row-placed_td]:!bg-green-100 [&_tr.contract-row-placed:hover_td]:!bg-green-200"
                 size="small"
               />
             </Card>
