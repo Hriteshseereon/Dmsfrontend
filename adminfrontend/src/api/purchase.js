@@ -619,4 +619,56 @@ export const updatePurchaseInvoice = async (id, payload) => {
   });
   return res.data;
 };
+
+// ==========================================
+// 🔹 STOCK IN TRANSIT APIs
+// ==========================================
+
+export const getTransitSuppliers = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("/purchase/stock-in-transit/suppliers/", {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+
+export const getTransitPendingItems = async (supplierName) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("/purchase/stock-in-transit/pending-items/", {
+    params: {
+      organisation: currentOrgId,
+      ...(supplierName ? { supplier_name: supplierName } : {}),
+    },
+  });
+  return res.data;
+};
+
+export const getStockInTransit = async (params = {}) => {
+  const { currentOrgId, selectedFY } = useSessionStore.getState();
+  const res = await api.get("/purchase/stock-in-transit/", {
+    params: {
+      organisation: currentOrgId,
+      financial_year: selectedFY,
+      ...params,
+    },
+  });
+  return res.data;
+};
+
+export const createStockInTransit = async (payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.post("/purchase/stock-in-transit/", payload, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+
+export const updateStockInTransit = async (id, payload) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.patch(`/purchase/stock-in-transit/${id}/`, payload, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+
 
