@@ -565,6 +565,7 @@ export default function StockInTransit() {
     {
       title: <span className="text-amber-900 font-bold">Transport Name</span>,
       dataIndex: "transport_name",
+      render: (text) => (text ? String(text).trim().split(/\s+/)[0] : "-"),
     },
     {
       title: <span className="text-amber-900 font-bold">Vehicle No</span>,
