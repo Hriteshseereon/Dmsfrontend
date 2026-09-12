@@ -655,6 +655,31 @@ export const getStockInTransit = async (params = {}) => {
   return res.data;
 };
 
+export const getVehicleInvoices = async (vehicleNo, lrNo) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get("/purchase/stock-in-transit/vehicle-invoices/", {
+    params: {
+      organisation: currentOrgId,
+      vehicle_no: vehicleNo,
+      lr_no: lrNo,
+    },
+  });
+  return res.data;
+};
+
+export const getDepoDetails = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  try {
+    const res = await api.get("/organisation/depo-details/", {
+      params: { organisation: currentOrgId },
+    });
+    return res.data;
+  } catch (err) {
+    console.warn("Could not fetch depo details from backend, fallback:", err);
+    return [];
+  }
+};
+
 export const createStockInTransit = async (payload) => {
   const { currentOrgId } = useSessionStore.getState();
   const res = await api.post("/purchase/stock-in-transit/", payload, {
@@ -670,5 +695,6 @@ export const updateStockInTransit = async (id, payload) => {
   });
   return res.data;
 };
+
 
 

@@ -304,7 +304,27 @@ export default function PurchaseInvoice() {
 
   const handleVehicleChange = async (vehicleNo) => {
     setVehicleDropdownOpen(false);
-    const matchedVehicle = availableVehicles.find((v) => v.vehicle_no === vehicleNo);
+    if (!vehicleNo) return;
+
+    let matchedVehicle = availableVehicles.find((v) => v.vehicle_no === vehicleNo);
+
+    // Call GET /api/purchase/invoices/available-vehicles/?vehicle_no=<vehicle_no> to fetch fresh remaining quantities
+    try {
+      message.loading({ content: "Fetching vehicle details...", key: "load_vehicle_details" });
+      const res = await getAvailableVehicles(vehicleNo);
+      const list = res?.data || res || [];
+      const freshVehicle = Array.isArray(list)
+        ? (list.find((v) => v.vehicle_no === vehicleNo) || list[0])
+        : list;
+      if (freshVehicle && freshVehicle.items) {
+        matchedVehicle = freshVehicle;
+      }
+      message.destroy("load_vehicle_details");
+    } catch (err) {
+      console.warn("Could not fetch specific vehicle details, using cached:", err);
+      message.destroy("load_vehicle_details");
+    }
+
     if (!matchedVehicle) return;
 
     form.setFieldsValue({
@@ -318,21 +338,34 @@ export default function PurchaseInvoice() {
         0,
     });
 
-    // Populate initial items list
-    const populatedItems = (matchedVehicle.items || []).map((item) => ({
-      sale_contract: item.sale_contract_id,
-      sale_contract_item: item.sale_contract_item_id,
-      product: item.product_id,
-      item_name: item.item_name,
-      qty: item.qty,
-      unit: item.unit,
-      net_wt: item.net_wt,
-      gst_percent: item.gst_percent,
-      rate: undefined,
-      taxable_amount: 0,
-      igst_amount: 0,
-      total_amount: 0,
-    }));
+    // Populate initial items list with available_qty, editable invoice_qty & unit_net_wt
+    const populatedItems = (matchedVehicle.items || []).map((item) => {
+      const remainingQty = Number(item.qty || 0);
+      const invoiceQty = Number(item.invoice_qty || remainingQty || 0);
+      const netWt = Number(item.net_wt || 0);
+      const unitNetWt = remainingQty > 0 ? netWt / remainingQty : 0;
+      const actualNetWt = Number((unitNetWt * invoiceQty).toFixed(3));
+
+      return {
+        sale_contract: item.sale_contract_id,
+        sale_contract_item: item.sale_contract_item_id,
+        product: item.product_id,
+        item_name: item.item_name,
+        available_qty: Number(remainingQty).toFixed(2),
+        original_qty: Number(item.original_qty !== undefined ? item.original_qty : remainingQty),
+        already_invoiced_qty: Number(item.already_invoiced_qty || 0),
+        qty: remainingQty,
+        invoice_qty: invoiceQty,
+        unit: item.unit,
+        unit_net_wt: unitNetWt,
+        net_wt: actualNetWt,
+        gst_percent: item.gst_percent,
+        rate: undefined,
+        taxable_amount: 0,
+        igst_amount: 0,
+        total_amount: 0,
+      };
+    });
 
     form.setFieldsValue({ items: populatedItems });
 
@@ -389,12 +422,47 @@ export default function PurchaseInvoice() {
     message.destroy("load_rates");
   };
 
+  // Handle invoice_qty change for an item row
+  const handleInvoiceQtyChange = (index, newQty) => {
+    const items = form.getFieldValue("items") || [];
+    if (!items[index]) return;
+
+    const currentItem = items[index];
+    const validQty = Math.max(0, Number(newQty || 0));
+    const unitNetWt = Number(
+      currentItem.unit_net_wt ||
+        (currentItem.qty > 0 ? Number(currentItem.net_wt || 0) / currentItem.qty : 0)
+    );
+    const newNetWt = Number((unitNetWt * validQty).toFixed(3));
+
+    const rate = Number(currentItem.rate || 0);
+    const gstPercent = Number(currentItem.gst_percent || 0);
+    const taxableAmount = Number((validQty * rate).toFixed(2));
+    const igstAmount = Number(((taxableAmount * gstPercent) / 100).toFixed(2));
+    const totalAmount = Number((taxableAmount + igstAmount).toFixed(2));
+
+    const updated = [...items];
+    updated[index] = {
+      ...currentItem,
+      invoice_qty: validQty,
+      net_wt: newNetWt,
+      taxable_amount: taxableAmount,
+      igst_amount: igstAmount,
+      total_amount: totalAmount,
+    };
+
+    form.setFieldsValue({ items: updated });
+    recalculateGrandTotals(updated);
+  };
+
   const handleRateChange = (index, rate, rateOption) => {
     const items = form.getFieldValue("items") || [];
     if (!items[index] || !rateOption) return;
 
     const currentItem = items[index];
-    const qty = Number(currentItem.qty || 0);
+    const invQty = Number(
+      currentItem.invoice_qty !== undefined ? currentItem.invoice_qty : currentItem.qty || 0
+    );
     const gstPercent = Number(currentItem.gst_percent || 0);
     const rateVal = Number(rateOption.rate ?? rate ?? 0);
     const contractBalance = Number(
@@ -403,14 +471,16 @@ export default function PurchaseInvoice() {
         : rateOption.souda_qty ?? 0
     );
 
-    // If contract balance is less than required item quantity: split item
-    if (contractBalance > 0 && contractBalance < qty) {
+    // If contract balance is less than required item invoice quantity: split item
+    if (contractBalance > 0 && contractBalance < invQty) {
       const allocatedQty = contractBalance;
-      const remainingQty = Number((qty - allocatedQty).toFixed(3));
-      const originalNetWt = Number(currentItem.net_wt || 0);
-      const allocatedNetWt =
-        qty > 0 ? Number(((originalNetWt * allocatedQty) / qty).toFixed(3)) : 0;
-      const remainingNetWt = Number((originalNetWt - allocatedNetWt).toFixed(3));
+      const remainingQty = Number((invQty - allocatedQty).toFixed(3));
+      const unitNetWt = Number(
+        currentItem.unit_net_wt ||
+          (invQty > 0 ? Number(currentItem.net_wt || 0) / invQty : 0)
+      );
+      const allocatedNetWt = Number((unitNetWt * allocatedQty).toFixed(3));
+      const remainingNetWt = Number((unitNetWt * remainingQty).toFixed(3));
 
       const currentTaxable = allocatedQty * rateVal;
       const currentIgst = (currentTaxable * gstPercent) / 100;
@@ -418,7 +488,7 @@ export default function PurchaseInvoice() {
 
       const updatedCurrentItem = {
         ...currentItem,
-        qty: allocatedQty,
+        invoice_qty: allocatedQty,
         net_wt: allocatedNetWt,
         rate: rateVal,
         purchase_contract: rateOption.purchase_contract_id,
@@ -433,8 +503,11 @@ export default function PurchaseInvoice() {
         sale_contract_item: currentItem.sale_contract_item,
         product: currentItem.product,
         item_name: currentItem.item_name,
-        qty: remainingQty,
+        available_qty: currentItem.available_qty,
+        qty: currentItem.qty,
+        invoice_qty: remainingQty,
         unit: currentItem.unit,
+        unit_net_wt: unitNetWt,
         net_wt: remainingNetWt,
         gst_percent: currentItem.gst_percent,
         rate: undefined,
@@ -466,8 +539,8 @@ export default function PurchaseInvoice() {
       return;
     }
 
-    // Standard case: contract balance >= item qty
-    const taxableAmount = qty * rateVal;
+    // Standard case: contract balance >= invoice qty
+    const taxableAmount = invQty * rateVal;
     const igstAmount = (taxableAmount * gstPercent) / 100;
     const totalAmount = taxableAmount + igstAmount;
 
@@ -503,7 +576,11 @@ export default function PurchaseInvoice() {
 
   const recalculateGrandTotals = (itemsOverride) => {
     const items = itemsOverride || form.getFieldValue("items") || [];
-    const totalQty = items.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+    const totalQty = items.reduce(
+      (sum, item) =>
+        sum + Number(item.invoice_qty !== undefined ? item.invoice_qty : item.qty || 0),
+      0
+    );
     const totalTaxable = items.reduce(
       (sum, item) => sum + Number(item.taxable_amount || 0),
       0
@@ -551,9 +628,10 @@ export default function PurchaseInvoice() {
 
     const formattedItems = (record.items || []).map((item) => {
       const qty = Number(item.qty || 0);
+      const invoiceQty = Number(item.invoice_qty || qty || 0);
       const rate = Number(item.rate || 0);
       const gstPercent = Number(item.gst_percent || 0);
-      const taxableAmount = Number(item.taxable_amount || qty * rate || 0);
+      const taxableAmount = Number(item.taxable_amount || invoiceQty * rate || 0);
       const igstAmount = Number(
         item.igst_amount ||
           item.total_gst_amount ||
@@ -563,6 +641,8 @@ export default function PurchaseInvoice() {
       const totalAmount = Number(
         item.total_amount || taxableAmount + igstAmount || 0
       );
+      const netWt = Number(item.net_wt || 0);
+      const unitNetWt = invoiceQty > 0 ? netWt / invoiceQty : 0;
 
       return {
         sale_contract: item.sale_contract,
@@ -571,9 +651,12 @@ export default function PurchaseInvoice() {
         purchase_contract_item: item.purchase_contract_item,
         product: item.product,
         item_name: item.item_name,
+        available_qty: Number(qty).toFixed(2),
         qty: qty,
+        invoice_qty: invoiceQty,
         unit: item.unit,
-        net_wt: Number(item.net_wt || 0),
+        unit_net_wt: unitNetWt,
+        net_wt: netWt,
         gst_percent: gstPercent,
         rate: rate,
         taxable_amount: Number(taxableAmount.toFixed(2)),
@@ -691,19 +774,19 @@ export default function PurchaseInvoice() {
         supplier_name: values.supplier_name,
         place: values.place,
         lr_no: values.lr_no,
-        lr_date: values.lr_date ? dayjs(values.lr_date).format("YYYY-MM-DD") : null,
+        lr_date: values.lr_date ? dayjs(values.lr_date).format("DD-MM-YYYY") : null,
         transport_name: values.transport_name,
         vehicle_no: values.vehicle_no,
         ewaybill_no: values.ewaybill_no || null,
         ewaybill_date: values.ewaybill_date
-          ? dayjs(values.ewaybill_date).format("YYYY-MM-DD")
+          ? dayjs(values.ewaybill_date).format("DD-MM-YYYY")
           : null,
         invoice_no: values.invoice_no,
         invoice_date: values.invoice_date
-          ? dayjs(values.invoice_date).format("YYYY-MM-DD")
+          ? dayjs(values.invoice_date).format("DD-MM-YYYY")
           : null,
         payment_due_date: values.payment_due_date
-          ? dayjs(values.payment_due_date).format("YYYY-MM-DD")
+          ? dayjs(values.payment_due_date).format("DD-MM-YYYY")
           : null,
         dispatch_from: values.dispatch_from,
         ship_to: values.ship_to,
@@ -715,11 +798,12 @@ export default function PurchaseInvoice() {
           purchase_contract_item: item.purchase_contract_item,
           product: item.product,
           item_name: item.item_name,
-          qty: item.qty,
+          qty: Number(item.qty || item.available_qty || item.invoice_qty || 0),
+          invoice_qty: Number(item.invoice_qty || item.qty || 0),
           unit: item.unit,
-          net_wt: item.net_wt,
-          gst_percent: item.gst_percent,
-          rate: item.rate,
+          net_wt: Number(item.net_wt || 0),
+          gst_percent: Number(item.gst_percent || 0),
+          rate: Number(item.rate || 0),
         })),
       };
 
@@ -834,6 +918,7 @@ export default function PurchaseInvoice() {
     {
       title: <span className="text-amber-700 font-semibold">Transport Name</span>,
       dataIndex: "transport_name",
+      render: (text) => (text ? String(text).trim().split(/\s+/)[0] : "-"),
     },
     {
       title: <span className="text-amber-700 font-semibold">Vehicle No</span>,
@@ -1019,6 +1104,7 @@ export default function PurchaseInvoice() {
     {
       title: <span className="text-amber-700 font-semibold">Transport Name</span>,
       dataIndex: "transport_name",
+      render: (text) => (text ? String(text).trim().split(/\s+/)[0] : "-"),
     },
     {
       title: <span className="text-amber-700 font-semibold">Vehicle No</span>,
@@ -1432,16 +1518,18 @@ export default function PurchaseInvoice() {
 
             <Row gutter={8} className="pb-2 mb-2 text-amber-800 font-bold text-xs">
               <Col span={4}>Item Name</Col>
-              <Col span={2}>Qty</Col>
-              <Col span={2}>Unit</Col>
+              <Col span={2}>Avail Qty</Col>
+              <Col span={2}>Invoice Qty</Col>
+              <Col span={1}>Unit</Col>
               <Col span={2}>Net Wt (Ton)</Col>
               <Col span={1}>GST %</Col>
-              <Col span={5}>Rate Selection (Available Soudas)</Col>
+              <Col span={4}>Rate Selection (Available Soudas)</Col>
               <Col span={2}>Taxable Amt</Col>
               <Col span={1}>SGST</Col>
               <Col span={1}>CGST</Col>
-              <Col span={2}>IGST</Col>
+              <Col span={1}>IGST</Col>
               <Col span={2}>Total Amount</Col>
+              <Col span={1} className="text-center">Action</Col>
             </Row>
 
             <Form.List name="items">
@@ -1465,23 +1553,78 @@ export default function PurchaseInvoice() {
                         <Form.Item name={[field.name, "product"]} hidden>
                           <Input />
                         </Form.Item>
-                      </Col>
-
-                      <Col span={2}>
-                        <Form.Item name={[field.name, "qty"]} style={{ marginBottom: 0 }}>
-                          <InputNumber disabled className="w-full bg-gray-50!" />
+                        <Form.Item name={[field.name, "unit_net_wt"]} hidden>
+                          <InputNumber />
                         </Form.Item>
                       </Col>
 
                       <Col span={2}>
+                        <Form.Item name={[field.name, "qty"]} style={{ marginBottom: 0 }}>
+                          <Tooltip
+                            title={`Original: ${
+                              form.getFieldValue(["items", field.name, "original_qty"]) ??
+                              form.getFieldValue(["items", field.name, "qty"]) ??
+                              "-"
+                            } | Invoiced: ${
+                              form.getFieldValue(["items", field.name, "already_invoiced_qty"]) ?? 0
+                            } | Remaining: ${
+                              form.getFieldValue(["items", field.name, "qty"]) ?? "-"
+                            }`}
+                          >
+                            <Input
+                              disabled
+                              className="w-full bg-gray-50! font-bold text-center cursor-help"
+                              style={{
+                                color: "#111827",
+                                fontWeight: 700,
+                                WebkitTextFillColor: "#111827",
+                              }}
+                            />
+                          </Tooltip>
+                        </Form.Item>
+                        <Form.Item name={[field.name, "available_qty"]} hidden>
+                          <Input />
+                        </Form.Item>
+                        <Form.Item name={[field.name, "original_qty"]} hidden>
+                          <InputNumber />
+                        </Form.Item>
+                        <Form.Item name={[field.name, "already_invoiced_qty"]} hidden>
+                          <InputNumber />
+                        </Form.Item>
+                      </Col>
+
+                      <Col span={2}>
+                        <Form.Item
+                          name={[field.name, "invoice_qty"]}
+                          style={{ marginBottom: 0 }}
+                          rules={[{ required: true, message: "Required" }]}
+                        >
+                          <InputNumber
+                            min={0.01}
+                            max={
+                              Number(
+                                form.getFieldValue(["items", field.name, "available_qty"]) ||
+                                form.getFieldValue(["items", field.name, "qty"]) ||
+                                999999
+                              )
+                            }
+                            precision={2}
+                            className="w-full border-amber-400! font-semibold"
+                            placeholder="Qty"
+                            onChange={(val) => handleInvoiceQtyChange(field.name, val)}
+                          />
+                        </Form.Item>
+                      </Col>
+
+                      <Col span={1}>
                         <Form.Item name={[field.name, "unit"]} style={{ marginBottom: 0 }}>
-                          <Input disabled className="bg-gray-50!" />
+                          <Input disabled className="bg-gray-50! text-center p-0" />
                         </Form.Item>
                       </Col>
 
                       <Col span={2}>
                         <Form.Item name={[field.name, "net_wt"]} style={{ marginBottom: 0 }}>
-                          <InputNumber disabled className="w-full bg-gray-50!" />
+                          <InputNumber disabled className="w-full bg-gray-50!" precision={3} />
                         </Form.Item>
                       </Col>
 
@@ -1491,7 +1634,7 @@ export default function PurchaseInvoice() {
                         </Form.Item>
                       </Col>
 
-                      <Col span={5}>
+                      <Col span={4}>
                         <Form.Item
                           name={[field.name, "rate"]}
                           style={{ marginBottom: 0 }}
@@ -1585,14 +1728,14 @@ export default function PurchaseInvoice() {
                       </Col>
 
                       <Col span={1}>
-                        <Input disabled className="w-full bg-gray-50! border-dashed text-center" placeholder="-" />
+                        <Input disabled className="w-full bg-gray-50! border-dashed text-center p-0 text-xs" placeholder="-" />
                       </Col>
 
                       <Col span={1}>
-                        <Input disabled className="w-full bg-gray-50! border-dashed text-center" placeholder="-" />
+                        <Input disabled className="w-full bg-gray-50! border-dashed text-center p-0 text-xs" placeholder="-" />
                       </Col>
 
-                      <Col span={2}>
+                      <Col span={1}>
                         <Form.Item name={[field.name, "igst_amount"]} style={{ marginBottom: 0 }}>
                           <InputNumber disabled className="w-full bg-gray-50!" precision={2} />
                         </Form.Item>
@@ -1602,6 +1745,18 @@ export default function PurchaseInvoice() {
                         <Form.Item name={[field.name, "total_amount"]} style={{ marginBottom: 0 }}>
                           <InputNumber disabled className="w-full bg-gray-50!" precision={2} />
                         </Form.Item>
+                      </Col>
+
+                      <Col span={1} className="text-center">
+                        <Tooltip title="Remove item from this invoice">
+                          <Button
+                            type="text"
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => handleRemoveItem(field.name)}
+                            disabled={form.getFieldValue("items")?.length <= 1}
+                          />
+                        </Tooltip>
                       </Col>
                     </Row>
                   );
@@ -1615,15 +1770,16 @@ export default function PurchaseInvoice() {
               <Col span={4}>
                 <span className="font-bold text-amber-800">Total:</span>
               </Col>
+              <Col span={2}></Col>
               <Col span={2}>
                 <Form.Item name="total_qty" style={{ marginBottom: 0 }}>
                   <InputNumber disabled className="w-full bg-gray-100! font-semibold" />
                 </Form.Item>
               </Col>
-              <Col span={2}></Col>
+              <Col span={1}></Col>
               <Col span={2}></Col>
               <Col span={1}></Col>
-              <Col span={5}></Col>
+              <Col span={4}></Col>
               <Col span={2}>
                 <Form.Item name="total_taxable_amount" style={{ marginBottom: 0 }}>
                   <InputNumber disabled className="w-full bg-gray-100! font-semibold" precision={2} />
@@ -1631,7 +1787,7 @@ export default function PurchaseInvoice() {
               </Col>
               <Col span={1}></Col>
               <Col span={1}></Col>
-              <Col span={2}>
+              <Col span={1}>
                 <Form.Item name="total_igst_amount" style={{ marginBottom: 0 }}>
                   <InputNumber disabled className="w-full bg-gray-100! font-semibold" precision={2} />
                 </Form.Item>
@@ -1641,6 +1797,7 @@ export default function PurchaseInvoice() {
                   <InputNumber disabled className="w-full bg-gray-100! font-semibold" precision={2} />
                 </Form.Item>
               </Col>
+              <Col span={1}></Col>
             </Row>
           </Card>
 
@@ -1766,7 +1923,6 @@ export default function PurchaseInvoice() {
         width={1000}
         destroyOnClose
       >
-
         {viewRecord && (
           <div>
             <Row gutter={[16, 12]}>
@@ -1834,7 +1990,7 @@ export default function PurchaseInvoice() {
               className="border border-amber-100"
               columns={[
                 { title: "Item Name", dataIndex: "item_name" },
-                { title: "Qty", dataIndex: "qty" },
+                { title: "Qty", dataIndex: "qty", render: (val, r) => `${r.invoice_qty || val} ${r.unit || ""}` },
                 { title: "Unit", dataIndex: "unit" },
                 { title: "Net Wt (Ton)", dataIndex: "net_wt" },
                 { title: "GST %", dataIndex: "gst_percent", render: (val) => `${val}%` },

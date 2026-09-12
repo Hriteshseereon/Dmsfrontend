@@ -16,22 +16,30 @@ import {
   Space,
   Tooltip,
   message,
+  Badge,
 } from "antd";
 import {
   SearchOutlined,
   DownloadOutlined,
   EyeOutlined,
   CheckCircleOutlined,
+  EditOutlined,
   ReloadOutlined,
+  CarOutlined,
   ShopOutlined,
+  InboxOutlined,
+  ExclamationCircleOutlined,
+  ClockCircleOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 
 import { exportToExcel } from "../../../../../utils/exportToExcel";
 import {
-  getTransitSuppliers,
-  getTransitPendingItems,
+  getStockInTransit,
+  getVehicleInvoices,
+  getDepoDetails,
   createStockInTransit,
   updateStockInTransit,
 } from "../../../../../api/purchase";
@@ -48,7 +56,23 @@ const { Text } = Typography;
 const { TextArea } = Input;
 
 const CLAIM_REASONS = ["None", "Shortage", "Leakage", "Damage", "Others"];
-const RECEIVED_AT_OPTIONS = ["Direct", "Depo", "Both"];
+
+const RECEIVED_AT_OPTIONS = [
+  { label: "Direct (Plant / Place)", value: "direct" },
+  { label: "Depot", value: "depo" },
+  // { label: "Both (Split Direct & Depot)", value: "both" },
+];
+
+const FALLBACK_DEPOS = [
+  { id: "depo-1", name: "Bhubaneswar Depo", code: "BBS-01" },
+  { id: "depo-2", name: "Cuttack Depo", code: "CTC-01" },
+  { id: "depo-3", name: "Sambalpur Depo", code: "SBP-01" },
+  { id: "depo-4", name: "Rourkela Depo", code: "RKL-01" },
+  { id: "depo-5", name: "Balasore Depo", code: "BLS-01" },
+  { id: "depo-6", name: "Berhampur Depo", code: "BAM-01" },
+  { id: "depo-7", name: "Jajpur Depo", code: "JJP-01" },
+  { id: "depo-8", name: "Angul Depo", code: "ANG-01" },
+];
 
 const parseApiDate = (value) => {
   if (!value) return null;
@@ -72,268 +96,470 @@ const fmtDate = (d) => {
 };
 
 export default function StockInTransit() {
-  const [suppliers, setSuppliers] = useState([]);
-  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+  const [rawData, setRawData] = useState([]);
+  const [vehicleList, setVehicleList] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
-  // Supplier Drill-down Modal State
-  const [supplierModalOpen, setSupplierModalOpen] = useState(false);
-  const [selectedSupplier, setSelectedSupplier] = useState(null);
-  const [supplierItems, setSupplierItems] = useState([]);
-  const [loadingItems, setLoadingItems] = useState(false);
+  // Step 2: Vehicle Invoices Drill-down Modal State
+  const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [loadingVehicleInvoices, setLoadingVehicleInvoices] = useState(false);
 
-  // Receive / Edit Modal State
+  // Step 3: Stock Receiving Modal State (Per Invoice)
   const [receiveModalOpen, setReceiveModalOpen] = useState(false);
-  const [editingRecord, setEditingRecord] = useState(null);
+  const [editingInvoice, setEditingInvoice] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [toReceiveAtValue, setToReceiveAtValue] = useState("direct");
   const [form] = Form.useForm();
 
   // View Details Modal State
   const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [viewRecord, setViewRecord] = useState(null);
+  const [viewInvoice, setViewInvoice] = useState(null);
 
   const selectedFY = useSelectedFinancialYear();
 
   useEffect(() => {
-    fetchSuppliersList();
-  }, []);
+    fetchTransitData();
+  }, [selectedFY]);
 
-  // 1. Fetch Suppliers who have items in transit
-  const fetchSuppliersList = async () => {
+  // 1. Fetch Aggregated Supplier & Vehicle Data
+  const fetchTransitData = async () => {
     try {
-      setLoadingSuppliers(true);
-      const res = await getTransitSuppliers();
+      setLoading(true);
+      const res = await getStockInTransit();
       const list = Array.isArray(res) ? res : res?.data || [];
-      setSuppliers(list);
-    } catch (error) {
-      console.error("Error loading transit suppliers:", error);
-      message.error("Failed to load transit suppliers list");
-    } finally {
-      setLoadingSuppliers(false);
-    }
-  };
+      setRawData(list);
 
-  // 2. Fetch Pending and Recorded Transit Items for a Selected Supplier and group by Invoice
-  const fetchSupplierTransitItems = async (supplier) => {
-    if (!supplier) return;
-    const supplierName = supplier.supplier_name || supplier.vendor_name;
-    if (!supplierName) {
-      message.warning("Supplier name is missing");
-      return;
-    }
+      // Process hierarchical or flat response into unified Vehicle rows (grouped by vehicle_no + lr_no)
+      const processedVehicles = [];
 
-    try {
-      setLoadingItems(true);
+      list.forEach((supplier, sIdx) => {
+        const supplierName =
+          supplier.supplier_name || supplier.vendor_name || "";
+        const vendorId = supplier.vendor_id;
+        const place = supplier.place || "";
 
-      // Fetch pending / transit items for this supplier
-      const resPending = await getTransitPendingItems(supplierName);
-      const rawRecords = Array.isArray(resPending)
-        ? resPending
-        : resPending?.data || [];
+        if (Array.isArray(supplier.vehicles) && supplier.vehicles.length > 0) {
+          // Standard hierarchical format from endpoint 1
+          supplier.vehicles.forEach((veh, vIdx) => {
+            const vehicleKey = `${supplierName}_${veh.vehicle_no || "V"}_${veh.lr_no || "LR"}_${sIdx}_${vIdx}`;
 
-      // Group records by purchase_invoice_id (or invoice_no / lr_no) to prevent duplicate invoice rows
-      const invoiceMap = new Map();
+            // Calculate invoices and status if not given
+            const invoices = (veh.invoices || []).map((inv, iIdx) => {
+              const invStatus =
+                inv.status || (inv.stock_received_on ? "Received" : "Pending");
+              return {
+                ...inv,
+                status: invStatus,
+                items: (inv.items || []).map((item, itIdx) => ({
+                  ...item,
+                  id:
+                    item.purchase_invoice_item_id ||
+                    item.item_id ||
+                    item.id ||
+                    `item_${iIdx}_${itIdx}`,
+                  purchase_invoice_item_id:
+                    item.purchase_invoice_item_id || item.item_id || item.id,
+                  invoiced_qty: Number(item.invoiced_qty || item.qty || 0),
+                  rate: Number(item.rate || 0),
+                  direct_qty:
+                    item.direct_qty !== "" && item.direct_qty !== undefined
+                      ? Number(item.direct_qty)
+                      : null,
+                  depo_qty:
+                    item.depo_qty !== "" && item.depo_qty !== undefined
+                      ? Number(item.depo_qty)
+                      : null,
+                  claim_qty: Number(item.claim_qty || 0),
+                  claim_amount: Number(item.claim_amount || 0),
+                  claim_reason: item.claim_reason || "None",
+                  narration: item.narration || "",
+                })),
+              };
+            });
 
-      rawRecords.forEach((item, idx) => {
-        const invKey =
-          item.purchase_invoice_id ||
-          item.invoice_no ||
-          item.lr_no ||
-          `inv_${idx}`;
+            // Derive outer vehicle status from its invoices
+            const allReceived =
+              invoices.length > 0 &&
+              invoices.every((i) => i.status === "Received");
+            const anyReceived = invoices.some((i) => i.status === "Received");
+            const derivedStatus =
+              veh.status ||
+              (allReceived
+                ? "Received"
+                : anyReceived
+                  ? "Partially Received"
+                  : "Intransit");
 
-        const itemObj = {
-          id:
-            item.purchase_invoice_item_id ||
-            item.item_id ||
-            item.id ||
-            `item_${idx}`,
-          purchase_invoice_item_id:
-            item.purchase_invoice_item_id || item.item_id || item.id,
-          stock_in_transit_id: item.stock_in_transit_id,
-          item_name: item.item_name || item.product_name || "-",
-          item_code: item.item_code || "",
-          unit: item.unit || "TIN",
-          invoiced_qty: Number(item.invoiced_qty || 0),
-          rate: Number(item.rate || 0),
-          claim_reason: item.claim_reason || "None",
-          claim_qty: Number(item.claim_qty || 0),
-          claim_amount: Number(item.claim_amount || 0),
-        };
-
-        if (invoiceMap.has(invKey)) {
-          const existing = invoiceMap.get(invKey);
-          existing.items.push(itemObj);
-
-          if (!existing.stock_in_transit_id && item.stock_in_transit_id) {
-            existing.stock_in_transit_id = item.stock_in_transit_id;
-          }
-          if (!existing.stock_received_on && item.stock_received_on) {
-            existing.stock_received_on = item.stock_received_on;
-          }
-          if (
-            existing.transit_days === null &&
-            item.transit_days !== null &&
-            item.transit_days !== undefined
-          ) {
-            existing.transit_days = item.transit_days;
-          }
-          if (!existing.narration && item.narration) {
-            existing.narration = item.narration;
-          }
-          if (item.status === "Pending") {
-            existing.hasPendingItems = true;
-          }
-        } else {
-          invoiceMap.set(invKey, {
-            key: invKey,
-            id: item.stock_in_transit_id || invKey,
-            stock_in_transit_id: item.stock_in_transit_id,
-            purchase_invoice_id: item.purchase_invoice_id,
-            supplier_name:
-              item.supplier_name ||
-              item.vendor_name ||
-              supplier.supplier_name ||
-              supplier.vendor_name ||
-              "",
-            vendor_id: item.vendor_id || supplier.vendor_id,
-            place: item.place || "",
-            lr_no: item.lr_no || "-",
-            lr_date: item.lr_date,
-            transport_name: item.transport_name || "-",
-            vehicle_no: item.vehicle_no || "-",
-            ewaybill_no: item.ewaybill_no || "-",
-            ewaybill_date: item.ewaybill_date,
-            invoice_no: item.invoice_no || item.purchase_invoice_number || "-",
-            invoice_date: item.invoice_date,
-            invoice_amount: Number(
-              item.invoice_amount || item.total_amount || 0,
-            ),
-            transit_days: item.transit_days ?? null,
-            stock_received_on: item.stock_received_on || null,
-            to_be_received_at: item.to_be_received_at || "Direct",
-            narration: item.narration || "",
-            status:
-              item.status || (item.stock_received_on ? "Received" : "Pending"),
-            hasPendingItems: item.status === "Pending",
-            items: [itemObj],
+            processedVehicles.push({
+              key: vehicleKey,
+              supplier_name: supplierName,
+              vendor_id: vendorId,
+              place: veh.place || place,
+              vehicle_no: veh.vehicle_no || "-",
+              lr_no: veh.lr_no || "-",
+              lr_date: veh.lr_date,
+              transport_name: veh.transport_name || "-",
+              total_qty: Number(veh.total_qty || 0),
+              total_amount: Number(veh.total_amount || 0),
+              total_amount_display: veh.total_amount_display,
+              invoices_count: veh.invoices_count || invoices.length,
+              status: derivedStatus,
+              invoices: invoices,
+            });
           });
+        } else if (
+          supplier.vehicle_no ||
+          supplier.purchase_invoice_id ||
+          supplier.invoice_no
+        ) {
+          // Flat invoice item fallback: group by vehicle_no + lr_no
+          const vehicleNo = supplier.vehicle_no || "-";
+          const lrNo = supplier.lr_no || "-";
+          const vehicleKey = `${supplierName}_${vehicleNo}_${lrNo}`;
+
+          const existing = processedVehicles.find((v) => v.key === vehicleKey);
+
+          const invoiceObj = {
+            purchase_invoice_id: supplier.purchase_invoice_id,
+            invoice_no:
+              supplier.invoice_no || supplier.purchase_invoice_number || "-",
+            invoice_date: supplier.invoice_date,
+            invoice_amount: Number(
+              supplier.invoice_amount || supplier.total_amount || 0,
+            ),
+            total_qty: Number(supplier.total_qty || supplier.invoiced_qty || 0),
+            ewaybill_no: supplier.ewaybill_no || "-",
+            ewaybill_date: supplier.ewaybill_date,
+            transit_days: supplier.transit_days ?? "",
+            stock_received_on: supplier.stock_received_on || "",
+            to_be_received_at: supplier.to_be_received_at || "",
+            received_place: supplier.received_place || supplier.place || "",
+            depo_id: supplier.depo_id || supplier.depo,
+            depo_name: supplier.depo_name || "",
+            status:
+              supplier.status ||
+              (supplier.stock_received_on ? "Received" : "Pending"),
+            items: Array.isArray(supplier.items)
+              ? supplier.items
+              : [
+                  {
+                    id:
+                      supplier.purchase_invoice_item_id ||
+                      supplier.item_id ||
+                      "item_0",
+                    purchase_invoice_item_id:
+                      supplier.purchase_invoice_item_id || supplier.item_id,
+                    item_name:
+                      supplier.item_name || supplier.product_name || "-",
+                    item_code: supplier.item_code || "",
+                    unit: supplier.unit || "TIN",
+                    invoiced_qty: Number(
+                      supplier.invoiced_qty || supplier.qty || 0,
+                    ),
+                    rate: Number(supplier.rate || 0),
+                    claim_reason: supplier.claim_reason || "None",
+                    claim_qty: Number(supplier.claim_qty || 0),
+                    claim_amount: Number(supplier.claim_amount || 0),
+                    direct_qty: supplier.direct_qty,
+                    depo_qty: supplier.depo_qty,
+                    narration: supplier.narration || "",
+                    status: supplier.status || "Pending",
+                  },
+                ],
+          };
+
+          if (existing) {
+            existing.invoices.push(invoiceObj);
+            existing.total_qty += Number(supplier.invoiced_qty || 0);
+            existing.total_amount += Number(supplier.invoice_amount || 0);
+            existing.invoices_count = existing.invoices.length;
+
+            const allRec = existing.invoices.every(
+              (i) => i.status === "Received",
+            );
+            const anyRec = existing.invoices.some(
+              (i) => i.status === "Received",
+            );
+            existing.status = allRec
+              ? "Received"
+              : anyRec
+                ? "Partially Received"
+                : "Intransit";
+          } else {
+            processedVehicles.push({
+              key: vehicleKey,
+              supplier_name: supplierName,
+              vendor_id: vendorId,
+              place: place,
+              vehicle_no: vehicleNo,
+              lr_no: lrNo,
+              lr_date: supplier.lr_date,
+              transport_name: supplier.transport_name || "-",
+              total_qty: Number(
+                supplier.total_qty || supplier.invoiced_qty || 0,
+              ),
+              total_amount: Number(
+                supplier.invoice_amount || supplier.total_amount || 0,
+              ),
+              invoices_count: 1,
+              status:
+                supplier.status ||
+                (supplier.stock_received_on ? "Received" : "Intransit"),
+              invoices: [invoiceObj],
+            });
+          }
         }
       });
 
-      const groupedList = Array.from(invoiceMap.values()).map((inv) => ({
-        ...inv,
-        status: inv.hasPendingItems
-          ? "Pending"
-          : inv.stock_received_on
-            ? "Received"
-            : inv.status,
-      }));
-
-      setSupplierItems(groupedList);
+      setVehicleList(processedVehicles);
     } catch (error) {
-      console.error("Error fetching supplier transit items:", error);
-      message.error("Failed to load transit items for supplier");
+      console.error("Error loading stock in transit vehicles:", error);
+      message.error("Failed to load Stock In Transit vehicles list");
     } finally {
-      setLoadingItems(false);
+      setLoading(false);
     }
   };
 
-  // Open Supplier Drill-down Modal on click / double click
-  const handleOpenSupplierModal = (record) => {
-    setSelectedSupplier(record);
-    setSupplierModalOpen(true);
-    fetchSupplierTransitItems(record);
-  };
+  // Step 2: Open Vehicle Invoices Modal on Vehicle Click
+  const handleOpenVehicleModal = async (vehicleRecord) => {
+    setSelectedVehicle(vehicleRecord);
+    setVehicleModalOpen(true);
 
-  // Live Transit Days calculation: stock_received_on - invoice_date
-  const calculateTransitDays = (receivedDate, invDate) => {
-    if (!receivedDate || !invDate) return 0;
-    const dRecv = parseApiDate(receivedDate);
-    const dInv = parseApiDate(invDate);
-    if (dRecv && dInv && dRecv.isValid() && dInv.isValid()) {
-      const diff = dRecv.diff(dInv, "day");
-      return diff >= 0 ? diff : 0;
+    // If needed, fetch fresh vehicle-invoices specifically from backend
+    if (
+      vehicleRecord.vehicle_no &&
+      vehicleRecord.lr_no &&
+      vehicleRecord.vehicle_no !== "-"
+    ) {
+      try {
+        setLoadingVehicleInvoices(true);
+        const res = await getVehicleInvoices(
+          vehicleRecord.vehicle_no,
+          vehicleRecord.lr_no,
+        );
+        if (res && res.invoices) {
+          const freshInvoices = res.invoices.map((inv) => ({
+            ...inv,
+            status:
+              inv.status || (inv.stock_received_on ? "Received" : "Pending"),
+          }));
+          setSelectedVehicle((prev) => ({
+            ...prev,
+            ...res,
+            invoices: freshInvoices,
+            status: res.vehicle_status || res.status || prev.status,
+          }));
+        }
+      } catch (err) {
+        console.warn(
+          "Could not fetch fresh vehicle invoices, using cached:",
+          err,
+        );
+      } finally {
+        setLoadingVehicleInvoices(false);
+      }
     }
-    return 0;
   };
 
-  // Open Receive / Edit Modal for an entry
-  const handleOpenReceive = (record) => {
-    setEditingRecord(record);
+  // Step 3: Open Stock Receiving Modal for a Specific Invoice
+  const handleOpenReceiveModal = (invoiceRecord, parentVehicle) => {
+    setEditingInvoice(invoiceRecord);
     form.resetFields();
 
-    const initialReceivedOn = record.stock_received_on
-      ? parseApiDate(record.stock_received_on)
+    const initialReceivedOn = invoiceRecord.stock_received_on
+      ? parseApiDate(invoiceRecord.stock_received_on)
       : dayjs();
 
-    const invDate = record.invoice_date
-      ? parseApiDate(record.invoice_date)
+    const invDate = invoiceRecord.invoice_date
+      ? parseApiDate(invoiceRecord.invoice_date)
       : null;
-    const computedDays =
-      record.transit_days !== null && record.transit_days !== undefined
-        ? record.transit_days
-        : calculateTransitDays(initialReceivedOn, invDate);
+    const computedTransitDays =
+      invoiceRecord.transit_days !== "" &&
+      invoiceRecord.transit_days !== null &&
+      invoiceRecord.transit_days !== undefined
+        ? invoiceRecord.transit_days
+        : invDate && initialReceivedOn
+          ? Math.max(0, initialReceivedOn.diff(invDate, "day"))
+          : 0;
 
-    const formattedItems = (record.items || []).map((item) => {
+    const initialReceivedAt =
+      invoiceRecord.to_be_received_at?.toLowerCase() || "direct";
+    setToReceiveAtValue(initialReceivedAt);
+
+    const defaultPlace =
+      invoiceRecord.received_place ||
+      parentVehicle?.place ||
+      invoiceRecord.place ||
+      "Bhadrak";
+    const defaultDepo = invoiceRecord.depo_name || invoiceRecord.depo || "";
+
+    const formattedItems = (invoiceRecord.items || []).map((item) => {
       const invQty = Number(item.invoiced_qty || item.qty || 0);
       const rate = Number(item.rate || 0);
       const claimQty = Number(item.claim_qty || 0);
       const claimAmount = Number(
-        item.claim_amount !== undefined ? item.claim_amount : claimQty * rate,
+        item.claim_amount !== undefined &&
+          item.claim_amount !== "" &&
+          Number(item.claim_amount) > 0
+          ? item.claim_amount
+          : claimQty * rate,
       );
+
+      let directQty =
+        item.direct_qty !== null &&
+        item.direct_qty !== undefined &&
+        item.direct_qty !== ""
+          ? Number(item.direct_qty)
+          : initialReceivedAt === "direct"
+            ? Math.max(0, invQty - claimQty)
+            : initialReceivedAt === "both"
+              ? Number((invQty / 2).toFixed(2))
+              : 0;
+
+      let depoQty =
+        item.depo_qty !== null &&
+        item.depo_qty !== undefined &&
+        item.depo_qty !== ""
+          ? Number(item.depo_qty)
+          : initialReceivedAt === "depo"
+            ? Math.max(0, invQty - claimQty)
+            : initialReceivedAt === "both"
+              ? Math.max(0, Number((invQty - directQty - claimQty).toFixed(2)))
+              : 0;
 
       return {
         purchase_invoice_item_id:
           item.purchase_invoice_item_id || item.item_id || item.id,
-        item_name: item.item_name,
+        item_name: item.item_name || "-",
         item_code: item.item_code || "",
         unit: item.unit || "TIN",
         invoiced_qty: invQty,
         rate: rate,
+        direct_qty: directQty,
+        depo_qty: depoQty,
         claim_reason: item.claim_reason || "None",
         claim_qty: claimQty,
         claim_amount: Number(claimAmount.toFixed(2)),
+        narration: item.narration || "",
       };
     });
 
     form.setFieldsValue({
-      supplier_name: record.supplier_name,
-      place: record.place,
-      lr_no: record.lr_no,
-      lr_date: parseApiDate(record.lr_date),
-      transport_name: record.transport_name,
-      vehicle_no: record.vehicle_no,
-      invoice_no: record.invoice_no,
-      invoice_date: parseApiDate(record.invoice_date),
-      invoice_amount: record.invoice_amount,
+      supplier_name: parentVehicle?.supplier_name || "",
+      vehicle_no: parentVehicle?.vehicle_no || "",
+      lr_no: parentVehicle?.lr_no || "",
+      lr_date: parseApiDate(parentVehicle?.lr_date),
+      transport_name: parentVehicle?.transport_name || "",
+      invoice_no: invoiceRecord.invoice_no,
+      invoice_date: parseApiDate(invoiceRecord.invoice_date),
+      invoice_amount: invoiceRecord.invoice_amount,
       stock_received_on: initialReceivedOn,
-      to_be_received_at: record.to_be_received_at || "Direct",
-      transit_days: computedDays,
-      narration: record.narration || "",
+      transit_days: computedTransitDays,
+      to_be_received_at: initialReceivedAt,
+      received_place: defaultPlace,
+      depo: defaultDepo,
+      status: "Received",
       items: formattedItems,
     });
 
     setReceiveModalOpen(true);
   };
 
-  // When Stock Received On changes, update transit_days live
+  // Transit Days Live Calculation
   const handleReceivedDateChange = (date) => {
-    if (editingRecord && date) {
-      const days = calculateTransitDays(date, editingRecord.invoice_date);
-      form.setFieldsValue({ transit_days: days });
+    if (editingInvoice && date) {
+      const invDate = parseApiDate(editingInvoice.invoice_date);
+      if (invDate && invDate.isValid()) {
+        const days = Math.max(0, date.diff(invDate, "day"));
+        form.setFieldsValue({ transit_days: days });
+      }
     }
   };
 
-  // Recalculate Claim Amount when Claim Qty or Rate changes
-  const handleItemClaimChange = (index, field, value) => {
+  // Handle To Be Received At dropdown change
+  const handleReceiveLocationTypeChange = (value) => {
+    setToReceiveAtValue(value);
+    const items = form.getFieldValue("items") || [];
+
+    const updated = items.map((i) => {
+      const invQty = Number(i.invoiced_qty || 0);
+      const claimQty = Number(i.claim_qty || 0);
+      const netQty = Math.max(0, invQty - claimQty);
+
+      if (value === "direct") {
+        return { ...i, direct_qty: netQty, depo_qty: 0 };
+      } else if (value === "depo") {
+        return { ...i, direct_qty: 0, depo_qty: netQty };
+      } else {
+        const half = Number((netQty / 2).toFixed(2));
+        const rem = Number((netQty - half).toFixed(2));
+        return { ...i, direct_qty: half, depo_qty: rem };
+      }
+    });
+
+    form.setFieldsValue({
+      to_be_received_at: value,
+      items: updated,
+      depo: value !== "direct" ? form.getFieldValue("depo") || "" : null,
+      received_place:
+        value !== "depo"
+          ? form.getFieldValue("received_place") ||
+            selectedVehicle?.place ||
+            "Bhadrak"
+          : null,
+    });
+  };
+
+  // Recalculate Claim Amount or Split Quantities
+  const handleItemFieldChange = (index, field, value) => {
     const items = form.getFieldValue("items") || [];
     if (!items[index]) return;
 
     const currentItem = { ...items[index], [field]: value };
+    const invQty = Number(currentItem.invoiced_qty || 0);
+
     if (field === "claim_qty" || field === "rate") {
       const qty = Number(currentItem.claim_qty || 0);
       const rate = Number(currentItem.rate || 0);
       currentItem.claim_amount = Number((qty * rate).toFixed(2));
+
+      const netAvailable = Math.max(0, invQty - qty);
+      if (toReceiveAtValue === "direct") {
+        currentItem.direct_qty = netAvailable;
+        currentItem.depo_qty = 0;
+      } else if (toReceiveAtValue === "depo") {
+        currentItem.direct_qty = 0;
+        currentItem.depo_qty = netAvailable;
+      } else if (toReceiveAtValue === "both") {
+        const curDirect = Number(currentItem.direct_qty || 0);
+        currentItem.depo_qty = Math.max(
+          0,
+          Number((netAvailable - curDirect).toFixed(2)),
+        );
+      }
+    }
+
+    if (field === "direct_qty" && toReceiveAtValue === "both") {
+      const dir = Math.min(invQty, Math.max(0, Number(value || 0)));
+      const claim = Number(currentItem.claim_qty || 0);
+      currentItem.direct_qty = dir;
+      currentItem.depo_qty = Math.max(
+        0,
+        Number((invQty - dir - claim).toFixed(2)),
+      );
+    }
+
+    if (field === "depo_qty" && toReceiveAtValue === "both") {
+      const dep = Math.min(invQty, Math.max(0, Number(value || 0)));
+      const claim = Number(currentItem.claim_qty || 0);
+      currentItem.depo_qty = dep;
+      currentItem.direct_qty = Math.max(
+        0,
+        Number((invQty - dep - claim).toFixed(2)),
+      );
     }
 
     if (
@@ -361,45 +587,49 @@ export default function StockInTransit() {
     form.setFieldsValue({ items: updated });
   };
 
-  // Submit Receive / Claim Entry
+  // Submit Stock Receiving Entry (POST /purchase/stock-in-transit/)
   const handleSubmitReceive = async () => {
     try {
       const values = await form.validateFields();
       setSubmitting(true);
 
       const formattedPayload = {
+        purchase_invoice_id: editingInvoice.purchase_invoice_id,
         stock_received_on: values.stock_received_on
           ? dayjs(values.stock_received_on).format("YYYY-MM-DD")
           : dayjs().format("YYYY-MM-DD"),
-        to_be_received_at: values.to_be_received_at || "Direct",
         transit_days: Number(values.transit_days || 0),
-        narration: values.narration || "",
+        to_be_received_at: values.to_be_received_at || "direct",
+        received_place:
+          values.to_be_received_at !== "depo"
+            ? values.received_place || selectedVehicle?.place || "Bhadrak"
+            : null,
+        depo: values.to_be_received_at !== "direct" ? values.depo : null,
+        status: "Received",
         items: (values.items || []).map((item) => ({
-          purchase_invoice_item_id:
-            item.purchase_invoice_item_id || item.item_id || item.id,
+          purchase_invoice_item_id: item.purchase_invoice_item_id,
+          direct_qty: String(Number(item.direct_qty || 0).toFixed(2)),
+          depo_qty: String(Number(item.depo_qty || 0).toFixed(2)),
           claim_reason: item.claim_reason || "None",
-          claim_qty: Number(item.claim_qty || 0),
-          claim_amount: Number(item.claim_amount || 0),
+          claim_qty: String(Number(item.claim_qty || 0).toFixed(2)),
+          claim_amount: String(Number(item.claim_amount || 0).toFixed(2)),
+          narration: item.narration || "",
+          status: "Received",
         })),
       };
 
-      if (editingRecord?.stock_in_transit_id) {
-        await updateStockInTransit(
-          editingRecord.stock_in_transit_id,
-          formattedPayload,
-        );
-      } else {
-        await createStockInTransit(formattedPayload);
-      }
+      const res = await createStockInTransit(formattedPayload);
+      message.success(
+        res?.message || "Stock in transit details recorded successfully!",
+      );
 
-      message.success("Stock In Transit entry recorded successfully!");
       setReceiveModalOpen(false);
 
-      // Refresh data inside the drill-down modal and supplier summary list
-      if (selectedSupplier) {
-        fetchSupplierTransitItems(selectedSupplier);
+      // Refresh both Vehicle Modal invoices and Main Vehicle List
+      if (selectedVehicle) {
+        handleOpenVehicleModal(selectedVehicle);
       }
-      fetchSuppliersList();
+      fetchTransitData();
     } catch (error) {
       console.error("Submit Stock In Transit Error:", error);
       message.error(
@@ -412,41 +642,85 @@ export default function StockInTransit() {
     }
   };
 
-  // Open View Modal
-  const handleOpenView = (record) => {
-    setViewRecord(record);
+  // Open View Modal for an Invoice
+  const handleOpenViewModal = (invoiceRecord) => {
+    setViewInvoice(invoiceRecord);
     setViewModalOpen(true);
   };
 
-  // Filtered Suppliers on Main Screen
-  const filteredSuppliers = useMemo(() => {
-    if (!searchText || searchText.trim() === "") return suppliers;
-    const q = searchText.trim().toLowerCase();
-    return suppliers.filter(
-      (s) =>
-        (s.supplier_name && s.supplier_name.toLowerCase().includes(q)) ||
-        (s.vendor_name && s.vendor_name.toLowerCase().includes(q)) ||
-        (s.vendor_id && String(s.vendor_id).toLowerCase().includes(q)),
-    );
-  }, [suppliers, searchText]);
+  // Filtered Vehicles for Main Screen
+  const filteredVehicles = useMemo(() => {
+    let list = vehicleList;
 
-  // Export Suppliers to Excel
+    if (statusFilter !== "ALL") {
+      list = list.filter((v) => v.status === statusFilter);
+    }
+
+    if (searchText && searchText.trim() !== "") {
+      const q = searchText.trim().toLowerCase();
+      list = list.filter(
+        (v) =>
+          (v.supplier_name && v.supplier_name.toLowerCase().includes(q)) ||
+          (v.vehicle_no && v.vehicle_no.toLowerCase().includes(q)) ||
+          (v.lr_no && v.lr_no.toLowerCase().includes(q)) ||
+          (v.transport_name && v.transport_name.toLowerCase().includes(q)) ||
+          (v.place && v.place.toLowerCase().includes(q)),
+      );
+    }
+
+    return list;
+  }, [vehicleList, searchText, statusFilter]);
+
+  // Overall KPI Statistics
+  const stats = useMemo(() => {
+    const totalVehicles = vehicleList.length;
+    const intransitCount = vehicleList.filter(
+      (v) => v.status === "Intransit",
+    ).length;
+    const partialCount = vehicleList.filter(
+      (v) => v.status === "Partially Received",
+    ).length;
+    const receivedCount = vehicleList.filter(
+      (v) => v.status === "Received",
+    ).length;
+    const totalAmount = vehicleList.reduce(
+      (acc, v) => acc + Number(v.total_amount || 0),
+      0,
+    );
+
+    return {
+      totalVehicles,
+      intransitCount,
+      partialCount,
+      receivedCount,
+      totalAmount,
+    };
+  }, [vehicleList]);
+
+  // Export List to Excel
   const handleExport = () => {
-    const rows = suppliers.map((s) => ({
-      "Supplier Name": s.supplier_name || s.vendor_name,
-      "Vendor ID": s.vendor_id,
-      "Invoice Count": s.invoice_count || 0,
-      "Total Items": s.total_items || 0,
+    const rows = filteredVehicles.map((v, idx) => ({
+      "#": idx + 1,
+      "Supplier Name": v.supplier_name,
+      Place: v.place,
+      "Vehicle No": v.vehicle_no,
+      "LR No": v.lr_no,
+      "LR Date": fmtDate(v.lr_date),
+      "Transport Name": v.transport_name,
+      "Invoices Count": v.invoices_count,
+      "Total Qty": v.total_qty,
+      "Total Amount": v.total_amount,
+      "Vehicle Status": v.status,
     }));
-    exportToExcel(rows, "Transit_Suppliers_List", "Suppliers");
+    exportToExcel(rows, "Stock_In_Transit_Vehicles", "Vehicles");
   };
 
-  // MAIN SCREEN COLUMNS: Supplier List
-  const supplierColumns = [
+  // MAIN SCREEN COLUMNS: Supplier & Connected Vehicle List
+  const vehicleColumns = [
     {
       title: <span className="text-amber-900 font-bold">#</span>,
       key: "index",
-      width: 60,
+      width: 50,
       render: (_, __, index) => (
         <span className="font-semibold text-gray-500">{index + 1}</span>
       ),
@@ -454,17 +728,15 @@ export default function StockInTransit() {
     {
       title: <span className="text-amber-900 font-bold">Supplier Name</span>,
       dataIndex: "supplier_name",
-      render: (text, record) => {
-        const fullName = text || record.vendor_name || "-";
-        const firstName = String(fullName).trim().split(" ")[0] || "-";
+      width: 170,
+      render: (text) => {
+        const firstName =
+          String(text || "")
+            .trim()
+            .split(/\s+/)[0] || "-";
         return (
-          <Tooltip
-            title={`Supplier: ${fullName} (Double-click to view transit invoices)`}
-          >
-            <span
-              className="cursor-pointer font-bold text-amber-900 hover:text-amber-600 transition-colors text-base"
-              onClick={() => handleOpenSupplierModal(record)}
-            >
+          <Tooltip title={text}>
+            <span className="text-amber-900 font-bold text-sm cursor-pointer hover:underline">
               {firstName}
             </span>
           </Tooltip>
@@ -472,104 +744,159 @@ export default function StockInTransit() {
       },
     },
     {
-      title: <span className="text-amber-900 font-bold">Full Name</span>,
-      dataIndex: "vendor_name",
-      render: (text, record) => (
-        <span className="font-medium text-gray-800">
-          {text || record.supplier_name || "-"}
-        </span>
-      ),
-    },
-    {
-      title: (
-        <span className="text-amber-900 font-bold">Invoices in Transit</span>
-      ),
-      dataIndex: "invoice_count",
-      render: (count) => (
-        <Tag color="purple" className="font-semibold text-xs px-2.5 py-0.5">
-          {count || 0} Invoices
-        </Tag>
-      ),
-    },
-    {
-      title: (
-        <span className="text-amber-900 font-bold">Total Transit Items</span>
-      ),
-      dataIndex: "total_items",
-      render: (count) => (
-        <Tag color="blue" className="font-semibold text-xs px-2.5 py-0.5">
-          {count || 0} Items
-        </Tag>
-      ),
-    },
-    {
-      title: <span className="text-amber-900 font-bold">Status</span>,
-      key: "status",
-      render: () => <Tag color="warning">Pending Receipt</Tag>,
-    },
-    {
-      title: <span className="text-amber-900 font-bold">Actions</span>,
-      key: "actions",
-      fixed: "right",
-      width: 220,
-      render: (_, record) => (
-        <Button
-          type="primary"
-          size="middle"
-          icon={<EyeOutlined />}
-          className="bg-amber-500! hover:bg-amber-600! border-none! text-white! font-semibold shadow-sm"
-          onClick={() => handleOpenSupplierModal(record)}
-        >
-          View Invoices ({record.invoice_count || 0})
-        </Button>
-      ),
-    },
-  ];
-
-  // INNER MODAL COLUMNS (13 Fields + Status & Actions)
-  const innerTableColumns = [
-    {
-      title: <span className="text-amber-900 font-bold">Supplier Name</span>,
-      dataIndex: "supplier_name",
-      render: (text) => {
-        const firstName =
-          String(text || "")
-            .trim()
-            .split(" ")[0] || "-";
-        return (
-          <Tooltip title={text}>
-            <span className="text-amber-900 font-medium">{firstName}</span>
-          </Tooltip>
-        );
-      },
-    },
-    {
       title: <span className="text-amber-900 font-bold">Place</span>,
       dataIndex: "place",
+      width: 130,
+      render: (text) => (
+        <span className="font-medium text-gray-700">{text || "-"}</span>
+      ),
+    },
+    {
+      title: <span className="text-amber-900 font-bold">Vehicle No</span>,
+      dataIndex: "vehicle_no",
       width: 140,
       render: (text) => (
-        <span className="whitespace-nowrap font-medium text-gray-700">
-          {text || "-"}
-        </span>
+        <Tag color="warning" className="font-bold text-xs px-2">
+          {text}
+        </Tag>
       ),
     },
     {
       title: <span className="text-amber-900 font-bold">LR No</span>,
       dataIndex: "lr_no",
+      width: 120,
     },
     {
       title: <span className="text-amber-900 font-bold">LR Date</span>,
       dataIndex: "lr_date",
+      width: 110,
       render: (val) => fmtDate(val),
     },
     {
-      title: <span className="text-amber-900 font-bold">Transport Name</span>,
+      title: <span className="text-amber-900 font-bold">Transport</span>,
       dataIndex: "transport_name",
+      width: 130,
+      render: (text) => (text ? String(text).trim().split(/\s+/)[0] : "-"),
     },
     {
-      title: <span className="text-amber-900 font-bold">Vehicle No</span>,
-      dataIndex: "vehicle_no",
-      render: (text) => <Tag color="warning">{text}</Tag>,
+      title: (
+        <span className="text-amber-900 font-bold">Connected Invoices</span>
+      ),
+      dataIndex: "invoices_count",
+      width: 140,
+      align: "center",
+      render: (count) => (
+        <Tag
+          color="purple"
+          className="font-semibold px-2 py-0.5 cursor-pointer"
+        >
+          {count || 0} Invoices
+        </Tag>
+      ),
+    },
+    {
+      title: <span className="text-amber-900 font-bold">Total Qty</span>,
+      dataIndex: "total_qty",
+      width: 120,
+      align: "right",
+      render: (qty) => (
+        <span className="font-bold text-amber-950">
+          {Number(qty || 0).toFixed(2)}
+        </span>
+      ),
+    },
+    {
+      title: <span className="text-amber-900 font-bold">Total Amount</span>,
+      dataIndex: "total_amount",
+      width: 140,
+      align: "right",
+      render: (amt, r) => (
+        <span className="font-bold text-gray-900">
+          {r.total_amount_display ||
+            `₹${Number(amt || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`}
+        </span>
+      ),
+    },
+    {
+      title: <span className="text-amber-900 font-bold">Vehicle Status</span>,
+      dataIndex: "status",
+      width: 150,
+      align: "center",
+      render: (status) => {
+        if (status === "Received") {
+          return (
+            <Tag
+              color="success"
+              icon={<CheckCircleOutlined />}
+              className="font-bold px-2 py-0.5"
+            >
+              Received
+            </Tag>
+          );
+        }
+        if (status === "Partially Received") {
+          return (
+            <Tag
+              color="processing"
+              icon={<ClockCircleOutlined />}
+              className="font-bold px-2 py-0.5"
+            >
+              Partially Received
+            </Tag>
+          );
+        }
+        return (
+          <Tag
+            color="warning"
+            icon={<ExclamationCircleOutlined />}
+            className="font-bold px-2 py-0.5"
+          >
+            Intransit
+          </Tag>
+        );
+      },
+    },
+    {
+      title: <span className="text-amber-900 font-bold">Actions</span>,
+      key: "actions",
+      fixed: "right",
+      width: 140,
+      align: "center",
+      render: (_, record) => (
+        <Button
+          type="primary"
+          size="small"
+          icon={<EyeOutlined />}
+          className="bg-amber-500! hover:bg-amber-600! border-none! text-white! font-semibold"
+          onClick={() => handleOpenVehicleModal(record)}
+        >
+          View Invoices
+        </Button>
+      ),
+    },
+  ];
+
+  // INVOICES TABLE COLUMNS (Inside Vehicle Drill-down Modal)
+  const invoiceColumns = [
+    {
+      title: <span className="text-amber-900 font-bold">#</span>,
+      key: "index",
+      width: 45,
+      render: (_, __, index) => (
+        <span className="font-medium text-gray-500">{index + 1}</span>
+      ),
+    },
+    {
+      title: <span className="text-amber-900 font-bold">Invoice No</span>,
+      dataIndex: "invoice_no",
+      render: (text) => (
+        <span className="font-bold text-amber-900">{text}</span>
+      ),
+    },
+    {
+      title: <span className="text-amber-900 font-bold">Invoice Date</span>,
+      dataIndex: "invoice_date",
+      render: (val) => fmtDate(val),
     },
     {
       title: <span className="text-amber-900 font-bold">E-waybill No</span>,
@@ -582,36 +909,37 @@ export default function StockInTransit() {
         ),
     },
     {
-      title: <span className="text-amber-900 font-bold">E-waybill Date</span>,
-      dataIndex: "ewaybill_date",
-      render: (val) => fmtDate(val),
-    },
-    {
-      title: <span className="text-amber-900 font-bold">Invoice No</span>,
-      dataIndex: "invoice_no",
-      render: (text) => (
-        <span className="font-semibold text-gray-800">{text}</span>
+      title: <span className="text-amber-900 font-bold">Invoice Amount</span>,
+      dataIndex: "invoice_amount",
+      align: "right",
+      render: (amt, r) => (
+        <span className="font-bold text-gray-900">
+          {r.invoice_amount_display ||
+            `₹${Number(amt || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`}
+        </span>
       ),
     },
     {
-      title: <span className="text-amber-900 font-bold">Invoice Date</span>,
-      dataIndex: "invoice_date",
-      render: (val) => fmtDate(val),
-    },
-    {
-      title: <span className="text-amber-900 font-bold">Invoice Amount</span>,
-      dataIndex: "invoice_amount",
-      render: (val) =>
-        `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      title: <span className="text-amber-900 font-bold">Total Qty</span>,
+      dataIndex: "total_qty",
+      align: "right",
+      render: (qty) => (
+        <span className="font-semibold text-amber-900">
+          {Number(qty || 0).toFixed(2)}
+        </span>
+      ),
     },
     {
       title: <span className="text-amber-900 font-bold">Transit Days</span>,
       dataIndex: "transit_days",
-      render: (val) =>
-        val !== null && val !== undefined ? (
-          <span className="font-bold text-blue-700">{val} Days</span>
+      align: "center",
+      render: (days) =>
+        days !== "" && days !== null && days !== undefined ? (
+          <Tag color="geekblue" className="font-bold">
+            {days} Days
+          </Tag>
         ) : (
-          <Tag color="default">-</Tag>
+          <span className="text-gray-400">-</span>
         ),
     },
     {
@@ -621,41 +949,69 @@ export default function StockInTransit() {
       dataIndex: "stock_received_on",
       render: (val) =>
         val ? (
-          <span className="font-medium text-green-800">{fmtDate(val)}</span>
+          <span className="font-medium text-green-700">{fmtDate(val)}</span>
         ) : (
           <Tag color="error">Pending</Tag>
         ),
     },
     {
-      title: <span className="text-amber-900 font-bold">Status</span>,
+      title: <span className="text-amber-900 font-bold">Destination</span>,
+      dataIndex: "to_be_received_at",
+      render: (dest, record) => {
+        if (dest === "depo")
+          return <Tag color="purple">Depot: {record.depo_name || "Depot"}</Tag>;
+        if (dest === "both")
+          return <Tag color="cyan">Both (Direct + Depot)</Tag>;
+        if (dest === "direct")
+          return (
+            <Tag color="gold">Direct ({record.received_place || "Plant"})</Tag>
+          );
+        return <span className="text-gray-400">-</span>;
+      },
+    },
+    {
+      title: <span className="text-amber-900 font-bold">Invoice Status</span>,
       dataIndex: "status",
-      render: (status) => (
-        <Tag color={status === "Received" ? "success" : "warning"}>
-          {status || "Pending"}
-        </Tag>
-      ),
+      align: "center",
+      render: (status) =>
+        status === "Received" ? (
+          <Tag color="success" icon={<CheckCircleOutlined />}>
+            Received
+          </Tag>
+        ) : (
+          <Tag color="warning" icon={<ClockCircleOutlined />}>
+            Pending
+          </Tag>
+        ),
     },
     {
       title: <span className="text-amber-900 font-bold">Actions</span>,
       key: "actions",
       fixed: "right",
-      width: 150,
+      width: 140,
+      align: "center",
       render: (_, record) => (
         <Space size="small">
           <Button
             type="primary"
             size="small"
-            icon={<CheckCircleOutlined />}
-            className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
-            onClick={() => handleOpenReceive(record)}
+            icon={
+              record.status === "Received" ? (
+                <EditOutlined />
+              ) : (
+                <CheckCircleOutlined />
+              )
+            }
+            className="bg-amber-500! hover:bg-amber-600! border-none! text-white! font-semibold"
+            onClick={() => handleOpenReceiveModal(record, selectedVehicle)}
           >
             {record.status === "Received" ? "Edit" : "Receive"}
           </Button>
           <Button
             size="small"
             icon={<EyeOutlined />}
-            className="text-blue-500 hover:text-blue-700 border-blue-300!"
-            onClick={() => handleOpenView(record)}
+            className="text-amber-700 hover:text-amber-900 border-amber-300!"
+            onClick={() => handleOpenViewModal(record)}
           />
         </Space>
       ),
@@ -663,152 +1019,295 @@ export default function StockInTransit() {
   ];
 
   return (
-    <div>
+    <div className="space-y-4">
+      {/* TOP KPI METRICS BAR */}
+      <Row gutter={[16, 16]}>
+        <Col xs={24} sm={12} md={6}>
+          <Card
+            size="small"
+            className="border-amber-200 bg-amber-50/40 shadow-xs rounded-lg"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs font-semibold text-amber-800 uppercase tracking-wider">
+                  Total Transit Vehicles
+                </div>
+                <div className="text-2xl font-black text-amber-950 mt-1">
+                  {stats.totalVehicles}
+                </div>
+              </div>
+              <CarOutlined className="text-3xl text-amber-500 opacity-80" />
+            </div>
+          </Card>
+        </Col>
+
+        <Col xs={24} sm={12} md={6}>
+          <Card
+            size="small"
+            className="border-orange-200 bg-orange-50/40 shadow-xs rounded-lg"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs font-semibold text-orange-800 uppercase tracking-wider">
+                  Intransit Vehicles
+                </div>
+                <div className="text-2xl font-black text-orange-950 mt-1">
+                  {stats.intransitCount}
+                </div>
+              </div>
+              <InboxOutlined className="text-3xl text-orange-500 opacity-80" />
+            </div>
+          </Card>
+        </Col>
+
+        <Col xs={24} sm={12} md={6}>
+          <Card
+            size="small"
+            className="border-blue-200 bg-blue-50/40 shadow-xs rounded-lg"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs font-semibold text-blue-800 uppercase tracking-wider">
+                  Partially Received
+                </div>
+                <div className="text-2xl font-black text-blue-950 mt-1">
+                  {stats.partialCount}
+                </div>
+              </div>
+              <ClockCircleOutlined className="text-3xl text-blue-500 opacity-80" />
+            </div>
+          </Card>
+        </Col>
+
+        <Col xs={24} sm={12} md={6}>
+          <Card
+            size="small"
+            className="border-green-200 bg-green-50/40 shadow-xs rounded-lg"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs font-semibold text-green-800 uppercase tracking-wider">
+                  Fully Received Vehicles
+                </div>
+                <div className="text-2xl font-black text-green-950 mt-1">
+                  {stats.receivedCount}
+                </div>
+              </div>
+              <CheckCircleOutlined className="text-3xl text-green-500 opacity-80" />
+            </div>
+          </Card>
+        </Col>
+      </Row>
+
       {/* FILTER & ACTIONS BAR */}
-      <Row
-        justify="space-between"
-        style={{ marginBottom: 16 }}
-        gutter={[12, 12]}
-      >
+      <Row justify="space-between" align="middle" gutter={[12, 12]}>
         <Col>
-          <Space wrap>
+          <Space wrap size="middle">
             <Input
-              placeholder="Search supplier name or ID..."
+              placeholder="Search supplier, vehicle, LR..."
               value={searchText}
               prefix={<SearchOutlined className="text-amber-600!" />}
-              style={{ width: 280 }}
+              style={{ width: 300 }}
               className="border-amber-300! focus:border-amber-500!"
               onChange={(e) => setSearchText(e.target.value)}
               allowClear
             />
+
+            <Select
+              value={statusFilter}
+              onChange={setStatusFilter}
+              style={{ width: 170 }}
+              className="border-amber-300!"
+            >
+              <Option value="ALL">All Vehicle Status</Option>
+              <Option value="Intransit">Intransit</Option>
+              <Option value="Partially Received">Partially Received</Option>
+              <Option value="Received">Received</Option>
+            </Select>
+
             <Button
               icon={<ReloadOutlined />}
               className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-              onClick={fetchSuppliersList}
+              onClick={fetchTransitData}
+              loading={loading}
             >
               Refresh
             </Button>
           </Space>
         </Col>
+
         <Col>
-          <Space>
-            <Button
-              icon={<DownloadOutlined />}
-              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-              onClick={handleExport}
-            >
-              Export
-            </Button>
-          </Space>
+          <Button
+            icon={<DownloadOutlined />}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            onClick={handleExport}
+          >
+            Export Excel
+          </Button>
         </Col>
       </Row>
 
-      {/* YELLOW BANNER & MAIN SUPPLIER TABLE */}
+      {/* STEP 1: MAIN SUPPLIER & VEHICLE AGGREGATED TABLE */}
       <div className="border border-amber-300 rounded-lg shadow-md bg-white overflow-hidden">
-        {/* Yellow Header Banner */}
-        {/* <div className="bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 text-amber-950 font-black text-center py-2.5 text-xl tracking-wider shadow-inner uppercase border-b border-amber-400">
-          STOCK IN TRANSIT
-        </div> */}
-
-        <div className="p-4">
-          <Table
-            columns={supplierColumns}
-            dataSource={filteredSuppliers}
-            loading={loadingSuppliers}
-            rowKey={(r) => r.vendor_id || r.supplier_name}
-            pagination={{ pageSize: 10 }}
-            className="border-amber-100"
-            onRow={(record) => ({
-              onDoubleClick: () => handleOpenSupplierModal(record),
-              className:
-                "cursor-pointer hover:bg-amber-50/50 transition-colors",
-            })}
-          />
-        </div>
+        <Table
+          columns={vehicleColumns}
+          dataSource={filteredVehicles}
+          loading={loading}
+          rowKey="key"
+          pagination={{ pageSize: 10, showSizeChanger: true }}
+          size="middle"
+          scroll={{ x: 1400 }}
+          onRow={(record) => ({
+            onDoubleClick: () => handleOpenVehicleModal(record),
+            className: "cursor-pointer hover:bg-amber-50/40 transition-colors",
+          })}
+        />
       </div>
 
-      {/* INNER MODAL: 13-FIELD STOCK IN TRANSIT TABLE FOR SELECTED SUPPLIER */}
+      {/* STEP 2: VEHICLE INVOICES DRILL-DOWN MODAL */}
       <Modal
         title={
           <div className="flex items-center justify-between pr-8">
             <div className="flex items-center gap-2">
-              <ShopOutlined className="text-amber-600 text-xl" />
-              <span className="text-amber-800 text-2xl font-bold">
-                Stock In Transit:{" "}
-                {selectedSupplier?.supplier_name ||
-                  selectedSupplier?.vendor_name}
-              </span>
+              <CarOutlined className="text-amber-600 text-2xl" />
+              <div>
+                <span className="text-amber-800 text-2xl font-bold">
+                  Vehicle: {selectedVehicle?.vehicle_no}
+                </span>
+                <span className="text-gray-500 text-sm ml-2">
+                  (LR No: <strong>{selectedVehicle?.lr_no}</strong> | Date:{" "}
+                  <strong>{fmtDate(selectedVehicle?.lr_date)}</strong>)
+                </span>
+              </div>
             </div>
             <Space>
-              <Tag color="orange" className="text-sm px-3 py-1 font-semibold">
-                {selectedSupplier?.invoice_count || 0} Invoices
-              </Tag>
-              <Tag color="blue" className="text-sm px-3 py-1 font-semibold">
-                {selectedSupplier?.total_items || 0} Total Items
-              </Tag>
+              {selectedVehicle?.status === "Received" ? (
+                <Tag color="success" className="font-bold text-sm px-3 py-1">
+                  All Invoices Received
+                </Tag>
+              ) : selectedVehicle?.status === "Partially Received" ? (
+                <Tag color="processing" className="font-bold text-sm px-3 py-1">
+                  Partially Received
+                </Tag>
+              ) : (
+                <Tag color="warning" className="font-bold text-sm px-3 py-1">
+                  Intransit
+                </Tag>
+              )}
             </Space>
           </div>
         }
-        open={supplierModalOpen}
-        onCancel={() => setSupplierModalOpen(false)}
+        open={vehicleModalOpen}
+        onCancel={() => setVehicleModalOpen(false)}
         footer={[
           <Button
             key="refresh"
             icon={<ReloadOutlined />}
-            onClick={() => fetchSupplierTransitItems(selectedSupplier)}
+            onClick={() =>
+              selectedVehicle && handleOpenVehicleModal(selectedVehicle)
+            }
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
-            Refresh Items
+            Refresh Invoices
           </Button>,
           <Button
             key="close"
-            onClick={() => setSupplierModalOpen(false)}
+            onClick={() => setVehicleModalOpen(false)}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Close
           </Button>,
         ]}
-        width="95vw"
-        style={{ top: 20, maxWidth: 1650 }}
-        styles={{ body: { padding: "16px 20px" } }}
+        width="90vw"
+        style={{ maxWidth: 1450 }}
         destroyOnClose
       >
-        <div className="mb-4 text-sm text-gray-600 bg-amber-50/60 p-2.5 rounded border border-amber-200/70 flex items-center justify-between">
-          <span>
-            Showing all transit invoices & vehicle details for{" "}
-            <strong className="text-amber-900 text-base">
-              {selectedSupplier?.supplier_name || selectedSupplier?.vendor_name}
-            </strong>
-          </span>
-          <span className="text-xs text-amber-800 font-medium">
-            💡 Double-click any row or click <strong>Receive</strong> to record
-            receipt, transit days & claims
-          </span>
+        <div className="space-y-4">
+          {/* Header Summary for this Vehicle */}
+          <Card size="small" className="border-amber-200 bg-amber-50/30">
+            <Row gutter={[16, 12]}>
+              <Col span={6}>
+                <div className="text-xs text-gray-500 font-semibold">
+                  Supplier Name
+                </div>
+                <div className="font-bold text-amber-900 text-base">
+                  {selectedVehicle?.supplier_name}
+                </div>
+              </Col>
+              <Col span={4}>
+                <div className="text-xs text-gray-500 font-semibold">Place</div>
+                <div className="font-semibold text-gray-800">
+                  {selectedVehicle?.place || "-"}
+                </div>
+              </Col>
+              <Col span={5}>
+                <div className="text-xs text-gray-500 font-semibold">
+                  Transport
+                </div>
+                <div className="font-semibold text-gray-800">
+                  {selectedVehicle?.transport_name || "-"}
+                </div>
+              </Col>
+              <Col span={3}>
+                <div className="text-xs text-gray-500 font-semibold">
+                  Invoices Count
+                </div>
+                <div className="font-bold text-purple-900">
+                  {selectedVehicle?.invoices_count ||
+                    selectedVehicle?.invoices?.length ||
+                    0}
+                </div>
+              </Col>
+              <Col span={3}>
+                <div className="text-xs text-gray-500 font-semibold">
+                  Total Qty
+                </div>
+                <div className="font-bold text-amber-900">
+                  {Number(selectedVehicle?.total_qty || 0).toFixed(2)}
+                </div>
+              </Col>
+              <Col span={3}>
+                <div className="text-xs text-gray-500 font-semibold">
+                  Total Amount
+                </div>
+                <div className="font-bold text-gray-900">
+                  {selectedVehicle?.total_amount_display ||
+                    `₹${Number(selectedVehicle?.total_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`}
+                </div>
+              </Col>
+            </Row>
+          </Card>
+
+          {/* Connected Invoices Table */}
+          <div className="border border-amber-200 rounded-lg shadow-sm bg-white overflow-hidden">
+            <Table
+              columns={invoiceColumns}
+              dataSource={selectedVehicle?.invoices || []}
+              loading={loadingVehicleInvoices}
+              rowKey={(inv) => inv.purchase_invoice_id || inv.invoice_no}
+              pagination={false}
+              size="middle"
+              scroll={{ x: 1300 }}
+              onRow={(record) => ({
+                onDoubleClick: () =>
+                  handleOpenReceiveModal(record, selectedVehicle),
+                className:
+                  "cursor-pointer hover:bg-amber-50/40 transition-colors",
+              })}
+            />
+          </div>
         </div>
-        <Table
-          columns={innerTableColumns}
-          dataSource={supplierItems}
-          loading={loadingItems}
-          rowKey="key"
-          pagination={{ pageSize: 10 }}
-          size="middle"
-          className="border border-amber-200 rounded-lg shadow-sm"
-          scroll={{ x: 1550 }}
-          onRow={(record) => ({
-            onDoubleClick: () => handleOpenReceive(record),
-            className: "cursor-pointer hover:bg-amber-50/40",
-          })}
-        />
       </Modal>
 
-      {/* RECEIVE / EDIT TRANSIT MODAL */}
+      {/* STEP 3: STOCK RECEIVING MODAL (PER INVOICE) */}
       <Modal
         title={
-          <span className="text-amber-800 text-2xl font-bold">
-            {editingRecord?.status === "Received"
-              ? "Edit Stock In Transit Receipt"
-              : "Record Stock In Transit Receipt"}
-          </span>
+          <div className="flex items-center gap-2">
+            <FileTextOutlined className="text-amber-600 text-xl" />
+            <span className="text-amber-800 text-2xl font-bold">
+              Record / Edit Stock Receipt: {editingInvoice?.invoice_no}
+            </span>
+          </div>
         }
         open={receiveModalOpen}
         onCancel={() => setReceiveModalOpen(false)}
@@ -825,25 +1324,23 @@ export default function StockInTransit() {
             type="primary"
             loading={submitting}
             onClick={handleSubmitReceive}
-            className="bg-amber-500! hover:bg-amber-600! border-none! font-semibold"
+            className="bg-amber-500! hover:bg-amber-600! border-none! font-bold text-white!"
           >
-            {editingRecord?.status === "Received"
-              ? "Update Receipt"
-              : "Mark as Received"}
+            Mark Invoice as Received
           </Button>,
         ]}
-        width={1300}
+        width={1350}
         destroyOnClose
       >
         <Form form={form} layout="vertical">
-          {/* Header Invoice Overview Card */}
+          {/* Overview Card */}
           <Card
             size="small"
             style={{ marginBottom: 16, border: "1px solid #FDE68A" }}
             styles={{ body: { padding: "12px 16px" } }}
           >
             <h6 className="text-amber-700 font-bold mb-3 text-sm">
-              Transit & Invoice Details
+              Invoice & Vehicle Header Info
             </h6>
             <Row gutter={[12, 12]}>
               <Col span={6}>
@@ -854,50 +1351,6 @@ export default function StockInTransit() {
                     </span>
                   }
                   name="supplier_name"
-                >
-                  <Input disabled className="bg-gray-50!" />
-                </Form.Item>
-              </Col>
-              <Col span={3}>
-                <Form.Item
-                  label={
-                    <span className="text-amber-800 font-semibold">Place</span>
-                  }
-                  name="place"
-                >
-                  <Input disabled className="bg-gray-50!" />
-                </Form.Item>
-              </Col>
-              <Col span={3}>
-                <Form.Item
-                  label={
-                    <span className="text-amber-800 font-semibold">LR No</span>
-                  }
-                  name="lr_no"
-                >
-                  <Input disabled className="bg-gray-50!" />
-                </Form.Item>
-              </Col>
-              <Col span={3}>
-                <Form.Item
-                  label={
-                    <span className="text-amber-800 font-semibold">
-                      LR Date
-                    </span>
-                  }
-                  name="lr_date"
-                >
-                  <AppDatePicker disabled className="bg-gray-50! w-full" />
-                </Form.Item>
-              </Col>
-              <Col span={5}>
-                <Form.Item
-                  label={
-                    <span className="text-amber-800 font-semibold">
-                      Transport Name
-                    </span>
-                  }
-                  name="transport_name"
                 >
                   <Input disabled className="bg-gray-50!" />
                 </Form.Item>
@@ -914,8 +1367,42 @@ export default function StockInTransit() {
                   <Input disabled className="bg-gray-50!" />
                 </Form.Item>
               </Col>
-
               <Col span={4}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-800 font-semibold">LR No</span>
+                  }
+                  name="lr_no"
+                >
+                  <Input disabled className="bg-gray-50!" />
+                </Form.Item>
+              </Col>
+              <Col span={4}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-800 font-semibold">
+                      LR Date
+                    </span>
+                  }
+                  name="lr_date"
+                >
+                  <AppDatePicker disabled className="bg-gray-50! w-full" />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-800 font-semibold">
+                      Transport Name
+                    </span>
+                  }
+                  name="transport_name"
+                >
+                  <Input disabled className="bg-gray-50!" />
+                </Form.Item>
+              </Col>
+
+              <Col span={6}>
                 <Form.Item
                   label={
                     <span className="text-amber-800 font-semibold">
@@ -939,7 +1426,42 @@ export default function StockInTransit() {
                   <AppDatePicker disabled className="bg-gray-50! w-full" />
                 </Form.Item>
               </Col>
-              <Col span={4}>
+              <Col span={6}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-800 font-semibold">
+                      Invoice Amount
+                    </span>
+                  }
+                  name="invoice_amount"
+                >
+                  <InputNumber
+                    disabled
+                    className="w-full bg-gray-50! font-semibold"
+                    formatter={(val) =>
+                      `₹${Number(val || 0).toLocaleString("en-IN")}`
+                    }
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+
+          {/* Receiving Settings Card */}
+          <Card
+            size="small"
+            style={{
+              marginBottom: 16,
+              border: "1px solid #FDE68A",
+              background: "#FFFBEB",
+            }}
+            styles={{ body: { padding: "12px 16px" } }}
+          >
+            <h6 className="text-amber-900 font-bold mb-3 text-sm">
+              Stock Receipt & Receiving Destination
+            </h6>
+            <Row gutter={[12, 12]}>
+              <Col span={5}>
                 <Form.Item
                   label={
                     <span className="text-amber-900 font-bold">
@@ -960,31 +1482,8 @@ export default function StockInTransit() {
                   />
                 </Form.Item>
               </Col>
-              <Col span={4}>
-                <Form.Item
-                  label={
-                    <span className="text-amber-900 font-bold">
-                      To Be Received At
-                    </span>
-                  }
-                  name="to_be_received_at"
-                  rules={[
-                    {
-                      required: true,
-                      message: "Receiving location is required",
-                    },
-                  ]}
-                >
-                  <Select placeholder="Select Receiving Location">
-                    {RECEIVED_AT_OPTIONS.map((opt) => (
-                      <Option key={opt} value={opt}>
-                        {opt}
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={4}>
+
+              <Col span={3}>
                 <Form.Item
                   label={
                     <span className="text-amber-900 font-bold">
@@ -995,48 +1494,110 @@ export default function StockInTransit() {
                 >
                   <InputNumber
                     disabled
-                    className="w-full bg-blue-50! font-bold text-blue-800"
+                    className="w-full bg-blue-50! font-bold text-blue-900"
                   />
                 </Form.Item>
               </Col>
-              <Col span={4}>
+
+              <Col span={5}>
                 <Form.Item
                   label={
-                    <span className="text-amber-800 font-semibold">
-                      Invoice Amount
+                    <span className="text-amber-900 font-bold">
+                      To Be Received At
                     </span>
                   }
-                  name="invoice_amount"
+                  name="to_be_received_at"
+                  rules={[
+                    {
+                      required: true,
+                      message: "Receiving destination is required",
+                    },
+                  ]}
                 >
-                  <InputNumber
-                    disabled
-                    className="w-full bg-gray-50! font-semibold"
-                    formatter={(value) =>
-                      `₹${Number(value || 0).toLocaleString("en-IN")}`
-                    }
-                  />
+                  <Select
+                    placeholder="Select Location"
+                    className="w-full font-semibold"
+                    onChange={handleReceiveLocationTypeChange}
+                  >
+                    {RECEIVED_AT_OPTIONS.map((opt) => (
+                      <Option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </Option>
+                    ))}
+                  </Select>
                 </Form.Item>
               </Col>
+
+              {/* Direct Place (shown when direct or both) */}
+              {(toReceiveAtValue === "direct" ||
+                toReceiveAtValue === "both") && (
+                <Col span={toReceiveAtValue === "both" ? 5 : 11}>
+                  <Form.Item
+                    label={
+                      <span className="text-amber-900 font-bold">
+                        Direct Receiving Place
+                      </span>
+                    }
+                    name="received_place"
+                    rules={[{ required: true, message: "Place is required" }]}
+                  >
+                    <Input
+                      placeholder="e.g. Bhadrak / Haldia"
+                      className="w-full font-medium"
+                    />
+                  </Form.Item>
+                </Col>
+              )}
+
+              {/* Depot Input (shown when depo or both) */}
+              {(toReceiveAtValue === "depo" || toReceiveAtValue === "both") && (
+                <Col span={toReceiveAtValue === "both" ? 6 : 11}>
+                  <Form.Item
+                    label={
+                      <span className="text-purple-900 font-bold">
+                        Depot Name / Location
+                      </span>
+                    }
+                    name="depo"
+                    rules={[
+                      { required: true, message: "Depot name is required" },
+                    ]}
+                  >
+                    <Input
+                      placeholder="Enter Depot Name (e.g. Bhubaneswar Depo)"
+                      className="w-full font-medium"
+                    />
+                  </Form.Item>
+                </Col>
+              )}
             </Row>
           </Card>
 
-          {/* Items & Claim Recording Card */}
+          {/* Items & Claim Details Card */}
           <Card
             size="small"
             style={{ marginBottom: 16, border: "1px solid #FDE68A" }}
             styles={{ body: { padding: "12px 16px" } }}
           >
             <div className="flex items-center justify-between mb-3">
-              <h6 className="text-amber-700 font-bold text-sm mb-0">
-                Items & Claim Details
-              </h6>
+              <div>
+                <h6 className="text-amber-700 font-bold text-sm mb-0">
+                  Items, Split Receiving & Claim Details
+                </h6>
+                {toReceiveAtValue === "both" && (
+                  <span className="text-xs text-purple-700 font-medium">
+                    💡 Both Mode Active: Split quantity into Direct Qty (Place)
+                    and Depot Qty.
+                  </span>
+                )}
+              </div>
               <Space align="center">
                 <span className="text-xs font-semibold text-amber-800">
                   Quick Batch Claim:
                 </span>
                 <Select
                   size="small"
-                  placeholder="Set all items claim"
+                  placeholder="Set all claim reasons"
                   style={{ width: 140 }}
                   onChange={handleApplyBatchClaimReason}
                 >
@@ -1049,17 +1610,33 @@ export default function StockInTransit() {
               </Space>
             </div>
 
+            {/* Table Header based on Destination Mode */}
             <Row
               gutter={8}
               className="pb-2 mb-2 text-amber-900 font-bold text-xs border-b border-amber-200"
             >
-              <Col span={7}>Item Name</Col>
-              <Col span={3}>Invoiced Qty</Col>
-              <Col span={2}>Unit</Col>
-              <Col span={3}>Unit Rate (₹)</Col>
-              <Col span={4}>Claim Reason</Col>
+              <Col span={toReceiveAtValue === "both" ? 5 : 7}>Item Name</Col>
+              <Col span={toReceiveAtValue === "both" ? 2 : 3}>Invoiced Qty</Col>
+              <Col span={1}>Unit</Col>
+              <Col span={2}>Rate (₹)</Col>
+              {toReceiveAtValue === "both" && (
+                <>
+                  <Col span={2} className="text-amber-900">
+                    Direct Qty
+                  </Col>
+                  <Col span={2} className="text-purple-900">
+                    Depo Qty
+                  </Col>
+                </>
+              )}
+              <Col span={toReceiveAtValue === "both" ? 3 : 4}>Claim Reason</Col>
               <Col span={2}>Claim Qty</Col>
-              <Col span={3}>Claim Amount (₹)</Col>
+              <Col span={toReceiveAtValue === "both" ? 2 : 3}>
+                Claim Amt (₹)
+              </Col>
+              <Col span={toReceiveAtValue === "both" ? 3 : 2}>
+                Item Narration
+              </Col>
             </Row>
 
             <Form.List name="items">
@@ -1076,7 +1653,7 @@ export default function StockInTransit() {
                       align="middle"
                       className="mb-2.5"
                     >
-                      <Col span={7}>
+                      <Col span={toReceiveAtValue === "both" ? 5 : 7}>
                         <Form.Item
                           name={[field.name, "item_name"]}
                           style={{ marginBottom: 0 }}
@@ -1091,7 +1668,7 @@ export default function StockInTransit() {
                         </Form.Item>
                       </Col>
 
-                      <Col span={3}>
+                      <Col span={toReceiveAtValue === "both" ? 2 : 3}>
                         <Form.Item
                           name={[field.name, "invoiced_qty"]}
                           style={{ marginBottom: 0 }}
@@ -1104,16 +1681,19 @@ export default function StockInTransit() {
                         </Form.Item>
                       </Col>
 
-                      <Col span={2}>
+                      <Col span={1}>
                         <Form.Item
                           name={[field.name, "unit"]}
                           style={{ marginBottom: 0 }}
                         >
-                          <Input disabled className="bg-gray-50! text-center" />
+                          <Input
+                            disabled
+                            className="bg-gray-50! text-center p-0 text-xs"
+                          />
                         </Form.Item>
                       </Col>
 
-                      <Col span={3}>
+                      <Col span={2}>
                         <Form.Item
                           name={[field.name, "rate"]}
                           style={{ marginBottom: 0 }}
@@ -1126,7 +1706,56 @@ export default function StockInTransit() {
                         </Form.Item>
                       </Col>
 
-                      <Col span={4}>
+                      {/* Both Mode: Direct Qty & Depo Qty */}
+                      {toReceiveAtValue === "both" && (
+                        <>
+                          <Col span={2}>
+                            <Form.Item
+                              name={[field.name, "direct_qty"]}
+                              style={{ marginBottom: 0 }}
+                            >
+                              <InputNumber
+                                min={0}
+                                max={maxQty}
+                                precision={2}
+                                className="w-full border-amber-400! font-semibold text-amber-900"
+                                placeholder="Direct"
+                                onChange={(val) =>
+                                  handleItemFieldChange(
+                                    field.name,
+                                    "direct_qty",
+                                    val,
+                                  )
+                                }
+                              />
+                            </Form.Item>
+                          </Col>
+
+                          <Col span={2}>
+                            <Form.Item
+                              name={[field.name, "depo_qty"]}
+                              style={{ marginBottom: 0 }}
+                            >
+                              <InputNumber
+                                min={0}
+                                max={maxQty}
+                                precision={2}
+                                className="w-full border-purple-400! font-semibold text-purple-900"
+                                placeholder="Depo"
+                                onChange={(val) =>
+                                  handleItemFieldChange(
+                                    field.name,
+                                    "depo_qty",
+                                    val,
+                                  )
+                                }
+                              />
+                            </Form.Item>
+                          </Col>
+                        </>
+                      )}
+
+                      <Col span={toReceiveAtValue === "both" ? 3 : 4}>
                         <Form.Item
                           name={[field.name, "claim_reason"]}
                           style={{ marginBottom: 0 }}
@@ -1134,7 +1763,7 @@ export default function StockInTransit() {
                           <Select
                             className="w-full"
                             onChange={(val) =>
-                              handleItemClaimChange(
+                              handleItemFieldChange(
                                 field.name,
                                 "claim_reason",
                                 val,
@@ -1162,7 +1791,7 @@ export default function StockInTransit() {
                             className="w-full border-amber-300!"
                             placeholder="0"
                             onChange={(val) =>
-                              handleItemClaimChange(
+                              handleItemFieldChange(
                                 field.name,
                                 "claim_qty",
                                 val,
@@ -1172,7 +1801,7 @@ export default function StockInTransit() {
                         </Form.Item>
                       </Col>
 
-                      <Col span={3}>
+                      <Col span={toReceiveAtValue === "both" ? 2 : 3}>
                         <Form.Item
                           name={[field.name, "claim_amount"]}
                           style={{ marginBottom: 0 }}
@@ -1184,33 +1813,30 @@ export default function StockInTransit() {
                           />
                         </Form.Item>
                       </Col>
+
+                      <Col span={toReceiveAtValue === "both" ? 3 : 2}>
+                        <Form.Item
+                          name={[field.name, "narration"]}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <Input
+                            placeholder="Item note"
+                            className="w-full text-xs"
+                            onChange={(e) =>
+                              handleItemFieldChange(
+                                field.name,
+                                "narration",
+                                e.target.value,
+                              )
+                            }
+                          />
+                        </Form.Item>
+                      </Col>
                     </Row>
                   );
                 })
               }
             </Form.List>
-          </Card>
-
-          {/* General Narration Card */}
-          <Card
-            size="small"
-            style={{ border: "1px solid #FDE68A" }}
-            styles={{ body: { padding: "12px 16px" } }}
-          >
-            <Form.Item
-              label={
-                <span className="text-amber-800 font-semibold">
-                  General Receipt Narration / Remarks
-                </span>
-              }
-              name="narration"
-              style={{ marginBottom: 0 }}
-            >
-              <TextArea
-                rows={2}
-                placeholder="Optional overall remarks regarding receipt or transport condition..."
-              />
-            </Form.Item>
           </Card>
         </Form>
       </Modal>
@@ -1218,9 +1844,12 @@ export default function StockInTransit() {
       {/* VIEW DETAILS MODAL */}
       <Modal
         title={
-          <span className="text-amber-800 text-2xl font-bold">
-            Stock In Transit Details
-          </span>
+          <div className="flex items-center gap-2">
+            <EyeOutlined className="text-amber-600 text-xl" />
+            <span className="text-amber-800 text-2xl font-bold">
+              Invoice Stock Details: {viewInvoice?.invoice_no}
+            </span>
+          </div>
         }
         open={viewModalOpen}
         onCancel={() => setViewModalOpen(false)}
@@ -1229,14 +1858,14 @@ export default function StockInTransit() {
             key="receive"
             type="primary"
             icon={<CheckCircleOutlined />}
-            className="bg-amber-500! hover:bg-amber-600! border-none!"
+            className="bg-amber-500! hover:bg-amber-600! border-none! font-semibold text-white!"
             onClick={() => {
-              const rec = viewRecord;
+              const rec = viewInvoice;
               setViewModalOpen(false);
-              if (rec) handleOpenReceive(rec);
+              if (rec) handleOpenReceiveModal(rec, selectedVehicle);
             }}
           >
-            {viewRecord?.status === "Received"
+            {viewInvoice?.status === "Received"
               ? "Edit Receipt"
               : "Record Receipt"}
           </Button>,
@@ -1248,171 +1877,125 @@ export default function StockInTransit() {
             Close
           </Button>,
         ]}
-        width={1050}
+        width={1000}
         destroyOnClose
       >
-        {viewRecord && (
-          <div>
-            <Row gutter={[16, 12]}>
-              <Col span={8}>
-                <Text type="secondary">Supplier Name: </Text>
-                <div className="font-bold text-amber-900 text-base">
-                  {viewRecord.supplier_name}
-                </div>
-              </Col>
-              <Col span={4}>
-                <Text type="secondary">Place: </Text>
-                <div className="font-semibold">{viewRecord.place || "-"}</div>
-              </Col>
-              <Col span={4}>
-                <Text type="secondary">LR No: </Text>
-                <div className="font-semibold">{viewRecord.lr_no || "-"}</div>
-              </Col>
-              <Col span={4}>
-                <Text type="secondary">LR Date: </Text>
-                <div className="font-semibold">
-                  {fmtDate(viewRecord.lr_date)}
-                </div>
-              </Col>
-              <Col span={4}>
-                <Text type="secondary">Vehicle No: </Text>
-                <div>
-                  <Tag color="warning">{viewRecord.vehicle_no || "-"}</Tag>
-                </div>
-              </Col>
+        {viewInvoice && (
+          <div className="space-y-4">
+            <Card size="small" className="border-amber-200 bg-amber-50/30">
+              <Row gutter={[16, 12]}>
+                <Col span={6}>
+                  <div className="text-xs text-gray-500">Invoice No & Date</div>
+                  <div className="font-bold text-amber-900 text-base">
+                    {viewInvoice.invoice_no} (
+                    {fmtDate(viewInvoice.invoice_date)})
+                  </div>
+                </Col>
+                <Col span={6}>
+                  <div className="text-xs text-gray-500">Invoice Amount</div>
+                  <div className="font-bold text-gray-900">
+                    {viewInvoice.invoice_amount_display ||
+                      `₹${Number(viewInvoice.invoice_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`}
+                  </div>
+                </Col>
+                <Col span={4}>
+                  <div className="text-xs text-gray-500">Transit Days</div>
+                  <div className="font-bold text-blue-700">
+                    {viewInvoice.transit_days !== "" &&
+                    viewInvoice.transit_days !== null &&
+                    viewInvoice.transit_days !== undefined
+                      ? `${viewInvoice.transit_days} Days`
+                      : "-"}
+                  </div>
+                </Col>
+                <Col span={4}>
+                  <div className="text-xs text-gray-500">Stock Received On</div>
+                  <div className="font-bold text-green-700">
+                    {fmtDate(viewInvoice.stock_received_on)}
+                  </div>
+                </Col>
+                <Col span={4}>
+                  <div className="text-xs text-gray-500">Destination</div>
+                  <div>
+                    <Tag color="cyan">
+                      {viewInvoice.to_be_received_at || "Direct"}
+                    </Tag>
+                  </div>
+                </Col>
+              </Row>
+            </Card>
 
-              <Col span={8}>
-                <Text type="secondary">Transport Name: </Text>
-                <div className="font-semibold">
-                  {viewRecord.transport_name || "-"}
-                </div>
-              </Col>
-              <Col span={4}>
-                <Text type="secondary">Invoice No: </Text>
-                <div className="font-bold text-gray-800">
-                  {viewRecord.invoice_no || "-"}
-                </div>
-              </Col>
-              <Col span={4}>
-                <Text type="secondary">Invoice Date: </Text>
-                <div className="font-semibold">
-                  {fmtDate(viewRecord.invoice_date)}
-                </div>
-              </Col>
-              <Col span={4}>
-                <Text type="secondary">E-waybill No: </Text>
-                <div className="font-semibold">
-                  {viewRecord.ewaybill_no || "-"}
-                </div>
-              </Col>
-              <Col span={4}>
-                <Text type="secondary">E-waybill Date: </Text>
-                <div className="font-semibold">
-                  {fmtDate(viewRecord.ewaybill_date)}
-                </div>
-              </Col>
-
-              <Col span={4}>
-                <Text type="secondary">Transit Days: </Text>
-                <div className="font-bold text-blue-700">
-                  {viewRecord.transit_days !== null &&
-                  viewRecord.transit_days !== undefined
-                    ? `${viewRecord.transit_days} Days`
-                    : "-"}
-                </div>
-              </Col>
-              <Col span={4}>
-                <Text type="secondary">Stock Received On: </Text>
-                <div className="font-bold text-green-800">
-                  {fmtDate(viewRecord.stock_received_on)}
-                </div>
-              </Col>
-              <Col span={4}>
-                <Text type="secondary">To Be Received At: </Text>
-                <div className="font-semibold">
-                  {viewRecord.to_be_received_at || "Direct"}
-                </div>
-              </Col>
-              <Col span={4}>
-                <Text type="secondary">Status: </Text>
-                <div>
-                  <Tag
-                    color={
-                      viewRecord.status === "Received" ? "success" : "warning"
-                    }
-                  >
-                    {viewRecord.status || "Pending"}
-                  </Tag>
-                </div>
-              </Col>
-              <Col span={4}>
-                <Text type="secondary">Invoice Amount: </Text>
-                <div className="font-bold text-amber-800">
-                  ₹
-                  {Number(viewRecord.invoice_amount || 0).toLocaleString(
-                    "en-IN",
-                    {
-                      minimumFractionDigits: 2,
-                    },
-                  )}
-                </div>
-              </Col>
-            </Row>
-
-            <Divider style={{ margin: "16px 0" }} />
-
-            <h5 className="text-amber-800 font-bold mb-3">
-              Item Receipt & Claims
-            </h5>
             <Table
-              dataSource={viewRecord.items || []}
-              rowKey="id"
-              pagination={false}
               size="small"
-              className="border border-amber-100"
+              pagination={false}
+              bordered
+              dataSource={viewInvoice.items || []}
+              rowKey="id"
               columns={[
-                { title: "Item Name", dataIndex: "item_name" },
+                {
+                  title: "Item Name",
+                  dataIndex: "item_name",
+                  render: (t) => <span className="font-semibold">{t}</span>,
+                },
                 {
                   title: "Invoiced Qty",
                   dataIndex: "invoiced_qty",
-                  render: (val, r) => `${val} ${r.unit || ""}`,
+                  render: (q, r) => `${q} ${r.unit || ""}`,
                 },
                 {
                   title: "Rate",
                   dataIndex: "rate",
-                  render: (val) => `₹${Number(val || 0).toFixed(2)}`,
+                  render: (rt) => `₹${rt}`,
+                },
+                {
+                  title: "Direct Qty",
+                  dataIndex: "direct_qty",
+                  render: (dq) =>
+                    dq !== null && dq !== undefined && dq !== "" ? dq : "-",
+                },
+                {
+                  title: "Depo Qty",
+                  dataIndex: "depo_qty",
+                  render: (dpq) =>
+                    dpq !== null && dpq !== undefined && dpq !== "" ? dpq : "-",
                 },
                 {
                   title: "Claim Reason",
                   dataIndex: "claim_reason",
-                  render: (val) => (
-                    <Tag color={val && val !== "None" ? "error" : "default"}>
-                      {val || "None"}
+                  render: (cr) => (
+                    <Tag color={cr && cr !== "None" ? "volcano" : "default"}>
+                      {cr || "None"}
                     </Tag>
                   ),
                 },
                 {
                   title: "Claim Qty",
                   dataIndex: "claim_qty",
-                  render: (val, r) =>
-                    `${Number(val || 0).toFixed(2)} ${r.unit || ""}`,
+                  render: (cq, r) =>
+                    Number(cq) > 0 ? `${cq} ${r.unit || ""}` : "-",
                 },
                 {
                   title: "Claim Amount",
                   dataIndex: "claim_amount",
-                  render: (val) => `₹${Number(val || 0).toFixed(2)}`,
+                  render: (ca) =>
+                    Number(ca) > 0 ? (
+                      <span className="font-bold text-red-600">
+                        ₹
+                        {Number(ca).toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </span>
+                    ) : (
+                      "-"
+                    ),
+                },
+                {
+                  title: "Narration",
+                  dataIndex: "narration",
+                  render: (n) => n || "-",
                 },
               ]}
             />
-
-            {viewRecord.narration && (
-              <div style={{ marginTop: 16 }}>
-                <Text type="secondary">General Remarks: </Text>
-                <div className="font-medium text-gray-700 bg-gray-50 p-2 rounded border">
-                  {viewRecord.narration}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </Modal>
