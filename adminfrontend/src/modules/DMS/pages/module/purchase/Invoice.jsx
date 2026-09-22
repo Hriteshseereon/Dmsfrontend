@@ -84,7 +84,8 @@ export default function PurchaseInvoice() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editingRecordDocUrl, setEditingRecordDocUrl] = useState(null);
-  const [supplierInvoicesModalOpen, setSupplierInvoicesModalOpen] = useState(false);
+  const [supplierInvoicesModalOpen, setSupplierInvoicesModalOpen] =
+    useState(false);
   const [selectedMergedSupplier, setSelectedMergedSupplier] = useState(null);
   const [viewModal, setViewModal] = useState(false);
   const [viewRecord, setViewRecord] = useState(null);
@@ -115,14 +116,14 @@ export default function PurchaseInvoice() {
     const hasEwaybillNo = Boolean(
       inv.ewaybill_no &&
       String(inv.ewaybill_no).trim() !== "" &&
-      String(inv.ewaybill_no).toLowerCase() !== "pending"
+      String(inv.ewaybill_no).toLowerCase() !== "pending",
     );
     const hasEwaybillDate = Boolean(inv.ewaybill_date);
     const hasDoc = Boolean(
       inv.invoice_upload_status === "Uploaded" ||
       inv.invoice_copy_url ||
       inv.invoice_copy ||
-      inv.file
+      inv.file,
     );
     return hasEwaybillNo && hasEwaybillDate && hasDoc;
   };
@@ -142,7 +143,9 @@ export default function PurchaseInvoice() {
         });
       } else {
         // Candidate for supplier grouping
-        const supplierKey = String(item.vendor || item.supplier_name || "unknown").trim();
+        const supplierKey = String(
+          item.vendor || item.supplier_name || "unknown",
+        ).trim();
         if (!supplierGroups[supplierKey]) {
           supplierGroups[supplierKey] = {
             vendor: item.vendor,
@@ -164,15 +167,15 @@ export default function PurchaseInvoice() {
         // Merge into single supplier row
         const totalQty = group.items.reduce(
           (sum, i) => sum + Number(i.total_qty || 0),
-          0
+          0,
         );
         const totalAmount = group.items.reduce(
           (sum, i) => sum + Number(i.total_amount || 0),
-          0
+          0,
         );
         const totalNetWeight = group.items.reduce(
           (sum, i) => sum + Number(i.total_net_weight || 0),
-          0
+          0,
         );
 
         result.push({
@@ -253,8 +256,6 @@ export default function PurchaseInvoice() {
       items: [],
       total_qty: 0,
       total_taxable_amount: 0,
-      total_sgst_amount: 0,
-      total_cgst_amount: 0,
       total_igst_amount: 0,
       total_amount: 0,
       round_off_amount: 0,
@@ -279,15 +280,22 @@ export default function PurchaseInvoice() {
     });
 
     try {
-      message.loading({ content: "Loading available vehicles...", key: "load_vehicles" });
+      message.loading({
+        content: "Loading available vehicles...",
+        key: "load_vehicles",
+      });
       const res = await getAvailableVehicles();
       const list = res?.data || res || [];
 
       // Filter vehicles client-side by place to match supplier's place/city
       const filtered = list.filter(
         (v) =>
-          String(v.place || "").trim().toLowerCase() ===
-          String(supplierCity || "").trim().toLowerCase()
+          String(v.place || "")
+            .trim()
+            .toLowerCase() ===
+          String(supplierCity || "")
+            .trim()
+            .toLowerCase(),
       );
 
       setAvailableVehicles(filtered.length > 0 ? filtered : list);
@@ -300,7 +308,10 @@ export default function PurchaseInvoice() {
       }, 150);
     } catch (error) {
       console.error("Error loading vehicles:", error);
-      message.error({ content: "Failed to load vehicles", key: "load_vehicles" });
+      message.error({
+        content: "Failed to load vehicles",
+        key: "load_vehicles",
+      });
     }
   };
 
@@ -308,22 +319,30 @@ export default function PurchaseInvoice() {
     setVehicleDropdownOpen(false);
     if (!vehicleNo) return;
 
-    let matchedVehicle = availableVehicles.find((v) => v.vehicle_no === vehicleNo);
+    let matchedVehicle = availableVehicles.find(
+      (v) => v.vehicle_no === vehicleNo,
+    );
 
     // Call GET /api/purchase/invoices/available-vehicles/?vehicle_no=<vehicle_no> to fetch fresh remaining quantities
     try {
-      message.loading({ content: "Fetching vehicle details...", key: "load_vehicle_details" });
+      message.loading({
+        content: "Fetching vehicle details...",
+        key: "load_vehicle_details",
+      });
       const res = await getAvailableVehicles(vehicleNo);
       const list = res?.data || res || [];
       const freshVehicle = Array.isArray(list)
-        ? (list.find((v) => v.vehicle_no === vehicleNo) || list[0])
+        ? list.find((v) => v.vehicle_no === vehicleNo) || list[0]
         : list;
       if (freshVehicle && freshVehicle.items) {
         matchedVehicle = freshVehicle;
       }
       message.destroy("load_vehicle_details");
     } catch (err) {
-      console.warn("Could not fetch specific vehicle details, using cached:", err);
+      console.warn(
+        "Could not fetch specific vehicle details, using cached:",
+        err,
+      );
       message.destroy("load_vehicle_details");
     }
 
@@ -331,7 +350,9 @@ export default function PurchaseInvoice() {
 
     form.setFieldsValue({
       lr_no: matchedVehicle.lr_no || "",
-      lr_date: matchedVehicle.lr_date ? parseApiDate(matchedVehicle.lr_date) : null,
+      lr_date: matchedVehicle.lr_date
+        ? parseApiDate(matchedVehicle.lr_date)
+        : null,
       transport_name: matchedVehicle.transport_name || "",
       place: matchedVehicle.place || form.getFieldValue("place") || "",
       gross_weight:
@@ -340,47 +361,13 @@ export default function PurchaseInvoice() {
         0,
     });
 
-    const vehicleGrossWeight = Number(
-      matchedVehicle.gross_weight_loaded ||
-      matchedVehicle.gross_weight_loading_plan ||
-      0
-    );
-    const totalVehicleNetWeight = (matchedVehicle.items || []).reduce(
-      (sum, it) => sum + Number(it.net_wt || 0),
-      0
-    );
-    const totalVehicleQty = (matchedVehicle.items || []).reduce(
-      (sum, it) => sum + Number(it.qty || 0),
-      0
-    );
-
-    // Populate initial items list with available_qty, editable invoice_qty, unit_net_wt & unit_gross_wt
+    // Populate initial items list with available_qty, editable invoice_qty & unit_net_wt
     const populatedItems = (matchedVehicle.items || []).map((item) => {
-      const remainingQty = Number(
-        item.remaining_qty !== undefined
-          ? item.remaining_qty
-          : item.qty !== undefined
-          ? item.qty
-          : (item.original_qty || 0) - (item.already_invoiced_qty || 0)
-      );
+      const remainingQty = Number(item.qty || 0);
       const invoiceQty = Number(item.invoice_qty || remainingQty || 0);
       const netWt = Number(item.net_wt || 0);
       const unitNetWt = remainingQty > 0 ? netWt / remainingQty : 0;
       const actualNetWt = Number((unitNetWt * invoiceQty).toFixed(3));
-
-      let unitGrossWt = 0;
-      if (item.gross_wt && remainingQty > 0) {
-        unitGrossWt = Number(item.gross_wt) / remainingQty;
-      } else if (item.gross_weight && remainingQty > 0) {
-        unitGrossWt = Number(item.gross_weight) / remainingQty;
-      } else if (vehicleGrossWeight > 0 && totalVehicleNetWeight > 0) {
-        const itemTotalGrossWt = (netWt / totalVehicleNetWeight) * vehicleGrossWeight;
-        unitGrossWt = remainingQty > 0 ? itemTotalGrossWt / remainingQty : 0;
-      } else if (vehicleGrossWeight > 0 && totalVehicleQty > 0) {
-        unitGrossWt = vehicleGrossWeight / totalVehicleQty;
-      } else {
-        unitGrossWt = unitNetWt;
-      }
 
       return {
         sale_contract: item.sale_contract_id,
@@ -388,19 +375,18 @@ export default function PurchaseInvoice() {
         product: item.product_id,
         item_name: item.item_name,
         available_qty: Number(remainingQty).toFixed(2),
-        original_qty: Number(item.original_qty !== undefined ? item.original_qty : remainingQty),
+        original_qty: Number(
+          item.original_qty !== undefined ? item.original_qty : remainingQty,
+        ),
         already_invoiced_qty: Number(item.already_invoiced_qty || 0),
         qty: remainingQty,
         invoice_qty: invoiceQty,
         unit: item.unit,
         unit_net_wt: unitNetWt,
-        unit_gross_wt: unitGrossWt,
         net_wt: actualNetWt,
         gst_percent: item.gst_percent,
         rate: undefined,
         taxable_amount: 0,
-        sgst_amount: 0,
-        cgst_amount: 0,
         igst_amount: 0,
         total_amount: 0,
       };
@@ -444,7 +430,10 @@ export default function PurchaseInvoice() {
 
   const fetchSoudaRatesForItems = async (vendorId, itemsList) => {
     const ratesByItem = {};
-    message.loading({ content: "Fetching contract rates...", key: "load_rates" });
+    message.loading({
+      content: "Fetching contract rates...",
+      key: "load_rates",
+    });
     await Promise.all(
       itemsList.map(async (item) => {
         if (!item.item_name || ratesByItem[item.item_name]) return;
@@ -455,7 +444,7 @@ export default function PurchaseInvoice() {
           console.error(`Failed to fetch rates for ${item.item_name}`, error);
           ratesByItem[item.item_name] = [];
         }
-      })
+      }),
     );
     setSoudaRatesMap(ratesByItem);
     message.destroy("load_rates");
@@ -470,29 +459,17 @@ export default function PurchaseInvoice() {
     const validQty = Math.max(0, Number(newQty || 0));
     const unitNetWt = Number(
       currentItem.unit_net_wt ||
-        (currentItem.qty > 0 ? Number(currentItem.net_wt || 0) / currentItem.qty : 0)
+        (currentItem.qty > 0
+          ? Number(currentItem.net_wt || 0) / currentItem.qty
+          : 0),
     );
     const newNetWt = Number((unitNetWt * validQty).toFixed(3));
 
     const rate = Number(currentItem.rate || 0);
     const gstPercent = Number(currentItem.gst_percent || 0);
     const taxableAmount = Number((validQty * rate).toFixed(2));
-
-    let sgstAmount = Number(currentItem.sgst_amount || 0);
-    let cgstAmount = Number(currentItem.cgst_amount || 0);
-    let igstAmount = Number(currentItem.igst_amount || 0);
-
-    if (sgstAmount > 0 || cgstAmount > 0) {
-      sgstAmount = Number(((taxableAmount * (gstPercent / 2)) / 100).toFixed(2));
-      cgstAmount = Number(((taxableAmount * (gstPercent / 2)) / 100).toFixed(2));
-      igstAmount = 0;
-    } else {
-      igstAmount = Number(((taxableAmount * gstPercent) / 100).toFixed(2));
-      sgstAmount = 0;
-      cgstAmount = 0;
-    }
-
-    const totalAmount = Number((taxableAmount + sgstAmount + cgstAmount + igstAmount).toFixed(2));
+    const igstAmount = Number(((taxableAmount * gstPercent) / 100).toFixed(2));
+    const totalAmount = Number((taxableAmount + igstAmount).toFixed(2));
 
     const updated = [...items];
     updated[index] = {
@@ -500,44 +477,6 @@ export default function PurchaseInvoice() {
       invoice_qty: validQty,
       net_wt: newNetWt,
       taxable_amount: taxableAmount,
-      sgst_amount: sgstAmount,
-      cgst_amount: cgstAmount,
-      igst_amount: igstAmount,
-      total_amount: totalAmount,
-    };
-
-    form.setFieldsValue({ items: updated });
-    recalculateGrandTotals(updated);
-  };
-
-  // Handle tax amounts change (SGST, CGST, IGST) directly
-  const handleTaxAmountChange = (index, fieldType, value) => {
-    const items = form.getFieldValue("items") || [];
-    if (!items[index]) return;
-
-    const currentItem = items[index];
-    const val = Math.max(0, Number(value || 0));
-    const taxableAmount = Number(currentItem.taxable_amount || 0);
-
-    let sgstAmount = Number(currentItem.sgst_amount || 0);
-    let cgstAmount = Number(currentItem.cgst_amount || 0);
-    let igstAmount = Number(currentItem.igst_amount || 0);
-
-    if (fieldType === "sgst_amount") {
-      sgstAmount = val;
-    } else if (fieldType === "cgst_amount") {
-      cgstAmount = val;
-    } else if (fieldType === "igst_amount") {
-      igstAmount = val;
-    }
-
-    const totalAmount = Number((taxableAmount + sgstAmount + cgstAmount + igstAmount).toFixed(2));
-
-    const updated = [...items];
-    updated[index] = {
-      ...currentItem,
-      sgst_amount: sgstAmount,
-      cgst_amount: cgstAmount,
       igst_amount: igstAmount,
       total_amount: totalAmount,
     };
@@ -552,14 +491,16 @@ export default function PurchaseInvoice() {
 
     const currentItem = items[index];
     const invQty = Number(
-      currentItem.invoice_qty !== undefined ? currentItem.invoice_qty : currentItem.qty || 0
+      currentItem.invoice_qty !== undefined
+        ? currentItem.invoice_qty
+        : currentItem.qty || 0,
     );
     const gstPercent = Number(currentItem.gst_percent || 0);
     const rateVal = Number(rateOption.rate ?? rate ?? 0);
     const contractBalance = Number(
       rateOption.balance_qty !== undefined && rateOption.balance_qty !== null
         ? rateOption.balance_qty
-        : rateOption.souda_qty ?? 0
+        : (rateOption.souda_qty ?? 0),
     );
 
     // If contract balance is less than required item invoice quantity: split item
@@ -568,27 +509,14 @@ export default function PurchaseInvoice() {
       const remainingQty = Number((invQty - allocatedQty).toFixed(3));
       const unitNetWt = Number(
         currentItem.unit_net_wt ||
-          (invQty > 0 ? Number(currentItem.net_wt || 0) / invQty : 0)
+          (invQty > 0 ? Number(currentItem.net_wt || 0) / invQty : 0),
       );
-      const unitGrossWt = Number(currentItem.unit_gross_wt || unitNetWt);
       const allocatedNetWt = Number((unitNetWt * allocatedQty).toFixed(3));
       const remainingNetWt = Number((unitNetWt * remainingQty).toFixed(3));
 
-      const currentTaxable = Number((allocatedQty * rateVal).toFixed(2));
-      let sgstAmount = Number(currentItem.sgst_amount || 0);
-      let cgstAmount = Number(currentItem.cgst_amount || 0);
-      let igstAmount = Number(currentItem.igst_amount || 0);
-
-      if (sgstAmount > 0 || cgstAmount > 0) {
-        sgstAmount = Number(((currentTaxable * (gstPercent / 2)) / 100).toFixed(2));
-        cgstAmount = Number(((currentTaxable * (gstPercent / 2)) / 100).toFixed(2));
-        igstAmount = 0;
-      } else {
-        igstAmount = Number(((currentTaxable * gstPercent) / 100).toFixed(2));
-        sgstAmount = 0;
-        cgstAmount = 0;
-      }
-      const currentTotal = Number((currentTaxable + sgstAmount + cgstAmount + igstAmount).toFixed(2));
+      const currentTaxable = allocatedQty * rateVal;
+      const currentIgst = (currentTaxable * gstPercent) / 100;
+      const currentTotal = currentTaxable + currentIgst;
 
       const updatedCurrentItem = {
         ...currentItem,
@@ -597,11 +525,9 @@ export default function PurchaseInvoice() {
         rate: rateVal,
         purchase_contract: rateOption.purchase_contract_id,
         purchase_contract_item: rateOption.purchase_contract_item_id,
-        taxable_amount: currentTaxable,
-        sgst_amount: sgstAmount,
-        cgst_amount: cgstAmount,
-        igst_amount: igstAmount,
-        total_amount: currentTotal,
+        taxable_amount: Number(currentTaxable.toFixed(2)),
+        igst_amount: Number(currentIgst.toFixed(2)),
+        total_amount: Number(currentTotal.toFixed(2)),
       };
 
       const newSplitItem = {
@@ -614,15 +540,12 @@ export default function PurchaseInvoice() {
         invoice_qty: remainingQty,
         unit: currentItem.unit,
         unit_net_wt: unitNetWt,
-        unit_gross_wt: unitGrossWt,
         net_wt: remainingNetWt,
         gst_percent: currentItem.gst_percent,
         rate: undefined,
         purchase_contract: undefined,
         purchase_contract_item: undefined,
         taxable_amount: 0,
-        sgst_amount: 0,
-        cgst_amount: 0,
         igst_amount: 0,
         total_amount: 0,
         is_split: true,
@@ -638,7 +561,7 @@ export default function PurchaseInvoice() {
       message.info(
         `Quantity split: ${allocatedQty} ${currentItem.unit || ""} allocated to Souda #${
           rateOption.souda_no || ""
-        }. Remaining ${remainingQty} ${currentItem.unit || ""} created below.`
+        }. Remaining ${remainingQty} ${currentItem.unit || ""} created below.`,
       );
 
       // Auto-focus new row's rate dropdown for selecting next contract
@@ -649,21 +572,9 @@ export default function PurchaseInvoice() {
     }
 
     // Standard case: contract balance >= invoice qty
-    const taxableAmount = Number((invQty * rateVal).toFixed(2));
-    let sgstAmount = Number(currentItem.sgst_amount || 0);
-    let cgstAmount = Number(currentItem.cgst_amount || 0);
-    let igstAmount = Number(currentItem.igst_amount || 0);
-
-    if (sgstAmount > 0 || cgstAmount > 0) {
-      sgstAmount = Number(((taxableAmount * (gstPercent / 2)) / 100).toFixed(2));
-      cgstAmount = Number(((taxableAmount * (gstPercent / 2)) / 100).toFixed(2));
-      igstAmount = 0;
-    } else {
-      igstAmount = Number(((taxableAmount * gstPercent) / 100).toFixed(2));
-      sgstAmount = 0;
-      cgstAmount = 0;
-    }
-    const totalAmount = Number((taxableAmount + sgstAmount + cgstAmount + igstAmount).toFixed(2));
+    const taxableAmount = invQty * rateVal;
+    const igstAmount = (taxableAmount * gstPercent) / 100;
+    const totalAmount = taxableAmount + igstAmount;
 
     const updatedItems = [...items];
     updatedItems[index] = {
@@ -671,11 +582,9 @@ export default function PurchaseInvoice() {
       rate: rateVal,
       purchase_contract: rateOption.purchase_contract_id,
       purchase_contract_item: rateOption.purchase_contract_item_id,
-      taxable_amount: taxableAmount,
-      sgst_amount: sgstAmount,
-      cgst_amount: cgstAmount,
-      igst_amount: igstAmount,
-      total_amount: totalAmount,
+      taxable_amount: Number(taxableAmount.toFixed(2)),
+      igst_amount: Number(igstAmount.toFixed(2)),
+      total_amount: Number(totalAmount.toFixed(2)),
     };
 
     form.setFieldsValue({ items: updatedItems });
@@ -701,34 +610,24 @@ export default function PurchaseInvoice() {
     const items = itemsOverride || form.getFieldValue("items") || [];
     const totalQty = items.reduce(
       (sum, item) =>
-        sum + Number(item.invoice_qty !== undefined ? item.invoice_qty : item.qty || 0),
-      0
+        sum +
+        Number(
+          item.invoice_qty !== undefined ? item.invoice_qty : item.qty || 0,
+        ),
+      0,
     );
     const totalTaxable = items.reduce(
       (sum, item) => sum + Number(item.taxable_amount || 0),
-      0
-    );
-    const totalSGST = items.reduce(
-      (sum, item) => sum + Number(item.sgst_amount || 0),
-      0
-    );
-    const totalCGST = items.reduce(
-      (sum, item) => sum + Number(item.cgst_amount || 0),
-      0
+      0,
     );
     const totalIGST = items.reduce(
       (sum, item) => sum + Number(item.igst_amount || 0),
-      0
+      0,
     );
     const totalAmount = items.reduce(
       (sum, item) => sum + Number(item.total_amount || 0),
-      0
+      0,
     );
-    const totalGrossWeight = items.reduce((sum, item) => {
-      const invQty = Number(item.invoice_qty !== undefined ? item.invoice_qty : item.qty || 0);
-      const unitGross = Number(item.unit_gross_wt || item.unit_net_wt || 0);
-      return sum + (unitGross * invQty);
-    }, 0);
 
     const roundOff = Number(form.getFieldValue("round_off_amount") || 0);
     const grandTotal = totalAmount + roundOff;
@@ -736,12 +635,9 @@ export default function PurchaseInvoice() {
     form.setFieldsValue({
       total_qty: Number(totalQty.toFixed(3)),
       total_taxable_amount: Number(totalTaxable.toFixed(2)),
-      total_sgst_amount: Number(totalSGST.toFixed(2)),
-      total_cgst_amount: Number(totalCGST.toFixed(2)),
       total_igst_amount: Number(totalIGST.toFixed(2)),
       total_amount: Number(totalAmount.toFixed(2)),
       grand_total: Number(grandTotal.toFixed(2)),
-      gross_weight: Number(totalGrossWeight.toFixed(3)),
     });
   };
 
@@ -762,7 +658,9 @@ export default function PurchaseInvoice() {
 
   const handleEdit = async (record) => {
     setEditingId(record.id);
-    setEditingRecordDocUrl(record.invoice_copy_url || record.invoice_copy || record.file || null);
+    setEditingRecordDocUrl(
+      record.invoice_copy_url || record.invoice_copy || record.file || null,
+    );
     form.resetFields();
 
     const formattedItems = (record.items || []).map((item) => {
@@ -770,24 +668,20 @@ export default function PurchaseInvoice() {
       const invoiceQty = Number(item.invoice_qty || qty || 0);
       const rate = Number(item.rate || 0);
       const gstPercent = Number(item.gst_percent || 0);
-      const taxableAmount = Number(item.taxable_amount || invoiceQty * rate || 0);
-      const sgstAmount = Number(item.sgst_amount || 0);
-      const cgstAmount = Number(item.cgst_amount || 0);
-      let igstAmount = Number(item.igst_amount || 0);
-      if (!sgstAmount && !cgstAmount && !igstAmount) {
-        igstAmount = Number(item.total_gst_amount || (taxableAmount * gstPercent) / 100 || 0);
-      }
+      const taxableAmount = Number(
+        item.taxable_amount || invoiceQty * rate || 0,
+      );
+      const igstAmount = Number(
+        item.igst_amount ||
+          item.total_gst_amount ||
+          (taxableAmount * gstPercent) / 100 ||
+          0,
+      );
       const totalAmount = Number(
-        item.total_amount || taxableAmount + sgstAmount + cgstAmount + igstAmount || 0
+        item.total_amount || taxableAmount + igstAmount || 0,
       );
       const netWt = Number(item.net_wt || 0);
       const unitNetWt = invoiceQty > 0 ? netWt / invoiceQty : 0;
-      const unitGrossWt = Number(
-        item.unit_gross_wt ||
-          (record.total_gross_weight && record.total_qty
-            ? Number(record.total_gross_weight) / Number(record.total_qty)
-            : unitNetWt)
-      );
 
       return {
         sale_contract: item.sale_contract,
@@ -801,13 +695,10 @@ export default function PurchaseInvoice() {
         invoice_qty: invoiceQty,
         unit: item.unit,
         unit_net_wt: unitNetWt,
-        unit_gross_wt: unitGrossWt,
         net_wt: netWt,
         gst_percent: gstPercent,
         rate: rate,
         taxable_amount: Number(taxableAmount.toFixed(2)),
-        sgst_amount: Number(sgstAmount.toFixed(2)),
-        cgst_amount: Number(cgstAmount.toFixed(2)),
         igst_amount: Number(igstAmount.toFixed(2)),
         total_amount: Number(totalAmount.toFixed(2)),
       };
@@ -848,17 +739,15 @@ export default function PurchaseInvoice() {
       payment_due_date: parseApiDate(record.payment_due_date),
       dispatch_from: record.dispatch_from || "Haldia",
       ship_to: record.ship_to || "",
-      gross_weight: Number(record.total_gross_weight || record.gross_weight || 0),
+      gross_weight: Number(record.total_gross_weight || 0),
       round_off_amount: Number(record.round_off_amount || 0),
       items: formattedItems,
       total_qty: Number(Number(record.total_qty || 0).toFixed(3)),
       total_taxable_amount: Number(
-        Number(record.total_taxable_amount || 0).toFixed(2)
+        Number(record.total_taxable_amount || 0).toFixed(2),
       ),
-      total_sgst_amount: Number(Number(record.total_sgst_amount || 0).toFixed(2)),
-      total_cgst_amount: Number(Number(record.total_cgst_amount || 0).toFixed(2)),
       total_igst_amount: Number(
-        Number(record.igst_amount || record.total_gst_amount || 0).toFixed(2)
+        Number(record.igst_amount || record.total_gst_amount || 0).toFixed(2),
       ),
       total_amount: Number(Number(record.total_amount || 0).toFixed(2)),
       grand_total: Number(Number(record.grand_total || 0).toFixed(2)),
@@ -890,28 +779,37 @@ export default function PurchaseInvoice() {
 
       // Duplicate check for purchase invoice number and e-waybill number when adding new
       if (!editingId) {
-        const enteredInvoiceNo = String(values.invoice_no || "").trim().toLowerCase();
+        const enteredInvoiceNo = String(values.invoice_no || "")
+          .trim()
+          .toLowerCase();
         if (enteredInvoiceNo) {
           const isDuplicateInvoice = data.some(
             (inv) =>
               inv.invoice_no &&
-              String(inv.invoice_no).trim().toLowerCase() === enteredInvoiceNo
+              String(inv.invoice_no).trim().toLowerCase() === enteredInvoiceNo,
           );
           if (isDuplicateInvoice) {
-            message.error(`Purchase Invoice No "${values.invoice_no}" already exists!`);
+            message.error(
+              `Purchase Invoice No "${values.invoice_no}" already exists!`,
+            );
             return;
           }
         }
 
-        const enteredEwaybillNo = String(values.ewaybill_no || "").trim().toLowerCase();
+        const enteredEwaybillNo = String(values.ewaybill_no || "")
+          .trim()
+          .toLowerCase();
         if (enteredEwaybillNo && enteredEwaybillNo !== "pending") {
           const isDuplicateEwaybill = data.some(
             (inv) =>
               inv.ewaybill_no &&
-              String(inv.ewaybill_no).trim().toLowerCase() === enteredEwaybillNo
+              String(inv.ewaybill_no).trim().toLowerCase() ===
+                enteredEwaybillNo,
           );
           if (isDuplicateEwaybill) {
-            message.error(`E-waybill No "${values.ewaybill_no}" already exists!`);
+            message.error(
+              `E-waybill No "${values.ewaybill_no}" already exists!`,
+            );
             return;
           }
         }
@@ -924,7 +822,9 @@ export default function PurchaseInvoice() {
         supplier_name: values.supplier_name,
         place: values.place,
         lr_no: values.lr_no,
-        lr_date: values.lr_date ? dayjs(values.lr_date).format("DD-MM-YYYY") : null,
+        lr_date: values.lr_date
+          ? dayjs(values.lr_date).format("DD-MM-YYYY")
+          : null,
         transport_name: values.transport_name,
         vehicle_no: values.vehicle_no,
         ewaybill_no: values.ewaybill_no || null,
@@ -940,8 +840,6 @@ export default function PurchaseInvoice() {
           : null,
         dispatch_from: values.dispatch_from,
         ship_to: values.ship_to,
-        total_gross_weight: values.gross_weight,
-        gross_weight: values.gross_weight,
         round_off_amount: String(values.round_off_amount || 0),
         items: (values.items || []).map((item) => ({
           sale_contract: item.sale_contract,
@@ -956,11 +854,6 @@ export default function PurchaseInvoice() {
           net_wt: Number(item.net_wt || 0),
           gst_percent: Number(item.gst_percent || 0),
           rate: Number(item.rate || 0),
-          taxable_amount: Number(item.taxable_amount || 0),
-          sgst_amount: Number(item.sgst_amount || 0),
-          cgst_amount: Number(item.cgst_amount || 0),
-          igst_amount: Number(item.igst_amount || 0),
-          total_amount: Number(item.total_amount || 0),
         })),
       };
 
@@ -987,7 +880,7 @@ export default function PurchaseInvoice() {
           error.message ||
           (editingId
             ? "Failed to update Purchase Invoice"
-            : "Failed to create Purchase Invoice")
+            : "Failed to create Purchase Invoice"),
       );
     } finally {
       setSubmitting(false);
@@ -1013,7 +906,9 @@ export default function PurchaseInvoice() {
       "Transport Name": item.transport_name,
       "Vehicle No": item.vehicle_no,
       "E-waybill No": item.ewaybill_no || "Pending",
-      "E-waybill Date": item.ewaybill_date ? fmtDate(item.ewaybill_date) : "Pending",
+      "E-waybill Date": item.ewaybill_date
+        ? fmtDate(item.ewaybill_date)
+        : "Pending",
       "Invoice No": item.invoice_no,
       "Invoice Date": fmtDate(item.invoice_date),
       "Total Qty": item.total_qty,
@@ -1027,10 +922,15 @@ export default function PurchaseInvoice() {
 
   const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Supplier Name</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Supplier Name</span>
+      ),
       dataIndex: "supplier_name",
       render: (text, record) => {
-        const firstName = String(text || "").trim().split(" ")[0] || "-";
+        const firstName =
+          String(text || "")
+            .trim()
+            .split(" ")[0] || "-";
         if (record.isMergedRow) {
           return (
             <Tooltip title={`Supplier: ${text} (Double-click row to view all)`}>
@@ -1073,7 +973,9 @@ export default function PurchaseInvoice() {
       render: (val) => fmtDate(val),
     },
     {
-      title: <span className="text-amber-700 font-semibold">Transport Name</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Transport Name</span>
+      ),
       dataIndex: "transport_name",
       render: (text) => (text ? String(text).trim().split(/\s+/)[0] : "-"),
     },
@@ -1084,7 +986,7 @@ export default function PurchaseInvoice() {
         record.isMergedRow ? (
           <Tag color="cyan">{text}</Tag>
         ) : (
-          <span className="font-semibold text-amber-900">{text || "-"}</span>
+          <Tag color="warning">{text}</Tag>
         ),
     },
     {
@@ -1102,7 +1004,9 @@ export default function PurchaseInvoice() {
       },
     },
     {
-      title: <span className="text-amber-700 font-semibold">E-waybill Date</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">E-waybill Date</span>
+      ),
       dataIndex: "ewaybill_date",
       render: (val, record) => {
         if (record.isMergedRow) {
@@ -1137,14 +1041,17 @@ export default function PurchaseInvoice() {
     {
       title: <span className="text-amber-700 font-semibold">Total Amount</span>,
       dataIndex: "total_amount",
-      render: (val) => `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      render: (val) =>
+        `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
     },
     {
       title: <span className="text-amber-700 font-semibold">Total Net Wt</span>,
       dataIndex: "total_net_weight",
     },
     {
-      title: <span className="text-amber-700 font-semibold">Payment Due Date</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Payment Due Date</span>
+      ),
       dataIndex: "payment_due_date",
       render: (val, record) => (record.isMergedRow ? "-" : fmtDate(val)),
     },
@@ -1228,10 +1135,15 @@ export default function PurchaseInvoice() {
 
   const supplierDetailColumns = [
     {
-      title: <span className="text-amber-700 font-semibold">Supplier Name</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Supplier Name</span>
+      ),
       dataIndex: "supplier_name",
       render: (text) => {
-        const firstName = String(text || "").trim().split(" ")[0] || "-";
+        const firstName =
+          String(text || "")
+            .trim()
+            .split(" ")[0] || "-";
         return (
           <Tooltip title={text}>
             <span className="text-amber-900 font-medium">{firstName}</span>
@@ -1259,14 +1171,16 @@ export default function PurchaseInvoice() {
       render: (val) => fmtDate(val),
     },
     {
-      title: <span className="text-amber-700 font-semibold">Transport Name</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Transport Name</span>
+      ),
       dataIndex: "transport_name",
       render: (text) => (text ? String(text).trim().split(/\s+/)[0] : "-"),
     },
     {
       title: <span className="text-amber-700 font-semibold">Vehicle No</span>,
       dataIndex: "vehicle_no",
-      render: (text) => <span className="font-semibold text-amber-900">{text || "-"}</span>,
+      render: (text) => <Tag color="warning">{text}</Tag>,
     },
     {
       title: <span className="text-amber-700 font-semibold">E-waybill No</span>,
@@ -1279,14 +1193,19 @@ export default function PurchaseInvoice() {
         ),
     },
     {
-      title: <span className="text-amber-700 font-semibold">E-waybill Date</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">E-waybill Date</span>
+      ),
       dataIndex: "ewaybill_date",
-      render: (val) => (val ? <span>{fmtDate(val)}</span> : <Tag color="error">Pending</Tag>),
+      render: (val) =>
+        val ? <span>{fmtDate(val)}</span> : <Tag color="error">Pending</Tag>,
     },
     {
       title: <span className="text-amber-700 font-semibold">Invoice No</span>,
       dataIndex: "invoice_no",
-      render: (text) => <span className="font-semibold text-gray-800">{text}</span>,
+      render: (text) => (
+        <span className="font-semibold text-gray-800">{text}</span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">Invoice Date</span>,
@@ -1308,7 +1227,9 @@ export default function PurchaseInvoice() {
       dataIndex: "total_net_weight",
     },
     {
-      title: <span className="text-amber-700 font-semibold">Payment Due Date</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Payment Due Date</span>
+      ),
       dataIndex: "payment_due_date",
       render: (val) => fmtDate(val),
     },
@@ -1409,8 +1330,12 @@ export default function PurchaseInvoice() {
 
       {/* TABLE VIEW */}
       <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
-        <h2 className="text-lg font-semibold text-amber-700 mb-0">Purchase Invoices</h2>
-        <p className="text-amber-600 mb-3">Manage and verify your purchase invoice logs</p>
+        <h2 className="text-lg font-semibold text-amber-700 mb-0">
+          Purchase Invoices
+        </h2>
+        <p className="text-amber-600 mb-3">
+          Manage and verify your purchase invoice logs
+        </p>
 
         <Table
           columns={columns}
@@ -1427,7 +1352,9 @@ export default function PurchaseInvoice() {
                 setSupplierInvoicesModalOpen(true);
               }
             },
-            className: record.isMergedRow ? "cursor-pointer hover:bg-amber-50/50" : "",
+            className: record.isMergedRow
+              ? "cursor-pointer hover:bg-amber-50/50"
+              : "",
           })}
         />
       </div>
@@ -1493,7 +1420,11 @@ export default function PurchaseInvoice() {
             <Row gutter={[12, 12]}>
               <Col span={5}>
                 <Form.Item
-                  label={<span className="text-amber-700 font-semibold">Supplier Name</span>}
+                  label={
+                    <span className="text-amber-700 font-semibold">
+                      Supplier Name
+                    </span>
+                  }
                   name="vendor"
                   rules={[{ required: true, message: "Supplier is required" }]}
                 >
@@ -1516,26 +1447,47 @@ export default function PurchaseInvoice() {
               </Col>
 
               <Col span={3}>
-                <Form.Item label={<span className="text-amber-700 font-semibold">Place</span>} name="place">
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold">Place</span>
+                  }
+                  name="place"
+                >
                   <Input disabled className="bg-gray-50!" />
                 </Form.Item>
               </Col>
 
               <Col span={3}>
-                <Form.Item label={<span className="text-amber-700 font-semibold">LR No</span>} name="lr_no">
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold">LR No</span>
+                  }
+                  name="lr_no"
+                >
                   <Input disabled className="bg-gray-50!" />
                 </Form.Item>
               </Col>
 
               <Col span={3}>
-                <Form.Item label={<span className="text-amber-700 font-semibold">LR Date</span>} name="lr_date">
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold">
+                      LR Date
+                    </span>
+                  }
+                  name="lr_date"
+                >
                   <AppDatePicker disabled className="bg-gray-50! w-full" />
                 </Form.Item>
               </Col>
 
               <Col span={5}>
                 <Form.Item
-                  label={<span className="text-amber-700 font-semibold">Transport Name</span>}
+                  label={
+                    <span className="text-amber-700 font-semibold">
+                      Transport Name
+                    </span>
+                  }
                   name="transport_name"
                 >
                   <Input disabled className="bg-gray-50!" />
@@ -1544,16 +1496,24 @@ export default function PurchaseInvoice() {
 
               <Col span={5}>
                 <Form.Item
-                  label={<span className="text-amber-700 font-semibold">Vehicle No</span>}
+                  label={
+                    <span className="text-amber-700 font-semibold">
+                      Vehicle No
+                    </span>
+                  }
                   name="vehicle_no"
-                  rules={[{ required: true, message: "Vehicle No is required" }]}
+                  rules={[
+                    { required: true, message: "Vehicle No is required" },
+                  ]}
                 >
                   <Select
                     ref={vehicleSelectRef}
                     placeholder="Select Pending Vehicle"
                     showSearch
                     open={vehicleDropdownOpen}
-                    onDropdownVisibleChange={(open) => setVehicleDropdownOpen(open)}
+                    onDropdownVisibleChange={(open) =>
+                      setVehicleDropdownOpen(open)
+                    }
                     optionFilterProp="children"
                     onChange={handleVehicleChange}
                     disabled={!form.getFieldValue("vendor")}
@@ -1568,7 +1528,14 @@ export default function PurchaseInvoice() {
               </Col>
 
               <Col span={5}>
-                <Form.Item label={<span className="text-amber-700 font-semibold">E-waybill No</span>} name="ewaybill_no">
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold">
+                      E-waybill No
+                    </span>
+                  }
+                  name="ewaybill_no"
+                >
                   <Input
                     ref={ewaybillNoRef}
                     placeholder="Enter E-waybill No"
@@ -1583,7 +1550,14 @@ export default function PurchaseInvoice() {
               </Col>
 
               <Col span={4}>
-                <Form.Item label={<span className="text-amber-700 font-semibold">E-waybill Date</span>} name="ewaybill_date">
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold">
+                      E-waybill Date
+                    </span>
+                  }
+                  name="ewaybill_date"
+                >
                   <AppDatePicker
                     ref={ewaybillDateRef}
                     className="w-full"
@@ -1599,9 +1573,15 @@ export default function PurchaseInvoice() {
 
               <Col span={5}>
                 <Form.Item
-                  label={<span className="text-amber-700 font-semibold">Invoice No</span>}
+                  label={
+                    <span className="text-amber-700 font-semibold">
+                      Invoice No
+                    </span>
+                  }
                   name="invoice_no"
-                  rules={[{ required: true, message: "Invoice No is required" }]}
+                  rules={[
+                    { required: true, message: "Invoice No is required" },
+                  ]}
                 >
                   <Input
                     ref={invoiceNoRef}
@@ -1618,9 +1598,15 @@ export default function PurchaseInvoice() {
 
               <Col span={5}>
                 <Form.Item
-                  label={<span className="text-amber-700 font-semibold">Invoice Date</span>}
+                  label={
+                    <span className="text-amber-700 font-semibold">
+                      Invoice Date
+                    </span>
+                  }
                   name="invoice_date"
-                  rules={[{ required: true, message: "Invoice Date is required" }]}
+                  rules={[
+                    { required: true, message: "Invoice Date is required" },
+                  ]}
                 >
                   <AppDatePicker
                     ref={invoiceDateRef}
@@ -1647,7 +1633,11 @@ export default function PurchaseInvoice() {
 
               <Col span={5}>
                 <Form.Item
-                  label={<span className="text-amber-700 font-semibold">Payment Due Date</span>}
+                  label={
+                    <span className="text-amber-700 font-semibold">
+                      Payment Due Date
+                    </span>
+                  }
                   name="payment_due_date"
                 >
                   <AppDatePicker
@@ -1673,38 +1663,59 @@ export default function PurchaseInvoice() {
           >
             <h6 className="text-amber-600 font-bold mb-3">Items Information</h6>
 
-            <Row gutter={8} className="pb-2 mb-2 text-amber-800 font-bold text-xs">
-              <Col span={3}>Item Name</Col>
+            <Row
+              gutter={8}
+              className="pb-2 mb-2 text-amber-800 font-bold text-xs"
+            >
+              <Col span={4}>Item Name</Col>
               <Col span={2}>Avail Qty</Col>
               <Col span={2}>Invoice Qty</Col>
-              <Col span={1} className="text-center">Unit</Col>
-              <Col span={1} className="text-center">Net Wt</Col>
-              <Col span={1} className="text-center">GST %</Col>
-              <Col span={3}>Rate Selection</Col>
+              <Col span={1}>Unit</Col>
+              <Col span={2}>Net Wt (Ton)</Col>
+              <Col span={1}>GST %</Col>
+              <Col span={4}>Rate Selection (Available Soudas)</Col>
               <Col span={2}>Taxable Amt</Col>
-              <Col span={2} className="text-center">SGST</Col>
-              <Col span={2} className="text-center">CGST</Col>
-              <Col span={2} className="text-center">IGST</Col>
+              <Col span={1}>SGST</Col>
+              <Col span={1}>CGST</Col>
+              <Col span={1}>IGST</Col>
               <Col span={2}>Total Amount</Col>
-              <Col span={1} className="text-center">Action</Col>
+              <Col span={1} className="text-center">
+                Action
+              </Col>
             </Row>
 
             <Form.List name="items">
               {(fields) =>
                 fields.map((field) => {
-                  const itemName = form.getFieldValue(["items", field.name, "item_name"]);
-                  const availableRates = soudaRatesMap[itemName] || soudaRatesMap[field.name] || [];
+                  const itemName = form.getFieldValue([
+                    "items",
+                    field.name,
+                    "item_name",
+                  ]);
+                  const availableRates =
+                    soudaRatesMap[itemName] || soudaRatesMap[field.name] || [];
 
                   return (
-                    <Row key={field.key} gutter={8} align="middle" className="mb-2">
-                      <Col span={3}>
-                        <Form.Item name={[field.name, "item_name"]} style={{ marginBottom: 0 }}>
-                          <Input disabled className="bg-gray-50!" style={{ width: "100%", minWidth: 0 }} />
+                    <Row
+                      key={field.key}
+                      gutter={8}
+                      align="middle"
+                      className="mb-2"
+                    >
+                      <Col span={4}>
+                        <Form.Item
+                          name={[field.name, "item_name"]}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <Input disabled className="bg-gray-50!" />
                         </Form.Item>
                         <Form.Item name={[field.name, "sale_contract"]} hidden>
                           <Input />
                         </Form.Item>
-                        <Form.Item name={[field.name, "sale_contract_item"]} hidden>
+                        <Form.Item
+                          name={[field.name, "sale_contract_item"]}
+                          hidden
+                        >
                           <Input />
                         </Form.Item>
                         <Form.Item name={[field.name, "product"]} hidden>
@@ -1713,24 +1724,50 @@ export default function PurchaseInvoice() {
                         <Form.Item name={[field.name, "unit_net_wt"]} hidden>
                           <InputNumber />
                         </Form.Item>
-                        <Form.Item name={[field.name, "unit_gross_wt"]} hidden>
-                          <InputNumber />
-                        </Form.Item>
                       </Col>
 
                       <Col span={2}>
-                        <Form.Item name={[field.name, "qty"]} style={{ marginBottom: 0 }}>
-                          <Input
-                            disabled
-                            className="w-full bg-gray-50! font-bold text-center"
-                            style={{
-                              color: "#111827",
-                              fontWeight: 700,
-                              WebkitTextFillColor: "#111827",
-                              width: "100%",
-                              minWidth: 0,
-                            }}
-                          />
+                        <Form.Item
+                          name={[field.name, "qty"]}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <Tooltip
+                            title={`Original: ${
+                              form.getFieldValue([
+                                "items",
+                                field.name,
+                                "original_qty",
+                              ]) ??
+                              form.getFieldValue([
+                                "items",
+                                field.name,
+                                "qty",
+                              ]) ??
+                              "-"
+                            } | Invoiced: ${
+                              form.getFieldValue([
+                                "items",
+                                field.name,
+                                "already_invoiced_qty",
+                              ]) ?? 0
+                            } | Remaining: ${
+                              form.getFieldValue([
+                                "items",
+                                field.name,
+                                "qty",
+                              ]) ?? "-"
+                            }`}
+                          >
+                            <Input
+                              disabled
+                              className="w-full bg-gray-50! font-bold text-center cursor-help"
+                              style={{
+                                color: "#111827",
+                                fontWeight: 700,
+                                WebkitTextFillColor: "#111827",
+                              }}
+                            />
+                          </Tooltip>
                         </Form.Item>
                         <Form.Item name={[field.name, "available_qty"]} hidden>
                           <Input />
@@ -1738,7 +1775,10 @@ export default function PurchaseInvoice() {
                         <Form.Item name={[field.name, "original_qty"]} hidden>
                           <InputNumber />
                         </Form.Item>
-                        <Form.Item name={[field.name, "already_invoiced_qty"]} hidden>
+                        <Form.Item
+                          name={[field.name, "already_invoiced_qty"]}
+                          hidden
+                        >
                           <InputNumber />
                         </Form.Item>
                       </Col>
@@ -1751,63 +1791,99 @@ export default function PurchaseInvoice() {
                         >
                           <InputNumber
                             min={0.01}
-                            max={
-                              Number(
-                                form.getFieldValue(["items", field.name, "available_qty"]) ||
-                                form.getFieldValue(["items", field.name, "qty"]) ||
-                                999999
-                              )
-                            }
+                            max={Number(
+                              form.getFieldValue([
+                                "items",
+                                field.name,
+                                "available_qty",
+                              ]) ||
+                                form.getFieldValue([
+                                  "items",
+                                  field.name,
+                                  "qty",
+                                ]) ||
+                                999999,
+                            )}
                             precision={2}
                             className="w-full border-amber-400! font-semibold"
-                            style={{ width: "100%", minWidth: 0 }}
                             placeholder="Qty"
-                            onChange={(val) => handleInvoiceQtyChange(field.name, val)}
+                            onChange={(val) =>
+                              handleInvoiceQtyChange(field.name, val)
+                            }
                           />
                         </Form.Item>
                       </Col>
 
                       <Col span={1}>
-                        <Form.Item name={[field.name, "unit"]} style={{ marginBottom: 0 }}>
-                          <Input disabled className="bg-gray-50! text-center p-0" style={{ width: "100%", minWidth: 0 }} />
+                        <Form.Item
+                          name={[field.name, "unit"]}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <Input
+                            disabled
+                            className="bg-gray-50! text-center p-0"
+                          />
+                        </Form.Item>
+                      </Col>
+
+                      <Col span={2}>
+                        <Form.Item
+                          name={[field.name, "net_wt"]}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <InputNumber
+                            disabled
+                            className="w-full bg-gray-50!"
+                            precision={3}
+                          />
                         </Form.Item>
                       </Col>
 
                       <Col span={1}>
-                        <Form.Item name={[field.name, "net_wt"]} style={{ marginBottom: 0 }}>
-                          <InputNumber disabled className="w-full bg-gray-50!" style={{ width: "100%", minWidth: 0 }} precision={3} />
+                        <Form.Item
+                          name={[field.name, "gst_percent"]}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <InputNumber
+                            disabled
+                            className="w-full bg-gray-50!"
+                          />
                         </Form.Item>
                       </Col>
 
-                      <Col span={1}>
-                        <Form.Item name={[field.name, "gst_percent"]} style={{ marginBottom: 0 }}>
-                          <InputNumber disabled className="w-full bg-gray-50! text-center" style={{ width: "100%", minWidth: 0 }} />
-                        </Form.Item>
-                      </Col>
-
-                      <Col span={3}>
+                      <Col span={4}>
                         <Form.Item
                           name={[field.name, "rate"]}
                           style={{ marginBottom: 0 }}
                           rules={[{ required: true, message: "Select rate" }]}
                         >
                           <Select
-                            ref={(el) => (rateSelectRefs.current[field.name] = el)}
+                            ref={(el) =>
+                              (rateSelectRefs.current[field.name] = el)
+                            }
                             placeholder="Select Rate"
                             className="w-full"
-                            style={{ width: "100%", minWidth: 0 }}
                             optionLabelProp="label"
                             popupMatchSelectWidth={false}
-                            dropdownStyle={{ minWidth: 700, borderRadius: 8, padding: 4 }}
+                            dropdownStyle={{
+                              minWidth: 700,
+                              borderRadius: 8,
+                              padding: 4,
+                            }}
                             onChange={(val, option) =>
-                              handleRateChange(field.name, option.data?.rate, option.data)
+                              handleRateChange(
+                                field.name,
+                                option.data?.rate,
+                                option.data,
+                              )
                             }
                             dropdownRender={(menu) => (
                               <div>
                                 <div
                                   style={{
                                     display: "grid",
-                                    gridTemplateColumns: "1.2fr 1fr 1fr 0.8fr 1fr 0.8fr 1fr",
+                                    gridTemplateColumns:
+                                      "1.2fr 1fr 1fr 0.8fr 1fr 0.8fr 1fr",
                                     gap: "8px",
                                     padding: "8px 12px",
                                     background: "#FEF3C7",
@@ -1831,7 +1907,10 @@ export default function PurchaseInvoice() {
                           >
                             {availableRates.map((r) => (
                               <Option
-                                key={r.purchase_contract_item_id || `${r.souda_no}_${r.rate}`}
+                                key={
+                                  r.purchase_contract_item_id ||
+                                  `${r.souda_no}_${r.rate}`
+                                }
                                 value={r.rate}
                                 label={`₹${r.rate}`}
                                 data={r}
@@ -1839,7 +1918,8 @@ export default function PurchaseInvoice() {
                                 <div
                                   style={{
                                     display: "grid",
-                                    gridTemplateColumns: "1.2fr 1fr 1fr 0.8fr 1fr 0.8fr 1fr",
+                                    gridTemplateColumns:
+                                      "1.2fr 1fr 1fr 0.8fr 1fr 0.8fr 1fr",
                                     gap: "8px",
                                     fontSize: "12px",
                                     padding: "4px 0",
@@ -1865,62 +1945,72 @@ export default function PurchaseInvoice() {
                             ))}
                           </Select>
                         </Form.Item>
-                        <Form.Item name={[field.name, "purchase_contract"]} hidden>
+                        <Form.Item
+                          name={[field.name, "purchase_contract"]}
+                          hidden
+                        >
                           <Input />
                         </Form.Item>
-                        <Form.Item name={[field.name, "purchase_contract_item"]} hidden>
+                        <Form.Item
+                          name={[field.name, "purchase_contract_item"]}
+                          hidden
+                        >
                           <Input />
                         </Form.Item>
                       </Col>
 
                       <Col span={2}>
-                        <Form.Item name={[field.name, "taxable_amount"]} style={{ marginBottom: 0 }}>
-                          <InputNumber disabled className="w-full bg-gray-50!" style={{ width: "100%", minWidth: 0 }} precision={2} />
+                        <Form.Item
+                          name={[field.name, "taxable_amount"]}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <InputNumber
+                            disabled
+                            className="w-full bg-gray-50!"
+                            precision={2}
+                          />
                         </Form.Item>
                       </Col>
 
-                      <Col span={2}>
-                        <Form.Item name={[field.name, "sgst_amount"]} style={{ marginBottom: 0 }}>
+                      <Col span={1}>
+                        <Input
+                          disabled
+                          className="w-full bg-gray-50! border-dashed text-center p-0 text-xs"
+                          placeholder="-"
+                        />
+                      </Col>
+
+                      <Col span={1}>
+                        <Input
+                          disabled
+                          className="w-full bg-gray-50! border-dashed text-center p-0 text-xs"
+                          placeholder="-"
+                        />
+                      </Col>
+
+                      <Col span={1}>
+                        <Form.Item
+                          name={[field.name, "igst_amount"]}
+                          style={{ marginBottom: 0 }}
+                        >
                           <InputNumber
-                            min={0}
+                            disabled
+                            className="w-full bg-gray-50!"
                             precision={2}
-                            className="w-full font-medium"
-                            style={{ width: "100%", minWidth: 0 }}
-                            placeholder="SGST"
-                            onChange={(val) => handleTaxAmountChange(field.name, "sgst_amount", val)}
                           />
                         </Form.Item>
                       </Col>
 
                       <Col span={2}>
-                        <Form.Item name={[field.name, "cgst_amount"]} style={{ marginBottom: 0 }}>
+                        <Form.Item
+                          name={[field.name, "total_amount"]}
+                          style={{ marginBottom: 0 }}
+                        >
                           <InputNumber
-                            min={0}
+                            disabled
+                            className="w-full bg-gray-50!"
                             precision={2}
-                            className="w-full font-medium"
-                            style={{ width: "100%", minWidth: 0 }}
-                            placeholder="CGST"
-                            onChange={(val) => handleTaxAmountChange(field.name, "cgst_amount", val)}
                           />
-                        </Form.Item>
-                      </Col>
-
-                      <Col span={2}>
-                        <Form.Item name={[field.name, "igst_amount"]} style={{ marginBottom: 0 }}>
-                          <InputNumber
-                            min={0}
-                            precision={2}
-                            className="w-full font-medium"
-                            style={{ width: "100%", minWidth: 0 }}
-                            placeholder="IGST"
-                            onChange={(val) => handleTaxAmountChange(field.name, "igst_amount", val)}
-                          />
-                        </Form.Item>
-                      </Col>
-
-                      <Col span={2}>
-                        <Form.Item name={[field.name, "total_amount"]} style={{ marginBottom: 0 }}>
-                          <InputNumber disabled className="w-full bg-gray-50!" style={{ width: "100%", minWidth: 0 }} precision={2} />
                         </Form.Item>
                       </Col>
 
@@ -1944,42 +2034,52 @@ export default function PurchaseInvoice() {
             {/* Total Row */}
             <Divider style={{ margin: "12px 0" }} />
             <Row gutter={8} align="middle">
-              <Col span={3}>
+              <Col span={4}>
                 <span className="font-bold text-amber-800">Total:</span>
               </Col>
               <Col span={2}></Col>
               <Col span={2}>
                 <Form.Item name="total_qty" style={{ marginBottom: 0 }}>
-                  <InputNumber disabled className="w-full bg-gray-100! font-semibold" style={{ width: "100%", minWidth: 0 }} />
+                  <InputNumber
+                    disabled
+                    className="w-full bg-gray-100! font-semibold"
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={1}></Col>
+              <Col span={2}></Col>
+              <Col span={1}></Col>
+              <Col span={4}></Col>
+              <Col span={2}>
+                <Form.Item
+                  name="total_taxable_amount"
+                  style={{ marginBottom: 0 }}
+                >
+                  <InputNumber
+                    disabled
+                    className="w-full bg-gray-100! font-semibold"
+                    precision={2}
+                  />
                 </Form.Item>
               </Col>
               <Col span={1}></Col>
               <Col span={1}></Col>
-              <Col span={1}></Col>
-              <Col span={3}></Col>
-              <Col span={2}>
-                <Form.Item name="total_taxable_amount" style={{ marginBottom: 0 }}>
-                  <InputNumber disabled className="w-full bg-gray-100! font-semibold" style={{ width: "100%", minWidth: 0 }} precision={2} />
-                </Form.Item>
-              </Col>
-              <Col span={2}>
-                <Form.Item name="total_sgst_amount" style={{ marginBottom: 0 }}>
-                  <InputNumber disabled className="w-full bg-gray-100! font-semibold" style={{ width: "100%", minWidth: 0 }} precision={2} />
-                </Form.Item>
-              </Col>
-              <Col span={2}>
-                <Form.Item name="total_cgst_amount" style={{ marginBottom: 0 }}>
-                  <InputNumber disabled className="w-full bg-gray-100! font-semibold" style={{ width: "100%", minWidth: 0 }} precision={2} />
-                </Form.Item>
-              </Col>
-              <Col span={2}>
+              <Col span={1}>
                 <Form.Item name="total_igst_amount" style={{ marginBottom: 0 }}>
-                  <InputNumber disabled className="w-full bg-gray-100! font-semibold" style={{ width: "100%", minWidth: 0 }} precision={2} />
+                  <InputNumber
+                    disabled
+                    className="w-full bg-gray-100! font-semibold"
+                    precision={2}
+                  />
                 </Form.Item>
               </Col>
               <Col span={2}>
                 <Form.Item name="total_amount" style={{ marginBottom: 0 }}>
-                  <InputNumber disabled className="w-full bg-gray-100! font-semibold" style={{ width: "100%", minWidth: 0 }} precision={2} />
+                  <InputNumber
+                    disabled
+                    className="w-full bg-gray-100! font-semibold"
+                    precision={2}
+                  />
                 </Form.Item>
               </Col>
               <Col span={1}></Col>
@@ -1994,22 +2094,39 @@ export default function PurchaseInvoice() {
           >
             <Row gutter={[16, 16]} align="middle">
               <Col span={4}>
-                <Form.Item label={<span className="text-amber-700">Total Gr. Wt (Ton)</span>} name="gross_weight">
+                <Form.Item
+                  label={
+                    <span className="text-amber-700">Total Gr. Wt (Ton)</span>
+                  }
+                  name="gross_weight"
+                >
                   <InputNumber disabled className="w-full bg-gray-50!" />
                 </Form.Item>
               </Col>
               <Col span={5}>
-                <Form.Item label={<span className="text-amber-700">Despatch From</span>} name="dispatch_from">
+                <Form.Item
+                  label={<span className="text-amber-700">Despatch From</span>}
+                  name="dispatch_from"
+                >
                   <Input placeholder="Despatch plant location" />
                 </Form.Item>
               </Col>
               <Col span={5}>
-                <Form.Item label={<span className="text-amber-700">Ship To</span>} name="ship_to">
+                <Form.Item
+                  label={<span className="text-amber-700">Ship To</span>}
+                  name="ship_to"
+                >
                   <Input placeholder="Destination location" />
                 </Form.Item>
               </Col>
               <Col span={4}>
-                <Form.Item label={<span className="text-amber-700 font-semibold">Upload Invoice Copy</span>}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold">
+                      Upload Invoice Copy
+                    </span>
+                  }
+                >
                   <div
                     style={
                       editingId && !fileList.length && !editingRecordDocUrl
@@ -2024,10 +2141,15 @@ export default function PurchaseInvoice() {
                   >
                     {editingId && !fileList.length && !editingRecordDocUrl && (
                       <div className="flex items-center justify-between mb-1">
-                        <Tag color="error" className="text-[10px] leading-tight px-1 py-0 m-0">
+                        <Tag
+                          color="error"
+                          className="text-[10px] leading-tight px-1 py-0 m-0"
+                        >
                           Pending Upload
                         </Tag>
-                        <span className="text-red-500 font-semibold text-[10px]">Required!</span>
+                        <span className="text-red-500 font-semibold text-[10px]">
+                          Required!
+                        </span>
                       </div>
                     )}
                     <Upload
@@ -2039,8 +2161,13 @@ export default function PurchaseInvoice() {
                       fileList={fileList}
                       maxCount={1}
                     >
-                      <Button icon={<UploadOutlined />} className="w-full border-amber-300!">
-                        {editingRecordDocUrl && !fileList.length ? "Change File" : "Choose File"}
+                      <Button
+                        icon={<UploadOutlined />}
+                        className="w-full border-amber-300!"
+                      >
+                        {editingRecordDocUrl && !fileList.length
+                          ? "Change File"
+                          : "Choose File"}
                       </Button>
                     </Upload>
                     {editingRecordDocUrl && !fileList.length && (
@@ -2059,7 +2186,10 @@ export default function PurchaseInvoice() {
                 </Form.Item>
               </Col>
               <Col span={3}>
-                <Form.Item label={<span className="text-amber-700">Round Off</span>} name="round_off_amount">
+                <Form.Item
+                  label={<span className="text-amber-700">Round Off</span>}
+                  name="round_off_amount"
+                >
                   <InputNumber
                     className="w-full"
                     onChange={() => recalculateGrandTotals()}
@@ -2069,8 +2199,19 @@ export default function PurchaseInvoice() {
                 </Form.Item>
               </Col>
               <Col span={3}>
-                <Form.Item label={<span className="text-amber-700 font-bold">Grand Total</span>} name="grand_total">
-                  <InputNumber disabled className="w-full bg-amber-50! font-bold text-amber-800" precision={2} />
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-bold">
+                      Grand Total
+                    </span>
+                  }
+                  name="grand_total"
+                >
+                  <InputNumber
+                    disabled
+                    className="w-full bg-amber-50! font-bold text-amber-800"
+                    precision={2}
+                  />
                 </Form.Item>
               </Col>
             </Row>
@@ -2080,7 +2221,11 @@ export default function PurchaseInvoice() {
 
       {/* VIEW DETAILS MODAL */}
       <Modal
-        title={<span className="text-amber-800 text-2xl font-bold">View Purchase Invoice Details</span>}
+        title={
+          <span className="text-amber-800 text-2xl font-bold">
+            View Purchase Invoice Details
+          </span>
+        }
         open={viewModal}
         onCancel={() => setViewModal(false)}
         footer={[
@@ -2113,7 +2258,9 @@ export default function PurchaseInvoice() {
             <Row gutter={[16, 12]}>
               <Col span={8}>
                 <Text type="secondary">Supplier Name: </Text>
-                <div className="font-bold text-amber-900 text-base">{viewRecord.supplier_name}</div>
+                <div className="font-bold text-amber-900 text-base">
+                  {viewRecord.supplier_name}
+                </div>
               </Col>
               <Col span={4}>
                 <Text type="secondary">Place: </Text>
@@ -2125,24 +2272,34 @@ export default function PurchaseInvoice() {
               </Col>
               <Col span={4}>
                 <Text type="secondary">LR Date: </Text>
-                <div className="font-semibold">{fmtDate(viewRecord.lr_date)}</div>
+                <div className="font-semibold">
+                  {fmtDate(viewRecord.lr_date)}
+                </div>
               </Col>
               <Col span={4}>
                 <Text type="secondary">Vehicle No: </Text>
-                <div className="font-semibold text-amber-900">{viewRecord.vehicle_no || "-"}</div>
+                <div>
+                  <Tag color="warning">{viewRecord.vehicle_no}</Tag>
+                </div>
               </Col>
 
               <Col span={8}>
                 <Text type="secondary">Transport Name: </Text>
-                <div className="font-semibold">{viewRecord.transport_name || "-"}</div>
+                <div className="font-semibold">
+                  {viewRecord.transport_name || "-"}
+                </div>
               </Col>
               <Col span={4}>
                 <Text type="secondary">Invoice No: </Text>
-                <div className="font-bold text-gray-800">{viewRecord.invoice_no || "-"}</div>
+                <div className="font-bold text-gray-800">
+                  {viewRecord.invoice_no || "-"}
+                </div>
               </Col>
               <Col span={4}>
                 <Text type="secondary">Invoice Date: </Text>
-                <div className="font-semibold">{fmtDate(viewRecord.invoice_date)}</div>
+                <div className="font-semibold">
+                  {fmtDate(viewRecord.invoice_date)}
+                </div>
               </Col>
               <Col span={4}>
                 <Text type="secondary">E-waybill No: </Text>
@@ -2173,10 +2330,18 @@ export default function PurchaseInvoice() {
               className="border border-amber-100"
               columns={[
                 { title: "Item Name", dataIndex: "item_name" },
-                { title: "Qty", dataIndex: "qty", render: (val, r) => `${r.invoice_qty || val} ${r.unit || ""}` },
+                {
+                  title: "Qty",
+                  dataIndex: "qty",
+                  render: (val, r) => `${r.invoice_qty || val} ${r.unit || ""}`,
+                },
                 { title: "Unit", dataIndex: "unit" },
                 { title: "Net Wt (Ton)", dataIndex: "net_wt" },
-                { title: "GST %", dataIndex: "gst_percent", render: (val) => `${val}%` },
+                {
+                  title: "GST %",
+                  dataIndex: "gst_percent",
+                  render: (val) => `${val}%`,
+                },
                 {
                   title: "Rate",
                   dataIndex: "rate",
@@ -2188,17 +2353,7 @@ export default function PurchaseInvoice() {
                   render: (val) => `₹${Number(val || 0).toFixed(2)}`,
                 },
                 {
-                  title: "SGST",
-                  dataIndex: "sgst_amount",
-                  render: (val) => `₹${Number(val || 0).toFixed(2)}`,
-                },
-                {
-                  title: "CGST",
-                  dataIndex: "cgst_amount",
-                  render: (val) => `₹${Number(val || 0).toFixed(2)}`,
-                },
-                {
-                  title: "IGST",
+                  title: "IGST Amount",
                   dataIndex: "igst_amount",
                   render: (val) => `₹${Number(val || 0).toFixed(2)}`,
                 },
@@ -2215,7 +2370,9 @@ export default function PurchaseInvoice() {
             <Row gutter={16}>
               <Col span={6}>
                 <Text type="secondary">Despatch From: </Text>
-                <div className="font-medium">{viewRecord.dispatch_from || "-"}</div>
+                <div className="font-medium">
+                  {viewRecord.dispatch_from || "-"}
+                </div>
               </Col>
               <Col span={6}>
                 <Text type="secondary">Ship To: </Text>
@@ -2227,12 +2384,15 @@ export default function PurchaseInvoice() {
               </Col>
               <Col span={4}>
                 <Text type="secondary">Round Off: </Text>
-                <div className="font-bold">₹{Number(viewRecord.round_off_amount || 0).toFixed(2)}</div>
+                <div className="font-bold">
+                  ₹{Number(viewRecord.round_off_amount || 0).toFixed(2)}
+                </div>
               </Col>
               <Col span={4}>
                 <Text type="secondary">Grand Total: </Text>
                 <div className="font-bold text-lg text-amber-800">
-                  ₹{Number(viewRecord.grand_total || 0).toLocaleString("en-IN", {
+                  ₹
+                  {Number(viewRecord.grand_total || 0).toLocaleString("en-IN", {
                     minimumFractionDigits: 2,
                   })}
                 </div>
@@ -2266,7 +2426,8 @@ export default function PurchaseInvoice() {
               Supplier Invoices: {selectedMergedSupplier?.supplier_name}
             </span>
             <Tag color="orange" className="text-sm px-3 py-1 font-semibold">
-              {selectedMergedSupplier?.underlyingRecords?.length || 0} Invoices Consolidated
+              {selectedMergedSupplier?.underlyingRecords?.length || 0} Invoices
+              Consolidated
             </Tag>
           </div>
         }
@@ -2288,7 +2449,9 @@ export default function PurchaseInvoice() {
       >
         <div className="mb-4 text-sm text-gray-600 bg-amber-50/60 p-2.5 rounded border border-amber-200/70">
           Showing all underlying purchase invoice entries for{" "}
-          <strong className="text-amber-900 text-base">{selectedMergedSupplier?.supplier_name}</strong>
+          <strong className="text-amber-900 text-base">
+            {selectedMergedSupplier?.supplier_name}
+          </strong>
         </div>
         <Table
           columns={supplierDetailColumns}
