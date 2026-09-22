@@ -485,6 +485,33 @@ export default function PurchaseInvoice() {
     recalculateGrandTotals(updated);
   };
 
+  const handleTaxChange = (index, fieldName, val) => {
+    const items = form.getFieldValue("items") || [];
+    if (!items[index]) return;
+
+    const currentItem = items[index];
+    const validVal = Number(val || 0);
+    const taxableAmount = Number(currentItem.taxable_amount || 0);
+
+    const updatedItem = {
+      ...currentItem,
+      [fieldName]: validVal,
+    };
+
+    const sgst = Number(fieldName === "sgst_amount" ? validVal : updatedItem.sgst_amount || 0);
+    const cgst = Number(fieldName === "cgst_amount" ? validVal : updatedItem.cgst_amount || 0);
+    const igst = Number(fieldName === "igst_amount" ? validVal : updatedItem.igst_amount || 0);
+
+    const totalTax = igst > 0 ? igst : sgst + cgst;
+    updatedItem.total_amount = Number((taxableAmount + totalTax).toFixed(2));
+
+    const updated = [...items];
+    updated[index] = updatedItem;
+
+    form.setFieldsValue({ items: updated });
+    recalculateGrandTotals(updated);
+  };
+
   const handleRateChange = (index, rate, rateOption) => {
     const items = form.getFieldValue("items") || [];
     if (!items[index] || !rateOption) return;
@@ -621,11 +648,21 @@ export default function PurchaseInvoice() {
       0,
     );
     const totalIGST = items.reduce(
-      (sum, item) => sum + Number(item.igst_amount || 0),
+      (sum, item) =>
+        sum +
+        Number(
+          item.igst_amount !== undefined && Number(item.igst_amount) > 0
+            ? item.igst_amount
+            : Number(item.sgst_amount || 0) + Number(item.cgst_amount || 0),
+        ),
       0,
     );
     const totalAmount = items.reduce(
       (sum, item) => sum + Number(item.total_amount || 0),
+      0,
+    );
+    const totalNetWt = items.reduce(
+      (sum, item) => sum + Number(item.net_wt || 0),
       0,
     );
 
@@ -633,6 +670,7 @@ export default function PurchaseInvoice() {
     const grandTotal = totalAmount + roundOff;
 
     form.setFieldsValue({
+      gross_weight: Number(totalNetWt.toFixed(3)),
       total_qty: Number(totalQty.toFixed(3)),
       total_taxable_amount: Number(totalTaxable.toFixed(2)),
       total_igst_amount: Number(totalIGST.toFixed(2)),
@@ -984,9 +1022,9 @@ export default function PurchaseInvoice() {
       dataIndex: "vehicle_no",
       render: (text, record) =>
         record.isMergedRow ? (
-          <Tag color="cyan">{text}</Tag>
+          <span className="font-semibold text-amber-800">{text}</span>
         ) : (
-          <Tag color="warning">{text}</Tag>
+          <span className="font-semibold text-amber-900">{text}</span>
         ),
     },
     {
@@ -1180,7 +1218,9 @@ export default function PurchaseInvoice() {
     {
       title: <span className="text-amber-700 font-semibold">Vehicle No</span>,
       dataIndex: "vehicle_no",
-      render: (text) => <Tag color="warning">{text}</Tag>,
+      render: (text) => (
+        <span className="font-semibold text-amber-900">{text}</span>
+      ),
     },
     {
       title: <span className="text-amber-700 font-semibold">E-waybill No</span>,
@@ -1392,7 +1432,8 @@ export default function PurchaseInvoice() {
             {editingId ? "Update Entry" : "Save Entry"}
           </Button>,
         ]}
-        width={1400}
+        width="96vw"
+        style={{ maxWidth: 1560, top: 16 }}
         destroyOnClose
       >
         <Form
@@ -1655,435 +1696,501 @@ export default function PurchaseInvoice() {
             </Row>
           </Card>
 
-          {/* Items Card */}
+          {/* Items Card *          {/* Items Card */}
           <Card
             size="small"
-            style={{ marginBottom: 16, border: "1px solid #FDE68A" }}
+            style={{
+              marginBottom: 16,
+              border: "1px solid #FDE68A",
+              overflowX: "auto",
+            }}
             styles={{ body: { padding: "12px 16px" } }}
           >
-            <h6 className="text-amber-600 font-bold mb-3">Items Information</h6>
+            <div style={{ minWidth: 1320 }}>
+              <h6 className="text-amber-600 font-bold mb-3">
+                Items Information
+              </h6>
 
-            <Row
-              gutter={8}
-              className="pb-2 mb-2 text-amber-800 font-bold text-xs"
-            >
-              <Col span={4}>Item Name</Col>
-              <Col span={2}>Avail Qty</Col>
-              <Col span={2}>Invoice Qty</Col>
-              <Col span={1}>Unit</Col>
-              <Col span={2}>Net Wt (Ton)</Col>
-              <Col span={1}>GST %</Col>
-              <Col span={4}>Rate Selection (Available Soudas)</Col>
-              <Col span={2}>Taxable Amt</Col>
-              <Col span={1}>SGST</Col>
-              <Col span={1}>CGST</Col>
-              <Col span={1}>IGST</Col>
-              <Col span={2}>Total Amount</Col>
-              <Col span={1} className="text-center">
-                Action
-              </Col>
-            </Row>
+              {/* Table Header */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "1.8fr 1fr 1.1fr 0.7fr 1fr 0.7fr 2.2fr 1.2fr 0.9fr 0.9fr 0.9fr 1.4fr 45px",
+                  gap: "8px",
+                  alignItems: "center",
+                  paddingBottom: "8px",
+                  marginBottom: "8px",
+                  fontWeight: "bold",
+                  fontSize: "12px",
+                  color: "#92400E",
+                  borderBottom: "1px solid #FEF3C7",
+                }}
+              >
+                <div className="text-left">Item Name</div>
+                <div className="text-center">Avail Qty</div>
+                <div className="text-center">Invoice Qty</div>
+                <div className="text-center">Unit</div>
+                <div className="text-center">Net Wt (Ton)</div>
+                <div className="text-center">GST %</div>
+                <div className="text-left">Rate Selection (Soudas)</div>
+                <div className="text-center">Taxable Amt</div>
+                <div className="text-center">SGST</div>
+                <div className="text-center">CGST</div>
+                <div className="text-center">IGST</div>
+                <div className="text-center">Total Amount</div>
+                <div className="text-center">Action</div>
+              </div>
 
-            <Form.List name="items">
-              {(fields) =>
-                fields.map((field) => {
-                  const itemName = form.getFieldValue([
-                    "items",
-                    field.name,
-                    "item_name",
-                  ]);
-                  const availableRates =
-                    soudaRatesMap[itemName] || soudaRatesMap[field.name] || [];
+              {/* Items List Rows */}
+              <Form.List name="items">
+                {(fields) =>
+                  fields.map((field) => {
+                    const itemName = form.getFieldValue([
+                      "items",
+                      field.name,
+                      "item_name",
+                    ]);
+                    const availableRates =
+                      soudaRatesMap[itemName] || soudaRatesMap[field.name] || [];
 
-                  return (
-                    <Row
-                      key={field.key}
-                      gutter={8}
-                      align="middle"
-                      className="mb-2"
-                    >
-                      <Col span={4}>
-                        <Form.Item
-                          name={[field.name, "item_name"]}
-                          style={{ marginBottom: 0 }}
-                        >
-                          <Input disabled className="bg-gray-50!" />
-                        </Form.Item>
-                        <Form.Item name={[field.name, "sale_contract"]} hidden>
-                          <Input />
-                        </Form.Item>
-                        <Form.Item
-                          name={[field.name, "sale_contract_item"]}
-                          hidden
-                        >
-                          <Input />
-                        </Form.Item>
-                        <Form.Item name={[field.name, "product"]} hidden>
-                          <Input />
-                        </Form.Item>
-                        <Form.Item name={[field.name, "unit_net_wt"]} hidden>
-                          <InputNumber />
-                        </Form.Item>
-                      </Col>
+                    return (
+                      <div
+                        key={field.key}
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "1.8fr 1fr 1.1fr 0.7fr 1fr 0.7fr 2.2fr 1.2fr 0.9fr 0.9fr 0.9fr 1.4fr 45px",
+                          gap: "8px",
+                          alignItems: "center",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        {/* 1. Item Name */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "item_name"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <Input disabled className="bg-gray-50!" />
+                          </Form.Item>
+                          <Form.Item name={[field.name, "sale_contract"]} hidden>
+                            <Input />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, "sale_contract_item"]}
+                            hidden
+                          >
+                            <Input />
+                          </Form.Item>
+                          <Form.Item name={[field.name, "product"]} hidden>
+                            <Input />
+                          </Form.Item>
+                          <Form.Item name={[field.name, "unit_net_wt"]} hidden>
+                            <InputNumber />
+                          </Form.Item>
+                        </div>
 
-                      <Col span={2}>
-                        <Form.Item
-                          name={[field.name, "qty"]}
-                          style={{ marginBottom: 0 }}
-                        >
-                          <Tooltip
-                            title={`Original: ${
-                              form.getFieldValue([
-                                "items",
-                                field.name,
-                                "original_qty",
-                              ]) ??
-                              form.getFieldValue([
-                                "items",
-                                field.name,
-                                "qty",
-                              ]) ??
-                              "-"
-                            } | Invoiced: ${
-                              form.getFieldValue([
-                                "items",
-                                field.name,
-                                "already_invoiced_qty",
-                              ]) ?? 0
-                            } | Remaining: ${
-                              form.getFieldValue([
-                                "items",
-                                field.name,
-                                "qty",
-                              ]) ?? "-"
-                            }`}
+                        {/* 2. Avail Qty */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "qty"]}
+                            style={{ marginBottom: 0 }}
                           >
                             <Input
                               disabled
-                              className="w-full bg-gray-50! font-bold text-center cursor-help"
+                              className="w-full bg-gray-50! font-bold text-center"
                               style={{
                                 color: "#111827",
                                 fontWeight: 700,
                                 WebkitTextFillColor: "#111827",
                               }}
                             />
-                          </Tooltip>
-                        </Form.Item>
-                        <Form.Item name={[field.name, "available_qty"]} hidden>
-                          <Input />
-                        </Form.Item>
-                        <Form.Item name={[field.name, "original_qty"]} hidden>
-                          <InputNumber />
-                        </Form.Item>
-                        <Form.Item
-                          name={[field.name, "already_invoiced_qty"]}
-                          hidden
-                        >
-                          <InputNumber />
-                        </Form.Item>
-                      </Col>
+                          </Form.Item>
+                          <Form.Item name={[field.name, "available_qty"]} hidden>
+                            <Input />
+                          </Form.Item>
+                          <Form.Item name={[field.name, "original_qty"]} hidden>
+                            <InputNumber />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, "already_invoiced_qty"]}
+                            hidden
+                          >
+                            <InputNumber />
+                          </Form.Item>
+                        </div>
 
-                      <Col span={2}>
-                        <Form.Item
-                          name={[field.name, "invoice_qty"]}
-                          style={{ marginBottom: 0 }}
-                          rules={[{ required: true, message: "Required" }]}
-                        >
-                          <InputNumber
-                            min={0.01}
-                            max={Number(
-                              form.getFieldValue([
-                                "items",
-                                field.name,
-                                "available_qty",
-                              ]) ||
+                        {/* 3. Invoice Qty */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "invoice_qty"]}
+                            style={{ marginBottom: 0 }}
+                            rules={[{ required: true, message: "Required" }]}
+                          >
+                            <InputNumber
+                              min={0.01}
+                              max={Number(
                                 form.getFieldValue([
                                   "items",
                                   field.name,
-                                  "qty",
+                                  "available_qty",
                                 ]) ||
-                                999999,
-                            )}
-                            precision={2}
-                            className="w-full border-amber-400! font-semibold"
-                            placeholder="Qty"
-                            onChange={(val) =>
-                              handleInvoiceQtyChange(field.name, val)
-                            }
-                          />
-                        </Form.Item>
-                      </Col>
+                                  form.getFieldValue([
+                                    "items",
+                                    field.name,
+                                    "qty",
+                                  ]) ||
+                                  999999,
+                              )}
+                              precision={2}
+                              className="w-full border-amber-400! font-semibold text-center"
+                              placeholder="Qty"
+                              onChange={(val) =>
+                                handleInvoiceQtyChange(field.name, val)
+                              }
+                            />
+                          </Form.Item>
+                        </div>
 
-                      <Col span={1}>
-                        <Form.Item
-                          name={[field.name, "unit"]}
-                          style={{ marginBottom: 0 }}
-                        >
-                          <Input
-                            disabled
-                            className="bg-gray-50! text-center p-0"
-                          />
-                        </Form.Item>
-                      </Col>
-
-                      <Col span={2}>
-                        <Form.Item
-                          name={[field.name, "net_wt"]}
-                          style={{ marginBottom: 0 }}
-                        >
-                          <InputNumber
-                            disabled
-                            className="w-full bg-gray-50!"
-                            precision={3}
-                          />
-                        </Form.Item>
-                      </Col>
-
-                      <Col span={1}>
-                        <Form.Item
-                          name={[field.name, "gst_percent"]}
-                          style={{ marginBottom: 0 }}
-                        >
-                          <InputNumber
-                            disabled
-                            className="w-full bg-gray-50!"
-                          />
-                        </Form.Item>
-                      </Col>
-
-                      <Col span={4}>
-                        <Form.Item
-                          name={[field.name, "rate"]}
-                          style={{ marginBottom: 0 }}
-                          rules={[{ required: true, message: "Select rate" }]}
-                        >
-                          <Select
-                            ref={(el) =>
-                              (rateSelectRefs.current[field.name] = el)
-                            }
-                            placeholder="Select Rate"
-                            className="w-full"
-                            optionLabelProp="label"
-                            popupMatchSelectWidth={false}
-                            dropdownStyle={{
-                              minWidth: 700,
-                              borderRadius: 8,
-                              padding: 4,
-                            }}
-                            onChange={(val, option) =>
-                              handleRateChange(
-                                field.name,
-                                option.data?.rate,
-                                option.data,
-                              )
-                            }
-                            dropdownRender={(menu) => (
-                              <div>
-                                <div
-                                  style={{
-                                    display: "grid",
-                                    gridTemplateColumns:
-                                      "1.2fr 1fr 1fr 0.8fr 1fr 0.8fr 1fr",
-                                    gap: "8px",
-                                    padding: "8px 12px",
-                                    background: "#FEF3C7",
-                                    fontWeight: "bold",
-                                    fontSize: "12px",
-                                    borderBottom: "1px solid #FDE68A",
-                                    color: "#78350F",
-                                  }}
-                                >
-                                  <span>Souda No</span>
-                                  <span>Date</span>
-                                  <span>Souda Qty</span>
-                                  <span>Used</span>
-                                  <span>Balance</span>
-                                  <span>Unit</span>
-                                  <span>Rate</span>
-                                </div>
-                                {menu}
-                              </div>
-                            )}
+                        {/* 4. Unit */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "unit"]}
+                            style={{ marginBottom: 0 }}
                           >
-                            {availableRates.map((r) => (
-                              <Option
-                                key={
-                                  r.purchase_contract_item_id ||
-                                  `${r.souda_no}_${r.rate}`
-                                }
-                                value={r.rate}
-                                label={`₹${r.rate}`}
-                                data={r}
-                              >
-                                <div
-                                  style={{
-                                    display: "grid",
-                                    gridTemplateColumns:
-                                      "1.2fr 1fr 1fr 0.8fr 1fr 0.8fr 1fr",
-                                    gap: "8px",
-                                    fontSize: "12px",
-                                    padding: "4px 0",
-                                    alignItems: "center",
-                                    color: "#374151",
-                                  }}
-                                >
-                                  <span className="font-semibold text-amber-900">
-                                    {r.souda_no}
-                                  </span>
-                                  <span>{fmtDate(r.souda_date)}</span>
-                                  <span>{r.souda_qty}</span>
-                                  <span>{r.used_qty ?? 0}</span>
-                                  <span className="text-amber-700 font-semibold">
-                                    {r.balance_qty}
-                                  </span>
-                                  <span>{r.unit || "-"}</span>
-                                  <span className="font-bold text-green-700">
-                                    ₹{r.rate}
-                                  </span>
+                            <Input
+                              disabled
+                              className="bg-gray-50! text-center p-0"
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 5. Net Wt */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "net_wt"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              disabled
+                              className="w-full bg-gray-50! text-center"
+                              precision={3}
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 6. GST % */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "gst_percent"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              disabled
+                              controls={false}
+                              className="w-full bg-gray-50! text-center p-0"
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 7. Rate Selection */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "rate"]}
+                            style={{ marginBottom: 0 }}
+                            rules={[{ required: true, message: "Select rate" }]}
+                          >
+                            <Select
+                              ref={(el) =>
+                                (rateSelectRefs.current[field.name] = el)
+                              }
+                              placeholder="Select Rate"
+                              className="w-full"
+                              optionLabelProp="label"
+                              popupMatchSelectWidth={false}
+                              dropdownStyle={{
+                                minWidth: 700,
+                                borderRadius: 8,
+                                padding: 4,
+                              }}
+                              onChange={(val, option) =>
+                                handleRateChange(
+                                  field.name,
+                                  option.data?.rate,
+                                  option.data,
+                                )
+                              }
+                              dropdownRender={(menu) => (
+                                <div>
+                                  <div
+                                    style={{
+                                      display: "grid",
+                                      gridTemplateColumns:
+                                        "1.2fr 1fr 1fr 0.8fr 1fr 0.8fr 1fr",
+                                      gap: "8px",
+                                      padding: "8px 12px",
+                                      background: "#FEF3C7",
+                                      fontWeight: "bold",
+                                      fontSize: "12px",
+                                      borderBottom: "1px solid #FDE68A",
+                                      color: "#78350F",
+                                    }}
+                                  >
+                                    <span>Souda No</span>
+                                    <span>Date</span>
+                                    <span>Souda Qty</span>
+                                    <span>Used</span>
+                                    <span>Balance</span>
+                                    <span>Unit</span>
+                                    <span>Rate</span>
+                                  </div>
+                                  {menu}
                                 </div>
-                              </Option>
-                            ))}
-                          </Select>
-                        </Form.Item>
-                        <Form.Item
-                          name={[field.name, "purchase_contract"]}
-                          hidden
-                        >
-                          <Input />
-                        </Form.Item>
-                        <Form.Item
-                          name={[field.name, "purchase_contract_item"]}
-                          hidden
-                        >
-                          <Input />
-                        </Form.Item>
-                      </Col>
+                              )}
+                            >
+                              {availableRates.map((r) => (
+                                <Option
+                                  key={
+                                    r.purchase_contract_item_id ||
+                                    `${r.souda_no}_${r.rate}`
+                                  }
+                                  value={r.rate}
+                                  label={`₹${r.rate}`}
+                                  data={r}
+                                >
+                                  <div
+                                    style={{
+                                      display: "grid",
+                                      gridTemplateColumns:
+                                        "1.2fr 1fr 1fr 0.8fr 1fr 0.8fr 1fr",
+                                      gap: "8px",
+                                      fontSize: "12px",
+                                      padding: "4px 0",
+                                      alignItems: "center",
+                                      color: "#374151",
+                                    }}
+                                  >
+                                    <span className="font-semibold text-amber-900">
+                                      {r.souda_no}
+                                    </span>
+                                    <span>{fmtDate(r.souda_date)}</span>
+                                    <span>{r.souda_qty}</span>
+                                    <span>{r.used_qty ?? 0}</span>
+                                    <span className="text-amber-700 font-semibold">
+                                      {r.balance_qty}
+                                    </span>
+                                    <span>{r.unit || "-"}</span>
+                                    <span className="font-bold text-green-700">
+                                      ₹{r.rate}
+                                    </span>
+                                  </div>
+                                </Option>
+                              ))}
+                            </Select>
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, "purchase_contract"]}
+                            hidden
+                          >
+                            <Input />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, "purchase_contract_item"]}
+                            hidden
+                          >
+                            <Input />
+                          </Form.Item>
+                        </div>
 
-                      <Col span={2}>
-                        <Form.Item
-                          name={[field.name, "taxable_amount"]}
-                          style={{ marginBottom: 0 }}
-                        >
-                          <InputNumber
-                            disabled
-                            className="w-full bg-gray-50!"
-                            precision={2}
-                          />
-                        </Form.Item>
-                      </Col>
+                        {/* 8. Taxable Amt */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "taxable_amount"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              disabled
+                              className="w-full bg-gray-50! text-center"
+                              precision={2}
+                            />
+                          </Form.Item>
+                        </div>
 
-                      <Col span={1}>
-                        <Input
-                          disabled
-                          className="w-full bg-gray-50! border-dashed text-center p-0 text-xs"
-                          placeholder="-"
-                        />
-                      </Col>
+                        {/* 9. SGST */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "sgst_amount"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              controls={false}
+                              className="w-full text-center px-1 text-xs border-amber-300!"
+                              precision={2}
+                              placeholder="0.00"
+                              onChange={(val) =>
+                                handleTaxChange(field.name, "sgst_amount", val)
+                              }
+                            />
+                          </Form.Item>
+                        </div>
 
-                      <Col span={1}>
-                        <Input
-                          disabled
-                          className="w-full bg-gray-50! border-dashed text-center p-0 text-xs"
-                          placeholder="-"
-                        />
-                      </Col>
+                        {/* 10. CGST */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "cgst_amount"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              controls={false}
+                              className="w-full text-center px-1 text-xs border-amber-300!"
+                              precision={2}
+                              placeholder="0.00"
+                              onChange={(val) =>
+                                handleTaxChange(field.name, "cgst_amount", val)
+                              }
+                            />
+                          </Form.Item>
+                        </div>
 
-                      <Col span={1}>
-                        <Form.Item
-                          name={[field.name, "igst_amount"]}
-                          style={{ marginBottom: 0 }}
-                        >
-                          <InputNumber
-                            disabled
-                            className="w-full bg-gray-50!"
-                            precision={2}
-                          />
-                        </Form.Item>
-                      </Col>
+                        {/* 11. IGST */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "igst_amount"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              controls={false}
+                              className="w-full text-center px-1 text-xs border-amber-300!"
+                              precision={2}
+                              placeholder="0.00"
+                              onChange={(val) =>
+                                handleTaxChange(field.name, "igst_amount", val)
+                              }
+                            />
+                          </Form.Item>
+                        </div>
 
-                      <Col span={2}>
-                        <Form.Item
-                          name={[field.name, "total_amount"]}
-                          style={{ marginBottom: 0 }}
-                        >
-                          <InputNumber
-                            disabled
-                            className="w-full bg-gray-50!"
-                            precision={2}
-                          />
-                        </Form.Item>
-                      </Col>
+                        {/* 12. Total Amount */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "total_amount"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              disabled
+                              className="w-full bg-gray-50! font-semibold text-center"
+                              precision={2}
+                            />
+                          </Form.Item>
+                        </div>
 
-                      <Col span={1} className="text-center">
-                        <Tooltip title="Remove item from this invoice">
-                          <Button
-                            type="text"
-                            danger
-                            icon={<DeleteOutlined />}
-                            onClick={() => handleRemoveItem(field.name)}
-                            disabled={form.getFieldValue("items")?.length <= 1}
-                          />
-                        </Tooltip>
-                      </Col>
-                    </Row>
-                  );
-                })
-              }
-            </Form.List>
+                        {/* 13. Action */}
+                        <div className="text-center flex justify-center items-center">
+                          <Tooltip title="Remove item from this invoice">
+                            <Button
+                              type="text"
+                              danger
+                              icon={<DeleteOutlined />}
+                              onClick={() => handleRemoveItem(field.name)}
+                              disabled={form.getFieldValue("items")?.length <= 1}
+                            />
+                          </Tooltip>
+                        </div>
+                      </div>
+                    );
+                  })
+                }
+              </Form.List>
 
-            {/* Total Row */}
-            <Divider style={{ margin: "12px 0" }} />
-            <Row gutter={8} align="middle">
-              <Col span={4}>
-                <span className="font-bold text-amber-800">Total:</span>
-              </Col>
-              <Col span={2}></Col>
-              <Col span={2}>
-                <Form.Item name="total_qty" style={{ marginBottom: 0 }}>
-                  <InputNumber
-                    disabled
-                    className="w-full bg-gray-100! font-semibold"
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={1}></Col>
-              <Col span={2}></Col>
-              <Col span={1}></Col>
-              <Col span={4}></Col>
-              <Col span={2}>
-                <Form.Item
-                  name="total_taxable_amount"
-                  style={{ marginBottom: 0 }}
-                >
-                  <InputNumber
-                    disabled
-                    className="w-full bg-gray-100! font-semibold"
-                    precision={2}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={1}></Col>
-              <Col span={1}></Col>
-              <Col span={1}>
-                <Form.Item name="total_igst_amount" style={{ marginBottom: 0 }}>
-                  <InputNumber
-                    disabled
-                    className="w-full bg-gray-100! font-semibold"
-                    precision={2}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={2}>
-                <Form.Item name="total_amount" style={{ marginBottom: 0 }}>
-                  <InputNumber
-                    disabled
-                    className="w-full bg-gray-100! font-semibold"
-                    precision={2}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={1}></Col>
-            </Row>
+              {/* Total Row */}
+              <Divider style={{ margin: "12px 0" }} />
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "1.8fr 1fr 1.1fr 0.7fr 1fr 0.7fr 2.2fr 1.2fr 0.9fr 0.9fr 0.9fr 1.4fr 45px",
+                  gap: "8px",
+                  alignItems: "center",
+                }}
+              >
+                {/* 1. Item Name / Total Label */}
+                <div>
+                  <span className="font-bold text-amber-800">Total:</span>
+                </div>
+
+                {/* 2. Avail Qty spacer */}
+                <div></div>
+
+                {/* 3. Total Qty */}
+                <div>
+                  <Form.Item name="total_qty" style={{ marginBottom: 0 }}>
+                    <InputNumber
+                      disabled
+                      precision={2}
+                      className="w-full bg-gray-100! font-semibold text-center"
+                    />
+                  </Form.Item>
+                </div>
+
+                {/* 4. Unit spacer */}
+                <div></div>
+
+                {/* 5. Net Wt spacer */}
+                <div></div>
+
+                {/* 6. GST spacer */}
+                <div></div>
+
+                {/* 7. Rate spacer */}
+                <div></div>
+
+                {/* 8. Total Taxable Amount */}
+                <div>
+                  <Form.Item
+                    name="total_taxable_amount"
+                    style={{ marginBottom: 0 }}
+                  >
+                    <InputNumber
+                      disabled
+                      className="w-full bg-gray-100! font-semibold text-center"
+                      precision={2}
+                    />
+                  </Form.Item>
+                </div>
+
+                {/* 9. SGST spacer */}
+                <div></div>
+
+                {/* 10. CGST spacer */}
+                <div></div>
+
+                {/* 11. Total IGST Amount */}
+                <div>
+                  <Form.Item name="total_igst_amount" style={{ marginBottom: 0 }}>
+                    <InputNumber
+                      disabled
+                      className="w-full bg-gray-100! font-semibold text-center"
+                      precision={2}
+                    />
+                  </Form.Item>
+                </div>
+
+                {/* 12. Grand Total Amount */}
+                <div>
+                  <Form.Item name="total_amount" style={{ marginBottom: 0 }}>
+                    <InputNumber
+                      disabled
+                      className="w-full bg-gray-100! font-bold text-amber-900 text-center"
+                      precision={2}
+                    />
+                  </Form.Item>
+                </div>
+
+                {/* 13. Action spacer */}
+                <div></div>
+              </div>
+            </div>
           </Card>
 
           {/* Bottom summaries */}
