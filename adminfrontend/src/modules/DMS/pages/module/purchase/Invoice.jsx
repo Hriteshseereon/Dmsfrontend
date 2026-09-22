@@ -361,13 +361,74 @@ export default function PurchaseInvoice() {
         0,
     });
 
-    // Populate initial items list with available_qty, editable invoice_qty & unit_net_wt
+    const totalOriginalQty = (matchedVehicle.items || []).reduce(
+      (sum, item) =>
+        sum +
+        Number(
+          item.original_qty !== undefined ? item.original_qty : item.qty || 0,
+        ),
+      0,
+    );
+    const totalOriginalNetWt = (matchedVehicle.items || []).reduce(
+      (sum, item) => sum + Number(item.net_wt || 0),
+      0,
+    );
+    const vehicleGrossLoaded = Number(
+      matchedVehicle.gross_weight_loaded ||
+        matchedVehicle.gross_weight_loading_plan ||
+        0,
+    );
+
+    // Populate initial items list with available_qty, editable invoice_qty, unit_net_wt & unit_gross_wt
     const populatedItems = (matchedVehicle.items || []).map((item) => {
+      const originalQty = Number(
+        item.original_qty !== undefined ? item.original_qty : item.qty || 0,
+      );
       const remainingQty = Number(item.qty || 0);
       const invoiceQty = Number(item.invoice_qty || remainingQty || 0);
-      const netWt = Number(item.net_wt || 0);
-      const unitNetWt = remainingQty > 0 ? netWt / remainingQty : 0;
+      const rawNetWt = Number(item.net_wt || 0);
+
+      // Determine unit net weight in Ton:
+      const unitNetWt =
+        originalQty > 0
+          ? rawNetWt / originalQty
+          : remainingQty > 0
+            ? rawNetWt / remainingQty
+            : 0;
+
       const actualNetWt = Number((unitNetWt * invoiceQty).toFixed(3));
+
+      // Determine unit gross weight in Ton (supports multiple items accurately):
+      let unitGrossWt = unitNetWt;
+      if (item.gross_weight !== undefined && Number(item.gross_weight) > 0) {
+        // If item explicitly has gross weight from backend
+        const itemGross =
+          Number(item.gross_weight) > 10
+            ? Number(item.gross_weight) / 1000
+            : Number(item.gross_weight);
+        unitGrossWt =
+          originalQty > 0
+            ? itemGross / originalQty
+            : remainingQty > 0
+              ? itemGross / remainingQty
+              : itemGross;
+      } else if (
+        vehicleGrossLoaded > 0 &&
+        totalOriginalNetWt > 0 &&
+        rawNetWt > 0
+      ) {
+        // Proportional gross weight share based on net weight of each item in the vehicle
+        const itemGrossShare =
+          (rawNetWt / totalOriginalNetWt) * vehicleGrossLoaded;
+        unitGrossWt =
+          originalQty > 0
+            ? itemGrossShare / originalQty
+            : remainingQty > 0
+              ? itemGrossShare / remainingQty
+              : unitNetWt;
+      } else if (totalOriginalQty > 0 && vehicleGrossLoaded > 0) {
+        unitGrossWt = vehicleGrossLoaded / totalOriginalQty;
+      }
 
       return {
         sale_contract: item.sale_contract_id,
@@ -375,14 +436,13 @@ export default function PurchaseInvoice() {
         product: item.product_id,
         item_name: item.item_name,
         available_qty: Number(remainingQty).toFixed(2),
-        original_qty: Number(
-          item.original_qty !== undefined ? item.original_qty : remainingQty,
-        ),
+        original_qty: originalQty,
         already_invoiced_qty: Number(item.already_invoiced_qty || 0),
         qty: remainingQty,
         invoice_qty: invoiceQty,
         unit: item.unit,
         unit_net_wt: unitNetWt,
+        unit_gross_wt: unitGrossWt,
         net_wt: actualNetWt,
         gst_percent: item.gst_percent,
         rate: undefined,
@@ -458,10 +518,13 @@ export default function PurchaseInvoice() {
     const currentItem = items[index];
     const validQty = Math.max(0, Number(newQty || 0));
     const unitNetWt = Number(
-      currentItem.unit_net_wt ||
-        (currentItem.qty > 0
-          ? Number(currentItem.net_wt || 0) / currentItem.qty
-          : 0),
+      currentItem.unit_net_wt !== undefined
+        ? currentItem.unit_net_wt
+        : (currentItem.original_qty > 0
+            ? Number(currentItem.net_wt || 0) / currentItem.original_qty
+            : (currentItem.qty > 0
+                ? Number(currentItem.net_wt || 0) / currentItem.qty
+                : 0)),
     );
     const newNetWt = Number((unitNetWt * validQty).toFixed(3));
 
@@ -475,6 +538,7 @@ export default function PurchaseInvoice() {
     updated[index] = {
       ...currentItem,
       invoice_qty: validQty,
+      unit_net_wt: unitNetWt,
       net_wt: newNetWt,
       taxable_amount: taxableAmount,
       igst_amount: igstAmount,
@@ -567,6 +631,7 @@ export default function PurchaseInvoice() {
         invoice_qty: remainingQty,
         unit: currentItem.unit,
         unit_net_wt: unitNetWt,
+        unit_gross_wt: currentItem.unit_gross_wt || unitNetWt,
         net_wt: remainingNetWt,
         gst_percent: currentItem.gst_percent,
         rate: undefined,
@@ -661,16 +726,23 @@ export default function PurchaseInvoice() {
       (sum, item) => sum + Number(item.total_amount || 0),
       0,
     );
-    const totalNetWt = items.reduce(
-      (sum, item) => sum + Number(item.net_wt || 0),
-      0,
-    );
+    const totalGrossWt = items.reduce((sum, item) => {
+      const invQty = Number(
+        item.invoice_qty !== undefined ? item.invoice_qty : item.qty || 0,
+      );
+      const unitGross = Number(
+        item.unit_gross_wt !== undefined && item.unit_gross_wt !== null
+          ? item.unit_gross_wt
+          : item.unit_net_wt || (item.qty > 0 ? Number(item.net_wt || 0) / item.qty : 0),
+      );
+      return sum + unitGross * invQty;
+    }, 0);
 
     const roundOff = Number(form.getFieldValue("round_off_amount") || 0);
     const grandTotal = totalAmount + roundOff;
 
     form.setFieldsValue({
-      gross_weight: Number(totalNetWt.toFixed(3)),
+      gross_weight: Number(totalGrossWt.toFixed(3)),
       total_qty: Number(totalQty.toFixed(3)),
       total_taxable_amount: Number(totalTaxable.toFixed(2)),
       total_igst_amount: Number(totalIGST.toFixed(2)),
@@ -720,6 +792,11 @@ export default function PurchaseInvoice() {
       );
       const netWt = Number(item.net_wt || 0);
       const unitNetWt = invoiceQty > 0 ? netWt / invoiceQty : 0;
+      const unitGrossWt =
+        item.unit_gross_wt ||
+        (record.total_gross_weight && record.total_qty
+          ? Number(record.total_gross_weight) / Number(record.total_qty)
+          : unitNetWt);
 
       return {
         sale_contract: item.sale_contract,
@@ -733,6 +810,7 @@ export default function PurchaseInvoice() {
         invoice_qty: invoiceQty,
         unit: item.unit,
         unit_net_wt: unitNetWt,
+        unit_gross_wt: unitGrossWt,
         net_wt: netWt,
         gst_percent: gstPercent,
         rate: rate,
@@ -878,6 +956,8 @@ export default function PurchaseInvoice() {
           : null,
         dispatch_from: values.dispatch_from,
         ship_to: values.ship_to,
+        gross_weight: values.gross_weight,
+        total_gross_weight: values.gross_weight,
         round_off_amount: String(values.round_off_amount || 0),
         items: (values.items || []).map((item) => ({
           sale_contract: item.sale_contract,
