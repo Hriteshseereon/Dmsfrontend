@@ -253,6 +253,8 @@ export default function PurchaseInvoice() {
       items: [],
       total_qty: 0,
       total_taxable_amount: 0,
+      total_sgst_amount: 0,
+      total_cgst_amount: 0,
       total_igst_amount: 0,
       total_amount: 0,
       round_off_amount: 0,
@@ -338,13 +340,47 @@ export default function PurchaseInvoice() {
         0,
     });
 
-    // Populate initial items list with available_qty, editable invoice_qty & unit_net_wt
+    const vehicleGrossWeight = Number(
+      matchedVehicle.gross_weight_loaded ||
+      matchedVehicle.gross_weight_loading_plan ||
+      0
+    );
+    const totalVehicleNetWeight = (matchedVehicle.items || []).reduce(
+      (sum, it) => sum + Number(it.net_wt || 0),
+      0
+    );
+    const totalVehicleQty = (matchedVehicle.items || []).reduce(
+      (sum, it) => sum + Number(it.qty || 0),
+      0
+    );
+
+    // Populate initial items list with available_qty, editable invoice_qty, unit_net_wt & unit_gross_wt
     const populatedItems = (matchedVehicle.items || []).map((item) => {
-      const remainingQty = Number(item.qty || 0);
+      const remainingQty = Number(
+        item.remaining_qty !== undefined
+          ? item.remaining_qty
+          : item.qty !== undefined
+          ? item.qty
+          : (item.original_qty || 0) - (item.already_invoiced_qty || 0)
+      );
       const invoiceQty = Number(item.invoice_qty || remainingQty || 0);
       const netWt = Number(item.net_wt || 0);
       const unitNetWt = remainingQty > 0 ? netWt / remainingQty : 0;
       const actualNetWt = Number((unitNetWt * invoiceQty).toFixed(3));
+
+      let unitGrossWt = 0;
+      if (item.gross_wt && remainingQty > 0) {
+        unitGrossWt = Number(item.gross_wt) / remainingQty;
+      } else if (item.gross_weight && remainingQty > 0) {
+        unitGrossWt = Number(item.gross_weight) / remainingQty;
+      } else if (vehicleGrossWeight > 0 && totalVehicleNetWeight > 0) {
+        const itemTotalGrossWt = (netWt / totalVehicleNetWeight) * vehicleGrossWeight;
+        unitGrossWt = remainingQty > 0 ? itemTotalGrossWt / remainingQty : 0;
+      } else if (vehicleGrossWeight > 0 && totalVehicleQty > 0) {
+        unitGrossWt = vehicleGrossWeight / totalVehicleQty;
+      } else {
+        unitGrossWt = unitNetWt;
+      }
 
       return {
         sale_contract: item.sale_contract_id,
@@ -358,10 +394,13 @@ export default function PurchaseInvoice() {
         invoice_qty: invoiceQty,
         unit: item.unit,
         unit_net_wt: unitNetWt,
+        unit_gross_wt: unitGrossWt,
         net_wt: actualNetWt,
         gst_percent: item.gst_percent,
         rate: undefined,
         taxable_amount: 0,
+        sgst_amount: 0,
+        cgst_amount: 0,
         igst_amount: 0,
         total_amount: 0,
       };
@@ -438,8 +477,22 @@ export default function PurchaseInvoice() {
     const rate = Number(currentItem.rate || 0);
     const gstPercent = Number(currentItem.gst_percent || 0);
     const taxableAmount = Number((validQty * rate).toFixed(2));
-    const igstAmount = Number(((taxableAmount * gstPercent) / 100).toFixed(2));
-    const totalAmount = Number((taxableAmount + igstAmount).toFixed(2));
+
+    let sgstAmount = Number(currentItem.sgst_amount || 0);
+    let cgstAmount = Number(currentItem.cgst_amount || 0);
+    let igstAmount = Number(currentItem.igst_amount || 0);
+
+    if (sgstAmount > 0 || cgstAmount > 0) {
+      sgstAmount = Number(((taxableAmount * (gstPercent / 2)) / 100).toFixed(2));
+      cgstAmount = Number(((taxableAmount * (gstPercent / 2)) / 100).toFixed(2));
+      igstAmount = 0;
+    } else {
+      igstAmount = Number(((taxableAmount * gstPercent) / 100).toFixed(2));
+      sgstAmount = 0;
+      cgstAmount = 0;
+    }
+
+    const totalAmount = Number((taxableAmount + sgstAmount + cgstAmount + igstAmount).toFixed(2));
 
     const updated = [...items];
     updated[index] = {
@@ -447,6 +500,44 @@ export default function PurchaseInvoice() {
       invoice_qty: validQty,
       net_wt: newNetWt,
       taxable_amount: taxableAmount,
+      sgst_amount: sgstAmount,
+      cgst_amount: cgstAmount,
+      igst_amount: igstAmount,
+      total_amount: totalAmount,
+    };
+
+    form.setFieldsValue({ items: updated });
+    recalculateGrandTotals(updated);
+  };
+
+  // Handle tax amounts change (SGST, CGST, IGST) directly
+  const handleTaxAmountChange = (index, fieldType, value) => {
+    const items = form.getFieldValue("items") || [];
+    if (!items[index]) return;
+
+    const currentItem = items[index];
+    const val = Math.max(0, Number(value || 0));
+    const taxableAmount = Number(currentItem.taxable_amount || 0);
+
+    let sgstAmount = Number(currentItem.sgst_amount || 0);
+    let cgstAmount = Number(currentItem.cgst_amount || 0);
+    let igstAmount = Number(currentItem.igst_amount || 0);
+
+    if (fieldType === "sgst_amount") {
+      sgstAmount = val;
+    } else if (fieldType === "cgst_amount") {
+      cgstAmount = val;
+    } else if (fieldType === "igst_amount") {
+      igstAmount = val;
+    }
+
+    const totalAmount = Number((taxableAmount + sgstAmount + cgstAmount + igstAmount).toFixed(2));
+
+    const updated = [...items];
+    updated[index] = {
+      ...currentItem,
+      sgst_amount: sgstAmount,
+      cgst_amount: cgstAmount,
       igst_amount: igstAmount,
       total_amount: totalAmount,
     };
@@ -479,12 +570,25 @@ export default function PurchaseInvoice() {
         currentItem.unit_net_wt ||
           (invQty > 0 ? Number(currentItem.net_wt || 0) / invQty : 0)
       );
+      const unitGrossWt = Number(currentItem.unit_gross_wt || unitNetWt);
       const allocatedNetWt = Number((unitNetWt * allocatedQty).toFixed(3));
       const remainingNetWt = Number((unitNetWt * remainingQty).toFixed(3));
 
-      const currentTaxable = allocatedQty * rateVal;
-      const currentIgst = (currentTaxable * gstPercent) / 100;
-      const currentTotal = currentTaxable + currentIgst;
+      const currentTaxable = Number((allocatedQty * rateVal).toFixed(2));
+      let sgstAmount = Number(currentItem.sgst_amount || 0);
+      let cgstAmount = Number(currentItem.cgst_amount || 0);
+      let igstAmount = Number(currentItem.igst_amount || 0);
+
+      if (sgstAmount > 0 || cgstAmount > 0) {
+        sgstAmount = Number(((currentTaxable * (gstPercent / 2)) / 100).toFixed(2));
+        cgstAmount = Number(((currentTaxable * (gstPercent / 2)) / 100).toFixed(2));
+        igstAmount = 0;
+      } else {
+        igstAmount = Number(((currentTaxable * gstPercent) / 100).toFixed(2));
+        sgstAmount = 0;
+        cgstAmount = 0;
+      }
+      const currentTotal = Number((currentTaxable + sgstAmount + cgstAmount + igstAmount).toFixed(2));
 
       const updatedCurrentItem = {
         ...currentItem,
@@ -493,9 +597,11 @@ export default function PurchaseInvoice() {
         rate: rateVal,
         purchase_contract: rateOption.purchase_contract_id,
         purchase_contract_item: rateOption.purchase_contract_item_id,
-        taxable_amount: Number(currentTaxable.toFixed(2)),
-        igst_amount: Number(currentIgst.toFixed(2)),
-        total_amount: Number(currentTotal.toFixed(2)),
+        taxable_amount: currentTaxable,
+        sgst_amount: sgstAmount,
+        cgst_amount: cgstAmount,
+        igst_amount: igstAmount,
+        total_amount: currentTotal,
       };
 
       const newSplitItem = {
@@ -508,12 +614,15 @@ export default function PurchaseInvoice() {
         invoice_qty: remainingQty,
         unit: currentItem.unit,
         unit_net_wt: unitNetWt,
+        unit_gross_wt: unitGrossWt,
         net_wt: remainingNetWt,
         gst_percent: currentItem.gst_percent,
         rate: undefined,
         purchase_contract: undefined,
         purchase_contract_item: undefined,
         taxable_amount: 0,
+        sgst_amount: 0,
+        cgst_amount: 0,
         igst_amount: 0,
         total_amount: 0,
         is_split: true,
@@ -540,9 +649,21 @@ export default function PurchaseInvoice() {
     }
 
     // Standard case: contract balance >= invoice qty
-    const taxableAmount = invQty * rateVal;
-    const igstAmount = (taxableAmount * gstPercent) / 100;
-    const totalAmount = taxableAmount + igstAmount;
+    const taxableAmount = Number((invQty * rateVal).toFixed(2));
+    let sgstAmount = Number(currentItem.sgst_amount || 0);
+    let cgstAmount = Number(currentItem.cgst_amount || 0);
+    let igstAmount = Number(currentItem.igst_amount || 0);
+
+    if (sgstAmount > 0 || cgstAmount > 0) {
+      sgstAmount = Number(((taxableAmount * (gstPercent / 2)) / 100).toFixed(2));
+      cgstAmount = Number(((taxableAmount * (gstPercent / 2)) / 100).toFixed(2));
+      igstAmount = 0;
+    } else {
+      igstAmount = Number(((taxableAmount * gstPercent) / 100).toFixed(2));
+      sgstAmount = 0;
+      cgstAmount = 0;
+    }
+    const totalAmount = Number((taxableAmount + sgstAmount + cgstAmount + igstAmount).toFixed(2));
 
     const updatedItems = [...items];
     updatedItems[index] = {
@@ -550,9 +671,11 @@ export default function PurchaseInvoice() {
       rate: rateVal,
       purchase_contract: rateOption.purchase_contract_id,
       purchase_contract_item: rateOption.purchase_contract_item_id,
-      taxable_amount: Number(taxableAmount.toFixed(2)),
-      igst_amount: Number(igstAmount.toFixed(2)),
-      total_amount: Number(totalAmount.toFixed(2)),
+      taxable_amount: taxableAmount,
+      sgst_amount: sgstAmount,
+      cgst_amount: cgstAmount,
+      igst_amount: igstAmount,
+      total_amount: totalAmount,
     };
 
     form.setFieldsValue({ items: updatedItems });
@@ -585,6 +708,14 @@ export default function PurchaseInvoice() {
       (sum, item) => sum + Number(item.taxable_amount || 0),
       0
     );
+    const totalSGST = items.reduce(
+      (sum, item) => sum + Number(item.sgst_amount || 0),
+      0
+    );
+    const totalCGST = items.reduce(
+      (sum, item) => sum + Number(item.cgst_amount || 0),
+      0
+    );
     const totalIGST = items.reduce(
       (sum, item) => sum + Number(item.igst_amount || 0),
       0
@@ -593,6 +724,11 @@ export default function PurchaseInvoice() {
       (sum, item) => sum + Number(item.total_amount || 0),
       0
     );
+    const totalGrossWeight = items.reduce((sum, item) => {
+      const invQty = Number(item.invoice_qty !== undefined ? item.invoice_qty : item.qty || 0);
+      const unitGross = Number(item.unit_gross_wt || item.unit_net_wt || 0);
+      return sum + (unitGross * invQty);
+    }, 0);
 
     const roundOff = Number(form.getFieldValue("round_off_amount") || 0);
     const grandTotal = totalAmount + roundOff;
@@ -600,9 +736,12 @@ export default function PurchaseInvoice() {
     form.setFieldsValue({
       total_qty: Number(totalQty.toFixed(3)),
       total_taxable_amount: Number(totalTaxable.toFixed(2)),
+      total_sgst_amount: Number(totalSGST.toFixed(2)),
+      total_cgst_amount: Number(totalCGST.toFixed(2)),
       total_igst_amount: Number(totalIGST.toFixed(2)),
       total_amount: Number(totalAmount.toFixed(2)),
       grand_total: Number(grandTotal.toFixed(2)),
+      gross_weight: Number(totalGrossWeight.toFixed(3)),
     });
   };
 
@@ -632,17 +771,23 @@ export default function PurchaseInvoice() {
       const rate = Number(item.rate || 0);
       const gstPercent = Number(item.gst_percent || 0);
       const taxableAmount = Number(item.taxable_amount || invoiceQty * rate || 0);
-      const igstAmount = Number(
-        item.igst_amount ||
-          item.total_gst_amount ||
-          (taxableAmount * gstPercent) / 100 ||
-          0
-      );
+      const sgstAmount = Number(item.sgst_amount || 0);
+      const cgstAmount = Number(item.cgst_amount || 0);
+      let igstAmount = Number(item.igst_amount || 0);
+      if (!sgstAmount && !cgstAmount && !igstAmount) {
+        igstAmount = Number(item.total_gst_amount || (taxableAmount * gstPercent) / 100 || 0);
+      }
       const totalAmount = Number(
-        item.total_amount || taxableAmount + igstAmount || 0
+        item.total_amount || taxableAmount + sgstAmount + cgstAmount + igstAmount || 0
       );
       const netWt = Number(item.net_wt || 0);
       const unitNetWt = invoiceQty > 0 ? netWt / invoiceQty : 0;
+      const unitGrossWt = Number(
+        item.unit_gross_wt ||
+          (record.total_gross_weight && record.total_qty
+            ? Number(record.total_gross_weight) / Number(record.total_qty)
+            : unitNetWt)
+      );
 
       return {
         sale_contract: item.sale_contract,
@@ -656,10 +801,13 @@ export default function PurchaseInvoice() {
         invoice_qty: invoiceQty,
         unit: item.unit,
         unit_net_wt: unitNetWt,
+        unit_gross_wt: unitGrossWt,
         net_wt: netWt,
         gst_percent: gstPercent,
         rate: rate,
         taxable_amount: Number(taxableAmount.toFixed(2)),
+        sgst_amount: Number(sgstAmount.toFixed(2)),
+        cgst_amount: Number(cgstAmount.toFixed(2)),
         igst_amount: Number(igstAmount.toFixed(2)),
         total_amount: Number(totalAmount.toFixed(2)),
       };
@@ -700,13 +848,15 @@ export default function PurchaseInvoice() {
       payment_due_date: parseApiDate(record.payment_due_date),
       dispatch_from: record.dispatch_from || "Haldia",
       ship_to: record.ship_to || "",
-      gross_weight: Number(record.total_gross_weight || 0),
+      gross_weight: Number(record.total_gross_weight || record.gross_weight || 0),
       round_off_amount: Number(record.round_off_amount || 0),
       items: formattedItems,
       total_qty: Number(Number(record.total_qty || 0).toFixed(3)),
       total_taxable_amount: Number(
         Number(record.total_taxable_amount || 0).toFixed(2)
       ),
+      total_sgst_amount: Number(Number(record.total_sgst_amount || 0).toFixed(2)),
+      total_cgst_amount: Number(Number(record.total_cgst_amount || 0).toFixed(2)),
       total_igst_amount: Number(
         Number(record.igst_amount || record.total_gst_amount || 0).toFixed(2)
       ),
@@ -790,6 +940,8 @@ export default function PurchaseInvoice() {
           : null,
         dispatch_from: values.dispatch_from,
         ship_to: values.ship_to,
+        total_gross_weight: values.gross_weight,
+        gross_weight: values.gross_weight,
         round_off_amount: String(values.round_off_amount || 0),
         items: (values.items || []).map((item) => ({
           sale_contract: item.sale_contract,
@@ -804,6 +956,11 @@ export default function PurchaseInvoice() {
           net_wt: Number(item.net_wt || 0),
           gst_percent: Number(item.gst_percent || 0),
           rate: Number(item.rate || 0),
+          taxable_amount: Number(item.taxable_amount || 0),
+          sgst_amount: Number(item.sgst_amount || 0),
+          cgst_amount: Number(item.cgst_amount || 0),
+          igst_amount: Number(item.igst_amount || 0),
+          total_amount: Number(item.total_amount || 0),
         })),
       };
 
@@ -927,7 +1084,7 @@ export default function PurchaseInvoice() {
         record.isMergedRow ? (
           <Tag color="cyan">{text}</Tag>
         ) : (
-          <Tag color="warning">{text}</Tag>
+          <span className="font-semibold text-amber-900">{text || "-"}</span>
         ),
     },
     {
@@ -1109,7 +1266,7 @@ export default function PurchaseInvoice() {
     {
       title: <span className="text-amber-700 font-semibold">Vehicle No</span>,
       dataIndex: "vehicle_no",
-      render: (text) => <Tag color="warning">{text}</Tag>,
+      render: (text) => <span className="font-semibold text-amber-900">{text || "-"}</span>,
     },
     {
       title: <span className="text-amber-700 font-semibold">E-waybill No</span>,
@@ -1517,17 +1674,17 @@ export default function PurchaseInvoice() {
             <h6 className="text-amber-600 font-bold mb-3">Items Information</h6>
 
             <Row gutter={8} className="pb-2 mb-2 text-amber-800 font-bold text-xs">
-              <Col span={4}>Item Name</Col>
+              <Col span={3}>Item Name</Col>
               <Col span={2}>Avail Qty</Col>
               <Col span={2}>Invoice Qty</Col>
-              <Col span={1}>Unit</Col>
-              <Col span={2}>Net Wt (Ton)</Col>
-              <Col span={1}>GST %</Col>
-              <Col span={4}>Rate Selection (Available Soudas)</Col>
+              <Col span={1} className="text-center">Unit</Col>
+              <Col span={1} className="text-center">Net Wt</Col>
+              <Col span={1} className="text-center">GST %</Col>
+              <Col span={3}>Rate Selection</Col>
               <Col span={2}>Taxable Amt</Col>
-              <Col span={1}>SGST</Col>
-              <Col span={1}>CGST</Col>
-              <Col span={1}>IGST</Col>
+              <Col span={2} className="text-center">SGST</Col>
+              <Col span={2} className="text-center">CGST</Col>
+              <Col span={2} className="text-center">IGST</Col>
               <Col span={2}>Total Amount</Col>
               <Col span={1} className="text-center">Action</Col>
             </Row>
@@ -1540,9 +1697,9 @@ export default function PurchaseInvoice() {
 
                   return (
                     <Row key={field.key} gutter={8} align="middle" className="mb-2">
-                      <Col span={4}>
+                      <Col span={3}>
                         <Form.Item name={[field.name, "item_name"]} style={{ marginBottom: 0 }}>
-                          <Input disabled className="bg-gray-50!" />
+                          <Input disabled className="bg-gray-50!" style={{ width: "100%", minWidth: 0 }} />
                         </Form.Item>
                         <Form.Item name={[field.name, "sale_contract"]} hidden>
                           <Input />
@@ -1556,31 +1713,24 @@ export default function PurchaseInvoice() {
                         <Form.Item name={[field.name, "unit_net_wt"]} hidden>
                           <InputNumber />
                         </Form.Item>
+                        <Form.Item name={[field.name, "unit_gross_wt"]} hidden>
+                          <InputNumber />
+                        </Form.Item>
                       </Col>
 
                       <Col span={2}>
                         <Form.Item name={[field.name, "qty"]} style={{ marginBottom: 0 }}>
-                          <Tooltip
-                            title={`Original: ${
-                              form.getFieldValue(["items", field.name, "original_qty"]) ??
-                              form.getFieldValue(["items", field.name, "qty"]) ??
-                              "-"
-                            } | Invoiced: ${
-                              form.getFieldValue(["items", field.name, "already_invoiced_qty"]) ?? 0
-                            } | Remaining: ${
-                              form.getFieldValue(["items", field.name, "qty"]) ?? "-"
-                            }`}
-                          >
-                            <Input
-                              disabled
-                              className="w-full bg-gray-50! font-bold text-center cursor-help"
-                              style={{
-                                color: "#111827",
-                                fontWeight: 700,
-                                WebkitTextFillColor: "#111827",
-                              }}
-                            />
-                          </Tooltip>
+                          <Input
+                            disabled
+                            className="w-full bg-gray-50! font-bold text-center"
+                            style={{
+                              color: "#111827",
+                              fontWeight: 700,
+                              WebkitTextFillColor: "#111827",
+                              width: "100%",
+                              minWidth: 0,
+                            }}
+                          />
                         </Form.Item>
                         <Form.Item name={[field.name, "available_qty"]} hidden>
                           <Input />
@@ -1610,6 +1760,7 @@ export default function PurchaseInvoice() {
                             }
                             precision={2}
                             className="w-full border-amber-400! font-semibold"
+                            style={{ width: "100%", minWidth: 0 }}
                             placeholder="Qty"
                             onChange={(val) => handleInvoiceQtyChange(field.name, val)}
                           />
@@ -1618,23 +1769,23 @@ export default function PurchaseInvoice() {
 
                       <Col span={1}>
                         <Form.Item name={[field.name, "unit"]} style={{ marginBottom: 0 }}>
-                          <Input disabled className="bg-gray-50! text-center p-0" />
+                          <Input disabled className="bg-gray-50! text-center p-0" style={{ width: "100%", minWidth: 0 }} />
                         </Form.Item>
                       </Col>
 
-                      <Col span={2}>
+                      <Col span={1}>
                         <Form.Item name={[field.name, "net_wt"]} style={{ marginBottom: 0 }}>
-                          <InputNumber disabled className="w-full bg-gray-50!" precision={3} />
+                          <InputNumber disabled className="w-full bg-gray-50!" style={{ width: "100%", minWidth: 0 }} precision={3} />
                         </Form.Item>
                       </Col>
 
                       <Col span={1}>
                         <Form.Item name={[field.name, "gst_percent"]} style={{ marginBottom: 0 }}>
-                          <InputNumber disabled className="w-full bg-gray-50!" />
+                          <InputNumber disabled className="w-full bg-gray-50! text-center" style={{ width: "100%", minWidth: 0 }} />
                         </Form.Item>
                       </Col>
 
-                      <Col span={4}>
+                      <Col span={3}>
                         <Form.Item
                           name={[field.name, "rate"]}
                           style={{ marginBottom: 0 }}
@@ -1644,6 +1795,7 @@ export default function PurchaseInvoice() {
                             ref={(el) => (rateSelectRefs.current[field.name] = el)}
                             placeholder="Select Rate"
                             className="w-full"
+                            style={{ width: "100%", minWidth: 0 }}
                             optionLabelProp="label"
                             popupMatchSelectWidth={false}
                             dropdownStyle={{ minWidth: 700, borderRadius: 8, padding: 4 }}
@@ -1723,27 +1875,52 @@ export default function PurchaseInvoice() {
 
                       <Col span={2}>
                         <Form.Item name={[field.name, "taxable_amount"]} style={{ marginBottom: 0 }}>
-                          <InputNumber disabled className="w-full bg-gray-50!" precision={2} />
+                          <InputNumber disabled className="w-full bg-gray-50!" style={{ width: "100%", minWidth: 0 }} precision={2} />
                         </Form.Item>
                       </Col>
 
-                      <Col span={1}>
-                        <Input disabled className="w-full bg-gray-50! border-dashed text-center p-0 text-xs" placeholder="-" />
+                      <Col span={2}>
+                        <Form.Item name={[field.name, "sgst_amount"]} style={{ marginBottom: 0 }}>
+                          <InputNumber
+                            min={0}
+                            precision={2}
+                            className="w-full font-medium"
+                            style={{ width: "100%", minWidth: 0 }}
+                            placeholder="SGST"
+                            onChange={(val) => handleTaxAmountChange(field.name, "sgst_amount", val)}
+                          />
+                        </Form.Item>
                       </Col>
 
-                      <Col span={1}>
-                        <Input disabled className="w-full bg-gray-50! border-dashed text-center p-0 text-xs" placeholder="-" />
+                      <Col span={2}>
+                        <Form.Item name={[field.name, "cgst_amount"]} style={{ marginBottom: 0 }}>
+                          <InputNumber
+                            min={0}
+                            precision={2}
+                            className="w-full font-medium"
+                            style={{ width: "100%", minWidth: 0 }}
+                            placeholder="CGST"
+                            onChange={(val) => handleTaxAmountChange(field.name, "cgst_amount", val)}
+                          />
+                        </Form.Item>
                       </Col>
 
-                      <Col span={1}>
+                      <Col span={2}>
                         <Form.Item name={[field.name, "igst_amount"]} style={{ marginBottom: 0 }}>
-                          <InputNumber disabled className="w-full bg-gray-50!" precision={2} />
+                          <InputNumber
+                            min={0}
+                            precision={2}
+                            className="w-full font-medium"
+                            style={{ width: "100%", minWidth: 0 }}
+                            placeholder="IGST"
+                            onChange={(val) => handleTaxAmountChange(field.name, "igst_amount", val)}
+                          />
                         </Form.Item>
                       </Col>
 
                       <Col span={2}>
                         <Form.Item name={[field.name, "total_amount"]} style={{ marginBottom: 0 }}>
-                          <InputNumber disabled className="w-full bg-gray-50!" precision={2} />
+                          <InputNumber disabled className="w-full bg-gray-50!" style={{ width: "100%", minWidth: 0 }} precision={2} />
                         </Form.Item>
                       </Col>
 
@@ -1767,34 +1944,42 @@ export default function PurchaseInvoice() {
             {/* Total Row */}
             <Divider style={{ margin: "12px 0" }} />
             <Row gutter={8} align="middle">
-              <Col span={4}>
+              <Col span={3}>
                 <span className="font-bold text-amber-800">Total:</span>
               </Col>
               <Col span={2}></Col>
               <Col span={2}>
                 <Form.Item name="total_qty" style={{ marginBottom: 0 }}>
-                  <InputNumber disabled className="w-full bg-gray-100! font-semibold" />
+                  <InputNumber disabled className="w-full bg-gray-100! font-semibold" style={{ width: "100%", minWidth: 0 }} />
                 </Form.Item>
               </Col>
               <Col span={1}></Col>
-              <Col span={2}></Col>
               <Col span={1}></Col>
-              <Col span={4}></Col>
+              <Col span={1}></Col>
+              <Col span={3}></Col>
               <Col span={2}>
                 <Form.Item name="total_taxable_amount" style={{ marginBottom: 0 }}>
-                  <InputNumber disabled className="w-full bg-gray-100! font-semibold" precision={2} />
+                  <InputNumber disabled className="w-full bg-gray-100! font-semibold" style={{ width: "100%", minWidth: 0 }} precision={2} />
                 </Form.Item>
               </Col>
-              <Col span={1}></Col>
-              <Col span={1}></Col>
-              <Col span={1}>
+              <Col span={2}>
+                <Form.Item name="total_sgst_amount" style={{ marginBottom: 0 }}>
+                  <InputNumber disabled className="w-full bg-gray-100! font-semibold" style={{ width: "100%", minWidth: 0 }} precision={2} />
+                </Form.Item>
+              </Col>
+              <Col span={2}>
+                <Form.Item name="total_cgst_amount" style={{ marginBottom: 0 }}>
+                  <InputNumber disabled className="w-full bg-gray-100! font-semibold" style={{ width: "100%", minWidth: 0 }} precision={2} />
+                </Form.Item>
+              </Col>
+              <Col span={2}>
                 <Form.Item name="total_igst_amount" style={{ marginBottom: 0 }}>
-                  <InputNumber disabled className="w-full bg-gray-100! font-semibold" precision={2} />
+                  <InputNumber disabled className="w-full bg-gray-100! font-semibold" style={{ width: "100%", minWidth: 0 }} precision={2} />
                 </Form.Item>
               </Col>
               <Col span={2}>
                 <Form.Item name="total_amount" style={{ marginBottom: 0 }}>
-                  <InputNumber disabled className="w-full bg-gray-100! font-semibold" precision={2} />
+                  <InputNumber disabled className="w-full bg-gray-100! font-semibold" style={{ width: "100%", minWidth: 0 }} precision={2} />
                 </Form.Item>
               </Col>
               <Col span={1}></Col>
@@ -1944,9 +2129,7 @@ export default function PurchaseInvoice() {
               </Col>
               <Col span={4}>
                 <Text type="secondary">Vehicle No: </Text>
-                <div>
-                  <Tag color="warning">{viewRecord.vehicle_no}</Tag>
-                </div>
+                <div className="font-semibold text-amber-900">{viewRecord.vehicle_no || "-"}</div>
               </Col>
 
               <Col span={8}>
@@ -2005,7 +2188,17 @@ export default function PurchaseInvoice() {
                   render: (val) => `₹${Number(val || 0).toFixed(2)}`,
                 },
                 {
-                  title: "IGST Amount",
+                  title: "SGST",
+                  dataIndex: "sgst_amount",
+                  render: (val) => `₹${Number(val || 0).toFixed(2)}`,
+                },
+                {
+                  title: "CGST",
+                  dataIndex: "cgst_amount",
+                  render: (val) => `₹${Number(val || 0).toFixed(2)}`,
+                },
+                {
+                  title: "IGST",
                   dataIndex: "igst_amount",
                   render: (val) => `₹${Number(val || 0).toFixed(2)}`,
                 },
