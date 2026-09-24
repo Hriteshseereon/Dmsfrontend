@@ -1,0 +1,91 @@
+/* Accounts Module Custom Styles aligned with DMS design */
+
+/* Main Category Tabs */
+.accounts-main-tabs .ant-tabs-nav {
+  margin-bottom: 0 !important;
+}
+
+.accounts-main-tabs .ant-tabs-ink-bar {
+  background: #d97706 !important;
+  height: 3px !important;
+  border-radius: 2px;
+}
+
+.accounts-main-tabs .ant-tabs-tab {
+  padding: 8px 16px !important;
+  transition: all 0.2s ease;
+}
+
+.accounts-main-tabs .ant-tabs-tab:hover .ant-tabs-tab-btn {
+  color: #b45309 !important;
+}
+
+.accounts-main-tabs .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #78350f !important;
+  font-weight: 700 !important;
+}
+
+/* Secondary Sub-Tabs (Cards) */
+.accounts-sub-tabs .ant-tabs-nav {
+  margin-bottom: 0 !important;
+}
+
+.accounts-sub-tabs .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab {
+  background: #ffffff !important;
+  border: 1px solid #fde68a !important;
+  border-radius: 6px !important;
+  margin-right: 6px !important;
+  padding: 4px 12px !important;
+  transition: all 0.2s ease;
+}
+
+.accounts-sub-tabs .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab:hover {
+  border-color: #d97706 !important;
+  background: #fffbeb !important;
+}
+
+.accounts-sub-tabs .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab.ant-tabs-tab-active {
+  background: #f59e0b !important;
+  border-color: #d97706 !important;
+}
+
+.accounts-sub-tabs .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+.accounts-sub-tabs .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn span {
+  color: #ffffff !important;
+}
+
+.accounts-sub-tabs .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn svg {
+  color: #ffffff !important;
+  fill: #ffffff !important;
+}
+
+/* Accounts Table Header & Row Styles (Matches DMS Table Standards) */
+.accounts-table .ant-table-thead > tr > th {
+  background-color: #fef3c7 !important;
+  color: #78350f !important;
+  font-weight: 700 !important;
+  border-bottom: 1px solid #fde68a !important;
+  padding: 10px 12px !important;
+}
+
+.accounts-table .ant-table-tbody > tr > td {
+  padding: 8px 12px !important;
+  border-bottom: 1px solid #f3f4f6 !important;
+}
+
+.accounts-table .ant-table-tbody > tr:hover > td {
+  background-color: #fffbeb !important;
+}
+
+/* Pagination Style */
+.accounts-table .ant-pagination .ant-pagination-item-active {
+  border-color: #d97706 !important;
+}
+
+.accounts-table .ant-pagination .ant-pagination-item-active a {
+  color: #d97706 !important;
+}
