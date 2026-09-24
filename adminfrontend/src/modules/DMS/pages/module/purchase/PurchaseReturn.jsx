@@ -43,6 +43,7 @@ import {
   createStockInTransit,
   updateStockInTransit,
 } from "../../../../../api/purchase";
+import { getProducts } from "../../../../../api/product";
 import {
   createFinancialYearDisabledDate,
   useSelectedFinancialYear,
@@ -98,9 +99,10 @@ const fmtDate = (d) => {
 export default function StockInTransit() {
   const [rawData, setRawData] = useState([]);
   const [vehicleList, setVehicleList] = useState([]);
+  const [productsList, setProductsList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("Intransit");
 
   // Step 2: Vehicle Invoices Drill-down Modal State
   const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
@@ -122,7 +124,18 @@ export default function StockInTransit() {
 
   useEffect(() => {
     fetchTransitData();
+    fetchProductsList();
   }, [selectedFY]);
+
+  const fetchProductsList = async () => {
+    try {
+      const res = await getProducts();
+      const list = Array.isArray(res) ? res : res?.data || res?.results || [];
+      setProductsList(list);
+    } catch (err) {
+      console.warn("Could not load products master for unit conversions:", err);
+    }
+  };
 
   // 1. Fetch Aggregated Supplier & Vehicle Data
   const fetchTransitData = async () => {
@@ -174,6 +187,11 @@ export default function StockInTransit() {
                       : null,
                   claim_qty: Number(item.claim_qty || 0),
                   claim_amount: Number(item.claim_amount || 0),
+                  claim_unit: item.claim_unit || item.unit,
+                  claim_rate:
+                    item.claim_rate !== undefined && item.claim_rate !== null
+                      ? Number(item.claim_rate)
+                      : null,
                   claim_reason: item.claim_reason || "None",
                   narration: item.narration || "",
                 })),
@@ -364,6 +382,92 @@ export default function StockInTransit() {
     }
   };
 
+  // Helper to determine Base, Lower, Upper units & rates for an item
+  const getItemUnitOptions = (item, products = []) => {
+    const matchedProduct = (Array.isArray(products) ? products : []).find(
+      (p) =>
+        (item.product_id && String(p.id) === String(item.product_id)) ||
+        (item.product && String(p.id) === String(item.product)) ||
+        (p.name &&
+          item.item_name &&
+          String(p.name).trim().toLowerCase() ===
+            String(item.item_name).trim().toLowerCase()),
+    );
+
+    const invoiceUnit = item.unit || "TIN";
+    const upperUnit =
+      item.upper_unit || matchedProduct?.upper_unit || invoiceUnit;
+    const baseUnit = item.base_unit || matchedProduct?.base_unit || "";
+    const lowerUnit = item.lower_unit || matchedProduct?.lower_unit || "";
+    const multiplier = Number(
+      item.multiplier || matchedProduct?.multiplier || 1,
+    );
+    const invRate = Number(item.rate || 0);
+
+    const options = [];
+
+    // 1. Upper / Invoice Unit (e.g. TIN, BOX, BAG)
+    const upperName = upperUnit || invoiceUnit;
+    if (upperName) {
+      options.push({
+        value: upperName,
+        label: `${upperName} (Upper/Invoice Unit)`,
+        short_label: upperName,
+        unit_name: upperName,
+        unit_type: "upper",
+        rate: invRate,
+        multiplier_to_invoice: 1,
+      });
+    }
+
+    // 2. Base Unit (e.g. LTR, KG, PCS)
+    if (baseUnit && baseUnit !== upperName) {
+      const baseRate =
+        multiplier > 1 ? Number((invRate / multiplier).toFixed(2)) : invRate;
+      const factor = multiplier > 1 ? 1 / multiplier : 1;
+      options.push({
+        value: baseUnit,
+        label: `${baseUnit} (Base Unit)`,
+        short_label: baseUnit,
+        unit_name: baseUnit,
+        unit_type: "base",
+        rate: baseRate,
+        multiplier_to_invoice: factor,
+      });
+    }
+
+    // 3. Lower Unit (e.g. POUCH, BOTTLE, ML, GM)
+    if (lowerUnit && lowerUnit !== upperName && lowerUnit !== baseUnit) {
+      const lowerRate =
+        multiplier > 1 ? Number((invRate / multiplier).toFixed(2)) : invRate;
+      const factor = multiplier > 1 ? 1 / multiplier : 1;
+      options.push({
+        value: lowerUnit,
+        label: `${lowerUnit} (Lower Unit)`,
+        short_label: lowerUnit,
+        unit_name: lowerUnit,
+        unit_type: "lower",
+        rate: lowerRate,
+        multiplier_to_invoice: factor,
+      });
+    }
+
+    // Fallback if no options
+    if (options.length === 0) {
+      options.push({
+        value: invoiceUnit,
+        label: `${invoiceUnit} (Invoice Unit)`,
+        short_label: invoiceUnit,
+        unit_name: invoiceUnit,
+        unit_type: "upper",
+        rate: invRate,
+        multiplier_to_invoice: 1,
+      });
+    }
+
+    return options;
+  };
+
   // Step 3: Open Stock Receiving Modal for a Specific Invoice
   const handleOpenReceiveModal = (invoiceRecord, parentVehicle) => {
     setEditingInvoice(invoiceRecord);
@@ -399,13 +503,34 @@ export default function StockInTransit() {
     const formattedItems = (invoiceRecord.items || []).map((item) => {
       const invQty = Number(item.invoiced_qty || item.qty || 0);
       const rate = Number(item.rate || 0);
+      const claimReason = item.claim_reason || "None";
+      const unitOptions = getItemUnitOptions(item, productsList);
+
+      const defaultClaimUnit =
+        item.claim_unit || (unitOptions[0]?.value || item.unit || "TIN");
+      const matchedUnitOpt =
+        unitOptions.find((u) => u.value === defaultClaimUnit) || unitOptions[0];
+      const claimRate = Number(
+        item.claim_rate !== undefined &&
+          item.claim_rate !== null &&
+          Number(item.claim_rate) > 0
+          ? item.claim_rate
+          : matchedUnitOpt?.rate || rate,
+      );
       const claimQty = Number(item.claim_qty || 0);
       const claimAmount = Number(
         item.claim_amount !== undefined &&
           item.claim_amount !== "" &&
           Number(item.claim_amount) > 0
           ? item.claim_amount
-          : claimQty * rate,
+          : (claimQty * claimRate).toFixed(2),
+      );
+
+      const shortageInInvoiceUnits =
+        claimQty * (matchedUnitOpt?.multiplier_to_invoice || 1);
+      const netAvailable = Math.max(
+        0,
+        Number((invQty - shortageInInvoiceUnits).toFixed(2)),
       );
 
       let directQty =
@@ -414,9 +539,9 @@ export default function StockInTransit() {
         item.direct_qty !== ""
           ? Number(item.direct_qty)
           : initialReceivedAt === "direct"
-            ? Math.max(0, invQty - claimQty)
+            ? netAvailable
             : initialReceivedAt === "both"
-              ? Number((invQty / 2).toFixed(2))
+              ? Number((netAvailable / 2).toFixed(2))
               : 0;
 
       let depoQty =
@@ -425,9 +550,9 @@ export default function StockInTransit() {
         item.depo_qty !== ""
           ? Number(item.depo_qty)
           : initialReceivedAt === "depo"
-            ? Math.max(0, invQty - claimQty)
+            ? netAvailable
             : initialReceivedAt === "both"
-              ? Math.max(0, Number((invQty - directQty - claimQty).toFixed(2)))
+              ? Math.max(0, Number((netAvailable - directQty).toFixed(2)))
               : 0;
 
       return {
@@ -440,10 +565,13 @@ export default function StockInTransit() {
         rate: rate,
         direct_qty: directQty,
         depo_qty: depoQty,
-        claim_reason: item.claim_reason || "None",
+        claim_reason: claimReason,
+        claim_unit: defaultClaimUnit,
+        claim_rate: claimRate,
         claim_qty: claimQty,
         claim_amount: Number(claimAmount.toFixed(2)),
         narration: item.narration || "",
+        unit_options: unitOptions,
       };
     });
 
@@ -486,8 +614,17 @@ export default function StockInTransit() {
 
     const updated = items.map((i) => {
       const invQty = Number(i.invoiced_qty || 0);
+      const unitOptions =
+        i.unit_options || getItemUnitOptions(i, productsList);
+      const matchedUnitOpt =
+        unitOptions.find((u) => u.value === i.claim_unit) || unitOptions[0];
       const claimQty = Number(i.claim_qty || 0);
-      const netQty = Math.max(0, invQty - claimQty);
+      const shortageInInvoiceUnits =
+        claimQty * (matchedUnitOpt?.multiplier_to_invoice || 1);
+      const netQty = Math.max(
+        0,
+        Number((invQty - shortageInInvoiceUnits).toFixed(2)),
+      );
 
       if (value === "direct") {
         return { ...i, direct_qty: netQty, depo_qty: 0 };
@@ -520,13 +657,129 @@ export default function StockInTransit() {
 
     const currentItem = { ...items[index], [field]: value };
     const invQty = Number(currentItem.invoiced_qty || 0);
+    const unitOptions =
+      currentItem.unit_options ||
+      getItemUnitOptions(currentItem, productsList);
 
-    if (field === "claim_qty" || field === "rate") {
+    if (field === "claim_reason") {
+      if (value === "None") {
+        currentItem.claim_qty = 0;
+        currentItem.claim_amount = 0;
+        currentItem.claim_rate = 0;
+        const netAvailable = invQty;
+        if (toReceiveAtValue === "direct") {
+          currentItem.direct_qty = netAvailable;
+          currentItem.depo_qty = 0;
+        } else if (toReceiveAtValue === "depo") {
+          currentItem.direct_qty = 0;
+          currentItem.depo_qty = netAvailable;
+        } else if (toReceiveAtValue === "both") {
+          const half = Number((netAvailable / 2).toFixed(2));
+          currentItem.direct_qty = half;
+          currentItem.depo_qty = Math.max(
+            0,
+            Number((netAvailable - half).toFixed(2)),
+          );
+        }
+      } else {
+        // If reason is shortage/leakage/damage, ensure a valid claim_unit & claim_rate are set
+        if (!currentItem.claim_unit || currentItem.claim_unit === "None") {
+          const defaultOpt = unitOptions[0];
+          currentItem.claim_unit = defaultOpt?.value || currentItem.unit;
+          currentItem.claim_rate =
+            defaultOpt?.rate || Number(currentItem.rate || 0);
+        } else {
+          const matchedOpt =
+            unitOptions.find((u) => u.value === currentItem.claim_unit) ||
+            unitOptions[0];
+          currentItem.claim_rate =
+            matchedOpt?.rate || Number(currentItem.rate || 0);
+        }
+        const qty = Number(currentItem.claim_qty || 0);
+        const rate = Number(currentItem.claim_rate || 0);
+        currentItem.claim_amount = Number((qty * rate).toFixed(2));
+        const matchedOpt =
+          unitOptions.find((u) => u.value === currentItem.claim_unit) ||
+          unitOptions[0];
+        const shortageInInvoiceUnits =
+          qty * (matchedOpt?.multiplier_to_invoice || 1);
+        const netAvailable = Math.max(
+          0,
+          Number((invQty - shortageInInvoiceUnits).toFixed(2)),
+        );
+        if (toReceiveAtValue === "direct") {
+          currentItem.direct_qty = netAvailable;
+          currentItem.depo_qty = 0;
+        } else if (toReceiveAtValue === "depo") {
+          currentItem.direct_qty = 0;
+          currentItem.depo_qty = netAvailable;
+        } else if (toReceiveAtValue === "both") {
+          const half = Number((netAvailable / 2).toFixed(2));
+          currentItem.direct_qty = half;
+          currentItem.depo_qty = Math.max(
+            0,
+            Number((netAvailable - half).toFixed(2)),
+          );
+        }
+      }
+    }
+
+    if (field === "claim_unit") {
+      const matchedOpt =
+        unitOptions.find((u) => u.value === value) || unitOptions[0];
+      if (matchedOpt) {
+        currentItem.claim_rate = matchedOpt.rate;
+        const qty = Number(currentItem.claim_qty || 0);
+        currentItem.claim_amount = Number((qty * matchedOpt.rate).toFixed(2));
+
+        const shortageInInvoiceUnits =
+          qty * (matchedOpt?.multiplier_to_invoice || 1);
+        const netAvailable = Math.max(
+          0,
+          Number((invQty - shortageInInvoiceUnits).toFixed(2)),
+        );
+        if (toReceiveAtValue === "direct") {
+          currentItem.direct_qty = netAvailable;
+          currentItem.depo_qty = 0;
+        } else if (toReceiveAtValue === "depo") {
+          currentItem.direct_qty = 0;
+          currentItem.depo_qty = netAvailable;
+        } else if (toReceiveAtValue === "both") {
+          const curDirect = Number(currentItem.direct_qty || 0);
+          currentItem.depo_qty = Math.max(
+            0,
+            Number((netAvailable - curDirect).toFixed(2)),
+          );
+        }
+      }
+    }
+
+    if (field === "claim_qty" || field === "claim_rate") {
+      const matchedOpt =
+        unitOptions.find((u) => u.value === currentItem.claim_unit) ||
+        unitOptions[0];
       const qty = Number(currentItem.claim_qty || 0);
-      const rate = Number(currentItem.rate || 0);
+      const rate = Number(
+        currentItem.claim_rate !== undefined
+          ? currentItem.claim_rate
+          : matchedOpt?.rate || currentItem.rate || 0,
+      );
       currentItem.claim_amount = Number((qty * rate).toFixed(2));
 
-      const netAvailable = Math.max(0, invQty - qty);
+      if (
+        field === "claim_qty" &&
+        qty > 0 &&
+        (!currentItem.claim_reason || currentItem.claim_reason === "None")
+      ) {
+        currentItem.claim_reason = "Shortage";
+      }
+
+      const shortageInInvoiceUnits =
+        qty * (matchedOpt?.multiplier_to_invoice || 1);
+      const netAvailable = Math.max(
+        0,
+        Number((invQty - shortageInInvoiceUnits).toFixed(2)),
+      );
       if (toReceiveAtValue === "direct") {
         currentItem.direct_qty = netAvailable;
         currentItem.depo_qty = 0;
@@ -543,31 +796,41 @@ export default function StockInTransit() {
     }
 
     if (field === "direct_qty" && toReceiveAtValue === "both") {
-      const dir = Math.min(invQty, Math.max(0, Number(value || 0)));
-      const claim = Number(currentItem.claim_qty || 0);
+      const matchedOpt =
+        unitOptions.find((u) => u.value === currentItem.claim_unit) ||
+        unitOptions[0];
+      const shortageInInvoiceUnits =
+        Number(currentItem.claim_qty || 0) *
+        (matchedOpt?.multiplier_to_invoice || 1);
+      const netAvailable = Math.max(
+        0,
+        Number((invQty - shortageInInvoiceUnits).toFixed(2)),
+      );
+      const dir = Math.min(netAvailable, Math.max(0, Number(value || 0)));
       currentItem.direct_qty = dir;
       currentItem.depo_qty = Math.max(
         0,
-        Number((invQty - dir - claim).toFixed(2)),
+        Number((netAvailable - dir).toFixed(2)),
       );
     }
 
     if (field === "depo_qty" && toReceiveAtValue === "both") {
-      const dep = Math.min(invQty, Math.max(0, Number(value || 0)));
-      const claim = Number(currentItem.claim_qty || 0);
+      const matchedOpt =
+        unitOptions.find((u) => u.value === currentItem.claim_unit) ||
+        unitOptions[0];
+      const shortageInInvoiceUnits =
+        Number(currentItem.claim_qty || 0) *
+        (matchedOpt?.multiplier_to_invoice || 1);
+      const netAvailable = Math.max(
+        0,
+        Number((invQty - shortageInInvoiceUnits).toFixed(2)),
+      );
+      const dep = Math.min(netAvailable, Math.max(0, Number(value || 0)));
       currentItem.depo_qty = dep;
       currentItem.direct_qty = Math.max(
         0,
-        Number((invQty - dep - claim).toFixed(2)),
+        Number((netAvailable - dep).toFixed(2)),
       );
-    }
-
-    if (
-      field === "claim_qty" &&
-      Number(value) > 0 &&
-      currentItem.claim_reason === "None"
-    ) {
-      currentItem.claim_reason = "Shortage";
     }
 
     const updated = [...items];
@@ -578,12 +841,31 @@ export default function StockInTransit() {
   // Apply batch claim reason to all items
   const handleApplyBatchClaimReason = (reason) => {
     const items = form.getFieldValue("items") || [];
-    const updated = items.map((i) => ({
-      ...i,
-      claim_reason: reason,
-      claim_qty: reason === "None" ? 0 : i.claim_qty,
-      claim_amount: reason === "None" ? 0 : i.claim_amount,
-    }));
+    const updated = items.map((i) => {
+      const unitOptions =
+        i.unit_options || getItemUnitOptions(i, productsList);
+      if (reason === "None") {
+        return {
+          ...i,
+          claim_reason: "None",
+          claim_qty: 0,
+          claim_rate: 0,
+          claim_amount: 0,
+          direct_qty:
+            toReceiveAtValue === "direct" ? Number(i.invoiced_qty || 0) : 0,
+          depo_qty:
+            toReceiveAtValue === "depo" ? Number(i.invoiced_qty || 0) : 0,
+        };
+      }
+      const defaultOpt = unitOptions[0];
+      return {
+        ...i,
+        claim_reason: reason,
+        claim_unit: i.claim_unit || defaultOpt?.value || i.unit,
+        claim_rate:
+          i.claim_rate || defaultOpt?.rate || Number(i.rate || 0),
+      };
+    });
     form.setFieldsValue({ items: updated });
   };
 
@@ -611,6 +893,8 @@ export default function StockInTransit() {
           direct_qty: String(Number(item.direct_qty || 0).toFixed(2)),
           depo_qty: String(Number(item.depo_qty || 0).toFixed(2)),
           claim_reason: item.claim_reason || "None",
+          claim_unit: item.claim_unit || item.unit,
+          claim_rate: String(Number(item.claim_rate || item.rate || 0).toFixed(2)),
           claim_qty: String(Number(item.claim_qty || 0).toFixed(2)),
           claim_amount: String(Number(item.claim_amount || 0).toFixed(2)),
           narration: item.narration || "",
@@ -1329,7 +1613,8 @@ export default function StockInTransit() {
             Mark Invoice as Received
           </Button>,
         ]}
-        width={1350}
+        width="96vw"
+        style={{ maxWidth: 1600 }}
         destroyOnClose
       >
         <Form form={form} layout="vertical">
@@ -1615,10 +1900,10 @@ export default function StockInTransit() {
               gutter={8}
               className="pb-2 mb-2 text-amber-900 font-bold text-xs border-b border-amber-200"
             >
-              <Col span={toReceiveAtValue === "both" ? 5 : 7}>Item Name</Col>
-              <Col span={toReceiveAtValue === "both" ? 2 : 3}>Invoiced Qty</Col>
-              <Col span={1}>Unit</Col>
-              <Col span={2}>Rate (₹)</Col>
+              <Col span={toReceiveAtValue === "both" ? 3 : 4}>Item Name</Col>
+              <Col span={2}>Invoiced Qty</Col>
+              <Col span={1}>Inv Unit</Col>
+              <Col span={2}>Inv Rate (₹)</Col>
               {toReceiveAtValue === "both" && (
                 <>
                   <Col span={2} className="text-amber-900">
@@ -1629,14 +1914,12 @@ export default function StockInTransit() {
                   </Col>
                 </>
               )}
-              <Col span={toReceiveAtValue === "both" ? 3 : 4}>Claim Reason</Col>
-              <Col span={2}>Claim Qty</Col>
-              <Col span={toReceiveAtValue === "both" ? 2 : 3}>
-                Claim Amt (₹)
-              </Col>
-              <Col span={toReceiveAtValue === "both" ? 3 : 2}>
-                Item Narration
-              </Col>
+              <Col span={2}>Claim Reason</Col>
+              <Col span={3}>Shortage Unit</Col>
+              <Col span={2}>Shortage Rate (₹)</Col>
+              <Col span={toReceiveAtValue === "both" ? 1 : 2}>Shortage Qty</Col>
+              <Col span={2}>Claim Amt (₹)</Col>
+              <Col span={toReceiveAtValue === "both" ? 2 : 4}>Item Narration</Col>
             </Row>
 
             <Form.List name="items">
@@ -1645,6 +1928,12 @@ export default function StockInTransit() {
                   const itemsValues = form.getFieldValue("items") || [];
                   const currentItem = itemsValues[field.name] || {};
                   const maxQty = Number(currentItem.invoiced_qty || 0);
+                  const isClaimDisabled =
+                    !currentItem.claim_reason ||
+                    currentItem.claim_reason === "None";
+                  const unitOptions =
+                    currentItem.unit_options ||
+                    getItemUnitOptions(currentItem, productsList);
 
                   return (
                     <Row
@@ -1653,13 +1942,27 @@ export default function StockInTransit() {
                       align="middle"
                       className="mb-2.5"
                     >
-                      <Col span={toReceiveAtValue === "both" ? 5 : 7}>
-                        <Form.Item
-                          name={[field.name, "item_name"]}
-                          style={{ marginBottom: 0 }}
+                      {/* 1. Item Name */}
+                      <Col span={toReceiveAtValue === "both" ? 3 : 4}>
+                        <Tooltip
+                          title={currentItem.item_name || "Item Name"}
+                          placement="topLeft"
                         >
-                          <Input disabled className="bg-gray-50! font-medium" />
-                        </Form.Item>
+                          <Form.Item
+                            name={[field.name, "item_name"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <Input
+                              disabled
+                              className="bg-gray-50! font-semibold text-gray-900"
+                              style={{
+                                color: "#111827",
+                                WebkitTextFillColor: "#111827",
+                                fontWeight: 600,
+                              }}
+                            />
+                          </Form.Item>
+                        </Tooltip>
                         <Form.Item
                           name={[field.name, "purchase_invoice_item_id"]}
                           hidden
@@ -1668,19 +1971,25 @@ export default function StockInTransit() {
                         </Form.Item>
                       </Col>
 
-                      <Col span={toReceiveAtValue === "both" ? 2 : 3}>
+                      {/* 2. Invoiced Qty */}
+                      <Col span={2}>
                         <Form.Item
                           name={[field.name, "invoiced_qty"]}
                           style={{ marginBottom: 0 }}
                         >
                           <InputNumber
                             disabled
-                            className="w-full bg-gray-50! font-semibold"
+                            className="w-full bg-gray-50! font-bold text-center"
+                            style={{
+                              color: "#111827",
+                              WebkitTextFillColor: "#111827",
+                            }}
                             precision={2}
                           />
                         </Form.Item>
                       </Col>
 
+                      {/* 3. Invoice Unit */}
                       <Col span={1}>
                         <Form.Item
                           name={[field.name, "unit"]}
@@ -1688,11 +1997,12 @@ export default function StockInTransit() {
                         >
                           <Input
                             disabled
-                            className="bg-gray-50! text-center p-0 text-xs"
+                            className="bg-gray-50! text-center p-0 text-xs font-semibold"
                           />
                         </Form.Item>
                       </Col>
 
+                      {/* 4. Invoice Rate */}
                       <Col span={2}>
                         <Form.Item
                           name={[field.name, "rate"]}
@@ -1700,7 +2010,7 @@ export default function StockInTransit() {
                         >
                           <InputNumber
                             disabled
-                            className="w-full bg-gray-50!"
+                            className="w-full bg-gray-50! font-medium text-center"
                             precision={2}
                           />
                         </Form.Item>
@@ -1718,7 +2028,7 @@ export default function StockInTransit() {
                                 min={0}
                                 max={maxQty}
                                 precision={2}
-                                className="w-full border-amber-400! font-semibold text-amber-900"
+                                className="w-full border-amber-400! font-semibold text-amber-900 text-center"
                                 placeholder="Direct"
                                 onChange={(val) =>
                                   handleItemFieldChange(
@@ -1740,7 +2050,7 @@ export default function StockInTransit() {
                                 min={0}
                                 max={maxQty}
                                 precision={2}
-                                className="w-full border-purple-400! font-semibold text-purple-900"
+                                className="w-full border-purple-400! font-semibold text-purple-900 text-center"
                                 placeholder="Depo"
                                 onChange={(val) =>
                                   handleItemFieldChange(
@@ -1755,13 +2065,14 @@ export default function StockInTransit() {
                         </>
                       )}
 
-                      <Col span={toReceiveAtValue === "both" ? 3 : 4}>
+                      {/* 5. Claim Reason */}
+                      <Col span={2}>
                         <Form.Item
                           name={[field.name, "claim_reason"]}
                           style={{ marginBottom: 0 }}
                         >
                           <Select
-                            className="w-full"
+                            className="w-full font-medium"
                             onChange={(val) =>
                               handleItemFieldChange(
                                 field.name,
@@ -1779,16 +2090,66 @@ export default function StockInTransit() {
                         </Form.Item>
                       </Col>
 
+                      {/* 6. Shortage Unit (Base, Lower, Upper units) */}
+                      <Col span={3}>
+                        <Form.Item
+                          name={[field.name, "claim_unit"]}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <Select
+                            disabled={isClaimDisabled}
+                            placeholder="Select Unit"
+                            className="w-full font-medium"
+                            onChange={(val) =>
+                              handleItemFieldChange(
+                                field.name,
+                                "claim_unit",
+                                val,
+                              )
+                            }
+                          >
+                            {unitOptions.map((opt) => (
+                              <Option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </Option>
+                            ))}
+                          </Select>
+                        </Form.Item>
+                      </Col>
+
+                      {/* 7. Shortage Rate (auto-calculated per unit) */}
                       <Col span={2}>
+                        <Form.Item
+                          name={[field.name, "claim_rate"]}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <InputNumber
+                            disabled={isClaimDisabled}
+                            className="w-full bg-amber-50/40 font-semibold text-center"
+                            placeholder="Rate"
+                            precision={2}
+                            onChange={(val) =>
+                              handleItemFieldChange(
+                                field.name,
+                                "claim_rate",
+                                val,
+                              )
+                            }
+                          />
+                        </Form.Item>
+                      </Col>
+
+                      {/* 8. Shortage Qty */}
+                      <Col span={toReceiveAtValue === "both" ? 1 : 2}>
                         <Form.Item
                           name={[field.name, "claim_qty"]}
                           style={{ marginBottom: 0 }}
                         >
                           <InputNumber
+                            disabled={isClaimDisabled}
                             min={0}
-                            max={maxQty > 0 ? maxQty : undefined}
                             precision={2}
-                            className="w-full border-amber-300!"
+                            className="w-full border-amber-300! font-semibold text-center"
                             placeholder="0"
                             onChange={(val) =>
                               handleItemFieldChange(
@@ -1801,20 +2162,22 @@ export default function StockInTransit() {
                         </Form.Item>
                       </Col>
 
-                      <Col span={toReceiveAtValue === "both" ? 2 : 3}>
+                      {/* 9. Claim Amount */}
+                      <Col span={2}>
                         <Form.Item
                           name={[field.name, "claim_amount"]}
                           style={{ marginBottom: 0 }}
                         >
                           <InputNumber
                             disabled
-                            className="w-full bg-amber-50! font-bold text-amber-900"
+                            className="w-full bg-amber-50! font-bold text-amber-900 text-center"
                             precision={2}
                           />
                         </Form.Item>
                       </Col>
 
-                      <Col span={toReceiveAtValue === "both" ? 3 : 2}>
+                      {/* 10. Item Narration */}
+                      <Col span={toReceiveAtValue === "both" ? 2 : 4}>
                         <Form.Item
                           name={[field.name, "narration"]}
                           style={{ marginBottom: 0 }}

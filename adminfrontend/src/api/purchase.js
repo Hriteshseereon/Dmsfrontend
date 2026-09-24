@@ -473,6 +473,14 @@ export const getVendors = async () => {
   return res.data;
 }
 
+export const getVendorById = async (vendorId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const res = await api.get(`/vendors/vendors/${vendorId}/`, {
+    params: { organisation: currentOrgId },
+  });
+  return res.data;
+};
+
 export const getVehiclePlacements = async () => {
   const { currentOrgId } = useSessionStore.getState();
   const res = await api.get("/transport/vehicle-placements/", {

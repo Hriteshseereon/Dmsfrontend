@@ -35,6 +35,8 @@ import customParseFormat from "dayjs/plugin/customParseFormat";
 import { exportToExcel } from "../../../../../utils/exportToExcel";
 import {
   getInvoiceSuppliers,
+  getVendors,
+  getVendorById,
   getAvailableVehicles,
   getSoudaRates,
   getFreightLocations,
@@ -221,8 +223,79 @@ export default function PurchaseInvoice() {
 
   const fetchSuppliers = async () => {
     try {
-      const res = await getInvoiceSuppliers();
-      setSuppliers(res?.data || res || []);
+      const [invSuppliersRes, vendorsRes] = await Promise.allSettled([
+        getInvoiceSuppliers(),
+        getVendors(),
+      ]);
+      const rawInv =
+        invSuppliersRes.status === "fulfilled" ? invSuppliersRes.value : [];
+      const rawVendors =
+        vendorsRes.status === "fulfilled" ? vendorsRes.value : [];
+
+      const invSuppliers = Array.isArray(rawInv)
+        ? rawInv
+        : rawInv?.data || rawInv?.results || [];
+      const vendors = Array.isArray(rawVendors)
+        ? rawVendors
+        : rawVendors?.data || rawVendors?.results || [];
+
+      // Merge vendor details (GSTIN, city, address) into suppliers list for complete auto-fill
+      const listToMap = invSuppliers.length > 0 ? invSuppliers : vendors;
+      const mergedSuppliers = listToMap.map((s) => {
+        const sId = String(s.id || s.vendor_id || "");
+        const sName = String(s.name || s.company_name || "")
+          .trim()
+          .toLowerCase();
+
+        const matchingVendor = vendors.find((v) => {
+          const vId = String(v.id || v.vendor_id || "");
+          const vName = String(v.name || v.company_name || "")
+            .trim()
+            .toLowerCase();
+          return (
+            (sId && vId && sId === vId) || (sName && vName && sName === vName)
+          );
+        });
+
+        const resolvedGst =
+          s.gst_number ||
+          s.gst_no ||
+          s.gstin ||
+          s.supplier_gst ||
+          s.business_details?.gstin ||
+          s.business_details?.gstin_no ||
+          matchingVendor?.business_details?.gstin ||
+          matchingVendor?.business_details?.gstin_no ||
+          matchingVendor?.gstin ||
+          matchingVendor?.gst_number ||
+          matchingVendor?.gst_no ||
+          matchingVendor?.gst ||
+          "";
+        const resolvedCity =
+          s.city ||
+          s.place ||
+          s.location ||
+          s.addresses?.[0]?.city ||
+          s.addresses?.[0]?.location ||
+          s.addresses?.[0]?.district ||
+          matchingVendor?.addresses?.[0]?.city ||
+          matchingVendor?.addresses?.[0]?.location ||
+          matchingVendor?.addresses?.[0]?.district ||
+          matchingVendor?.city ||
+          matchingVendor?.place ||
+          "";
+        return {
+          ...s,
+          id: s.id || matchingVendor?.id,
+          name: s.name || matchingVendor?.name || matchingVendor?.company_name,
+          gst_number: resolvedGst,
+          supplier_gst: resolvedGst,
+          city: resolvedCity,
+          place: resolvedCity,
+        };
+      });
+
+      setSuppliers(mergedSuppliers);
     } catch (error) {
       console.error("Error fetching suppliers:", error);
     }
@@ -242,6 +315,34 @@ export default function PurchaseInvoice() {
     }
   };
 
+  // Calculate Intra-state (Odisha '21') vs Inter-state (Outside Odisha) Taxes
+  const calculateItemTaxes = (taxableAmount, gstPercent, supplierGst) => {
+    const isOdisha = String(supplierGst || "").trim().startsWith("21");
+    const gstRate = Number(gstPercent || 0);
+    const taxable = Number(taxableAmount || 0);
+
+    if (isOdisha) {
+      const halfRate = gstRate / 2;
+      const cgst = Number(((taxable * halfRate) / 100).toFixed(2));
+      const sgst = Number(((taxable * halfRate) / 100).toFixed(2));
+      const totalTax = Number((cgst + sgst).toFixed(2));
+      return {
+        sgst_amount: sgst,
+        cgst_amount: cgst,
+        igst_amount: 0,
+        total_amount: Number((taxable + totalTax).toFixed(2)),
+      };
+    } else {
+      const igst = Number(((taxable * gstRate) / 100).toFixed(2));
+      return {
+        sgst_amount: 0,
+        cgst_amount: 0,
+        igst_amount: igst,
+        total_amount: Number((taxable + igst).toFixed(2)),
+      };
+    }
+  };
+
   const handleSupplierChange = async (supplierId) => {
     // Reset dependant fields with default dispatch_from: "Haldia"
     form.setFieldsValue({
@@ -250,12 +351,17 @@ export default function PurchaseInvoice() {
       lr_date: null,
       transport_name: "",
       place: "",
+      supplier_gst: "",
       gross_weight: undefined,
       dispatch_from: "Haldia",
       ship_to: "",
       items: [],
       total_qty: 0,
+      total_net_wt: 0,
       total_taxable_amount: 0,
+      total_sgst: 0,
+      total_cgst: 0,
+      total_igst: 0,
       total_igst_amount: 0,
       total_amount: 0,
       round_off_amount: 0,
@@ -264,20 +370,66 @@ export default function PurchaseInvoice() {
     setSoudaRatesMap({});
     setAvailableVehicles([]);
 
-    const selectedSupplier = suppliers.find((s) => s.id === supplierId);
+    const selectedSupplier = suppliers.find(
+      (s) => s.id === supplierId || String(s.id) === String(supplierId),
+    );
     if (!selectedSupplier) return;
 
-    // Set auto-filled supplier name and supplier's city as place
-    const supplierCity =
+    // Set auto-filled supplier name, supplier GST, and supplier's city as place
+    let supplierCity =
       selectedSupplier.city ||
       selectedSupplier.place ||
       selectedSupplier.location ||
       "";
+    let supplierGst =
+      selectedSupplier.supplier_gst ||
+      selectedSupplier.gst_number ||
+      selectedSupplier.gst_no ||
+      selectedSupplier.gstin ||
+      selectedSupplier.business_details?.gstin ||
+      selectedSupplier.business_details?.gstin_no ||
+      "";
 
     form.setFieldsValue({
       supplier_name: selectedSupplier.name,
+      supplier_gst: supplierGst,
       place: supplierCity,
     });
+
+    // If GST number or City is still missing, fetch vendor details directly by ID
+    if (!supplierGst || !supplierCity) {
+      try {
+        const vdRes = await getVendorById(supplierId);
+        const vd = vdRes?.data || vdRes;
+        if (vd) {
+          const freshGst =
+            vd.business_details?.gstin ||
+            vd.business_details?.gstin_no ||
+            vd.gstin ||
+            vd.gst_number ||
+            vd.gst_no ||
+            vd.gst ||
+            "";
+          const freshCity =
+            vd.addresses?.[0]?.city ||
+            vd.addresses?.[0]?.location ||
+            vd.addresses?.[0]?.district ||
+            vd.city ||
+            vd.place ||
+            "";
+
+          if (freshGst) supplierGst = freshGst;
+          if (freshCity) supplierCity = freshCity;
+
+          form.setFieldsValue({
+            supplier_gst: supplierGst,
+            place: supplierCity,
+          });
+        }
+      } catch (err) {
+        console.warn("Could not fetch full vendor details:", err);
+      }
+    }
 
     try {
       message.loading({
@@ -312,6 +464,24 @@ export default function PurchaseInvoice() {
         content: "Failed to load vehicles",
         key: "load_vehicles",
       });
+    }
+  };
+
+  const handleSupplierGstChange = (e) => {
+    const newGst = e.target.value;
+    form.setFieldsValue({ supplier_gst: newGst });
+    const currentItems = form.getFieldValue("items") || [];
+    if (currentItems.length > 0) {
+      const updated = currentItems.map((item) => {
+        const taxable = Number(item.taxable_amount || (Number(item.invoice_qty || item.qty || 0) * Number(item.rate || 0)));
+        const taxes = calculateItemTaxes(taxable, item.gst_percent, newGst);
+        return {
+          ...item,
+          ...taxes,
+        };
+      });
+      form.setFieldsValue({ items: updated });
+      recalculateGrandTotals(updated);
     }
   };
 
@@ -379,6 +549,8 @@ export default function PurchaseInvoice() {
         0,
     );
 
+    const supplierGst = form.getFieldValue("supplier_gst") || "";
+
     // Populate initial items list with available_qty, editable invoice_qty, unit_net_wt & unit_gross_wt
     const populatedItems = (matchedVehicle.items || []).map((item) => {
       const originalQty = Number(
@@ -389,29 +561,23 @@ export default function PurchaseInvoice() {
       const rawNetWt = Number(item.net_wt || 0);
 
       // Determine unit net weight in Ton:
+      // Uses backend net_weight_kg / net_wt_kg if available, otherwise proportional rawNetWt / originalQty
+      const unitNetKg = item.net_weight_kg ?? item.net_wt_kg ?? item.net_weight;
       const unitNetWt =
-        originalQty > 0
-          ? rawNetWt / originalQty
-          : remainingQty > 0
-            ? rawNetWt / remainingQty
-            : 0;
+        unitNetKg !== undefined && unitNetKg !== null && Number(unitNetKg) > 0
+          ? Number(unitNetKg) / 1000
+          : (originalQty > 0
+              ? rawNetWt / originalQty
+              : (remainingQty > 0 ? rawNetWt / remainingQty : 0));
 
       const actualNetWt = Number((unitNetWt * invoiceQty).toFixed(3));
 
-      // Determine unit gross weight in Ton (supports multiple items accurately):
+      // Determine unit gross weight in Ton (supports multiple items & backend gross_weight_kg accurately):
+      const unitGrossKg = item.gross_weight_kg ?? item.gross_wt_kg ?? item.gross_weight;
       let unitGrossWt = unitNetWt;
-      if (item.gross_weight !== undefined && Number(item.gross_weight) > 0) {
-        // If item explicitly has gross weight from backend
-        const itemGross =
-          Number(item.gross_weight) > 10
-            ? Number(item.gross_weight) / 1000
-            : Number(item.gross_weight);
-        unitGrossWt =
-          originalQty > 0
-            ? itemGross / originalQty
-            : remainingQty > 0
-              ? itemGross / remainingQty
-              : itemGross;
+      if (unitGrossKg !== undefined && unitGrossKg !== null && Number(unitGrossKg) > 0) {
+        const grossKgVal = Number(unitGrossKg);
+        unitGrossWt = grossKgVal > 5 ? grossKgVal / 1000 : grossKgVal;
       } else if (
         vehicleGrossLoaded > 0 &&
         totalOriginalNetWt > 0 &&
@@ -430,6 +596,8 @@ export default function PurchaseInvoice() {
         unitGrossWt = vehicleGrossLoaded / totalOriginalQty;
       }
 
+      const initialTaxes = calculateItemTaxes(0, item.gst_percent, supplierGst);
+
       return {
         sale_contract: item.sale_contract_id,
         sale_contract_item: item.sale_contract_item_id,
@@ -441,13 +609,17 @@ export default function PurchaseInvoice() {
         qty: remainingQty,
         invoice_qty: invoiceQty,
         unit: item.unit,
+        net_weight_kg: unitNetKg ? Number(unitNetKg) : Number((unitNetWt * 1000).toFixed(3)),
+        gross_weight_kg: unitGrossKg ? Number(unitGrossKg) : Number((unitGrossWt * 1000).toFixed(3)),
         unit_net_wt: unitNetWt,
         unit_gross_wt: unitGrossWt,
         net_wt: actualNetWt,
         gst_percent: item.gst_percent,
         rate: undefined,
         taxable_amount: 0,
-        igst_amount: 0,
+        sgst_amount: initialTaxes.sgst_amount,
+        cgst_amount: initialTaxes.cgst_amount,
+        igst_amount: initialTaxes.igst_amount,
         total_amount: 0,
       };
     });
@@ -531,8 +703,8 @@ export default function PurchaseInvoice() {
     const rate = Number(currentItem.rate || 0);
     const gstPercent = Number(currentItem.gst_percent || 0);
     const taxableAmount = Number((validQty * rate).toFixed(2));
-    const igstAmount = Number(((taxableAmount * gstPercent) / 100).toFixed(2));
-    const totalAmount = Number((taxableAmount + igstAmount).toFixed(2));
+    const supplierGst = form.getFieldValue("supplier_gst") || "";
+    const taxes = calculateItemTaxes(taxableAmount, gstPercent, supplierGst);
 
     const updated = [...items];
     updated[index] = {
@@ -541,8 +713,10 @@ export default function PurchaseInvoice() {
       unit_net_wt: unitNetWt,
       net_wt: newNetWt,
       taxable_amount: taxableAmount,
-      igst_amount: igstAmount,
-      total_amount: totalAmount,
+      sgst_amount: taxes.sgst_amount,
+      cgst_amount: taxes.cgst_amount,
+      igst_amount: taxes.igst_amount,
+      total_amount: taxes.total_amount,
     };
 
     form.setFieldsValue({ items: updated });
@@ -593,6 +767,7 @@ export default function PurchaseInvoice() {
         ? rateOption.balance_qty
         : (rateOption.souda_qty ?? 0),
     );
+    const supplierGst = form.getFieldValue("supplier_gst") || "";
 
     // If contract balance is less than required item invoice quantity: split item
     if (contractBalance > 0 && contractBalance < invQty) {
@@ -605,9 +780,8 @@ export default function PurchaseInvoice() {
       const allocatedNetWt = Number((unitNetWt * allocatedQty).toFixed(3));
       const remainingNetWt = Number((unitNetWt * remainingQty).toFixed(3));
 
-      const currentTaxable = allocatedQty * rateVal;
-      const currentIgst = (currentTaxable * gstPercent) / 100;
-      const currentTotal = currentTaxable + currentIgst;
+      const currentTaxable = Number((allocatedQty * rateVal).toFixed(2));
+      const currentTaxes = calculateItemTaxes(currentTaxable, gstPercent, supplierGst);
 
       const updatedCurrentItem = {
         ...currentItem,
@@ -616,9 +790,11 @@ export default function PurchaseInvoice() {
         rate: rateVal,
         purchase_contract: rateOption.purchase_contract_id,
         purchase_contract_item: rateOption.purchase_contract_item_id,
-        taxable_amount: Number(currentTaxable.toFixed(2)),
-        igst_amount: Number(currentIgst.toFixed(2)),
-        total_amount: Number(currentTotal.toFixed(2)),
+        taxable_amount: currentTaxable,
+        sgst_amount: currentTaxes.sgst_amount,
+        cgst_amount: currentTaxes.cgst_amount,
+        igst_amount: currentTaxes.igst_amount,
+        total_amount: currentTaxes.total_amount,
       };
 
       const newSplitItem = {
@@ -630,6 +806,8 @@ export default function PurchaseInvoice() {
         qty: currentItem.qty,
         invoice_qty: remainingQty,
         unit: currentItem.unit,
+        net_weight_kg: currentItem.net_weight_kg,
+        gross_weight_kg: currentItem.gross_weight_kg,
         unit_net_wt: unitNetWt,
         unit_gross_wt: currentItem.unit_gross_wt || unitNetWt,
         net_wt: remainingNetWt,
@@ -638,6 +816,8 @@ export default function PurchaseInvoice() {
         purchase_contract: undefined,
         purchase_contract_item: undefined,
         taxable_amount: 0,
+        sgst_amount: 0,
+        cgst_amount: 0,
         igst_amount: 0,
         total_amount: 0,
         is_split: true,
@@ -664,9 +844,8 @@ export default function PurchaseInvoice() {
     }
 
     // Standard case: contract balance >= invoice qty
-    const taxableAmount = invQty * rateVal;
-    const igstAmount = (taxableAmount * gstPercent) / 100;
-    const totalAmount = taxableAmount + igstAmount;
+    const taxableAmount = Number((invQty * rateVal).toFixed(2));
+    const taxes = calculateItemTaxes(taxableAmount, gstPercent, supplierGst);
 
     const updatedItems = [...items];
     updatedItems[index] = {
@@ -674,9 +853,11 @@ export default function PurchaseInvoice() {
       rate: rateVal,
       purchase_contract: rateOption.purchase_contract_id,
       purchase_contract_item: rateOption.purchase_contract_item_id,
-      taxable_amount: Number(taxableAmount.toFixed(2)),
-      igst_amount: Number(igstAmount.toFixed(2)),
-      total_amount: Number(totalAmount.toFixed(2)),
+      taxable_amount: taxableAmount,
+      sgst_amount: taxes.sgst_amount,
+      cgst_amount: taxes.cgst_amount,
+      igst_amount: taxes.igst_amount,
+      total_amount: taxes.total_amount,
     };
 
     form.setFieldsValue({ items: updatedItems });
@@ -708,18 +889,24 @@ export default function PurchaseInvoice() {
         ),
       0,
     );
+    const totalNetWt = items.reduce(
+      (sum, item) => sum + Number(item.net_wt || 0),
+      0,
+    );
     const totalTaxable = items.reduce(
       (sum, item) => sum + Number(item.taxable_amount || 0),
       0,
     );
+    const totalSGST = items.reduce(
+      (sum, item) => sum + Number(item.sgst_amount || 0),
+      0,
+    );
+    const totalCGST = items.reduce(
+      (sum, item) => sum + Number(item.cgst_amount || 0),
+      0,
+    );
     const totalIGST = items.reduce(
-      (sum, item) =>
-        sum +
-        Number(
-          item.igst_amount !== undefined && Number(item.igst_amount) > 0
-            ? item.igst_amount
-            : Number(item.sgst_amount || 0) + Number(item.cgst_amount || 0),
-        ),
+      (sum, item) => sum + Number(item.igst_amount || 0),
       0,
     );
     const totalAmount = items.reduce(
@@ -738,16 +925,36 @@ export default function PurchaseInvoice() {
       return sum + unitGross * invQty;
     }, 0);
 
-    const roundOff = Number(form.getFieldValue("round_off_amount") || 0);
-    const grandTotal = totalAmount + roundOff;
+    // Auto round-off calculation:
+    // If decimal < .50, round down (round_off_amount is negative)
+    // If decimal >= .50, round up (round_off_amount is positive)
+    const roundedTotal = Math.round(totalAmount);
+    const autoRoundOff = Number((roundedTotal - totalAmount).toFixed(2));
+    const finalGrandTotal = Number(roundedTotal.toFixed(2));
 
     form.setFieldsValue({
       gross_weight: Number(totalGrossWt.toFixed(3)),
+      total_gross_weight: Number(totalGrossWt.toFixed(3)),
       total_qty: Number(totalQty.toFixed(3)),
+      total_net_wt: Number(totalNetWt.toFixed(3)),
+      total_net_weight: Number(totalNetWt.toFixed(3)),
       total_taxable_amount: Number(totalTaxable.toFixed(2)),
+      total_sgst: Number(totalSGST.toFixed(2)),
+      total_cgst: Number(totalCGST.toFixed(2)),
+      total_igst: Number(totalIGST.toFixed(2)),
       total_igst_amount: Number(totalIGST.toFixed(2)),
       total_amount: Number(totalAmount.toFixed(2)),
-      grand_total: Number(grandTotal.toFixed(2)),
+      round_off_amount: autoRoundOff,
+      grand_total: finalGrandTotal,
+    });
+  };
+
+  const handleRoundOffChange = (val) => {
+    const roundOff = Number(val || 0);
+    const totalAmount = Number(form.getFieldValue("total_amount") || 0);
+    form.setFieldsValue({
+      round_off_amount: roundOff,
+      grand_total: Number((totalAmount + roundOff).toFixed(2)),
     });
   };
 
@@ -758,6 +965,14 @@ export default function PurchaseInvoice() {
     form.setFieldsValue({
       dispatch_from: "Haldia",
       round_off_amount: 0,
+      total_net_wt: 0,
+      total_sgst: 0,
+      total_cgst: 0,
+      total_igst: 0,
+      total_qty: 0,
+      total_taxable_amount: 0,
+      total_amount: 0,
+      grand_total: 0,
     });
     setFileList([]);
     setSoudaRatesMap({});
@@ -773,6 +988,7 @@ export default function PurchaseInvoice() {
     );
     form.resetFields();
 
+    const supplierGst = record.supplier_gst || "";
     const formattedItems = (record.items || []).map((item) => {
       const qty = Number(item.qty || 0);
       const invoiceQty = Number(item.invoice_qty || qty || 0);
@@ -781,22 +997,43 @@ export default function PurchaseInvoice() {
       const taxableAmount = Number(
         item.taxable_amount || invoiceQty * rate || 0,
       );
+
+      const defaultTaxes = calculateItemTaxes(taxableAmount, gstPercent, supplierGst);
+      const sgstAmount = Number(
+        item.sgst_amount !== undefined && item.sgst_amount !== null
+          ? item.sgst_amount
+          : defaultTaxes.sgst_amount,
+      );
+      const cgstAmount = Number(
+        item.cgst_amount !== undefined && item.cgst_amount !== null
+          ? item.cgst_amount
+          : defaultTaxes.cgst_amount,
+      );
       const igstAmount = Number(
-        item.igst_amount ||
-          item.total_gst_amount ||
-          (taxableAmount * gstPercent) / 100 ||
-          0,
+        item.igst_amount !== undefined && item.igst_amount !== null
+          ? item.igst_amount
+          : (item.total_gst_amount !== undefined && !sgstAmount && !cgstAmount
+              ? item.total_gst_amount
+              : defaultTaxes.igst_amount),
       );
+      const totalTax = igstAmount > 0 ? igstAmount : sgstAmount + cgstAmount;
       const totalAmount = Number(
-        item.total_amount || taxableAmount + igstAmount || 0,
+        item.total_amount !== undefined && item.total_amount !== null
+          ? item.total_amount
+          : taxableAmount + totalTax,
       );
+
       const netWt = Number(item.net_wt || 0);
-      const unitNetWt = invoiceQty > 0 ? netWt / invoiceQty : 0;
+      const unitNetKg = item.net_weight_kg ?? item.net_wt_kg;
+      const unitNetWt = unitNetKg ? Number(unitNetKg) / 1000 : (invoiceQty > 0 ? netWt / invoiceQty : 0);
+      const unitGrossKg = item.gross_weight_kg ?? item.gross_wt_kg;
       const unitGrossWt =
-        item.unit_gross_wt ||
-        (record.total_gross_weight && record.total_qty
-          ? Number(record.total_gross_weight) / Number(record.total_qty)
-          : unitNetWt);
+        unitGrossKg
+          ? (Number(unitGrossKg) > 5 ? Number(unitGrossKg) / 1000 : Number(unitGrossKg))
+          : (item.unit_gross_wt ||
+            (record.total_gross_weight && record.total_qty
+              ? Number(record.total_gross_weight) / Number(record.total_qty)
+              : unitNetWt));
 
       return {
         sale_contract: item.sale_contract,
@@ -809,12 +1046,16 @@ export default function PurchaseInvoice() {
         qty: qty,
         invoice_qty: invoiceQty,
         unit: item.unit,
+        net_weight_kg: unitNetKg ? Number(unitNetKg) : Number((unitNetWt * 1000).toFixed(3)),
+        gross_weight_kg: unitGrossKg ? Number(unitGrossKg) : Number((unitGrossWt * 1000).toFixed(3)),
         unit_net_wt: unitNetWt,
         unit_gross_wt: unitGrossWt,
         net_wt: netWt,
         gst_percent: gstPercent,
         rate: rate,
         taxable_amount: Number(taxableAmount.toFixed(2)),
+        sgst_amount: Number(sgstAmount.toFixed(2)),
+        cgst_amount: Number(cgstAmount.toFixed(2)),
         igst_amount: Number(igstAmount.toFixed(2)),
         total_amount: Number(totalAmount.toFixed(2)),
       };
@@ -843,6 +1084,7 @@ export default function PurchaseInvoice() {
     form.setFieldsValue({
       vendor: record.vendor,
       supplier_name: record.supplier_name || record.vendor_name || "",
+      supplier_gst: record.supplier_gst || "",
       place: record.place || "",
       lr_no: record.lr_no || "",
       lr_date: parseApiDate(record.lr_date),
@@ -855,15 +1097,21 @@ export default function PurchaseInvoice() {
       payment_due_date: parseApiDate(record.payment_due_date),
       dispatch_from: record.dispatch_from || "Haldia",
       ship_to: record.ship_to || "",
-      gross_weight: Number(record.total_gross_weight || 0),
+      gross_weight: Number(record.total_gross_weight || record.gross_weight || 0),
+      total_gross_weight: Number(record.total_gross_weight || record.gross_weight || 0),
       round_off_amount: Number(record.round_off_amount || 0),
       items: formattedItems,
       total_qty: Number(Number(record.total_qty || 0).toFixed(3)),
+      total_net_wt: Number(Number(record.total_net_wt || record.total_net_weight || 0).toFixed(3)),
+      total_net_weight: Number(Number(record.total_net_wt || record.total_net_weight || 0).toFixed(3)),
       total_taxable_amount: Number(
         Number(record.total_taxable_amount || 0).toFixed(2),
       ),
+      total_sgst: Number(Number(record.total_sgst || record.sgst_amount || 0).toFixed(2)),
+      total_cgst: Number(Number(record.total_cgst || record.cgst_amount || 0).toFixed(2)),
+      total_igst: Number(Number(record.total_igst || record.igst_amount || record.total_gst_amount || 0).toFixed(2)),
       total_igst_amount: Number(
-        Number(record.igst_amount || record.total_gst_amount || 0).toFixed(2),
+        Number(record.total_igst || record.igst_amount || record.total_gst_amount || 0).toFixed(2),
       ),
       total_amount: Number(Number(record.total_amount || 0).toFixed(2)),
       grand_total: Number(Number(record.grand_total || 0).toFixed(2)),
@@ -933,9 +1181,19 @@ export default function PurchaseInvoice() {
 
       setSubmitting(true);
 
+      const totalNetWtVal = Number(form.getFieldValue("total_net_wt") || 0);
+      const totalCgstVal = Number(form.getFieldValue("total_cgst") || 0);
+      const totalSgstVal = Number(form.getFieldValue("total_sgst") || 0);
+      const totalIgstVal = Number(form.getFieldValue("total_igst") || 0);
+      const totalTaxableVal = Number(form.getFieldValue("total_taxable_amount") || 0);
+      const totalAmtVal = Number(form.getFieldValue("total_amount") || 0);
+      const grandTotalVal = Number(form.getFieldValue("grand_total") || 0);
+      const roundOffVal = Number(form.getFieldValue("round_off_amount") || 0);
+
       const formattedPayload = {
         vendor: values.vendor,
         supplier_name: values.supplier_name,
+        supplier_gst: values.supplier_gst || null,
         place: values.place,
         lr_no: values.lr_no,
         lr_date: values.lr_date
@@ -958,7 +1216,16 @@ export default function PurchaseInvoice() {
         ship_to: values.ship_to,
         gross_weight: values.gross_weight,
         total_gross_weight: values.gross_weight,
-        round_off_amount: String(values.round_off_amount || 0),
+        total_net_wt: totalNetWtVal,
+        total_net_weight: totalNetWtVal,
+        total_qty: Number(form.getFieldValue("total_qty") || 0),
+        total_taxable_amount: totalTaxableVal,
+        total_cgst: totalCgstVal,
+        total_sgst: totalSgstVal,
+        total_igst: totalIgstVal,
+        total_amount: totalAmtVal,
+        round_off_amount: String(roundOffVal),
+        grand_total: grandTotalVal,
         items: (values.items || []).map((item) => ({
           sale_contract: item.sale_contract,
           sale_contract_item: item.sale_contract_item,
@@ -970,7 +1237,14 @@ export default function PurchaseInvoice() {
           invoice_qty: Number(item.invoice_qty || item.qty || 0),
           unit: item.unit,
           net_wt: Number(item.net_wt || 0),
+          net_weight_kg: Number(item.net_weight_kg || 0),
+          gross_weight_kg: Number(item.gross_weight_kg || 0),
           gst_percent: Number(item.gst_percent || 0),
+          sgst_amount: Number(item.sgst_amount || 0),
+          cgst_amount: Number(item.cgst_amount || 0),
+          igst_amount: Number(item.igst_amount || 0),
+          taxable_amount: Number(item.taxable_amount || 0),
+          total_amount: Number(item.total_amount || 0),
           rate: Number(item.rate || 0),
         })),
       };
@@ -1512,8 +1786,8 @@ export default function PurchaseInvoice() {
             {editingId ? "Update Entry" : "Save Entry"}
           </Button>,
         ]}
-        width="96vw"
-        style={{ maxWidth: 1560, top: 16 }}
+        width="98vw"
+        style={{ maxWidth: 1720, top: 12 }}
         destroyOnClose
       >
         <Form
@@ -1567,6 +1841,23 @@ export default function PurchaseInvoice() {
                 </Form.Item>
               </Col>
 
+              <Col span={4}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold">
+                      Supplier GST
+                    </span>
+                  }
+                  name="supplier_gst"
+                >
+                  <Input
+                    placeholder="e.g. 21AAECP1234F1Z5"
+                    className="font-medium"
+                    onChange={handleSupplierGstChange}
+                  />
+                </Form.Item>
+              </Col>
+
               <Col span={3}>
                 <Form.Item
                   label={
@@ -1574,7 +1865,7 @@ export default function PurchaseInvoice() {
                   }
                   name="place"
                 >
-                  <Input disabled className="bg-gray-50!" />
+                  <Input disabled className="bg-gray-50!" placeholder="Supplier City" />
                 </Form.Item>
               </Col>
 
@@ -1589,7 +1880,7 @@ export default function PurchaseInvoice() {
                 </Form.Item>
               </Col>
 
-              <Col span={3}>
+              <Col span={4}>
                 <Form.Item
                   label={
                     <span className="text-amber-700 font-semibold">
@@ -1615,7 +1906,7 @@ export default function PurchaseInvoice() {
                 </Form.Item>
               </Col>
 
-              <Col span={5}>
+              <Col span={4}>
                 <Form.Item
                   label={
                     <span className="text-amber-700 font-semibold">
@@ -1648,7 +1939,7 @@ export default function PurchaseInvoice() {
                 </Form.Item>
               </Col>
 
-              <Col span={5}>
+              <Col span={4}>
                 <Form.Item
                   label={
                     <span className="text-amber-700 font-semibold">
@@ -1692,7 +1983,7 @@ export default function PurchaseInvoice() {
                 </Form.Item>
               </Col>
 
-              <Col span={5}>
+              <Col span={4}>
                 <Form.Item
                   label={
                     <span className="text-amber-700 font-semibold">
@@ -1717,7 +2008,7 @@ export default function PurchaseInvoice() {
                 </Form.Item>
               </Col>
 
-              <Col span={5}>
+              <Col span={4}>
                 <Form.Item
                   label={
                     <span className="text-amber-700 font-semibold">
@@ -1752,7 +2043,7 @@ export default function PurchaseInvoice() {
                 </Form.Item>
               </Col>
 
-              <Col span={5}>
+              <Col span={4}>
                 <Form.Item
                   label={
                     <span className="text-amber-700 font-semibold">
@@ -1776,7 +2067,7 @@ export default function PurchaseInvoice() {
             </Row>
           </Card>
 
-          {/* Items Card *          {/* Items Card */}
+          {/* Items Card */}
           <Card
             size="small"
             style={{
@@ -1786,7 +2077,7 @@ export default function PurchaseInvoice() {
             }}
             styles={{ body: { padding: "12px 16px" } }}
           >
-            <div style={{ minWidth: 1320 }}>
+            <div style={{ minWidth: 1540 }}>
               <h6 className="text-amber-600 font-bold mb-3">
                 Items Information
               </h6>
@@ -1796,7 +2087,7 @@ export default function PurchaseInvoice() {
                 style={{
                   display: "grid",
                   gridTemplateColumns:
-                    "1.8fr 1fr 1.1fr 0.7fr 1fr 0.7fr 2.2fr 1.2fr 0.9fr 0.9fr 0.9fr 1.4fr 45px",
+                    "2.8fr 0.9fr 1.1fr 0.8fr 1.1fr 0.7fr 2.2fr 1.2fr 0.9fr 0.9fr 0.9fr 1.3fr 45px",
                   gap: "8px",
                   alignItems: "center",
                   paddingBottom: "8px",
@@ -1840,7 +2131,7 @@ export default function PurchaseInvoice() {
                         style={{
                           display: "grid",
                           gridTemplateColumns:
-                            "1.8fr 1fr 1.1fr 0.7fr 1fr 0.7fr 2.2fr 1.2fr 0.9fr 0.9fr 0.9fr 1.4fr 45px",
+                            "2.8fr 0.9fr 1.1fr 0.8fr 1.1fr 0.7fr 2.2fr 1.2fr 0.9fr 0.9fr 0.9fr 1.3fr 45px",
                           gap: "8px",
                           alignItems: "center",
                           marginBottom: "8px",
@@ -1848,12 +2139,22 @@ export default function PurchaseInvoice() {
                       >
                         {/* 1. Item Name */}
                         <div>
-                          <Form.Item
-                            name={[field.name, "item_name"]}
-                            style={{ marginBottom: 0 }}
-                          >
-                            <Input disabled className="bg-gray-50!" />
-                          </Form.Item>
+                          <Tooltip title={itemName || form.getFieldValue(["items", field.name, "item_name"]) || "Item Name"} placement="topLeft">
+                            <Form.Item
+                              name={[field.name, "item_name"]}
+                              style={{ marginBottom: 0 }}
+                            >
+                              <Input
+                                disabled
+                                className="bg-gray-50! font-semibold text-gray-900"
+                                style={{
+                                  color: "#111827",
+                                  WebkitTextFillColor: "#111827",
+                                  fontWeight: 600,
+                                }}
+                              />
+                            </Form.Item>
+                          </Tooltip>
                           <Form.Item name={[field.name, "sale_contract"]} hidden>
                             <Input />
                           </Form.Item>
@@ -2189,7 +2490,7 @@ export default function PurchaseInvoice() {
                 style={{
                   display: "grid",
                   gridTemplateColumns:
-                    "1.8fr 1fr 1.1fr 0.7fr 1fr 0.7fr 2.2fr 1.2fr 0.9fr 0.9fr 0.9fr 1.4fr 45px",
+                    "2.8fr 0.9fr 1.1fr 0.8fr 1.1fr 0.7fr 2.2fr 1.2fr 0.9fr 0.9fr 0.9fr 1.3fr 45px",
                   gap: "8px",
                   alignItems: "center",
                 }}
@@ -2216,8 +2517,17 @@ export default function PurchaseInvoice() {
                 {/* 4. Unit spacer */}
                 <div></div>
 
-                {/* 5. Net Wt spacer */}
-                <div></div>
+                {/* 5. Total Net Wt (Ton) */}
+                <div>
+                  <Form.Item name="total_net_wt" style={{ marginBottom: 0 }}>
+                    <InputNumber
+                      disabled
+                      precision={3}
+                      className="w-full bg-gray-100! font-semibold text-center"
+                      placeholder="0.000"
+                    />
+                  </Form.Item>
+                </div>
 
                 {/* 6. GST spacer */}
                 <div></div>
@@ -2239,19 +2549,38 @@ export default function PurchaseInvoice() {
                   </Form.Item>
                 </div>
 
-                {/* 9. SGST spacer */}
-                <div></div>
-
-                {/* 10. CGST spacer */}
-                <div></div>
-
-                {/* 11. Total IGST Amount */}
+                {/* 9. Total SGST */}
                 <div>
-                  <Form.Item name="total_igst_amount" style={{ marginBottom: 0 }}>
+                  <Form.Item name="total_sgst" style={{ marginBottom: 0 }}>
                     <InputNumber
                       disabled
-                      className="w-full bg-gray-100! font-semibold text-center"
+                      className="w-full bg-gray-100! font-semibold text-center text-xs"
                       precision={2}
+                      placeholder="0.00"
+                    />
+                  </Form.Item>
+                </div>
+
+                {/* 10. Total CGST */}
+                <div>
+                  <Form.Item name="total_cgst" style={{ marginBottom: 0 }}>
+                    <InputNumber
+                      disabled
+                      className="w-full bg-gray-100! font-semibold text-center text-xs"
+                      precision={2}
+                      placeholder="0.00"
+                    />
+                  </Form.Item>
+                </div>
+
+                {/* 11. Total IGST */}
+                <div>
+                  <Form.Item name="total_igst" style={{ marginBottom: 0 }}>
+                    <InputNumber
+                      disabled
+                      className="w-full bg-gray-100! font-semibold text-center text-xs"
+                      precision={2}
+                      placeholder="0.00"
                     />
                   </Form.Item>
                 </div>
@@ -2450,6 +2779,12 @@ export default function PurchaseInvoice() {
                 </div>
               </Col>
               <Col span={4}>
+                <Text type="secondary">Supplier GST: </Text>
+                <div className="font-semibold text-gray-800">
+                  {viewRecord.supplier_gst || "-"}
+                </div>
+              </Col>
+              <Col span={4}>
                 <Text type="secondary">Place: </Text>
                 <div className="font-semibold">{viewRecord.place || "-"}</div>
               </Col>
@@ -2540,9 +2875,24 @@ export default function PurchaseInvoice() {
                   render: (val) => `₹${Number(val || 0).toFixed(2)}`,
                 },
                 {
-                  title: "IGST Amount",
+                  title: "SGST",
+                  dataIndex: "sgst_amount",
+                  render: (val) => (Number(val) > 0 ? `₹${Number(val).toFixed(2)}` : "-"),
+                },
+                {
+                  title: "CGST",
+                  dataIndex: "cgst_amount",
+                  render: (val) => (Number(val) > 0 ? `₹${Number(val).toFixed(2)}` : "-"),
+                },
+                {
+                  title: "IGST",
                   dataIndex: "igst_amount",
-                  render: (val) => `₹${Number(val || 0).toFixed(2)}`,
+                  render: (val, r) =>
+                    Number(val) > 0
+                      ? `₹${Number(val).toFixed(2)}`
+                      : Number(r.total_gst_amount) > 0
+                        ? `₹${Number(r.total_gst_amount).toFixed(2)}`
+                        : "-",
                 },
                 {
                   title: "Total Amount",
@@ -2555,21 +2905,27 @@ export default function PurchaseInvoice() {
             <Divider style={{ margin: "16px 0" }} />
 
             <Row gutter={16}>
-              <Col span={6}>
+              <Col span={5}>
                 <Text type="secondary">Despatch From: </Text>
                 <div className="font-medium">
                   {viewRecord.dispatch_from || "-"}
                 </div>
               </Col>
-              <Col span={6}>
+              <Col span={5}>
                 <Text type="secondary">Ship To: </Text>
                 <div className="font-medium">{viewRecord.ship_to || "-"}</div>
               </Col>
-              <Col span={4}>
+              <Col span={3}>
                 <Text type="secondary">Total Qty: </Text>
                 <div className="font-bold">{viewRecord.total_qty}</div>
               </Col>
               <Col span={4}>
+                <Text type="secondary">Total Net Wt: </Text>
+                <div className="font-bold">
+                  {viewRecord.total_net_wt || viewRecord.total_net_weight || "-"} Ton
+                </div>
+              </Col>
+              <Col span={3}>
                 <Text type="secondary">Round Off: </Text>
                 <div className="font-bold">
                   ₹{Number(viewRecord.round_off_amount || 0).toFixed(2)}
