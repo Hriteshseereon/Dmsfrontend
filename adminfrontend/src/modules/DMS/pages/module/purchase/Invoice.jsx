@@ -130,9 +130,10 @@ export default function PurchaseInvoice() {
     return hasEwaybillNo && hasEwaybillDate && hasDoc;
   };
 
-  // Grouping and merging logic
+  // Grouping and merging logic:
+  // ONLY merge into a consolidated row if supplier_name, lr_no, AND vehicle_no are ALL IDENTICAL
   const processedTableData = useMemo(() => {
-    const supplierGroups = {};
+    const consolidatedGroups = {};
     const pendingList = [];
 
     (data || []).forEach((item) => {
@@ -144,29 +145,37 @@ export default function PurchaseInvoice() {
           isMergedRow: false,
         });
       } else {
-        // Candidate for supplier grouping
+        // Group ONLY when supplier_name, lr_no, AND vehicle_no are ALL same!
         const supplierKey = String(
-          item.vendor || item.supplier_name || "unknown",
-        ).trim();
-        if (!supplierGroups[supplierKey]) {
-          supplierGroups[supplierKey] = {
+          item.supplier_name || item.vendor_name || item.vendor || "",
+        ).trim().toLowerCase();
+        const lrKey = String(item.lr_no || "").trim().toLowerCase();
+        const vehicleKey = String(item.vehicle_no || "").trim().toLowerCase();
+        const compositeKey = `${supplierKey}___${lrKey}___${vehicleKey}`;
+
+        if (!consolidatedGroups[compositeKey]) {
+          consolidatedGroups[compositeKey] = {
             vendor: item.vendor,
             supplier_name: item.supplier_name || item.vendor_name || "",
             place: item.place || "",
+            lr_no: item.lr_no || "-",
+            lr_date: item.lr_date || null,
+            transport_name: item.transport_name || "-",
+            vehicle_no: item.vehicle_no || "-",
             items: [],
           };
         }
-        supplierGroups[supplierKey].items.push(item);
+        consolidatedGroups[compositeKey].items.push(item);
       }
     });
 
     const result = [];
 
-    // For suppliers with complete invoices:
-    Object.keys(supplierGroups).forEach((key) => {
-      const group = supplierGroups[key];
+    // For groups where Supplier Name, LR No, AND Vehicle No are all identical:
+    Object.keys(consolidatedGroups).forEach((key) => {
+      const group = consolidatedGroups[key];
       if (group.items.length >= 2) {
-        // Merge into single supplier row
+        // Merge into single consolidated row
         const totalQty = group.items.reduce(
           (sum, i) => sum + Number(i.total_qty || 0),
           0,
@@ -181,16 +190,16 @@ export default function PurchaseInvoice() {
         );
 
         result.push({
-          id: `merged_supplier_${key}`,
+          id: `merged_${key}`,
           isMergedRow: true,
           supplier_name: group.supplier_name,
           vendor: group.vendor,
           place: group.place,
-          lr_no: "-",
-          lr_date: null,
-          transport_name: "-",
-          vehicle_no: `${group.items.length} Vehicles`,
-          ewaybill_no: "All Uploaded",
+          lr_no: group.lr_no,
+          lr_date: group.lr_date,
+          transport_name: group.transport_name,
+          vehicle_no: group.vehicle_no,
+          ewaybill_no: group.items.every((i) => i.ewaybill_no) ? "All Uploaded" : "Uploaded",
           ewaybill_date: null,
           invoice_no: `${group.items.length} Invoices`,
           invoice_date: null,
@@ -1375,10 +1384,15 @@ export default function PurchaseInvoice() {
       title: <span className="text-amber-700 font-semibold">Vehicle No</span>,
       dataIndex: "vehicle_no",
       render: (text, record) =>
-        record.isMergedRow ? (
-          <span className="font-semibold text-amber-800">{text}</span>
+        text && text !== "-" ? (
+          <Tag
+            color="success"
+            className="font-bold text-xs px-1.5 py-0 m-0 leading-normal bg-emerald-50 text-emerald-900 border border-emerald-400"
+          >
+            {text}
+          </Tag>
         ) : (
-          <span className="font-semibold text-amber-900">{text}</span>
+          <span className="text-gray-400 font-medium">-</span>
         ),
     },
     {
@@ -1572,9 +1586,17 @@ export default function PurchaseInvoice() {
     {
       title: <span className="text-amber-700 font-semibold">Vehicle No</span>,
       dataIndex: "vehicle_no",
-      render: (text) => (
-        <span className="font-semibold text-amber-900">{text}</span>
-      ),
+      render: (text) =>
+        text && text !== "-" ? (
+          <Tag
+            color="success"
+            className="font-bold text-xs px-2.5 py-0.5 bg-emerald-50 text-emerald-900 border border-emerald-400 shadow-2xs"
+          >
+            {text}
+          </Tag>
+        ) : (
+          <span className="text-gray-400 font-medium">-</span>
+        ),
     },
     {
       title: <span className="text-amber-700 font-semibold">E-waybill No</span>,
@@ -1681,8 +1703,49 @@ export default function PurchaseInvoice() {
     },
   ];
 
+  const vehicleCountMap = useMemo(() => {
+    const map = {};
+    (processedTableData || []).forEach((row) => {
+      const v = String(row.vehicle_no || "").trim().toUpperCase();
+      if (v && v !== "-" && v !== "NULL" && v !== "UNDEFINED") {
+        map[v] = (map[v] || 0) + 1;
+      }
+    });
+    return map;
+  }, [processedTableData]);
+
   return (
     <div>
+      {/* SCOPED CSS FOR COMPACT ROWS & VEHICLE GREEN BORDER HIGHLIGHT */}
+      <style>{`
+        .ant-table-tbody > tr > td {
+          padding: 6px 10px !important;
+        }
+        .ant-table-thead > tr > th {
+          padding: 8px 10px !important;
+        }
+        .ant-table-row.vehicle-highlight-row > td {
+          background-color: #f0fdf4 !important;
+          border-top: 1.5px solid #22c55e !important;
+          border-bottom: 1.5px solid #22c55e !important;
+          padding-top: 5px !important;
+          padding-bottom: 5px !important;
+        }
+        .ant-table-row.vehicle-highlight-row > td:first-child {
+          border-left: 3.5px solid #16a34a !important;
+          border-top-left-radius: 4px !important;
+          border-bottom-left-radius: 4px !important;
+        }
+        .ant-table-row.vehicle-highlight-row > td:last-child {
+          border-right: 2px solid #16a34a !important;
+          border-top-right-radius: 4px !important;
+          border-bottom-right-radius: 4px !important;
+        }
+        .ant-table-row.vehicle-highlight-row:hover > td {
+          background-color: #dcfce7 !important;
+        }
+      `}</style>
+
       {/* FILTER HEADER CARD */}
       <Row justify="space-between" style={{ marginBottom: 16 }}>
         <Col>
@@ -1723,15 +1786,16 @@ export default function PurchaseInvoice() {
       </Row>
 
       {/* TABLE VIEW */}
-      <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
+      <div className="border border-amber-300 rounded-lg p-3 shadow-md bg-white">
         <h2 className="text-lg font-semibold text-amber-700 mb-0">
           Purchase Invoices
         </h2>
-        <p className="text-amber-600 mb-3">
+        <p className="text-amber-600 mb-2">
           Manage and verify your purchase invoice logs
         </p>
 
         <Table
+          size="small"
           columns={columns}
           dataSource={processedTableData}
           loading={loading}
@@ -1739,17 +1803,23 @@ export default function PurchaseInvoice() {
           pagination={{ pageSize: 10 }}
           className="border-amber-100"
           scroll={{ x: 1300 }}
-          onRow={(record) => ({
-            onDoubleClick: () => {
-              if (record.isMergedRow) {
-                setSelectedMergedSupplier(record);
-                setSupplierInvoicesModalOpen(true);
-              }
-            },
-            className: record.isMergedRow
-              ? "cursor-pointer hover:bg-amber-50/50"
-              : "",
-          })}
+          onRow={(record) => {
+            const vKey = String(record.vehicle_no || "").trim().toUpperCase();
+            const isSameVehicle =
+              record.isMergedRow || (vKey && (vehicleCountMap[vKey] || 0) > 1);
+
+            return {
+              onDoubleClick: () => {
+                if (record.isMergedRow) {
+                  setSelectedMergedSupplier(record);
+                  setSupplierInvoicesModalOpen(true);
+                }
+              },
+              className: isSameVehicle
+                ? "vehicle-highlight-row cursor-pointer font-medium"
+                : "hover:bg-amber-50/40 transition-colors",
+            };
+          }}
         />
       </div>
 
@@ -1852,7 +1922,12 @@ export default function PurchaseInvoice() {
                 >
                   <Input
                     placeholder="e.g. 21AAECP1234F1Z5"
-                    className="font-medium"
+                    className="font-bold text-gray-900 border-amber-300!"
+                    style={{
+                      color: "#111827",
+                      WebkitTextFillColor: "#111827",
+                      fontWeight: 700,
+                    }}
                     onChange={handleSupplierGstChange}
                   />
                 </Form.Item>
@@ -1865,7 +1940,16 @@ export default function PurchaseInvoice() {
                   }
                   name="place"
                 >
-                  <Input disabled className="bg-gray-50!" placeholder="Supplier City" />
+                  <Input
+                    disabled
+                    className="bg-gray-50! font-bold text-gray-900"
+                    style={{
+                      color: "#111827",
+                      WebkitTextFillColor: "#111827",
+                      fontWeight: 700,
+                    }}
+                    placeholder="Supplier City"
+                  />
                 </Form.Item>
               </Col>
 
@@ -1876,7 +1960,15 @@ export default function PurchaseInvoice() {
                   }
                   name="lr_no"
                 >
-                  <Input disabled className="bg-gray-50!" />
+                  <Input
+                    disabled
+                    className="bg-gray-50! font-bold text-gray-900"
+                    style={{
+                      color: "#111827",
+                      WebkitTextFillColor: "#111827",
+                      fontWeight: 700,
+                    }}
+                  />
                 </Form.Item>
               </Col>
 
@@ -1889,7 +1981,15 @@ export default function PurchaseInvoice() {
                   }
                   name="lr_date"
                 >
-                  <AppDatePicker disabled className="bg-gray-50! w-full" />
+                  <AppDatePicker
+                    disabled
+                    className="bg-gray-50! font-bold text-gray-900 w-full"
+                    style={{
+                      color: "#111827",
+                      WebkitTextFillColor: "#111827",
+                      fontWeight: 700,
+                    }}
+                  />
                 </Form.Item>
               </Col>
 
@@ -1902,7 +2002,15 @@ export default function PurchaseInvoice() {
                   }
                   name="transport_name"
                 >
-                  <Input disabled className="bg-gray-50!" />
+                  <Input
+                    disabled
+                    className="bg-gray-50! font-bold text-gray-900"
+                    style={{
+                      color: "#111827",
+                      WebkitTextFillColor: "#111827",
+                      fontWeight: 700,
+                    }}
+                  />
                 </Form.Item>
               </Col>
 
@@ -2077,8 +2185,8 @@ export default function PurchaseInvoice() {
             }}
             styles={{ body: { padding: "12px 16px" } }}
           >
-            <div style={{ minWidth: 1540 }}>
-              <h6 className="text-amber-600 font-bold mb-3">
+            <div style={{ minWidth: 1320 }}>
+              <h6 className="text-amber-600 font-bold mb-2">
                 Items Information
               </h6>
 
@@ -2087,11 +2195,11 @@ export default function PurchaseInvoice() {
                 style={{
                   display: "grid",
                   gridTemplateColumns:
-                    "2.8fr 0.9fr 1.1fr 0.8fr 1.1fr 0.7fr 2.2fr 1.2fr 0.9fr 0.9fr 0.9fr 1.3fr 45px",
-                  gap: "8px",
+                    "1.9fr 0.75fr 0.85fr 0.65fr 0.85fr 0.65fr 1.7fr 1.0fr 0.75fr 0.75fr 0.75fr 1.25fr 36px",
+                  gap: "6px",
                   alignItems: "center",
-                  paddingBottom: "8px",
-                  marginBottom: "8px",
+                  paddingBottom: "6px",
+                  marginBottom: "6px",
                   fontWeight: "bold",
                   fontSize: "12px",
                   color: "#92400E",
@@ -2109,7 +2217,7 @@ export default function PurchaseInvoice() {
                 <div className="text-center">SGST</div>
                 <div className="text-center">CGST</div>
                 <div className="text-center">IGST</div>
-                <div className="text-center">Total Amount</div>
+                <div className="text-center">Total Amount (₹)</div>
                 <div className="text-center">Action</div>
               </div>
 
@@ -2131,10 +2239,10 @@ export default function PurchaseInvoice() {
                         style={{
                           display: "grid",
                           gridTemplateColumns:
-                            "2.8fr 0.9fr 1.1fr 0.8fr 1.1fr 0.7fr 2.2fr 1.2fr 0.9fr 0.9fr 0.9fr 1.3fr 45px",
-                          gap: "8px",
+                            "1.9fr 0.75fr 0.85fr 0.65fr 0.85fr 0.65fr 1.7fr 1.0fr 0.75fr 0.75fr 0.75fr 1.25fr 36px",
+                          gap: "6px",
                           alignItems: "center",
-                          marginBottom: "8px",
+                          marginBottom: "6px",
                         }}
                       >
                         {/* 1. Item Name */}
@@ -2146,11 +2254,11 @@ export default function PurchaseInvoice() {
                             >
                               <Input
                                 disabled
-                                className="bg-gray-50! font-semibold text-gray-900"
+                                className="bg-gray-50! font-bold text-gray-900 text-xs"
                                 style={{
                                   color: "#111827",
                                   WebkitTextFillColor: "#111827",
-                                  fontWeight: 600,
+                                  fontWeight: 700,
                                 }}
                               />
                             </Form.Item>
@@ -2180,7 +2288,7 @@ export default function PurchaseInvoice() {
                           >
                             <Input
                               disabled
-                              className="w-full bg-gray-50! font-bold text-center"
+                              className="w-full bg-gray-50! font-bold text-center text-gray-900 text-xs"
                               style={{
                                 color: "#111827",
                                 fontWeight: 700,
@@ -2225,7 +2333,7 @@ export default function PurchaseInvoice() {
                                   999999,
                               )}
                               precision={2}
-                              className="w-full border-amber-400! font-semibold text-center"
+                              className="w-full border-amber-400! font-bold text-center text-gray-900 text-xs"
                               placeholder="Qty"
                               onChange={(val) =>
                                 handleInvoiceQtyChange(field.name, val)
@@ -2242,7 +2350,12 @@ export default function PurchaseInvoice() {
                           >
                             <Input
                               disabled
-                              className="bg-gray-50! text-center p-0"
+                              className="bg-gray-50! text-center p-0 font-bold text-gray-900 text-xs"
+                              style={{
+                                color: "#111827",
+                                WebkitTextFillColor: "#111827",
+                                fontWeight: 700,
+                              }}
                             />
                           </Form.Item>
                         </div>
@@ -2255,8 +2368,13 @@ export default function PurchaseInvoice() {
                           >
                             <InputNumber
                               disabled
-                              className="w-full bg-gray-50! text-center"
+                              className="w-full bg-gray-50! text-center font-bold text-gray-900 text-xs"
                               precision={3}
+                              style={{
+                                color: "#111827",
+                                WebkitTextFillColor: "#111827",
+                                fontWeight: 700,
+                              }}
                             />
                           </Form.Item>
                         </div>
@@ -2270,7 +2388,12 @@ export default function PurchaseInvoice() {
                             <InputNumber
                               disabled
                               controls={false}
-                              className="w-full bg-gray-50! text-center p-0"
+                              className="w-full bg-gray-50! text-center p-0 font-bold text-gray-900 text-xs"
+                              style={{
+                                color: "#111827",
+                                WebkitTextFillColor: "#111827",
+                                fontWeight: 700,
+                              }}
                             />
                           </Form.Item>
                         </div>
@@ -2287,11 +2410,11 @@ export default function PurchaseInvoice() {
                                 (rateSelectRefs.current[field.name] = el)
                               }
                               placeholder="Select Rate"
-                              className="w-full"
+                              className="w-full font-bold text-xs"
                               optionLabelProp="label"
                               popupMatchSelectWidth={false}
                               dropdownStyle={{
-                                minWidth: 700,
+                                minWidth: 650,
                                 borderRadius: 8,
                                 padding: 4,
                               }}
@@ -2392,8 +2515,13 @@ export default function PurchaseInvoice() {
                           >
                             <InputNumber
                               disabled
-                              className="w-full bg-gray-50! text-center"
+                              className="w-full bg-gray-50! text-center font-bold text-gray-900 text-xs"
                               precision={2}
+                              style={{
+                                color: "#111827",
+                                WebkitTextFillColor: "#111827",
+                                fontWeight: 700,
+                              }}
                             />
                           </Form.Item>
                         </div>
@@ -2406,7 +2534,7 @@ export default function PurchaseInvoice() {
                           >
                             <InputNumber
                               controls={false}
-                              className="w-full text-center px-1 text-xs border-amber-300!"
+                              className="w-full text-center px-1 text-xs border-amber-300! font-semibold"
                               precision={2}
                               placeholder="0.00"
                               onChange={(val) =>
@@ -2424,7 +2552,7 @@ export default function PurchaseInvoice() {
                           >
                             <InputNumber
                               controls={false}
-                              className="w-full text-center px-1 text-xs border-amber-300!"
+                              className="w-full text-center px-1 text-xs border-amber-300! font-semibold"
                               precision={2}
                               placeholder="0.00"
                               onChange={(val) =>
@@ -2442,7 +2570,7 @@ export default function PurchaseInvoice() {
                           >
                             <InputNumber
                               controls={false}
-                              className="w-full text-center px-1 text-xs border-amber-300!"
+                              className="w-full text-center px-1 text-xs border-amber-300! font-semibold"
                               precision={2}
                               placeholder="0.00"
                               onChange={(val) =>
@@ -2460,8 +2588,15 @@ export default function PurchaseInvoice() {
                           >
                             <InputNumber
                               disabled
-                              className="w-full bg-gray-50! font-semibold text-center"
+                              className="w-full bg-amber-50! font-bold text-center text-amber-950 border-amber-300!"
                               precision={2}
+                              style={{
+                                width: "100%",
+                                color: "#78350F",
+                                WebkitTextFillColor: "#78350F",
+                                fontWeight: 700,
+                                fontSize: "12px",
+                              }}
                             />
                           </Form.Item>
                         </div>
@@ -2472,6 +2607,7 @@ export default function PurchaseInvoice() {
                             <Button
                               type="text"
                               danger
+                              size="small"
                               icon={<DeleteOutlined />}
                               onClick={() => handleRemoveItem(field.name)}
                               disabled={form.getFieldValue("items")?.length <= 1}
@@ -2485,19 +2621,19 @@ export default function PurchaseInvoice() {
               </Form.List>
 
               {/* Total Row */}
-              <Divider style={{ margin: "12px 0" }} />
+              <Divider style={{ margin: "10px 0 6px 0" }} />
               <div
                 style={{
                   display: "grid",
                   gridTemplateColumns:
-                    "2.8fr 0.9fr 1.1fr 0.8fr 1.1fr 0.7fr 2.2fr 1.2fr 0.9fr 0.9fr 0.9fr 1.3fr 45px",
-                  gap: "8px",
+                    "1.9fr 0.75fr 0.85fr 0.65fr 0.85fr 0.65fr 1.7fr 1.0fr 0.75fr 0.75fr 0.75fr 1.25fr 36px",
+                  gap: "6px",
                   alignItems: "center",
                 }}
               >
                 {/* 1. Item Name / Total Label */}
                 <div>
-                  <span className="font-bold text-amber-800">Total:</span>
+                  <span className="font-bold text-amber-800 text-xs">Total:</span>
                 </div>
 
                 {/* 2. Avail Qty spacer */}
@@ -2509,7 +2645,12 @@ export default function PurchaseInvoice() {
                     <InputNumber
                       disabled
                       precision={2}
-                      className="w-full bg-gray-100! font-semibold text-center"
+                      className="w-full bg-gray-100! font-bold text-center text-gray-900 text-xs"
+                      style={{
+                        color: "#111827",
+                        WebkitTextFillColor: "#111827",
+                        fontWeight: 700,
+                      }}
                     />
                   </Form.Item>
                 </div>
@@ -2523,8 +2664,13 @@ export default function PurchaseInvoice() {
                     <InputNumber
                       disabled
                       precision={3}
-                      className="w-full bg-gray-100! font-semibold text-center"
+                      className="w-full bg-gray-100! font-bold text-center text-gray-900 text-xs"
                       placeholder="0.000"
+                      style={{
+                        color: "#111827",
+                        WebkitTextFillColor: "#111827",
+                        fontWeight: 700,
+                      }}
                     />
                   </Form.Item>
                 </div>
@@ -2543,8 +2689,13 @@ export default function PurchaseInvoice() {
                   >
                     <InputNumber
                       disabled
-                      className="w-full bg-gray-100! font-semibold text-center"
+                      className="w-full bg-gray-100! font-bold text-center text-gray-900 text-xs"
                       precision={2}
+                      style={{
+                        color: "#111827",
+                        WebkitTextFillColor: "#111827",
+                        fontWeight: 700,
+                      }}
                     />
                   </Form.Item>
                 </div>
@@ -2554,9 +2705,14 @@ export default function PurchaseInvoice() {
                   <Form.Item name="total_sgst" style={{ marginBottom: 0 }}>
                     <InputNumber
                       disabled
-                      className="w-full bg-gray-100! font-semibold text-center text-xs"
+                      className="w-full bg-gray-100! font-bold text-center text-xs text-gray-900"
                       precision={2}
                       placeholder="0.00"
+                      style={{
+                        color: "#111827",
+                        WebkitTextFillColor: "#111827",
+                        fontWeight: 700,
+                      }}
                     />
                   </Form.Item>
                 </div>
@@ -2566,9 +2722,14 @@ export default function PurchaseInvoice() {
                   <Form.Item name="total_cgst" style={{ marginBottom: 0 }}>
                     <InputNumber
                       disabled
-                      className="w-full bg-gray-100! font-semibold text-center text-xs"
+                      className="w-full bg-gray-100! font-bold text-center text-xs text-gray-900"
                       precision={2}
                       placeholder="0.00"
+                      style={{
+                        color: "#111827",
+                        WebkitTextFillColor: "#111827",
+                        fontWeight: 700,
+                      }}
                     />
                   </Form.Item>
                 </div>
@@ -2578,20 +2739,32 @@ export default function PurchaseInvoice() {
                   <Form.Item name="total_igst" style={{ marginBottom: 0 }}>
                     <InputNumber
                       disabled
-                      className="w-full bg-gray-100! font-semibold text-center text-xs"
+                      className="w-full bg-gray-100! font-bold text-center text-xs text-gray-900"
                       precision={2}
                       placeholder="0.00"
+                      style={{
+                        color: "#111827",
+                        WebkitTextFillColor: "#111827",
+                        fontWeight: 700,
+                      }}
                     />
                   </Form.Item>
                 </div>
 
-                {/* 12. Grand Total Amount */}
+                {/* 12. Total Amount */}
                 <div>
                   <Form.Item name="total_amount" style={{ marginBottom: 0 }}>
                     <InputNumber
                       disabled
-                      className="w-full bg-gray-100! font-bold text-amber-900 text-center"
+                      className="w-full bg-amber-100! font-bold text-amber-950 text-center border border-amber-400!"
                       precision={2}
+                      style={{
+                        width: "100%",
+                        color: "#78350F",
+                        WebkitTextFillColor: "#78350F",
+                        fontWeight: 800,
+                        fontSize: "12px",
+                      }}
                     />
                   </Form.Item>
                 </div>
@@ -2606,39 +2779,49 @@ export default function PurchaseInvoice() {
           <Card
             size="small"
             style={{ border: "1px solid #FDE68A" }}
-            styles={{ body: { padding: "12px 16px" } }}
+            styles={{ body: { padding: "10px 14px" } }}
           >
-            <Row gutter={[16, 16]} align="middle">
-              <Col span={4}>
+            <Row gutter={[12, 12]} align="middle">
+              <Col span={3}>
                 <Form.Item
                   label={
-                    <span className="text-amber-700">Total Gr. Wt (Ton)</span>
+                    <span className="text-amber-800 font-bold text-xs">Total Gr. Wt (Ton)</span>
                   }
                   name="gross_weight"
                 >
-                  <InputNumber disabled className="w-full bg-gray-50!" />
+                  <InputNumber
+                    disabled
+                    className="w-full bg-gray-50! font-bold text-gray-900 text-xs"
+                    precision={3}
+                    style={{
+                      color: "#111827",
+                      WebkitTextFillColor: "#111827",
+                      fontWeight: 700,
+                      height: "32px",
+                    }}
+                  />
                 </Form.Item>
               </Col>
               <Col span={5}>
                 <Form.Item
-                  label={<span className="text-amber-700">Despatch From</span>}
+                  label={<span className="text-amber-700 font-semibold text-xs">Despatch From</span>}
                   name="dispatch_from"
                 >
-                  <Input placeholder="Despatch plant location" />
+                  <Input placeholder="Despatch plant location" className="text-xs" style={{ height: "32px" }} />
                 </Form.Item>
               </Col>
               <Col span={5}>
                 <Form.Item
-                  label={<span className="text-amber-700">Ship To</span>}
+                  label={<span className="text-amber-700 font-semibold text-xs">Ship To</span>}
                   name="ship_to"
                 >
-                  <Input placeholder="Destination location" />
+                  <Input placeholder="Destination location" className="text-xs" style={{ height: "32px" }} />
                 </Form.Item>
               </Col>
-              <Col span={4}>
+              <Col span={5}>
                 <Form.Item
                   label={
-                    <span className="text-amber-700 font-semibold">
+                    <span className="text-amber-700 font-semibold text-xs">
                       Upload Invoice Copy
                     </span>
                   }
@@ -2650,7 +2833,7 @@ export default function PurchaseInvoice() {
                             border: "2px dashed #EF4444",
                             backgroundColor: "#FEF2F2",
                             borderRadius: "6px",
-                            padding: "6px 8px",
+                            padding: "4px 6px",
                           }
                         : {}
                     }
@@ -2678,8 +2861,9 @@ export default function PurchaseInvoice() {
                       maxCount={1}
                     >
                       <Button
+                        size="middle"
                         icon={<UploadOutlined />}
-                        className="w-full border-amber-300!"
+                        className="w-full border-amber-300! text-xs"
                       >
                         {editingRecordDocUrl && !fileList.length
                           ? "Change File"
@@ -2703,30 +2887,40 @@ export default function PurchaseInvoice() {
               </Col>
               <Col span={3}>
                 <Form.Item
-                  label={<span className="text-amber-700">Round Off</span>}
+                  label={<span className="text-amber-700 font-semibold text-xs">Round Off</span>}
                   name="round_off_amount"
                 >
                   <InputNumber
-                    className="w-full"
+                    className="w-full font-semibold text-xs border-amber-300!"
                     onChange={() => recalculateGrandTotals()}
                     precision={2}
                     step={0.01}
+                    placeholder="0.00"
+                    style={{ height: "32px" }}
                   />
                 </Form.Item>
               </Col>
               <Col span={3}>
                 <Form.Item
                   label={
-                    <span className="text-amber-700 font-bold">
-                      Grand Total
+                    <span className="text-amber-900 font-extrabold text-xs tracking-wide">
+                      Grand Total (₹)
                     </span>
                   }
                   name="grand_total"
                 >
                   <InputNumber
                     disabled
-                    className="w-full bg-amber-50! font-bold text-amber-800"
+                    className="w-full bg-amber-100! font-black text-amber-950 text-center border-2 border-amber-500!"
                     precision={2}
+                    style={{
+                      width: "100%",
+                      color: "#78350F",
+                      WebkitTextFillColor: "#78350F",
+                      fontWeight: 800,
+                      fontSize: "12px",
+                      height: "32px",
+                    }}
                   />
                 </Form.Item>
               </Col>
