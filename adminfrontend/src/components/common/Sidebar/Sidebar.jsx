@@ -8,6 +8,7 @@ import {
   DashboardOutlined,
   ShoppingCartOutlined,
   TagsOutlined,
+  BookOutlined,
   DatabaseOutlined,
   FileTextOutlined,
   ApartmentOutlined,
@@ -162,6 +163,14 @@ const baseMenuItems = [
     required: "sales",
   },
   {
+    key: "accounts",
+    label: "Accounting Module",
+    path: "/dms/accounts",
+    icon: <BookOutlined />,
+    module: "dms",
+    required: "reports",
+  },
+  {
     key: "reports",
     label: "Reports & Analytics",
     path: "/dms/reports",
@@ -214,6 +223,7 @@ const SidebarMenu = ({ collapsed, onNavClick }) => {
   const getActiveKey = (pathname) => {
     if (pathname.startsWith("/dms/purchase")) return "purchase";
     if (pathname.startsWith("/dms/sales")) return "sales";
+    if (pathname.startsWith("/dms/accounts")) return "accounts";
     if (pathname.startsWith("/dms/reports")) return "reports";
     if (pathname.startsWith("/dms/master/product")) return "master-product";
     if (pathname.startsWith("/dms/master/business-partner"))
