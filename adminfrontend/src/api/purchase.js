@@ -678,12 +678,32 @@ export const getVehicleInvoices = async (vehicleNo, lrNo) => {
 export const getDepoDetails = async () => {
   const { currentOrgId } = useSessionStore.getState();
   try {
-    const res = await api.get("/organisation/depo-details/", {
+    const res = await api.get("/organisation/organisation-branches/", {
       params: { organisation: currentOrgId },
     });
     return res.data;
   } catch (err) {
-    console.warn("Could not fetch depo details from backend, fallback:", err);
+    try {
+      const fallbackRes = await api.get("/organisation/depo-details/", {
+        params: { organisation: currentOrgId },
+      });
+      return fallbackRes.data;
+    } catch (fallbackErr) {
+      console.warn("Could not fetch depo/branches details from backend:", fallbackErr);
+      return [];
+    }
+  }
+};
+
+export const getOrganisationBranches = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  try {
+    const res = await api.get("/organisation/organisation-branches/", {
+      params: { organisation: currentOrgId },
+    });
+    return res.data;
+  } catch (err) {
+    console.warn("Could not fetch organisation branches:", err);
     return [];
   }
 };
