@@ -200,13 +200,13 @@ export default function PurchaseInvoice() {
           transport_name: group.transport_name,
           vehicle_no: group.vehicle_no,
           ewaybill_no: group.items.every((i) => i.ewaybill_no) ? "All Uploaded" : "Uploaded",
-          ewaybill_date: null,
+          ewaybill_date: group.items[0]?.ewaybill_date || null,
           invoice_no: `${group.items.length} Invoices`,
-          invoice_date: null,
+          invoice_date: group.items[0]?.invoice_date || null,
           total_qty: Number(totalQty.toFixed(3)),
           total_amount: Number(totalAmount.toFixed(2)),
           total_net_weight: Number(totalNetWeight.toFixed(3)),
-          payment_due_date: null,
+          payment_due_date: group.items[0]?.payment_due_date || null,
           invoice_upload_status: "Uploaded",
           underlyingRecords: group.items,
         });
@@ -697,7 +697,49 @@ export default function PurchaseInvoice() {
     if (!items[index]) return;
 
     const currentItem = items[index];
-    const validQty = Math.max(0, Number(newQty || 0));
+    const totalAvail = Number(
+      currentItem.available_qty !== undefined
+        ? currentItem.available_qty
+        : (currentItem.original_qty !== undefined
+            ? currentItem.original_qty
+            : (currentItem.qty || 0))
+    );
+
+    // Sum allocated in other rows for this same item/product
+    const otherRowsAllocated = items
+      .filter(
+        (it, idx) =>
+          idx !== index &&
+          ((it.product && it.product === currentItem.product) ||
+            (it.item_name && it.item_name === currentItem.item_name))
+      )
+      .reduce(
+        (sum, it) =>
+          sum +
+          Number(
+            it.invoice_qty !== undefined ? it.invoice_qty : it.qty || 0
+          ),
+        0
+      );
+
+    const maxAllowed = Math.max(
+      0,
+      Number((totalAvail - otherRowsAllocated).toFixed(3))
+    );
+
+    let inputQty = Number(newQty || 0);
+
+    // If user enters more than available balance quantity
+    if (newQty !== null && newQty !== undefined && inputQty > maxAllowed) {
+      message.error(
+        `Quantity cannot exceed remaining available balance (${maxAllowed} ${
+          currentItem.unit || ""
+        }). You entered ${newQty}. Value adjusted to ${maxAllowed}.`
+      );
+      inputQty = maxAllowed;
+    }
+
+    const validQty = Math.max(0, inputQty);
     const unitNetWt = Number(
       currentItem.unit_net_wt !== undefined
         ? currentItem.unit_net_wt
@@ -705,7 +747,7 @@ export default function PurchaseInvoice() {
             ? Number(currentItem.net_wt || 0) / currentItem.original_qty
             : (currentItem.qty > 0
                 ? Number(currentItem.net_wt || 0) / currentItem.qty
-                : 0)),
+                : 0))
     );
     const newNetWt = Number((unitNetWt * validQty).toFixed(3));
 
@@ -878,6 +920,103 @@ export default function PurchaseInvoice() {
         rateSelectRefs.current[index + 1]?.focus();
       }, 150);
     }
+  };
+
+  const handleAddSplitItem = (index) => {
+    const items = form.getFieldValue("items") || [];
+    if (!items[index]) return;
+
+    const currentItem = items[index];
+    const totalAvail = Number(
+      currentItem.available_qty !== undefined
+        ? currentItem.available_qty
+        : (currentItem.original_qty !== undefined
+            ? currentItem.original_qty
+            : (currentItem.qty || 0))
+    );
+
+    // Sum already allocated invoice_qty for this product across all rows
+    const sumAllocated = items
+      .filter(
+        (it) =>
+          (it.product && it.product === currentItem.product) ||
+          (it.item_name && it.item_name === currentItem.item_name)
+      )
+      .reduce(
+        (sum, it) =>
+          sum +
+          Number(
+            it.invoice_qty !== undefined ? it.invoice_qty : it.qty || 0
+          ),
+        0
+      );
+
+    const remainingQty = Math.max(
+      0,
+      Number((totalAvail - sumAllocated).toFixed(3))
+    );
+
+    if (remainingQty <= 0) {
+      message.warning(
+        `All available quantity for ${
+          currentItem.item_name || "this item"
+        } has already been allocated.`
+      );
+      return;
+    }
+
+    const unitNetWt = Number(
+      currentItem.unit_net_wt ||
+        (currentItem.qty > 0
+          ? Number(currentItem.net_wt || 0) / currentItem.qty
+          : 0)
+    );
+    const newNetWt = Number((unitNetWt * remainingQty).toFixed(3));
+
+    const newSplitItem = {
+      sale_contract: currentItem.sale_contract,
+      sale_contract_item: currentItem.sale_contract_item,
+      product: currentItem.product,
+      item_name: currentItem.item_name,
+      available_qty: totalAvail,
+      qty: currentItem.qty,
+      original_qty: totalAvail,
+      invoice_qty: remainingQty,
+      unit: currentItem.unit,
+      net_weight_kg: currentItem.net_weight_kg,
+      gross_weight_kg: currentItem.gross_weight_kg,
+      unit_net_wt: unitNetWt,
+      unit_gross_wt: currentItem.unit_gross_wt || unitNetWt,
+      net_wt: newNetWt,
+      gst_percent: currentItem.gst_percent,
+      rate: undefined,
+      purchase_contract: undefined,
+      purchase_contract_item: undefined,
+      taxable_amount: 0,
+      sgst_amount: 0,
+      cgst_amount: 0,
+      igst_amount: 0,
+      total_amount: 0,
+      is_split: true,
+    };
+
+    const updatedItems = [...items];
+    updatedItems.splice(index + 1, 0, newSplitItem);
+
+    form.setFieldsValue({ items: updatedItems });
+    recalculateGrandTotals(updatedItems);
+
+    message.info(
+      `Added another row for ${currentItem.item_name || "item"}${
+        remainingQty > 0
+          ? ` (Balance: ${remainingQty} ${currentItem.unit || ""})`
+          : ""
+      }. Please select rate/contract.`
+    );
+
+    setTimeout(() => {
+      rateSelectRefs.current[index + 1]?.focus();
+    }, 150);
   };
 
   const handleRemoveItem = (index) => {
@@ -1414,10 +1553,7 @@ export default function PurchaseInvoice() {
         <span className="text-amber-700 font-semibold">E-waybill Date</span>
       ),
       dataIndex: "ewaybill_date",
-      render: (val, record) => {
-        if (record.isMergedRow) {
-          return <span className="text-gray-400 font-medium">-</span>;
-        }
+      render: (val) => {
         return val ? (
           <span>{fmtDate(val)}</span>
         ) : (
@@ -1438,7 +1574,7 @@ export default function PurchaseInvoice() {
     {
       title: <span className="text-amber-700 font-semibold">Invoice Date</span>,
       dataIndex: "invoice_date",
-      render: (val, record) => (record.isMergedRow ? "-" : fmtDate(val)),
+      render: (val) => fmtDate(val),
     },
     {
       title: <span className="text-amber-700 font-semibold">Total Qty</span>,
@@ -1459,7 +1595,7 @@ export default function PurchaseInvoice() {
         <span className="text-amber-700 font-semibold">Payment Due Date</span>
       ),
       dataIndex: "payment_due_date",
-      render: (val, record) => (record.isMergedRow ? "-" : fmtDate(val)),
+      render: (val) => fmtDate(val),
     },
     {
       title: <span className="text-amber-700 font-semibold">Status</span>,
@@ -2185,7 +2321,7 @@ export default function PurchaseInvoice() {
             }}
             styles={{ body: { padding: "12px 16px" } }}
           >
-            <div style={{ minWidth: 1320 }}>
+            <div style={{ minWidth: 1520 }}>
               <h6 className="text-amber-600 font-bold mb-2">
                 Items Information
               </h6>
@@ -2195,7 +2331,7 @@ export default function PurchaseInvoice() {
                 style={{
                   display: "grid",
                   gridTemplateColumns:
-                    "1.9fr 0.75fr 0.85fr 0.65fr 0.85fr 0.65fr 1.7fr 1.0fr 0.75fr 0.75fr 0.75fr 1.25fr 36px",
+                    "2.2fr 0.7fr 0.85fr 0.9fr 0.8fr 0.55fr 1.6fr 1.55fr 0.7fr 0.7fr 0.7fr 1.35fr 60px",
                   gap: "6px",
                   alignItems: "center",
                   paddingBottom: "6px",
@@ -2239,7 +2375,7 @@ export default function PurchaseInvoice() {
                         style={{
                           display: "grid",
                           gridTemplateColumns:
-                            "1.9fr 0.75fr 0.85fr 0.65fr 0.85fr 0.65fr 1.7fr 1.0fr 0.75fr 0.75fr 0.75fr 1.25fr 36px",
+                            "2.2fr 0.7fr 0.85fr 0.9fr 0.8fr 0.55fr 1.6fr 1.55fr 0.7fr 0.7fr 0.7fr 1.35fr 60px",
                           gap: "6px",
                           alignItems: "center",
                           marginBottom: "6px",
@@ -2319,19 +2455,35 @@ export default function PurchaseInvoice() {
                           >
                             <InputNumber
                               min={0.01}
-                              max={Number(
-                                form.getFieldValue([
-                                  "items",
-                                  field.name,
-                                  "available_qty",
-                                ]) ||
-                                  form.getFieldValue([
-                                    "items",
-                                    field.name,
-                                    "qty",
-                                  ]) ||
-                                  999999,
-                              )}
+                              max={(() => {
+                                const allItems = form.getFieldValue("items") || [];
+                                const current = allItems[field.name] || {};
+                                const totalAv = Number(
+                                  current.available_qty !== undefined
+                                    ? current.available_qty
+                                    : (current.original_qty !== undefined
+                                        ? current.original_qty
+                                        : (current.qty || 0))
+                                );
+                                const otherAlloc = allItems
+                                  .filter(
+                                    (it, idx) =>
+                                      idx !== field.name &&
+                                      ((it.product && it.product === current.product) ||
+                                        (it.item_name && it.item_name === current.item_name))
+                                  )
+                                  .reduce(
+                                    (sum, it) =>
+                                      sum +
+                                      Number(
+                                        it.invoice_qty !== undefined
+                                          ? it.invoice_qty
+                                          : it.qty || 0
+                                      ),
+                                    0
+                                  );
+                                return Math.max(0.01, Number((totalAv - otherAlloc).toFixed(3)));
+                              })()}
                               precision={2}
                               className="w-full border-amber-400! font-bold text-center text-gray-900 text-xs"
                               placeholder="Qty"
@@ -2350,7 +2502,7 @@ export default function PurchaseInvoice() {
                           >
                             <Input
                               disabled
-                              className="bg-gray-50! text-center p-0 font-bold text-gray-900 text-xs"
+                              className="w-full bg-gray-50! text-center px-1 font-bold text-gray-900 text-xs"
                               style={{
                                 color: "#111827",
                                 WebkitTextFillColor: "#111827",
@@ -2518,6 +2670,7 @@ export default function PurchaseInvoice() {
                               className="w-full bg-gray-50! text-center font-bold text-gray-900 text-xs"
                               precision={2}
                               style={{
+                                width: "100%",
                                 color: "#111827",
                                 WebkitTextFillColor: "#111827",
                                 fontWeight: 700,
@@ -2602,7 +2755,61 @@ export default function PurchaseInvoice() {
                         </div>
 
                         {/* 13. Action */}
-                        <div className="text-center flex justify-center items-center">
+                        <div className="text-center flex justify-center items-center gap-1">
+                          {(() => {
+                            const allItems = form.getFieldValue("items") || [];
+                            const rowItem = allItems[field.name] || {};
+                            const rowTotalAvail = Number(
+                              rowItem.available_qty !== undefined
+                                ? rowItem.available_qty
+                                : (rowItem.original_qty !== undefined
+                                    ? rowItem.original_qty
+                                    : (rowItem.qty || 0))
+                            );
+                            const totalAlloc = allItems
+                              .filter(
+                                (it) =>
+                                  (it.product && it.product === rowItem.product) ||
+                                  (it.item_name && it.item_name === rowItem.item_name)
+                              )
+                              .reduce(
+                                (sum, it) =>
+                                  sum +
+                                  Number(
+                                    it.invoice_qty !== undefined
+                                      ? it.invoice_qty
+                                      : it.qty || 0
+                                  ),
+                                0
+                              );
+                            const remaining = Number(
+                              (rowTotalAvail - totalAlloc).toFixed(3)
+                            );
+                            if (rowTotalAvail > 0 && remaining > 0.001) {
+                              return (
+                                <Tooltip
+                                  title={`Add another row for this item (Remaining: ${remaining} ${
+                                    rowItem.unit || ""
+                                  })`}
+                                >
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    icon={
+                                      <PlusOutlined
+                                        style={{
+                                          color: "#d97706",
+                                          fontWeight: "bold",
+                                        }}
+                                      />
+                                    }
+                                    onClick={() => handleAddSplitItem(field.name)}
+                                  />
+                                </Tooltip>
+                              );
+                            }
+                            return null;
+                          })()}
                           <Tooltip title="Remove item from this invoice">
                             <Button
                               type="text"
@@ -2626,7 +2833,7 @@ export default function PurchaseInvoice() {
                 style={{
                   display: "grid",
                   gridTemplateColumns:
-                    "1.9fr 0.75fr 0.85fr 0.65fr 0.85fr 0.65fr 1.7fr 1.0fr 0.75fr 0.75fr 0.75fr 1.25fr 36px",
+                    "2.2fr 0.7fr 0.85fr 0.9fr 0.8fr 0.55fr 1.6fr 1.55fr 0.7fr 0.7fr 0.7fr 1.35fr 60px",
                   gap: "6px",
                   alignItems: "center",
                 }}
@@ -2647,6 +2854,7 @@ export default function PurchaseInvoice() {
                       precision={2}
                       className="w-full bg-gray-100! font-bold text-center text-gray-900 text-xs"
                       style={{
+                        width: "100%",
                         color: "#111827",
                         WebkitTextFillColor: "#111827",
                         fontWeight: 700,
@@ -2667,6 +2875,7 @@ export default function PurchaseInvoice() {
                       className="w-full bg-gray-100! font-bold text-center text-gray-900 text-xs"
                       placeholder="0.000"
                       style={{
+                        width: "100%",
                         color: "#111827",
                         WebkitTextFillColor: "#111827",
                         fontWeight: 700,
@@ -2692,6 +2901,7 @@ export default function PurchaseInvoice() {
                       className="w-full bg-gray-100! font-bold text-center text-gray-900 text-xs"
                       precision={2}
                       style={{
+                        width: "100%",
                         color: "#111827",
                         WebkitTextFillColor: "#111827",
                         fontWeight: 700,
@@ -2709,6 +2919,7 @@ export default function PurchaseInvoice() {
                       precision={2}
                       placeholder="0.00"
                       style={{
+                        width: "100%",
                         color: "#111827",
                         WebkitTextFillColor: "#111827",
                         fontWeight: 700,
@@ -2726,6 +2937,7 @@ export default function PurchaseInvoice() {
                       precision={2}
                       placeholder="0.00"
                       style={{
+                        width: "100%",
                         color: "#111827",
                         WebkitTextFillColor: "#111827",
                         fontWeight: 700,
@@ -2743,6 +2955,7 @@ export default function PurchaseInvoice() {
                       precision={2}
                       placeholder="0.00"
                       style={{
+                        width: "100%",
                         color: "#111827",
                         WebkitTextFillColor: "#111827",
                         fontWeight: 700,
