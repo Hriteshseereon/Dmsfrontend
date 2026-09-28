@@ -104,10 +104,14 @@ export default function StockInTransit() {
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState("Intransit");
 
+  const [deposList, setDeposList] = useState([]);
+
   // Step 2: Vehicle Invoices Drill-down Modal State
   const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [loadingVehicleInvoices, setLoadingVehicleInvoices] = useState(false);
+  const [selectedInvoiceRowKeys, setSelectedInvoiceRowKeys] = useState([]);
+  const [batchReceiving, setBatchReceiving] = useState(false);
 
   // Step 3: Stock Receiving Modal State (Per Invoice)
   const [receiveModalOpen, setReceiveModalOpen] = useState(false);
@@ -125,7 +129,18 @@ export default function StockInTransit() {
   useEffect(() => {
     fetchTransitData();
     fetchProductsList();
+    fetchDeposList();
   }, [selectedFY]);
+
+  const fetchDeposList = async () => {
+    try {
+      const res = await getDepoDetails();
+      const list = Array.isArray(res) ? res : res?.data || res?.results || [];
+      setDeposList(list);
+    } catch (err) {
+      console.warn("Could not load depo/branches list:", err);
+    }
+  };
 
   const fetchProductsList = async () => {
     try {
@@ -344,6 +359,7 @@ export default function StockInTransit() {
   // Step 2: Open Vehicle Invoices Modal on Vehicle Click
   const handleOpenVehicleModal = async (vehicleRecord) => {
     setSelectedVehicle(vehicleRecord);
+    setSelectedInvoiceRowKeys([]);
     setVehicleModalOpen(true);
 
     // If needed, fetch fresh vehicle-invoices specifically from backend
@@ -382,6 +398,87 @@ export default function StockInTransit() {
     }
   };
 
+  // Batch Receive all selected invoices without claims (Direct delivery)
+  const handleBatchReceiveInvoices = async () => {
+    if (!selectedInvoiceRowKeys.length || !selectedVehicle) return;
+
+    const invoicesToReceive = (selectedVehicle.invoices || []).filter(
+      (inv) =>
+        selectedInvoiceRowKeys.includes(
+          inv.purchase_invoice_id || inv.invoice_no
+        ) && inv.status !== "Received"
+    );
+
+    if (!invoicesToReceive.length) {
+      message.warning("Selected invoices are already marked as received.");
+      return;
+    }
+
+    try {
+      setBatchReceiving(true);
+      const todayStr = dayjs().format("YYYY-MM-DD");
+      const defaultPlace = selectedVehicle.place || "Bhadrak";
+
+      let successCount = 0;
+      for (const inv of invoicesToReceive) {
+        const invDate = inv.invoice_date
+          ? parseApiDate(inv.invoice_date)
+          : null;
+        const transitDays = invDate
+          ? Math.max(0, dayjs().diff(invDate, "day"))
+          : 0;
+
+        const formattedItems = (inv.items || []).map((item) => {
+          const invQty = Number(item.invoiced_qty || item.qty || 0);
+          const rate = Number(item.rate || 0);
+          return {
+            purchase_invoice_item_id:
+              item.purchase_invoice_item_id || item.item_id || item.id,
+            direct_qty: String(invQty.toFixed(2)),
+            depo_qty: "0.00",
+            claim_reason: "None",
+            claim_unit: item.unit || "TIN",
+            claim_rate: String(rate.toFixed(2)),
+            claim_qty: "0.00",
+            claim_amount: "0.00",
+            narration: "Batch received (No Claim)",
+            status: "Received",
+          };
+        });
+
+        const payload = {
+          purchase_invoice_id: inv.purchase_invoice_id || inv.id,
+          stock_received_on: todayStr,
+          transit_days: transitDays,
+          to_be_received_at: "direct",
+          received_place: defaultPlace,
+          depo: null,
+          status: "Received",
+          items: formattedItems,
+        };
+
+        try {
+          await createStockInTransit(payload);
+          successCount++;
+        } catch (itemErr) {
+          console.error("Failed receiving invoice " + inv.invoice_no, itemErr);
+        }
+      }
+
+      message.success(`Successfully batch received ${successCount} invoice(s)!`);
+      setSelectedInvoiceRowKeys([]);
+      if (selectedVehicle) {
+        await handleOpenVehicleModal(selectedVehicle);
+      }
+      fetchTransitData();
+    } catch (err) {
+      console.error("Batch receive failed:", err);
+      message.error("Failed to batch receive some invoices.");
+    } finally {
+      setBatchReceiving(false);
+    }
+  };
+
   // Helper to determine Base, Lower, Upper units & rates for an item
   const getItemUnitOptions = (item, products = []) => {
     const matchedProduct = (Array.isArray(products) ? products : []).find(
@@ -406,12 +503,12 @@ export default function StockInTransit() {
 
     const options = [];
 
-    // 1. Upper / Invoice Unit (e.g. TIN, BOX, BAG)
+    // 1. Upper / Invoice Unit (e.g. TIN, BOX, BAG, Cartoon)
     const upperName = upperUnit || invoiceUnit;
     if (upperName) {
       options.push({
         value: upperName,
-        label: `${upperName} (Upper/Invoice Unit)`,
+        label: upperName,
         short_label: upperName,
         unit_name: upperName,
         unit_type: "upper",
@@ -427,7 +524,7 @@ export default function StockInTransit() {
       const factor = multiplier > 1 ? 1 / multiplier : 1;
       options.push({
         value: baseUnit,
-        label: `${baseUnit} (Base Unit)`,
+        label: baseUnit,
         short_label: baseUnit,
         unit_name: baseUnit,
         unit_type: "base",
@@ -443,7 +540,7 @@ export default function StockInTransit() {
       const factor = multiplier > 1 ? 1 / multiplier : 1;
       options.push({
         value: lowerUnit,
-        label: `${lowerUnit} (Lower Unit)`,
+        label: lowerUnit,
         short_label: lowerUnit,
         unit_name: lowerUnit,
         unit_type: "lower",
@@ -456,7 +553,7 @@ export default function StockInTransit() {
     if (options.length === 0) {
       options.push({
         value: invoiceUnit,
-        label: `${invoiceUnit} (Invoice Unit)`,
+        label: invoiceUnit,
         short_label: invoiceUnit,
         unit_name: invoiceUnit,
         unit_type: "upper",
@@ -1563,8 +1660,39 @@ export default function StockInTransit() {
           </Card>
 
           {/* Connected Invoices Table */}
-          <div className="border border-amber-200 rounded-lg shadow-sm bg-white overflow-hidden">
+          <div className="border border-amber-200 rounded-lg shadow-sm bg-white overflow-hidden p-3">
+            <div className="flex items-center justify-between pb-3 border-b border-amber-100 mb-3">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-amber-900 text-sm">
+                  Invoices List ({selectedVehicle?.invoices?.length || 0})
+                </span>
+                {selectedInvoiceRowKeys.length > 0 && (
+                  <Tag color="purple" className="font-semibold">
+                    {selectedInvoiceRowKeys.length} Selected
+                  </Tag>
+                )}
+              </div>
+              <Space>
+                <Button
+                  type="primary"
+                  icon={<CheckCircleOutlined />}
+                  disabled={selectedInvoiceRowKeys.length === 0}
+                  loading={batchReceiving}
+                  onClick={handleBatchReceiveInvoices}
+                  className="bg-emerald-600! hover:bg-emerald-700! border-none! font-bold text-white!"
+                >
+                  Batch Receive Selected ({selectedInvoiceRowKeys.length})
+                </Button>
+              </Space>
+            </div>
             <Table
+              rowSelection={{
+                selectedRowKeys: selectedInvoiceRowKeys,
+                onChange: (keys) => setSelectedInvoiceRowKeys(keys),
+                getCheckboxProps: (record) => ({
+                  disabled: record.status === "Received",
+                }),
+              }}
               columns={invoiceColumns}
               dataSource={selectedVehicle?.invoices || []}
               loading={loadingVehicleInvoices}
@@ -1840,18 +1968,40 @@ export default function StockInTransit() {
                   <Form.Item
                     label={
                       <span className="text-purple-900 font-bold">
-                        Depot Name / Location
+                        Depot / Branch Name
                       </span>
                     }
                     name="depo"
                     rules={[
-                      { required: true, message: "Depot name is required" },
+                      { required: true, message: "Depot/Branch is required" },
                     ]}
                   >
-                    <Input
-                      placeholder="Enter Depot Name (e.g. Bhubaneswar Depo)"
+                    <Select
+                      placeholder="Select Depot / Branch"
                       className="w-full font-medium"
-                    />
+                      showSearch
+                      optionFilterProp="label"
+                      allowClear
+                    >
+                      {deposList.map((d) => (
+                        <Option
+                          key={d.id || d.name}
+                          value={d.name}
+                          label={`${d.name} ${d.short_name ? `(${d.short_name})` : ""}`}
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold text-gray-800">
+                              {d.name}
+                            </span>
+                            {d.short_name && (
+                              <Tag color="purple" className="ml-2 font-medium">
+                                {d.short_name}
+                              </Tag>
+                            )}
+                          </div>
+                        </Option>
+                      ))}
+                    </Select>
                   </Form.Item>
                 </Col>
               )}
@@ -1901,7 +2051,7 @@ export default function StockInTransit() {
               className="pb-2 mb-2 text-amber-900 font-bold text-xs border-b border-amber-200"
             >
               <Col span={toReceiveAtValue === "both" ? 3 : 4}>Item Name</Col>
-              <Col span={2}>Invoiced Qty</Col>
+              <Col span={toReceiveAtValue === "both" ? 1 : 2}>Invoiced Qty</Col>
               <Col span={1}>Inv Unit</Col>
               <Col span={2}>Inv Rate (₹)</Col>
               {toReceiveAtValue === "both" && (
@@ -1915,11 +2065,11 @@ export default function StockInTransit() {
                 </>
               )}
               <Col span={2}>Claim Reason</Col>
-              <Col span={3}>Shortage Unit</Col>
+              <Col span={2}>Shortage Qty</Col>
+              <Col span={2}>Shortage Unit</Col>
               <Col span={2}>Shortage Rate (₹)</Col>
-              <Col span={toReceiveAtValue === "both" ? 1 : 2}>Shortage Qty</Col>
               <Col span={2}>Claim Amt (₹)</Col>
-              <Col span={toReceiveAtValue === "both" ? 2 : 4}>Item Narration</Col>
+              <Col span={toReceiveAtValue === "both" ? 3 : 5}>Item Narration</Col>
             </Row>
 
             <Form.List name="items">
@@ -1972,7 +2122,7 @@ export default function StockInTransit() {
                       </Col>
 
                       {/* 2. Invoiced Qty */}
-                      <Col span={2}>
+                      <Col span={toReceiveAtValue === "both" ? 1 : 2}>
                         <Form.Item
                           name={[field.name, "invoiced_qty"]}
                           style={{ marginBottom: 0 }}
@@ -2090,8 +2240,31 @@ export default function StockInTransit() {
                         </Form.Item>
                       </Col>
 
-                      {/* 6. Shortage Unit (Base, Lower, Upper units) */}
-                      <Col span={3}>
+                      {/* 6. Shortage Qty */}
+                      <Col span={2}>
+                        <Form.Item
+                          name={[field.name, "claim_qty"]}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <InputNumber
+                            disabled={isClaimDisabled}
+                            min={0}
+                            precision={2}
+                            className="w-full border-amber-300! font-semibold text-center"
+                            placeholder="0"
+                            onChange={(val) =>
+                              handleItemFieldChange(
+                                field.name,
+                                "claim_qty",
+                                val,
+                              )
+                            }
+                          />
+                        </Form.Item>
+                      </Col>
+
+                      {/* 7. Shortage Unit (Base, Lower, Upper units) */}
+                      <Col span={2}>
                         <Form.Item
                           name={[field.name, "claim_unit"]}
                           style={{ marginBottom: 0 }}
@@ -2117,7 +2290,7 @@ export default function StockInTransit() {
                         </Form.Item>
                       </Col>
 
-                      {/* 7. Shortage Rate (auto-calculated per unit) */}
+                      {/* 8. Shortage Rate (auto-calculated per unit) */}
                       <Col span={2}>
                         <Form.Item
                           name={[field.name, "claim_rate"]}
@@ -2132,29 +2305,6 @@ export default function StockInTransit() {
                               handleItemFieldChange(
                                 field.name,
                                 "claim_rate",
-                                val,
-                              )
-                            }
-                          />
-                        </Form.Item>
-                      </Col>
-
-                      {/* 8. Shortage Qty */}
-                      <Col span={toReceiveAtValue === "both" ? 1 : 2}>
-                        <Form.Item
-                          name={[field.name, "claim_qty"]}
-                          style={{ marginBottom: 0 }}
-                        >
-                          <InputNumber
-                            disabled={isClaimDisabled}
-                            min={0}
-                            precision={2}
-                            className="w-full border-amber-300! font-semibold text-center"
-                            placeholder="0"
-                            onChange={(val) =>
-                              handleItemFieldChange(
-                                field.name,
-                                "claim_qty",
                                 val,
                               )
                             }
@@ -2177,7 +2327,7 @@ export default function StockInTransit() {
                       </Col>
 
                       {/* 10. Item Narration */}
-                      <Col span={toReceiveAtValue === "both" ? 2 : 4}>
+                      <Col span={toReceiveAtValue === "both" ? 3 : 5}>
                         <Form.Item
                           name={[field.name, "narration"]}
                           style={{ marginBottom: 0 }}
