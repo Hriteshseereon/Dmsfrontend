@@ -2321,7 +2321,7 @@ export default function PurchaseInvoice() {
             }}
             styles={{ body: { padding: "12px 16px" } }}
           >
-            <div style={{ minWidth: 1520 }}>
+            <div style={{ minWidth: 1680 }}>
               <h6 className="text-amber-600 font-bold mb-2">
                 Items Information
               </h6>
@@ -2331,7 +2331,7 @@ export default function PurchaseInvoice() {
                 style={{
                   display: "grid",
                   gridTemplateColumns:
-                    "2.2fr 0.7fr 0.85fr 0.9fr 0.8fr 0.55fr 1.6fr 1.55fr 0.7fr 0.7fr 0.7fr 1.35fr 60px",
+                    "3.2fr 0.7fr 0.85fr 0.75fr 0.8fr 0.55fr 1.5fr 1.25fr 1.0fr 1.0fr 1.0fr 1.45fr 60px",
                   gap: "6px",
                   alignItems: "center",
                   paddingBottom: "6px",
@@ -2375,7 +2375,7 @@ export default function PurchaseInvoice() {
                         style={{
                           display: "grid",
                           gridTemplateColumns:
-                            "2.2fr 0.7fr 0.85fr 0.9fr 0.8fr 0.55fr 1.6fr 1.55fr 0.7fr 0.7fr 0.7fr 1.35fr 60px",
+                            "3.2fr 0.7fr 0.85fr 0.75fr 0.8fr 0.55fr 1.5fr 1.25fr 1.0fr 1.0fr 1.0fr 1.45fr 60px",
                           gap: "6px",
                           alignItems: "center",
                           marginBottom: "6px",
@@ -2748,7 +2748,7 @@ export default function PurchaseInvoice() {
                                 color: "#78350F",
                                 WebkitTextFillColor: "#78350F",
                                 fontWeight: 700,
-                                fontSize: "12px",
+                                fontSize: "13px",
                               }}
                             />
                           </Form.Item>
@@ -2833,7 +2833,7 @@ export default function PurchaseInvoice() {
                 style={{
                   display: "grid",
                   gridTemplateColumns:
-                    "2.2fr 0.7fr 0.85fr 0.9fr 0.8fr 0.55fr 1.6fr 1.55fr 0.7fr 0.7fr 0.7fr 1.35fr 60px",
+                    "3.2fr 0.7fr 0.85fr 0.75fr 0.8fr 0.55fr 1.5fr 1.25fr 1.0fr 1.0fr 1.0fr 1.45fr 60px",
                   gap: "6px",
                   alignItems: "center",
                 }}
@@ -2858,6 +2858,7 @@ export default function PurchaseInvoice() {
                         color: "#111827",
                         WebkitTextFillColor: "#111827",
                         fontWeight: 700,
+                        fontSize: "13px",
                       }}
                     />
                   </Form.Item>
@@ -2879,6 +2880,7 @@ export default function PurchaseInvoice() {
                         color: "#111827",
                         WebkitTextFillColor: "#111827",
                         fontWeight: 700,
+                        fontSize: "13px",
                       }}
                     />
                   </Form.Item>
@@ -2905,6 +2907,7 @@ export default function PurchaseInvoice() {
                         color: "#111827",
                         WebkitTextFillColor: "#111827",
                         fontWeight: 700,
+                        fontSize: "13px",
                       }}
                     />
                   </Form.Item>
@@ -2923,6 +2926,7 @@ export default function PurchaseInvoice() {
                         color: "#111827",
                         WebkitTextFillColor: "#111827",
                         fontWeight: 700,
+                        fontSize: "13px",
                       }}
                     />
                   </Form.Item>
@@ -2941,6 +2945,7 @@ export default function PurchaseInvoice() {
                         color: "#111827",
                         WebkitTextFillColor: "#111827",
                         fontWeight: 700,
+                        fontSize: "13px",
                       }}
                     />
                   </Form.Item>
@@ -2959,6 +2964,7 @@ export default function PurchaseInvoice() {
                         color: "#111827",
                         WebkitTextFillColor: "#111827",
                         fontWeight: 700,
+                        fontSize: "13px",
                       }}
                     />
                   </Form.Item>
@@ -2976,7 +2982,7 @@ export default function PurchaseInvoice() {
                         color: "#78350F",
                         WebkitTextFillColor: "#78350F",
                         fontWeight: 800,
-                        fontSize: "12px",
+                        fontSize: "14px",
                       }}
                     />
                   </Form.Item>
@@ -3131,8 +3137,8 @@ export default function PurchaseInvoice() {
                       color: "#78350F",
                       WebkitTextFillColor: "#78350F",
                       fontWeight: 800,
-                      fontSize: "12px",
-                      height: "32px",
+                      fontSize: "16px",
+                      height: "36px",
                     }}
                   />
                 </Form.Item>
