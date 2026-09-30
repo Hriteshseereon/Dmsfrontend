@@ -62,14 +62,44 @@ const { Text } = Typography;
 
 const parseApiDate = (value) => {
   if (!value) return null;
-  const d = dayjs(value);
+  if (dayjs.isDayjs(value)) return value;
+  const str = String(value).trim();
+  if (!str) return null;
+
+  // Try standard known formats first
+  const formats = [
+    "DD-MM-YYYY",
+    "YYYY-MM-DD",
+    "DD-MM-YYYY HH:mm:ss",
+    "YYYY-MM-DD HH:mm:ss",
+    "DD/MM/YYYY",
+    "YYYY/MM/DD",
+    "DD/MM/YYYY HH:mm:ss",
+    "YYYY-MM-DDTHH:mm:ss",
+    "YYYY-MM-DDTHH:mm:ssZ",
+    "YYYY-MM-DDTHH:mm:ss.SSSZ",
+  ];
+  for (const f of formats) {
+    const d = dayjs(str, f, true);
+    if (d.isValid()) return d;
+  }
+
+  // Fallback to relaxed dayjs parsing
+  const d = dayjs(str);
   return d.isValid() ? d : null;
 };
 
 const fmtDate = (value) => {
   if (!value) return "-";
-  const d = dayjs(value);
-  return d.isValid() ? d.format("DD-MM-YYYY") : "-";
+  const d = parseApiDate(value);
+  if (d && d.isValid()) {
+    return d.format("DD-MM-YYYY");
+  }
+  const str = String(value).trim();
+  if (/^\d{2}-\d{2}-\d{4}/.test(str)) {
+    return str.substring(0, 10);
+  }
+  return str || "-";
 };
 
 // Helper to extract array from any DRF response structure
@@ -89,6 +119,9 @@ const isIntraStateGst = (gstNo) => {
   const cleanGst = String(gstNo).trim();
   return cleanGst.startsWith("21");
 };
+
+const ITEM_GRID_TEMPLATE =
+  "3.4fr 1.0fr 0.9fr 1.0fr 0.8fr 0.7fr 0.9fr 0.9fr 1.0fr 0.7fr 0.8fr 0.9fr 1.25fr 0.95fr 0.95fr 0.95fr 1.4fr 64px";
 
 export default function SaleInvoice() {
   const [form] = Form.useForm();
@@ -118,6 +151,68 @@ export default function SaleInvoice() {
   const [viewRecord, setViewRecord] = useState(null);
   const [fileList, setFileList] = useState([]);
   const [editingDocUrl, setEditingDocUrl] = useState(null);
+
+  // Form field focus and navigation refs
+  const invoiceDateRef = useRef(null);
+  const customerSelectRef = useRef(null);
+  const plantSelectRef = useRef(null);
+  const brokerSelectRef = useRef(null);
+  const vehicleSelectRef = useRef(null);
+  const ewaybillNoRef = useRef(null);
+  const ewaybillDateRef = useRef(null);
+  const einvoiceNoRef = useRef(null);
+  const paymentDueDateRef = useRef(null);
+
+  // Items table row refs
+  const itemSelectRefs = useRef([]);
+  const itemQtyRefs = useRef([]);
+  const itemFreeQtyRefs = useRef([]);
+  const itemNetWtRefs = useRef([]);
+  const itemGrossWtRefs = useRef([]);
+  const itemRateRefs = useRef([]);
+  const itemDiscPercentRefs = useRef([]);
+
+  // Bottom card refs
+  const dispatchFromRef = useRef(null);
+  const shipToRef = useRef(null);
+  const distanceKmRef = useRef(null);
+  const roundOffRef = useRef(null);
+
+  const focusItemField = (index, fieldType) => {
+    setTimeout(() => {
+      let targetEl = null;
+      if (fieldType === "item_name") {
+        targetEl = itemSelectRefs.current[index];
+      } else if (fieldType === "qty") {
+        targetEl = itemQtyRefs.current[index];
+      } else if (fieldType === "free_qty") {
+        targetEl = itemFreeQtyRefs.current[index];
+      } else if (fieldType === "net_weight_kg") {
+        targetEl = itemNetWtRefs.current[index];
+      } else if (fieldType === "gross_weight_kg") {
+        targetEl = itemGrossWtRefs.current[index];
+      } else if (fieldType === "rate") {
+        targetEl = itemRateRefs.current[index];
+      } else if (fieldType === "discount_percent") {
+        targetEl = itemDiscPercentRefs.current[index];
+      }
+
+      if (targetEl) {
+        if (targetEl.focus) {
+          targetEl.focus();
+        }
+        const input = targetEl.nativeElement
+          ? targetEl.nativeElement.querySelector("input")
+          : targetEl.querySelector
+          ? targetEl.querySelector("input")
+          : null;
+        if (input) {
+          input.focus();
+          input.select?.();
+        }
+      }
+    }, 40);
+  };
 
   /* ---------------- FETCH INITIAL DATA ---------------- */
   useEffect(() => {
@@ -674,6 +769,9 @@ export default function SaleInvoice() {
     }
 
     setModalOpen(true);
+    setTimeout(() => {
+      customerSelectRef.current?.focus();
+    }, 150);
   };
 
   /* ---------------- OPEN EDIT MODAL ---------------- */
@@ -899,7 +997,18 @@ export default function SaleInvoice() {
 
   /* ---------------- PRINT / PDF HANDLER ---------------- */
   const handlePrint = async (record) => {
-    const invId = record.id || record.sale_invoice_id;
+    const invId =
+      record?.id ||
+      record?.sale_invoice_id ||
+      record?.pk ||
+      record?.sale_invoice_uuid ||
+      record?.invoice_id;
+
+    if (!invId) {
+      message.error("Invoice ID not found");
+      return;
+    }
+
     try {
       message.loading({
         content: `Preparing Invoice PDF...`,
@@ -908,11 +1017,27 @@ export default function SaleInvoice() {
       const pdfBlob = await fetchSaleInvoicePDF(invId);
       const blobUrl = window.URL.createObjectURL(pdfBlob);
       const printWindow = window.open(blobUrl, "_blank");
-      if (!printWindow) throw new Error("Popup blocked. Please allow popups.");
-      message.success({ content: "PDF opened successfully", key: "print" });
+
+      // If browser blocked popup, trigger direct download
+      if (!printWindow) {
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = `Sale_Invoice_${record.sale_invoice_number || record.invoice_no || invId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+
+      message.success({
+        content: "Invoice PDF ready / opened successfully",
+        key: "print",
+      });
     } catch (err) {
-      console.error("Error printing invoice:", err);
-      message.error({ content: "Failed to download PDF", key: "print" });
+      console.error("Error downloading/printing invoice PDF:", err);
+      message.error({
+        content: err?.response?.data?.message || "Failed to download PDF",
+        key: "print",
+      });
     }
   };
 
@@ -1011,19 +1136,11 @@ export default function SaleInvoice() {
     {
       title: <span className="text-amber-700 font-semibold">Vehicle No</span>,
       dataIndex: "vehicle_no",
-      render: (val, r) => {
-        const v = val || r.vehicle_number;
-        return v ? (
-          <Tag
-            color="success"
-            className="font-bold text-xs px-2.5 py-0.5 bg-emerald-50 text-emerald-900 border border-emerald-400"
-          >
-            {v}
-          </Tag>
-        ) : (
-          "-"
-        );
-      },
+      render: (val, r) => (
+        <span className="font-semibold text-gray-900">
+          {val || r.vehicle_number || "-"}
+        </span>
+      ),
       width: 130,
     },
     {
@@ -1334,11 +1451,21 @@ export default function SaleInvoice() {
                   rules={[{ required: true, message: "Required" }]}
                 >
                   <AppDatePicker
+                    ref={invoiceDateRef}
                     className="w-full font-semibold"
                     style={{ height: "38px", fontSize: "13px" }}
                     disabledDate={(current) =>
                       createFinancialYearDisabledDate(selectedFY)(current)
                     }
+                    onTabComplete={() => {
+                      setTimeout(() => customerSelectRef.current?.focus(), 50);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        customerSelectRef.current?.focus();
+                      }
+                    }}
                   />
                 </Form.Item>
               </Col>
@@ -1361,10 +1488,20 @@ export default function SaleInvoice() {
                   rules={[{ required: true, message: "Select Customer" }]}
                 >
                   <Select
+                    ref={customerSelectRef}
                     placeholder="Select Customer"
                     showSearch
                     optionFilterProp="children"
                     onChange={handleCustomerChange}
+                    onSelect={() => {
+                      setTimeout(() => plantSelectRef.current?.focus(), 50);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        plantSelectRef.current?.focus();
+                      }
+                    }}
                     className="font-semibold"
                     style={{ height: "38px" }}
                   >
@@ -1423,12 +1560,22 @@ export default function SaleInvoice() {
                   rules={[{ required: true, message: "Select Plant" }]}
                 >
                   <Select
+                    ref={plantSelectRef}
                     placeholder="Select Plant"
                     showSearch
                     allowClear
                     optionFilterProp="children"
                     className="font-semibold"
                     style={{ height: "38px" }}
+                    onSelect={() => {
+                      setTimeout(() => brokerSelectRef.current?.focus(), 50);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        brokerSelectRef.current?.focus();
+                      }
+                    }}
                     onChange={(val) => {
                       const p = plants.find(
                         (item) =>
@@ -1477,12 +1624,22 @@ export default function SaleInvoice() {
                   name="broker_id"
                 >
                   <Select
+                    ref={brokerSelectRef}
                     placeholder="Select Broker"
                     showSearch
                     allowClear
                     optionFilterProp="children"
                     className="font-semibold"
                     style={{ height: "38px" }}
+                    onSelect={() => {
+                      setTimeout(() => vehicleSelectRef.current?.focus(), 50);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        vehicleSelectRef.current?.focus();
+                      }
+                    }}
                     onChange={(val) => {
                       if (val === "direct") {
                         form.setFieldsValue({ broker_name: "Direct" });
@@ -1534,6 +1691,7 @@ export default function SaleInvoice() {
                   rules={[{ required: true, message: "Select Vehicle" }]}
                 >
                   <Select
+                    ref={vehicleSelectRef}
                     placeholder={
                       !form.getFieldValue("customer_id")
                         ? "Select Customer First"
@@ -1545,6 +1703,15 @@ export default function SaleInvoice() {
                     allowClear
                     optionFilterProp="children"
                     onChange={handleVehicleChange}
+                    onSelect={() => {
+                      setTimeout(() => ewaybillNoRef.current?.focus(), 50);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        ewaybillNoRef.current?.focus();
+                      }
+                    }}
                     disabled={!form.getFieldValue("customer_id")}
                     className="font-semibold"
                     style={{ height: "38px" }}
@@ -1645,9 +1812,16 @@ export default function SaleInvoice() {
                   name="ewaybill_no"
                 >
                   <Input
+                    ref={ewaybillNoRef}
                     placeholder="Enter E-waybill No"
                     className="font-semibold"
                     style={{ height: "38px", fontSize: "13px" }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        ewaybillDateRef.current?.focus();
+                      }
+                    }}
                   />
                 </Form.Item>
               </Col>
@@ -1662,11 +1836,21 @@ export default function SaleInvoice() {
                   name="ewaybill_date"
                 >
                   <AppDatePicker
+                    ref={ewaybillDateRef}
                     className="w-full font-semibold"
                     style={{ height: "38px", fontSize: "13px" }}
                     disabledDate={(current) =>
                       createFinancialYearDisabledDate(selectedFY)(current)
                     }
+                    onTabComplete={() => {
+                      setTimeout(() => einvoiceNoRef.current?.focus(), 50);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        einvoiceNoRef.current?.focus();
+                      }
+                    }}
                   />
                 </Form.Item>
               </Col>
@@ -1681,9 +1865,16 @@ export default function SaleInvoice() {
                   name="einvoice_no"
                 >
                   <Input
+                    ref={einvoiceNoRef}
                     placeholder="Enter E-Invoice No"
                     className="font-semibold"
                     style={{ height: "38px", fontSize: "13px" }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        paymentDueDateRef.current?.focus();
+                      }
+                    }}
                   />
                 </Form.Item>
               </Col>
@@ -1698,11 +1889,21 @@ export default function SaleInvoice() {
                   name="payment_due_date"
                 >
                   <AppDatePicker
+                    ref={paymentDueDateRef}
                     className="w-full font-semibold"
                     style={{ height: "38px", fontSize: "13px" }}
                     disabledDate={(current) =>
                       createFinancialYearDisabledDate(selectedFY)(current)
                     }
+                    onTabComplete={() => {
+                      setTimeout(() => focusItemField(0, "qty"), 50);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        focusItemField(0, "qty");
+                      }
+                    }}
                   />
                 </Form.Item>
               </Col>
@@ -1719,7 +1920,7 @@ export default function SaleInvoice() {
             }}
             styles={{ body: { padding: "12px 16px" } }}
           >
-            <div style={{ minWidth: 1980 }}>
+            <div style={{ minWidth: 2150 }}>
               <div className="flex items-center justify-between mb-3">
                 <h6 className="text-amber-800 font-bold m-0 text-sm tracking-wider uppercase">
                   Items Table
@@ -1733,8 +1934,7 @@ export default function SaleInvoice() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns:
-                    "2.4fr 1.0fr 0.85fr 0.9fr 0.65fr 0.65fr 0.75fr 0.75fr 0.85fr 0.6fr 0.7fr 0.8fr 1.2fr 0.85fr 0.85fr 0.85fr 1.3fr 64px",
+                  gridTemplateColumns: ITEM_GRID_TEMPLATE,
                   gap: "8px",
                   alignItems: "center",
                   paddingBottom: "8px",
@@ -1774,8 +1974,7 @@ export default function SaleInvoice() {
                         key={field.key}
                         style={{
                           display: "grid",
-                          gridTemplateColumns:
-                            "2.4fr 1.0fr 0.85fr 0.9fr 0.65fr 0.65fr 0.75fr 0.75fr 0.85fr 0.6fr 0.7fr 0.8fr 1.2fr 0.85fr 0.85fr 0.85fr 1.3fr 64px",
+                          gridTemplateColumns: ITEM_GRID_TEMPLATE,
                           gap: "8px",
                           alignItems: "center",
                           marginBottom: "8px",
@@ -1789,14 +1988,22 @@ export default function SaleInvoice() {
                             rules={[{ required: true, message: "Select Item" }]}
                           >
                             <Select
+                              ref={(el) => (itemSelectRefs.current[field.name] = el)}
                               placeholder="Select Item / Product"
                               showSearch
                               optionFilterProp="children"
                               className="w-full font-bold"
                               style={{ height: "36px" }}
-                              onChange={(val) =>
-                                handleItemSelect(field.name, val)
-                              }
+                              onChange={(val) => {
+                                handleItemSelect(field.name, val);
+                                setTimeout(() => focusItemField(field.name, "qty"), 50);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  focusItemField(field.name, "qty");
+                                }
+                              }}
                             >
                               {contractItems.map((ci) => {
                                 const keyVal =
@@ -1806,8 +2013,7 @@ export default function SaleInvoice() {
                                   ci.souda_no;
                                 return (
                                   <Option key={keyVal} value={keyVal}>
-                                    {ci.item_name || ci.product_name} -{" "}
-                                    {ci.souda_no || "Contract"} (₹{ci.rate})
+                                    {ci.item_name || ci.product_name} - {ci.souda_no || "Contract"} (₹{ci.rate})
                                   </Option>
                                 );
                               })}
@@ -1888,12 +2094,20 @@ export default function SaleInvoice() {
                             rules={[{ required: true, message: "Required" }]}
                           >
                             <InputNumber
+                              ref={(el) => (itemQtyRefs.current[field.name] = el)}
                               min={0.001}
                               precision={2}
                               className="w-full border-amber-400! font-bold text-center text-gray-900"
                               placeholder="Invoice Qty"
                               style={{ height: "36px", fontSize: "13px" }}
+                              onFocus={(e) => setTimeout(() => e.target.select(), 0)}
                               onChange={() => handleItemFieldChange(field.name)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  focusItemField(field.name, "free_qty");
+                                }
+                              }}
                             />
                           </Form.Item>
                         </div>
@@ -1905,12 +2119,20 @@ export default function SaleInvoice() {
                             style={{ marginBottom: 0 }}
                           >
                             <InputNumber
+                              ref={(el) => (itemFreeQtyRefs.current[field.name] = el)}
                               min={0}
                               precision={2}
                               className="w-full text-center font-semibold"
                               placeholder="0"
                               style={{ height: "36px", fontSize: "13px" }}
+                              onFocus={(e) => setTimeout(() => e.target.select(), 0)}
                               onChange={() => handleItemFieldChange(field.name)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  focusItemField(field.name, "net_weight_kg");
+                                }
+                              }}
                             />
                           </Form.Item>
                         </div>
@@ -1942,11 +2164,19 @@ export default function SaleInvoice() {
                             style={{ marginBottom: 0 }}
                           >
                             <InputNumber
+                              ref={(el) => (itemNetWtRefs.current[field.name] = el)}
                               precision={3}
                               className="w-full text-center font-semibold"
                               placeholder="0.000"
                               style={{ height: "36px", fontSize: "13px" }}
+                              onFocus={(e) => setTimeout(() => e.target.select(), 0)}
                               onChange={() => handleItemFieldChange(field.name)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  focusItemField(field.name, "gross_weight_kg");
+                                }
+                              }}
                             />
                           </Form.Item>
                         </div>
@@ -1958,11 +2188,19 @@ export default function SaleInvoice() {
                             style={{ marginBottom: 0 }}
                           >
                             <InputNumber
+                              ref={(el) => (itemGrossWtRefs.current[field.name] = el)}
                               precision={3}
                               className="w-full text-center font-semibold"
                               placeholder="0.000"
                               style={{ height: "36px", fontSize: "13px" }}
+                              onFocus={(e) => setTimeout(() => e.target.select(), 0)}
                               onChange={() => handleItemFieldChange(field.name)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  focusItemField(field.name, "rate");
+                                }
+                              }}
                             />
                           </Form.Item>
                         </div>
@@ -1975,12 +2213,20 @@ export default function SaleInvoice() {
                             rules={[{ required: true, message: "Rate" }]}
                           >
                             <InputNumber
+                              ref={(el) => (itemRateRefs.current[field.name] = el)}
                               min={0}
                               precision={2}
                               className="w-full text-center font-bold"
                               placeholder="Rate"
                               style={{ height: "36px", fontSize: "13px" }}
+                              onFocus={(e) => setTimeout(() => e.target.select(), 0)}
                               onChange={() => handleItemFieldChange(field.name)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  focusItemField(field.name, "discount_percent");
+                                }
+                              }}
                             />
                           </Form.Item>
                         </div>
@@ -2013,6 +2259,7 @@ export default function SaleInvoice() {
                             style={{ marginBottom: 0 }}
                           >
                             <InputNumber
+                              ref={(el) => (itemDiscPercentRefs.current[field.name] = el)}
                               min={0}
                               max={100}
                               step={0.1}
@@ -2020,7 +2267,19 @@ export default function SaleInvoice() {
                               className="w-full text-center font-semibold"
                               placeholder="0%"
                               style={{ height: "36px", fontSize: "13px" }}
+                              onFocus={(e) => setTimeout(() => e.target.select(), 0)}
                               onChange={() => handleItemFieldChange(field.name)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  const allItems = form.getFieldValue("items") || [];
+                                  if (field.name < allItems.length - 1) {
+                                    focusItemField(field.name + 1, "qty");
+                                  } else {
+                                    dispatchFromRef.current?.focus();
+                                  }
+                                }
+                              }}
                             />
                           </Form.Item>
                         </div>
@@ -2197,24 +2456,23 @@ export default function SaleInvoice() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns:
-                    "2.4fr 1.0fr 0.85fr 0.9fr 0.65fr 0.65fr 0.75fr 0.75fr 0.85fr 0.6fr 0.7fr 0.8fr 1.2fr 0.85fr 0.85fr 0.85fr 1.3fr 64px",
+                  gridTemplateColumns: ITEM_GRID_TEMPLATE,
                   gap: "8px",
                   alignItems: "center",
                 }}
               >
                 {/* 1. Item Name / Total Label */}
-                <div className="flex items-center h-[38px]">
+                <div className="flex items-center h-[36px]">
                   <span className="font-extrabold text-amber-950 text-sm tracking-wide">
                     Total:
                   </span>
                 </div>
 
                 {/* 2. Souda Spacer */}
-                <div></div>
+                <div className="flex items-center justify-center text-gray-400 font-bold">-</div>
 
                 {/* 3. Contract Qty Spacer */}
-                <div></div>
+                <div className="flex items-center justify-center text-gray-400 font-bold">-</div>
 
                 {/* 4. Total Invoice Qty */}
                 <div>
@@ -2222,14 +2480,14 @@ export default function SaleInvoice() {
                     <InputNumber
                       disabled
                       precision={2}
-                      className="w-full bg-gray-100! font-bold text-center text-gray-900"
+                      className="w-full bg-amber-50! font-bold text-center text-amber-950 border-amber-300!"
                       style={{
                         width: "100%",
-                        color: "#111827",
-                        WebkitTextFillColor: "#111827",
+                        color: "#78350F",
+                        WebkitTextFillColor: "#78350F",
                         fontWeight: 700,
-                        fontSize: "14px",
-                        height: "38px",
+                        fontSize: "13px",
+                        height: "36px",
                       }}
                     />
                   </Form.Item>
@@ -2241,36 +2499,36 @@ export default function SaleInvoice() {
                     <InputNumber
                       disabled
                       precision={2}
-                      className="w-full bg-gray-100! font-bold text-center text-gray-900"
+                      className="w-full bg-amber-50! font-bold text-center text-amber-950 border-amber-300!"
                       style={{
                         width: "100%",
-                        color: "#111827",
-                        WebkitTextFillColor: "#111827",
+                        color: "#78350F",
+                        WebkitTextFillColor: "#78350F",
                         fontWeight: 700,
-                        fontSize: "14px",
-                        height: "38px",
+                        fontSize: "13px",
+                        height: "36px",
                       }}
                     />
                   </Form.Item>
                 </div>
 
                 {/* 6. Unit Spacer */}
-                <div></div>
+                <div className="flex items-center justify-center text-gray-400 font-bold">-</div>
 
                 {/* 7. Net Wt Spacer */}
-                <div></div>
+                <div className="flex items-center justify-center text-gray-400 font-bold">-</div>
 
                 {/* 8. Gr Wt Spacer */}
-                <div></div>
+                <div className="flex items-center justify-center text-gray-400 font-bold">-</div>
 
                 {/* 9. Rate Spacer */}
-                <div></div>
+                <div className="flex items-center justify-center text-gray-400 font-bold">-</div>
 
                 {/* 10. GST Spacer */}
-                <div></div>
+                <div className="flex items-center justify-center text-gray-400 font-bold">-</div>
 
                 {/* 11. Disc % Spacer */}
-                <div></div>
+                <div className="flex items-center justify-center text-gray-400 font-bold">-</div>
 
                 {/* 12. Total Disc Amt */}
                 <div>
@@ -2281,15 +2539,15 @@ export default function SaleInvoice() {
                     <InputNumber
                       disabled
                       precision={2}
-                      className="w-full bg-gray-100! font-bold text-center text-gray-900"
+                      className="w-full bg-amber-50! font-bold text-center text-amber-950 border-amber-300!"
                       placeholder="0.00"
                       style={{
                         width: "100%",
-                        color: "#111827",
-                        WebkitTextFillColor: "#111827",
+                        color: "#78350F",
+                        WebkitTextFillColor: "#78350F",
                         fontWeight: 700,
                         fontSize: "13px",
-                        height: "38px",
+                        height: "36px",
                       }}
                     />
                   </Form.Item>
@@ -2304,14 +2562,14 @@ export default function SaleInvoice() {
                     <InputNumber
                       disabled
                       precision={2}
-                      className="w-full bg-gray-100! font-bold text-center text-gray-900"
+                      className="w-full bg-amber-50! font-bold text-center text-amber-950 border-amber-300!"
                       style={{
                         width: "100%",
-                        color: "#111827",
-                        WebkitTextFillColor: "#111827",
+                        color: "#78350F",
+                        WebkitTextFillColor: "#78350F",
                         fontWeight: 700,
-                        fontSize: "14px",
-                        height: "38px",
+                        fontSize: "13px",
+                        height: "36px",
                       }}
                     />
                   </Form.Item>
@@ -2323,15 +2581,15 @@ export default function SaleInvoice() {
                     <InputNumber
                       disabled
                       precision={2}
-                      className="w-full bg-gray-100! font-bold text-center text-gray-900"
+                      className="w-full bg-amber-50! font-bold text-center text-amber-950 border-amber-300!"
                       placeholder="0.00"
                       style={{
                         width: "100%",
-                        color: "#111827",
-                        WebkitTextFillColor: "#111827",
+                        color: "#78350F",
+                        WebkitTextFillColor: "#78350F",
                         fontWeight: 700,
-                        fontSize: "14px",
-                        height: "38px",
+                        fontSize: "13px",
+                        height: "36px",
                       }}
                     />
                   </Form.Item>
@@ -2343,15 +2601,15 @@ export default function SaleInvoice() {
                     <InputNumber
                       disabled
                       precision={2}
-                      className="w-full bg-gray-100! font-bold text-center text-gray-900"
+                      className="w-full bg-amber-50! font-bold text-center text-amber-950 border-amber-300!"
                       placeholder="0.00"
                       style={{
                         width: "100%",
-                        color: "#111827",
-                        WebkitTextFillColor: "#111827",
+                        color: "#78350F",
+                        WebkitTextFillColor: "#78350F",
                         fontWeight: 700,
-                        fontSize: "14px",
-                        height: "38px",
+                        fontSize: "13px",
+                        height: "36px",
                       }}
                     />
                   </Form.Item>
@@ -2363,15 +2621,15 @@ export default function SaleInvoice() {
                     <InputNumber
                       disabled
                       precision={2}
-                      className="w-full bg-gray-100! font-bold text-center text-gray-900"
+                      className="w-full bg-amber-50! font-bold text-center text-amber-950 border-amber-300!"
                       placeholder="0.00"
                       style={{
                         width: "100%",
-                        color: "#111827",
-                        WebkitTextFillColor: "#111827",
+                        color: "#78350F",
+                        WebkitTextFillColor: "#78350F",
                         fontWeight: 700,
-                        fontSize: "14px",
-                        height: "38px",
+                        fontSize: "13px",
+                        height: "36px",
                       }}
                     />
                   </Form.Item>
@@ -2383,14 +2641,14 @@ export default function SaleInvoice() {
                     <InputNumber
                       disabled
                       precision={2}
-                      className="w-full bg-amber-100! font-bold text-amber-950 text-center border border-amber-400!"
+                      className="w-full bg-amber-100! font-black text-amber-950 text-center border-2 border-amber-400!"
                       style={{
                         width: "100%",
                         color: "#78350F",
                         WebkitTextFillColor: "#78350F",
                         fontWeight: 800,
-                        fontSize: "15px",
-                        height: "38px",
+                        fontSize: "14px",
+                        height: "36px",
                       }}
                     />
                   </Form.Item>
@@ -2469,9 +2727,16 @@ export default function SaleInvoice() {
                   name="dispatch_from"
                 >
                   <Input
+                    ref={dispatchFromRef}
                     placeholder="Origin location"
                     className="font-semibold"
                     style={{ height: "38px", fontSize: "13px" }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        shipToRef.current?.focus();
+                      }
+                    }}
                   />
                 </Form.Item>
               </Col>
@@ -2486,9 +2751,16 @@ export default function SaleInvoice() {
                   name="ship_to"
                 >
                   <Input
+                    ref={shipToRef}
                     placeholder="Destination city"
                     className="font-semibold"
                     style={{ height: "38px", fontSize: "13px" }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        distanceKmRef.current?.focus();
+                      }
+                    }}
                   />
                 </Form.Item>
               </Col>
@@ -2506,10 +2778,18 @@ export default function SaleInvoice() {
                   ]}
                 >
                   <InputNumber
+                    ref={distanceKmRef}
                     placeholder="Enter Distance (KM)"
                     className="w-full font-semibold border-amber-300!"
                     min={0}
                     style={{ height: "38px", fontSize: "13px" }}
+                    onFocus={(e) => setTimeout(() => e.target.select(), 0)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        roundOffRef.current?.focus();
+                      }
+                    }}
                   />
                 </Form.Item>
               </Col>
@@ -2555,12 +2835,20 @@ export default function SaleInvoice() {
                   name="round_off_amount"
                 >
                   <InputNumber
+                    ref={roundOffRef}
                     className="w-full font-semibold border-amber-300!"
                     onChange={() => recalculateAllTotals()}
                     precision={2}
                     step={0.01}
                     placeholder="0.00"
                     style={{ height: "38px", fontSize: "13px" }}
+                    onFocus={(e) => setTimeout(() => e.target.select(), 0)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleSubmit();
+                      }
+                    }}
                   />
                 </Form.Item>
               </Col>
@@ -2668,12 +2956,10 @@ export default function SaleInvoice() {
                 </Col>
                 <Col span={4}>
                   <Text type="secondary">Vehicle No:</Text>
-                  <div>
-                    <Tag color="success" className="font-bold">
-                      {viewRecord.vehicle_no ||
-                        viewRecord.vehicle_number ||
-                        "-"}
-                    </Tag>
+                  <div className="font-semibold text-gray-900">
+                    {viewRecord.vehicle_no ||
+                      viewRecord.vehicle_number ||
+                      "-"}
                   </div>
                 </Col>
 
