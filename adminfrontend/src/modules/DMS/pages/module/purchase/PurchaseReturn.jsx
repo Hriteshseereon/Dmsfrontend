@@ -135,8 +135,56 @@ export default function StockInTransit() {
   const fetchDeposList = async () => {
     try {
       const res = await getDepoDetails();
-      const list = Array.isArray(res) ? res : res?.data || res?.results || [];
-      setDeposList(list);
+      const rawList = Array.isArray(res)
+        ? res
+        : Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res?.results)
+        ? res.results
+        : Array.isArray(res?.data?.results)
+        ? res.data.results
+        : [];
+
+      const normalizedList = rawList
+        .map((d, index) => {
+          if (typeof d === "string") {
+            return { id: d, name: d, short_name: "" };
+          }
+          const name =
+            d.name ||
+            d.depot_name ||
+            d.branch_name ||
+            d.depo_name ||
+            d.title ||
+            d.depot?.name ||
+            d.branch?.name ||
+            "";
+          const shortName =
+            d.short_name ||
+            d.branch_short_name ||
+            d.depot_short_name ||
+            d.code ||
+            d.depot?.short_name ||
+            d.branch?.short_name ||
+            "";
+          const id =
+            d.id ||
+            d.branch_id ||
+            d.depot_id ||
+            d.depo_id ||
+            d.pk ||
+            name ||
+            `depo_${index}`;
+          return {
+            ...d,
+            id,
+            name,
+            short_name: shortName,
+          };
+        })
+        .filter((d) => Boolean(d.name));
+
+      setDeposList(normalizedList);
     } catch (err) {
       console.warn("Could not load depo/branches list:", err);
     }
@@ -984,6 +1032,7 @@ export default function StockInTransit() {
             ? values.received_place || selectedVehicle?.place || "Bhadrak"
             : null,
         depo: values.to_be_received_at !== "direct" ? values.depo : null,
+        depo_name: values.to_be_received_at !== "direct" ? values.depo : null,
         status: "Received",
         items: (values.items || []).map((item) => ({
           purchase_invoice_item_id: item.purchase_invoice_item_id,
@@ -1980,27 +2029,36 @@ export default function StockInTransit() {
                       placeholder="Select Depot / Branch"
                       className="w-full font-medium"
                       showSearch
-                      optionFilterProp="label"
+                      optionLabelProp="label"
+                      optionFilterProp="filterText"
                       allowClear
                     >
-                      {deposList.map((d) => (
-                        <Option
-                          key={d.id || d.name}
-                          value={d.name}
-                          label={`${d.name} ${d.short_name ? `(${d.short_name})` : ""}`}
-                        >
-                          <div className="flex justify-between items-center">
-                            <span className="font-semibold text-gray-800">
-                              {d.name}
-                            </span>
-                            {d.short_name && (
-                              <Tag color="purple" className="ml-2 font-medium">
-                                {d.short_name}
-                              </Tag>
-                            )}
-                          </div>
-                        </Option>
-                      ))}
+                      {deposList.map((d) => {
+                        const displayName = d.name;
+                        const shortCode = d.short_name;
+                        const labelText = shortCode
+                          ? `${displayName} (${shortCode})`
+                          : displayName;
+                        return (
+                          <Option
+                            key={d.id || displayName}
+                            value={displayName}
+                            label={labelText}
+                            filterText={`${displayName} ${shortCode || ""}`}
+                          >
+                            <div className="flex justify-between items-center py-0.5">
+                              <span className="font-semibold text-gray-800">
+                                {displayName}
+                              </span>
+                              {shortCode && (
+                                <Tag color="purple" className="ml-2 font-medium">
+                                  {shortCode}
+                                </Tag>
+                              )}
+                            </div>
+                          </Option>
+                        );
+                      })}
                     </Select>
                   </Form.Item>
                 </Col>
