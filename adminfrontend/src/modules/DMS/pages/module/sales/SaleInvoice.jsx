@@ -1,1218 +1,2858 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Table,
+  Input,
   Button,
+  message,
+  Modal,
   Form,
   Select,
   InputNumber,
   Row,
   Col,
   Card,
-  Modal,
-  Spin,
-  message,
-  Input,
-  DatePicker,
-  Checkbox
+  Upload,
+  Typography,
+  Tag,
+  Divider,
+  Space,
+  Tooltip,
+  Popconfirm,
 } from "antd";
 import {
-  PlusOutlined,
-  FileTextOutlined,
-  ReloadOutlined,
-  DownloadOutlined,
   SearchOutlined,
   FilterOutlined,
-    PrinterOutlined,
-    EditOutlined
+  PlusOutlined,
+  DownloadOutlined,
+  UploadOutlined,
+  DeleteOutlined,
+  EyeOutlined,
+  EditOutlined,
+  PrinterOutlined,
+  FilePdfOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
-import { getEligibleOrders, getSalesOrderById ,getItemByOrderId,getInvoiceDropdownData,createInvoice,getInvoiceById,getInvoices,updateInvoice,downloadInvoicePDF,fetchInvoicePDF} from "../../../../../api/sales";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+
 import { exportToExcel } from "../../../../../utils/exportToExcel";
+import {
+  getNextSaleInvoiceNumber,
+  getSaleInvoiceCustomers,
+  getSaleInvoicePlants,
+  getSaleInvoiceBrokers,
+  getSaleInvoiceIntransitVehicles,
+  getSaleInvoiceCustomerContractItems,
+  createSaleInvoice,
+  getSaleInvoices,
+  updateSaleInvoice,
+  deleteSaleInvoice,
+  fetchSaleInvoicePDF,
+} from "../../../../../api/sales";
+import {
+  createFinancialYearDisabledDate,
+  useSelectedFinancialYear,
+} from "../../../../../utils/financialYearValidation";
+import AppDatePicker from "../../../../../components/AppDatePicker";
+import useSessionStore from "../../../../../store/sessionStore";
+
+dayjs.extend(customParseFormat);
+
+const { Option } = Select;
+const { Text } = Typography;
+
+const parseApiDate = (value) => {
+  if (!value) return null;
+  const d = dayjs(value);
+  return d.isValid() ? d : null;
+};
+
+const fmtDate = (value) => {
+  if (!value) return "-";
+  const d = dayjs(value);
+  return d.isValid() ? d.format("DD-MM-YYYY") : "-";
+};
+
+// Helper to extract array from any DRF response structure
+const extractArray = (res) => {
+  if (!res) return [];
+  if (Array.isArray(res)) return res;
+  if (Array.isArray(res?.data)) return res.data;
+  if (Array.isArray(res?.results)) return res.results;
+  if (Array.isArray(res?.data?.results)) return res.data.results;
+  if (Array.isArray(res?.data?.data)) return res.data.data;
+  return [];
+};
+
+// GST Helper: Checks if customer GST starts with "21" (Odisha - Intra State)
+const isIntraStateGst = (gstNo) => {
+  if (!gstNo) return true; // default to intra-state if not specified
+  const cleanGst = String(gstNo).trim();
+  return cleanGst.startsWith("21");
+};
+
 export default function SaleInvoice() {
   const [form] = Form.useForm();
-  const [itemOptions, setItemOptions] = useState([]);
-const [selectedItem, setSelectedItem] = useState(null);
-  const [savedInvoices, setSavedInvoices] = useState([]);
-  const [orderOptions, setOrderOptions] = useState([]);
-  const [orderDetails, setOrderDetails] = useState(null);
-  const [itemsWithDelivery, setItemsWithDelivery] = useState([]);
-  const [invoiceDate, setInvoiceDate] = useState(null);
-  const [loadingOrders, setLoadingOrders] = useState(false);
-  const [loadingOrder, setLoadingOrder] = useState(false);
-const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-const [editingInvoiceId, setEditingInvoiceId] = useState(null);
-const [editItems, setEditItems] = useState([]);
-  const [selectedOrderId, setSelectedOrderId] = useState(undefined);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-const [editOrderId, setEditOrderId] = useState(null);
-const [editItemOptions, setEditItemOptions] = useState([]);
-const [editSelectedItems, setEditSelectedItems] = useState([]);
-const [searchText, setSearchText] = useState("");
-const [filteredInvoices, setFilteredInvoices] = useState([]);
-const [customerWallet, setCustomerWallet] = useState(null);
-const [debitAdjustedAmount, setDebitAdjustedAmount] = useState(0);
-const [countAsCredit, setCountAsCredit] = useState(false);
-const [editCustomerWallet, setEditCustomerWallet] = useState(null);
-const [editDebitAdjustedAmount, setEditDebitAdjustedAmount] = useState(0);
-const [editCountAsCredit, setEditCountAsCredit] = useState(false);
+  const selectedFY = useSelectedFinancialYear();
+  const currentOrgId = useSessionStore((state) => state.currentOrgId);
+
+  // Main list states
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [searchText, setSearchText] = useState("");
+
+  // Master Dropdown Data
+  const [customers, setCustomers] = useState([]);
+  const [plants, setPlants] = useState([]);
+  const [brokers, setBrokers] = useState([]);
+  const [intransitVehicles, setIntransitVehicles] = useState([]);
+  const [contractItems, setContractItems] = useState([]);
+
+  // Selected Customer metadata
+  const [selectedCustomerGst, setSelectedCustomerGst] = useState("");
+
+  // Modal states
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [viewRecord, setViewRecord] = useState(null);
+  const [fileList, setFileList] = useState([]);
+  const [editingDocUrl, setEditingDocUrl] = useState(null);
+
+  /* ---------------- FETCH INITIAL DATA ---------------- */
   useEffect(() => {
-    fetchOrderOptions();
     fetchInvoices();
-  }, []);
+    loadMasterDropdowns();
+  }, [selectedFY, currentOrgId]);
 
-  /* ---------------- FETCH ORDERS ---------------- */
-
-  const fetchOrderOptions = async () => {
-    setLoadingOrders(true);
+  const loadMasterDropdowns = async () => {
     try {
-      const res = await getEligibleOrders();
-     const options = (res || []).map((o) => ({
-  value: o.sales_order_id,          // ✅ id sent to backend
-  label: `${o.sales_order_number} - ${o.customer_name}`,  // ✅ visible in dropdown
-}));
-      setOrderOptions(options);
+      const [custRes, plantRes, brokerRes] = await Promise.allSettled([
+        getSaleInvoiceCustomers(),
+        getSaleInvoicePlants(),
+        getSaleInvoiceBrokers(),
+      ]);
+
+      if (custRes.status === "fulfilled" && custRes.value) {
+        const custList = extractArray(custRes.value);
+        setCustomers(custList);
+      }
+
+      if (plantRes.status === "fulfilled" && plantRes.value) {
+        const plantList = extractArray(plantRes.value);
+        setPlants(plantList);
+      }
+
+      if (brokerRes.status === "fulfilled" && brokerRes.value) {
+        const brokerList = extractArray(brokerRes.value);
+        setBrokers(brokerList);
+      }
     } catch (err) {
-      console.error("Failed to fetch sales orders:", err);
-      message.error("Failed to load sales orders");
-    } finally {
-      setLoadingOrders(false);
+      console.error("Error loading master dropdowns:", err);
     }
   };
 
-
-const handlePrint = async (record) => {
-  try {
-    message.loading({
-      content: `Preparing Invoice ${record.invoiceNumber} for print...`,
-      key: "print",
-    });
-
-    // Fetch the PDF from your backend
-    const pdfBlob = await fetchInvoicePDF(record.id); // must return Blob
-
-    // Create a blob URL
-    const blobUrl = window.URL.createObjectURL(pdfBlob);
-
-    // Open in new tab
-    const printWindow = window.open(blobUrl, "_blank");
-    if (!printWindow) throw new Error("Popup blocked. Please allow popups.");
-
-    message.success({
-      content: `Invoice ${record.invoiceNumber} ready!`,
-      key: "print",
-      duration: 2,
-    });
-
-    // Optional: you can auto-call print after PDF loads
-    printWindow.onload = () => {
-      printWindow.focus();
-      printWindow.print();
-    };
-  } catch (error) {
-    console.error(error);
-    message.error({
-      content: "Failed to open invoice for printing",
-      key: "print",
-      duration: 2,
-    });
-  }
-};
-
-const fetchInvoices = async () => {
-  try {
-    const res = await getInvoices();
-
-    const rows = (res || []).map((inv) => ({
-      id: inv.id,
-       sales_order_id: inv.sales_order_id,
-      invoiceNumber: inv.sale_invoice_number,
-      orderNumber: inv.order_number,
-      customerName: inv.customer_name,
-      invoiceDate: inv.invoice_date,
-      deliveredAmount: inv.payable_amount,
-          }));
-
-    setSavedInvoices(rows);
-    setFilteredInvoices(rows);
-
-
-  } catch (error) {
-    console.error(error);
-    message.error("Failed to load invoices");
-  }
-};
-
-const handleSearch = (value) => {
-  setSearchText(value);
-
-  if (!value) {
-    setFilteredInvoices(savedInvoices);
-    return;
-  }
-
-  const filtered = savedInvoices.filter((item) =>
-    JSON.stringify(item).toLowerCase().includes(value.toLowerCase())
-  );
-
-  setFilteredInvoices(filtered);
-};
-
-
-const handleDownload = async (record) => {
-  try {
-    message.loading({ content: `Downloading Invoice ${record.invoiceNumber}...`, key: 'download' });
-    await downloadInvoicePDF(record.id);
-    message.success({ content: `Invoice ${record.invoiceNumber} downloaded!`, key: 'download', duration: 2 });
-  } catch (error) {
-    console.error(error);
-    message.error({ content: `Failed to download invoice`, key: 'download', duration: 2 });
-  }
-};
-
-  /* ---------------- ORDER SELECT ---------------- */
-
- const onOrderSelect = async (orderId) => {
-  setSelectedOrderId(orderId);
-  setItemOptions([]);
-  setSelectedItem(null);
-
-  if (!orderId) return;
-
-  try {
-    // ✅ fetch order details
-    const order = await getSalesOrderById(orderId);
-   setOrderDetails({
-  ...order,
-  delivery_date: order.delivery_date
-});
-
-    // ✅ fetch order items
-    const items = await getItemByOrderId(orderId);
-
-    const options = (items || []).map((item) => ({
-      value: item.product_id,
-      label: item.product_name,
-    }));
-
-    setItemOptions(options);
-  } catch (err) {
-    console.error(err);
-    message.error("Failed to fetch order details");
-  }
-};
-
-const onItemSelect = async (product_ids) => {
-  try {
-    setLoadingOrder(true);
-
-   const res = await getInvoiceDropdownData(selectedOrderId, product_ids);
-setCustomerWallet(res.customer_wallet);
-// ✅ SET DELIVERY DATE HERE
-setOrderDetails(prev => ({
-  ...prev,
-  delivery_date: res.delivery_date
-}));
-
-const items = res?.items || res;
-
-   const rows = items.map((item, index) => {
-  const rate = Number(item.rate || 0);
-  const deliveredQty = Number(item.suggested_delivered_qty || 0);
-  const requiredQty = Number(item.required_qty || 0);
-  const creditedQty = Math.max(0, requiredQty - deliveredQty);
-
-  return {
-    key: item.sales_order_item_id || index,
-    itemId: item.sales_order_item_id,
-    productId: item.product_id,
-    productName: item.product_name,
-    uom: item.uom_name || "-",
-    rate,
-    requiredQty,
-    deliveredQty,
-    creditedQty,
-    deliveredAmount: deliveredQty * rate,   // ✅ added
-    creditedAmount: creditedQty * rate      // ✅ added
+  const fetchInvoices = async () => {
+    setLoading(true);
+    try {
+      const res = await getSaleInvoices();
+      const list = extractArray(res);
+      setInvoices(list);
+    } catch (err) {
+      console.error("Error fetching sale invoices:", err);
+      message.error("Failed to load sale invoices");
+    } finally {
+      setLoading(false);
+    }
   };
-});
 
-    setItemsWithDelivery(rows);
+  /* ---------------- CUSTOMER CHANGE HANDLER ---------------- */
+  const handleCustomerChange = async (customerId) => {
+    const cust = customers.find(
+      (c) => String(c.id || c.customer_id || c.pk) === String(customerId)
+    );
+    if (!cust) return;
 
-    // delivered qty autofill
+    const custName = cust.name || cust.customer_name || cust.company_name || "";
+    const custGst = cust.gst_number || cust.gst || cust.customer_gst || "";
+    const place = cust.place || cust.city || cust.billing_city || cust.address_city || "";
+
+    setSelectedCustomerGst(custGst);
+
     form.setFieldsValue({
-      items: rows.map((r) => ({
-        deliveredQty: r.deliveredQty,
-      })),
+      customer_id: customerId,
+      customer_name: custName,
+      customer_gst: custGst,
+      place: place,
+      ship_to: place,
+      vehicle_no: undefined,
+      transport_name: undefined,
+      lr_no: undefined,
+      lr_date: null,
+      payment_due_date: null,
+      dispatch_from: undefined,
     });
 
-    // ✅ set today invoice date
-    setInvoiceDate(dayjs());
+    // Load in-transit vehicles and contract items for this customer
+    try {
+      const [vehRes, itemRes] = await Promise.allSettled([
+        getSaleInvoiceIntransitVehicles(customerId),
+        getSaleInvoiceCustomerContractItems(customerId),
+      ]);
 
-  } catch (err) {
-    console.error(err);
-    message.error("Failed to load items");
-  } finally {
-    setLoadingOrder(false);
-  }
-};
-  /* ---------------- DELIVERED CHANGE ---------------- */
+      if (vehRes.status === "fulfilled" && vehRes.value) {
+        const vList = extractArray(vehRes.value);
+        setIntransitVehicles(vList);
+      } else {
+        setIntransitVehicles([]);
+      }
 
-// ---------- Step 1: reusable calculation ----------
-const updateItemAmounts = (items, value, index) => {
-  const numVal = Number(value) || 0;
-  const next = [...items];
-  const required = Number(next[index].requiredQty) || 0;
-  const rate = Number(next[index].rate) || 0;
-  const creditedQty = Math.max(0, required - numVal);
+      if (itemRes.status === "fulfilled" && itemRes.value) {
+        const iList = extractArray(itemRes.value);
+        setContractItems(iList);
 
-  next[index] = {
-    ...next[index],
-    deliveredQty: numVal,
-    creditedQty,
-    deliveredAmount: numVal * rate,
-    creditedAmount: creditedQty * rate,
+        // Auto populate all contract items into the items table
+        if (iList && iList.length > 0) {
+          const isIntra = isIntraStateGst(custGst);
+          const mappedItems = iList.map((ci) => {
+            const actualQty = Number(ci.qty || ci.actual_qty || 0);
+            const freeQty = Number(ci.free_qty || 0);
+            const rate = Number(ci.rate || 0);
+            const gstPercent = Number(ci.gst_percent || 0);
+            const discPercent = Number(ci.discount_percent || 0);
+            const netWeightKg = Number(ci.net_weight_kg || 0);
+            const grossWeightKg = Number(ci.gross_weight_kg || netWeightKg);
+
+            const invoiceQty = actualQty; // Default billing quantity to contract quantity
+            const discAmt = Number(((invoiceQty * rate * discPercent) / 100).toFixed(2));
+            const taxableAmt = Number((invoiceQty * rate - discAmt).toFixed(2));
+
+            let sgst = 0;
+            let cgst = 0;
+            let igst = 0;
+
+            if (isIntra) {
+              sgst = Number(((taxableAmt * gstPercent) / 200).toFixed(2));
+              cgst = Number(((taxableAmt * gstPercent) / 200).toFixed(2));
+            } else {
+              igst = Number(((taxableAmt * gstPercent) / 100).toFixed(2));
+            }
+
+            const totalAmt = Number((taxableAmt + sgst + cgst + igst).toFixed(2));
+
+            return {
+              sale_contract_id: ci.sale_contract_id,
+              sale_contract_uuid: ci.sale_contract_uuid,
+              sale_contract_item_id: ci.sale_contract_item_id,
+              product_id: ci.product_id,
+              item_name: ci.item_name || ci.product_name,
+              product_name: ci.product_name || ci.item_name,
+              souda_no: ci.souda_no || "-",
+              unit: ci.unit || "PACKATE",
+              actual_qty: actualQty,
+              qty: invoiceQty,
+              free_qty: freeQty,
+              rate: rate,
+              gst_percent: gstPercent,
+              discount_percent: discPercent,
+              discount_amount: discAmt,
+              taxable_amount: taxableAmt,
+              sgst_amount: sgst,
+              cgst_amount: cgst,
+              igst_amount: igst,
+              total_amount: totalAmt,
+              net_weight_kg: netWeightKg,
+              gross_weight_kg: grossWeightKg,
+            };
+          });
+
+          form.setFieldsValue({ items: mappedItems });
+          setTimeout(() => recalculateAllTotals(), 50);
+        } else {
+          form.setFieldsValue({
+            items: [
+              {
+                actual_qty: 0,
+                qty: 1,
+                free_qty: 0,
+                discount_percent: 0,
+                discount_amount: 0,
+                taxable_amount: 0,
+                sgst_amount: 0,
+                cgst_amount: 0,
+                igst_amount: 0,
+                total_amount: 0,
+              },
+            ],
+          });
+          recalculateAllTotals();
+        }
+      } else {
+        setContractItems([]);
+      }
+    } catch (err) {
+      console.error("Error loading customer dependent data:", err);
+    }
   };
 
-  return next;
-};
+  /* ---------------- VEHICLE CHANGE HANDLER ---------------- */
+  const handleVehicleChange = (vehicleNo) => {
+    const veh = intransitVehicles.find(
+      (v) => String(v.vehicle_no || v.vehicle_number) === String(vehicleNo)
+    );
+    if (!veh) return;
 
+    const custGst = form.getFieldValue("customer_gst") || selectedCustomerGst;
+    const isIntra = isIntraStateGst(custGst);
 
-const onDeliveredQtyChange = (value, index) => {
-  setItemsWithDelivery(prev => updateItemAmounts(prev, value, index));
-};
-
-
-  /* ---------------- TOTALS ---------------- */
-
-const getTotals = (items) => {
-  let totalAmount = 0;
-  let creditedQuantityAmount = 0;
-
-  items.forEach(row => {
-    totalAmount += Number(row.deliveredAmount) || 0;
-    creditedQuantityAmount += Number(row.creditedAmount) || 0;
-  });
-
-  return { totalAmount, creditedQuantityAmount };
-};
-
-
- const { totalAmount, creditedQuantityAmount } = 
-  orderDetails && itemsWithDelivery.length
-    ? getTotals(itemsWithDelivery)
-    : { totalAmount: 0, creditedQuantityAmount: 0 };
-const adjustedDeliveredAmount = totalAmount - (debitAdjustedAmount || 0);
-  /* ---------------- SAVE INVOICE ---------------- */
-const handleSubmit = async (values) => {
-  try {
-    const order = await getSalesOrderById(selectedOrderId);
-
-   const payload = {
-  sales_order_id: selectedOrderId,
-  customer_id: order.customer_id,
-  invoice_date: invoiceDate
-    ? invoiceDate.format("YYYY-MM-DD")
-    : dayjs().format("YYYY-MM-DD"),
-  debit_adjusted_amount: debitAdjustedAmount || 0,   
-  count_as_credit: countAsCredit,                    
- items: itemsWithDelivery.map((row) => ({
-  sales_order_item_id: row.itemId,
-  product_id: row.productId,
-  product_name: row.productName,
-  uom_name: row.uom || null,
-  required_qty: row.requiredQty,
-
-  delivered_qty: row.deliveredQty,
-  delivered_amount: row.deliveredAmount || 0,   // ✅ send
-
-  credited_qty: row.creditedQty,
-  credited_amount: row.creditedAmount || 0,     // ✅ send
-
-  rate: row.rate
-}))
-};
-
-    await createInvoice(payload);
-
-    message.success("Invoice created successfully");
-    fetchInvoices(); 
-    closeModal();
-
-  } catch (err) {
-    console.error(err);
-    message.error("Failed to create invoice");
-  }
-};
-const onEditItemSelect = async (product_ids) => {
-  try {
-    const res = await getInvoiceDropdownData(editOrderId, product_ids);
-setEditCustomerWallet(
-  res.customer_wallet || {
-    credit_balance: res.credit_balance || 0,
-    debit_balance: res.debit_balance || 0
-  }
-);
-    const items = res?.items || res;
-
-    const rows = items.map((item, index) => {
-      const rate = Number(item.rate || 0);
-      const deliveredQty = Number(item.suggested_delivered_qty || 0);
-      const requiredQty = Number(item.required_qty || 0);
-      const creditedQty = Math.max(0, requiredQty - deliveredQty);
-
-      return {
-        key: item.sales_order_item_id || index,
-        itemId: item.sales_order_item_id,
-        productId: item.product_id,
-        productName: item.product_name,
-        uom: item.uom_name,
-        rate,
-        requiredQty,
-        deliveredQty,
-        creditedQty,
-        deliveredAmount: deliveredQty * rate,
-        creditedAmount: creditedQty * rate
-      };
-    });
-
-    setEditItems(rows);
-    setEditSelectedItems(product_ids);
-
-  } catch (err) {
-    console.error(err);
-    message.error("Failed to load items");
-  }
-};
-  /* ---------------- MODAL HELPERS ---------------- */
-const handleEdit = async (record) => {
-  try {
-    const res = await getInvoiceById(record.id);
-
-    setEditingInvoiceId(record.id);
-
-    setEditOrderId(res.sales_order_id);
-    
-setInvoiceDate(dayjs(res.invoice_date));
-   setEditDebitAdjustedAmount(res.debit_adjusted_amount || 0);
-setEditCountAsCredit(res.count_as_credit || false);
-setEditCustomerWallet({
-  credit_balance: res.credit_balance || 0,
-  debit_balance: res.debit_balance || 0
-});
-
-    // ✅ SET ORDER DETAILS (this is missing)
-    setOrderDetails({
-      order_number: res.order_number,
-      order_date: res.order_date,
-      delivery_date: res.delivery_date,
-      invoice_date: res.invoice_date,
-      
-      customer: {
-        name: res.customer_name
-      }
-    });
-
-    // fetch items of order for dropdown
-    const items = await getItemByOrderId(res.sales_order_id);
-
-    const options = items.map((item) => ({
-      value: item.product_id,
-      label: item.product_name,
-    }));
-
-    setEditItemOptions(options);
-
-    const selectedProducts = res.items.map((i) => i.product_id);
-    setEditSelectedItems(selectedProducts);
-
-    const rows = res.items.map((item, index) => {
-      const rate = Number(item.rate || 0);
-      const deliveredQty = Number(item.delivered_qty || 0);
-      const requiredQty = Number(item.required_qty || 0);
-      const creditedQty = Math.max(0, requiredQty - deliveredQty);
-
-      return {
-        key: index,
-        itemId: item.sales_order_item_id,
-        productId: item.product_id,
-        productName: item.product_name,
-        uom: item.uom_name,
-        hsnCode: item.hsn_code,
-        rate,
-        requiredQty,
-        deliveredQty,
-        creditedQty,
-        deliveredAmount: deliveredQty * rate,
-        creditedAmount: creditedQty * rate
-      };
-    });
-
-    setEditItems(rows);
-
-    setIsEditModalOpen(true);
-
-  } catch (error) {
-    console.error(error);
-    message.error("Failed to load invoice");
-  }
-};
-const onEditDeliveredQtyChange = (value, index) => {
-  setEditItems(prev => updateItemAmounts(prev, value, index));
-};
-
-const handleUpdateInvoice = async () => {
-  try {
-
-    const res = await getInvoiceById(editingInvoiceId);
-
-    const payload = {
-      sales_order_db_id: res.sales_order_db_id,
-      sales_order_number: res.sales_order_number,
-      order_date: res.order_date,
-    invoice_date: invoiceDate
-  ? invoiceDate.format("YYYY-MM-DD")
-  : res.invoice_date,
-    delivery_date: res.delivery_date,
-
-      customer_id: res.customer_id,
-      customer_name: res.customer_name,
-debit_adjusted_amount: editDebitAdjustedAmount,
-count_as_credit: editCountAsCredit,
-      items: editItems.map((row) => ({
-        sales_order_item_id: row.itemId,
-        product_id: row.productId,
-        product_name: row.productName,
-        uom_name: row.uom,
-        hsn_code: row.hsnCode,
-
-        rate: row.rate,
-        required_qty: row.requiredQty,
-
-        delivered_qty: row.deliveredQty,
-        delivered_amount: row.deliveredAmount,
-
-        credited_qty: row.creditedQty,
-        credited_amount: row.creditedAmount
-      }))
+    const vehicleUpdate = {
+      vehicle_no: vehicleNo,
+      transport_name: veh.transport_name || veh.transporter_name || "",
+      lr_no: veh.lr_no || "",
+      lr_date: parseApiDate(veh.lr_date),
+      payment_due_date: parseApiDate(veh.payment_due_date),
+      dispatch_from: veh.dispatch_from || veh.source_location || "Haldia",
     };
 
-    await updateInvoice(editingInvoiceId, payload);
+    if (veh.ewaybill_no) vehicleUpdate.ewaybill_no = veh.ewaybill_no;
+    if (veh.ewaybill_date) vehicleUpdate.ewaybill_date = parseApiDate(veh.ewaybill_date);
+    if (veh.plant_id) vehicleUpdate.plant_id = veh.plant_id;
+    if (veh.plant_name) vehicleUpdate.plant_name = veh.plant_name;
+    if (veh.broker_id) vehicleUpdate.broker_id = veh.broker_id;
+    if (veh.broker_name) vehicleUpdate.broker_name = veh.broker_name;
 
-    message.success("Invoice updated successfully");
+    // If the selected vehicle includes its matched items array, populate them into the Items Table!
+    if (Array.isArray(veh.items) && veh.items.length > 0) {
+      const mappedVehicleItems = veh.items.map((ci) => {
+        const actualQty = Number(ci.contract_qty || ci.actual_qty || ci.qty || 0);
+        const freeQty = Number(ci.free_qty || 0);
+        const rate = Number(ci.rate || 0);
+        const gstPercent = Number(ci.gst_percent || ci.gst || 0);
+        const discPercent = Number(ci.discount_percent || 0);
+        const netWeightKg = Number(ci.net_weight_kg || ci.net_weight || 0);
+        const grossWeightKg = Number(
+          ci.gross_weight_kg || ci.gross_weight || ci.unit_gross_wt || netWeightKg
+        );
 
-    fetchInvoices();
+        const invoiceQty = Number(ci.invoice_qty || ci.qty || actualQty || 0);
+        const discAmt = Number(((invoiceQty * rate * discPercent) / 100).toFixed(2));
+        const taxableAmt = Number((invoiceQty * rate - discAmt).toFixed(2));
 
-    setIsEditModalOpen(false);
+        let sgst = 0;
+        let cgst = 0;
+        let igst = 0;
 
-  } catch (error) {
-    console.error(error);
-    message.error("Update failed");
-  }
-};
-  const openModal = () => {
-    setSelectedOrderId(undefined);
-    setOrderDetails(null);
-    setItemsWithDelivery([]);
-    form.resetFields();
-    setIsAddModalOpen(true);
-  };
+        if (isIntra) {
+          sgst = Number(((taxableAmt * gstPercent) / 200).toFixed(2));
+          cgst = Number(((taxableAmt * gstPercent) / 200).toFixed(2));
+        } else {
+          igst = Number(((taxableAmt * gstPercent) / 100).toFixed(2));
+        }
 
-  const closeModal = () => {
-    setIsAddModalOpen(false);
-    setSelectedOrderId(undefined);
-    setOrderDetails(null);
-    setItemsWithDelivery([]);
-    form.resetFields();
-  };
-const handleExport = async () => {
-  try {
+        const totalAmt = Number((taxableAmt + sgst + cgst + igst).toFixed(2));
 
-    const exportRows = [];
-
-    for (const inv of filteredInvoices) {
-
-      const invoiceDetails = await getInvoiceById(inv.id);
-
-      const items = invoiceDetails.items || [];
-
-      items.forEach((item, index) => {
-        exportRows.push({
-          "Invoice Number": invoiceDetails.sale_invoice_number,
-          "Sales Order": invoiceDetails.order_number,
-          "Customer": invoiceDetails.customer_name,
-          "Order Date": dayjs(invoiceDetails.order_date).format("DD-MM-YYYY"),
-          "Delivery Date": dayjs(invoiceDetails.delivery_date).format("DD-MM-YYYY"),
-          "Invoice Date": dayjs(invoiceDetails.invoice_date).format("DD-MM-YYYY"),
-
-          "Item": item.product_name,
-          "UOM": item.uom_name,
-          "Rate": item.rate,
-          "Required Qty": item.required_qty,
-          "Delivered Qty": item.delivered_qty,
-          "Credited Qty": item.credited_qty,
-
-          "Delivered Amount": item.delivered_amount,
-          "Credited Amount": item.credited_amount
-        });
+        return {
+          sale_contract_id: ci.sale_contract_id || ci.contract_id,
+          sale_contract_uuid: ci.sale_contract_uuid,
+          sale_contract_item_id: ci.sale_contract_item_id || ci.id,
+          product_id: ci.product_id || ci.product,
+          item_name: ci.item_name || ci.product_name,
+          product_name: ci.product_name || ci.item_name,
+          souda_no: ci.souda_no || ci.contract_number || "-",
+          unit: ci.unit || "PACKATE",
+          actual_qty: actualQty,
+          qty: invoiceQty,
+          free_qty: freeQty,
+          rate: rate,
+          gst_percent: gstPercent,
+          discount_percent: discPercent,
+          discount_amount: discAmt,
+          taxable_amount: taxableAmt,
+          sgst_amount: sgst,
+          cgst_amount: cgst,
+          igst_amount: igst,
+          total_amount: totalAmt,
+          net_weight_kg: netWeightKg,
+          gross_weight_kg: grossWeightKg,
+        };
       });
 
+      vehicleUpdate.items = mappedVehicleItems;
     }
 
-    exportToExcel(exportRows, "Sales_Invoices");
+    form.setFieldsValue(vehicleUpdate);
+    setTimeout(() => recalculateAllTotals(), 50);
+  };
 
-  } catch (error) {
-    console.error(error);
-    message.error("Export failed");
-  }
-};
-  /* ---------------- ITEMS TABLE COLUMNS ---------------- */
+  /* ---------------- ITEM SELECTION & CALCULATIONS ---------------- */
+  const handleItemSelect = (rowIndex, selectedValue) => {
+    const selectedContractItem = contractItems.find(
+      (ci) =>
+        String(ci.id || ci.sale_contract_item_id || ci.sale_contract_id) ===
+          String(selectedValue) ||
+        String(ci.product_id || ci.product) === String(selectedValue) ||
+        String(ci.souda_no) === String(selectedValue)
+    );
 
-  const itemColumns = [
-    {
-      title: <span className="text-amber-700 font-semibold">Item</span>,
-      dataIndex: "productName",
-      render: (t) => <span className="text-amber-800">{t}</span>,
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">UOM</span>,
-      dataIndex: "uom",
-      render: (t) => <span className="text-amber-800">{t}</span>,
-    },
-    {
-      title: <span className="text-amber-700 font-semibold">Rate</span>,
-      dataIndex: "rate",
-      render: (n) => (
-        <span className="text-amber-800 font-medium">
-          {Number(n) != null && !Number.isNaN(Number(n))
-            ? Number(n).toFixed(2)
-            : "0.00"}
-        </span>
-      ),
-    },
-   {
-  title: <span className="text-amber-700 font-semibold">Required Qty</span>,
-  dataIndex: "requiredQty",
-  render: (n) => (
-    <span className="text-amber-800 font-medium">{Number(n) ?? 0}</span>
-  ),
-},
-{
-  title: <span className="text-amber-700 font-semibold">Delivered Qty</span>,
-  key: "deliveredQty",
-  render: (_, record, index) => (
-    <Form.Item
-      name={["items", index, "deliveredQty"]}
-      rules={[
-        { required: true, message: "Enter delivered quantity" },
-        {
-          validator: (_, value) => {
-            if (value > record.requiredQty) {
-              return Promise.reject(
-                "Delivered quantity can't be greater than required quantity"
-              );
-            }
-            return Promise.resolve();
+    const items = form.getFieldValue("items") || [];
+    const currentItem = items[rowIndex] || {};
+
+    if (selectedContractItem) {
+      const actualQty = Number(selectedContractItem.qty || selectedContractItem.actual_qty || 0);
+      const rate = Number(selectedContractItem.rate || 0);
+      const gstPercent = Number(
+        selectedContractItem.gst_percent || selectedContractItem.gst || 5
+      );
+      const qty = Number(
+        currentItem.qty !== undefined && currentItem.qty !== null
+          ? currentItem.qty
+          : actualQty || 1
+      );
+      const freeQty = Number(currentItem.free_qty || 0);
+      const discPercent = Number(
+        currentItem.discount_percent !== undefined
+          ? currentItem.discount_percent
+          : selectedContractItem.discount_percent || 0
+      );
+
+      const netWeightKg = Number(
+        selectedContractItem.net_weight_kg ||
+          selectedContractItem.net_weight ||
+          selectedContractItem.unit_net_wt ||
+          0
+      );
+      const grossWeightKg = Number(
+        selectedContractItem.gross_weight_kg ||
+          selectedContractItem.gross_weight ||
+          selectedContractItem.unit_gross_wt ||
+          netWeightKg
+      );
+
+      const discAmt = Number(((qty * rate * discPercent) / 100).toFixed(2));
+      const taxableAmt = Number((qty * rate - discAmt).toFixed(2));
+
+      const custGst = form.getFieldValue("customer_gst") || selectedCustomerGst;
+      const isIntra = isIntraStateGst(custGst);
+
+      let sgst = 0;
+      let cgst = 0;
+      let igst = 0;
+
+      if (isIntra) {
+        sgst = Number(((taxableAmt * gstPercent) / 200).toFixed(2));
+        cgst = Number(((taxableAmt * gstPercent) / 200).toFixed(2));
+      } else {
+        igst = Number(((taxableAmt * gstPercent) / 100).toFixed(2));
+      }
+
+      const totalAmt = Number((taxableAmt + sgst + cgst + igst).toFixed(2));
+
+      items[rowIndex] = {
+        ...currentItem,
+        sale_contract_id:
+          selectedContractItem.sale_contract_id ||
+          selectedContractItem.contract_id,
+        sale_contract_uuid: selectedContractItem.sale_contract_uuid,
+        sale_contract_item_id:
+          selectedContractItem.sale_contract_item_id ||
+          selectedContractItem.id,
+        product_id:
+          selectedContractItem.product_id || selectedContractItem.product,
+        item_name:
+          selectedContractItem.item_name || selectedContractItem.product_name,
+        product_name:
+          selectedContractItem.product_name || selectedContractItem.item_name,
+        souda_no:
+          selectedContractItem.souda_no ||
+          selectedContractItem.contract_number ||
+          "-",
+        unit: selectedContractItem.unit || "PACKATE",
+        actual_qty: actualQty,
+        qty: qty,
+        free_qty: freeQty,
+        rate: rate,
+        gst_percent: gstPercent,
+        discount_percent: discPercent,
+        discount_amount: discAmt,
+        taxable_amount: taxableAmt,
+        sgst_amount: sgst,
+        cgst_amount: cgst,
+        igst_amount: igst,
+        total_amount: totalAmt,
+        net_weight_kg: netWeightKg,
+        gross_weight_kg: grossWeightKg,
+      };
+
+      form.setFieldsValue({ items: [...items] });
+      recalculateAllTotals();
+    }
+  };
+
+  const handleItemFieldChange = (rowIndex) => {
+    const items = form.getFieldValue("items") || [];
+    const item = items[rowIndex];
+    if (!item) return;
+
+    const qty = Number(item.qty || 0);
+    const freeQty = Number(item.free_qty || 0);
+    const rate = Number(item.rate || 0);
+    const discPercent = Number(item.discount_percent || 0);
+    const gstPercent = Number(item.gst_percent || 0);
+
+    const discAmt = Number(((qty * rate * discPercent) / 100).toFixed(2));
+    const taxableAmt = Number((qty * rate - discAmt).toFixed(2));
+
+    const custGst = form.getFieldValue("customer_gst") || selectedCustomerGst;
+    const isIntra = isIntraStateGst(custGst);
+
+    let sgst = 0;
+    let cgst = 0;
+    let igst = 0;
+
+    if (isIntra) {
+      sgst = Number(((taxableAmt * gstPercent) / 200).toFixed(2));
+      cgst = Number(((taxableAmt * gstPercent) / 200).toFixed(2));
+    } else {
+      igst = Number(((taxableAmt * gstPercent) / 100).toFixed(2));
+    }
+
+    const totalAmt = Number((taxableAmt + sgst + cgst + igst).toFixed(2));
+
+    items[rowIndex] = {
+      ...item,
+      discount_amount: discAmt,
+      taxable_amount: taxableAmt,
+      sgst_amount: sgst,
+      cgst_amount: cgst,
+      igst_amount: igst,
+      total_amount: totalAmt,
+    };
+
+    form.setFieldsValue({ items: [...items] });
+    recalculateAllTotals();
+  };
+
+  const recalculateAllItemTaxes = (custGst) => {
+    const isIntra = isIntraStateGst(custGst);
+    const items = form.getFieldValue("items") || [];
+
+    const updatedItems = items.map((item) => {
+      const taxableAmt = Number(item.taxable_amount || 0);
+      const gstPercent = Number(item.gst_percent || 0);
+
+      let sgst = 0;
+      let cgst = 0;
+      let igst = 0;
+
+      if (isIntra) {
+        sgst = Number(((taxableAmt * gstPercent) / 200).toFixed(2));
+        cgst = Number(((taxableAmt * gstPercent) / 200).toFixed(2));
+      } else {
+        igst = Number(((taxableAmt * gstPercent) / 100).toFixed(2));
+      }
+
+      const totalAmt = Number((taxableAmt + sgst + cgst + igst).toFixed(2));
+
+      return {
+        ...item,
+        sgst_amount: sgst,
+        cgst_amount: cgst,
+        igst_amount: igst,
+        total_amount: totalAmt,
+      };
+    });
+
+    form.setFieldsValue({ items: updatedItems });
+    recalculateAllTotals();
+  };
+
+  const recalculateAllTotals = () => {
+    const items = form.getFieldValue("items") || [];
+
+    let totalQty = 0;
+    let totalFreeQty = 0;
+    let totalDiscount = 0;
+    let totalTaxable = 0;
+    let totalSgst = 0;
+    let totalCgst = 0;
+    let totalIgst = 0;
+    let totalAmt = 0;
+    let totalGrossWtTon = 0;
+    let totalNetWtTon = 0;
+
+    items.forEach((it) => {
+      const q = Number(it.qty || 0);
+      const fq = Number(it.free_qty || 0);
+      const disc = Number(it.discount_amount || 0);
+      const tax = Number(it.taxable_amount || 0);
+      const sg = Number(it.sgst_amount || 0);
+      const cg = Number(it.cgst_amount || 0);
+      const ig = Number(it.igst_amount || 0);
+      const tot = Number(it.total_amount || 0);
+
+      const netKg = Number(it.net_weight_kg || 0);
+      const grossKg = Number(it.gross_weight_kg || netKg);
+
+      totalQty += q;
+      totalFreeQty += fq;
+      totalDiscount += disc;
+      totalTaxable += tax;
+      totalSgst += sg;
+      totalCgst += cg;
+      totalIgst += ig;
+      totalAmt += tot;
+
+      totalGrossWtTon += ((q + fq) * grossKg) / 1000;
+      totalNetWtTon += (q * netKg) / 1000;
+    });
+
+    const roundOff = Number(form.getFieldValue("round_off_amount") || 0);
+    const grandTotal = Number((totalAmt + roundOff).toFixed(2));
+
+    form.setFieldsValue({
+      total_qty: Number(totalQty.toFixed(3)),
+      total_free_qty: Number(totalFreeQty.toFixed(2)),
+      total_discount_amount: Number(totalDiscount.toFixed(2)),
+      total_taxable_amount: Number(totalTaxable.toFixed(2)),
+      total_sgst: Number(totalSgst.toFixed(2)),
+      total_cgst: Number(totalCgst.toFixed(2)),
+      total_igst: Number(totalIgst.toFixed(2)),
+      total_amount: Number(totalAmt.toFixed(2)),
+      total_gross_weight_ton: Number(totalGrossWtTon.toFixed(3)),
+      total_net_weight_ton: Number(totalNetWtTon.toFixed(3)),
+      grand_total: grandTotal,
+    });
+  };
+
+  /* ---------------- OPEN CREATE MODAL ---------------- */
+  const handleAddNew = async () => {
+    form.resetFields();
+    setEditingId(null);
+    setFileList([]);
+    setEditingDocUrl(null);
+    setIntransitVehicles([]);
+    setContractItems([]);
+    setSelectedCustomerGst("");
+
+    // Refresh master dropdowns to guarantee latest options
+    loadMasterDropdowns();
+
+    try {
+      // Auto-fetch next invoice number
+      const nextInvRes = await getNextSaleInvoiceNumber();
+      const nextNo =
+        nextInvRes?.invoice_number ||
+        nextInvRes?.next_invoice_number ||
+        nextInvRes?.data?.invoice_number ||
+        "";
+
+      form.setFieldsValue({
+        sale_invoice_number: nextNo,
+        invoice_date: dayjs(),
+        items: [
+          {
+            qty: 1,
+            free_qty: 0,
+            discount_percent: 0,
+            discount_amount: 0,
+            taxable_amount: 0,
+            sgst_amount: 0,
+            cgst_amount: 0,
+            igst_amount: 0,
+            total_amount: 0,
           },
-        },
-      ]}
-      style={{ marginBottom: 0 }}
-    >
-      <InputNumber
-        min={0}
-        className="w-full"
-        placeholder="0"
-        onChange={(v) => onDeliveredQtyChange(v, index)}
-      />
-    </Form.Item>
-  ),
-},
+        ],
+        round_off_amount: 0,
+        grand_total: 0,
+      });
+    } catch (err) {
+      console.error("Error generating next invoice number:", err);
+      form.setFieldsValue({
+        invoice_date: dayjs(),
+        items: [{}],
+      });
+    }
+
+    setModalOpen(true);
+  };
+
+  /* ---------------- OPEN EDIT MODAL ---------------- */
+  const handleEdit = async (record) => {
+    form.resetFields();
+    setEditingId(record.id || record.sale_invoice_id);
+    setFileList([]);
+    setEditingDocUrl(record.einvoice_pdf || record.invoice_copy_url || null);
+
+    const custId = record.customer_id;
+    const custGst = record.customer_gst || "";
+    setSelectedCustomerGst(custGst);
+
+    // Refresh master dropdowns
+    loadMasterDropdowns();
+
+    if (custId) {
+      try {
+        const [vehRes, itemRes] = await Promise.allSettled([
+          getSaleInvoiceIntransitVehicles(custId),
+          getSaleInvoiceCustomerContractItems(custId),
+        ]);
+
+        if (vehRes.status === "fulfilled" && vehRes.value) {
+          const vList = Array.isArray(vehRes.value)
+            ? vehRes.value
+            : vehRes.value.data || vehRes.value.results || [];
+          setIntransitVehicles(vList);
+        }
+
+        if (itemRes.status === "fulfilled" && itemRes.value) {
+          const iList = Array.isArray(itemRes.value)
+            ? itemRes.value
+            : itemRes.value.data || itemRes.value.results || [];
+          setContractItems(iList);
+        }
+      } catch (e) {
+        console.error("Error fetching dependencies on edit:", e);
+      }
+    }
+
+    form.setFieldsValue({
+      sale_invoice_number: record.sale_invoice_number || record.invoice_no,
+      invoice_date: parseApiDate(record.invoice_date),
+      customer_id: record.customer_id,
+      customer_name: record.customer_name,
+      customer_gst: record.customer_gst,
+      place: record.place,
+      plant_id: record.plant_id,
+      plant_name: record.plant_name,
+      broker_id: record.broker_id,
+      broker_name: record.broker_name,
+      vehicle_no: record.vehicle_no || record.vehicle_number,
+      transport_name: record.transport_name,
+      lr_no: record.lr_no,
+      lr_date: parseApiDate(record.lr_date),
+      ewaybill_no: record.ewaybill_no,
+      ewaybill_date: parseApiDate(record.ewaybill_date),
+      einvoice_no: record.einvoice_no,
+      payment_due_date: parseApiDate(record.payment_due_date),
+      items: (record.items || []).map((it) => ({
+        ...it,
+        qty: Number(it.qty || 0),
+        free_qty: Number(it.free_qty || 0),
+        rate: Number(it.rate || 0),
+        gst_percent: Number(it.gst_percent || 0),
+        discount_percent: Number(it.discount_percent || 0),
+        discount_amount: Number(it.discount_amount || 0),
+        taxable_amount: Number(it.taxable_amount || 0),
+        sgst_amount: Number(it.sgst_amount || 0),
+        cgst_amount: Number(it.cgst_amount || 0),
+        igst_amount: Number(it.igst_amount || 0),
+        total_amount: Number(it.total_amount || 0),
+      })),
+      total_qty: Number(record.total_qty || 0),
+      total_free_qty: Number(record.total_free_qty || 0),
+      total_taxable_amount: Number(record.total_taxable_amount || 0),
+      total_sgst: Number(record.total_sgst || 0),
+      total_cgst: Number(record.total_cgst || 0),
+      total_igst: Number(record.total_igst || 0),
+      total_amount: Number(record.total_amount || 0),
+      total_gross_weight_ton: Number(
+        record.total_gross_weight_ton || record.gross_weight || 0
+      ),
+      total_net_weight_ton: Number(
+        record.total_net_weight_ton || record.net_weight || 0
+      ),
+      dispatch_from: record.dispatch_from,
+      ship_to: record.ship_to,
+      distance_km: record.distance_km,
+      round_off_amount: Number(record.round_off_amount || 0),
+      grand_total: Number(record.grand_total || 0),
+    });
+
+    setModalOpen(true);
+  };
+
+  /* ---------------- FORM SUBMIT HANDLER ---------------- */
+  const handleSubmit = async () => {
+    try {
+      const values = await form.validateFields();
+
+      if (!values.items || values.items.length === 0) {
+        message.warning("Please add at least one item");
+        return;
+      }
+
+      setSubmitting(true);
+
+      const payload = {
+        invoice_date: values.invoice_date
+          ? values.invoice_date.format("YYYY-MM-DD")
+          : dayjs().format("YYYY-MM-DD"),
+        customer_id: values.customer_id,
+        customer_name: values.customer_name,
+        customer_gst: values.customer_gst,
+        place: values.place,
+        plant_id: values.plant_id,
+        plant_name:
+          plants.find((p) => String(p.id) === String(values.plant_id))?.name ||
+          values.plant_name,
+        broker_id: values.broker_id,
+        broker_name:
+          brokers.find((b) => String(b.id) === String(values.broker_id))
+            ?.name || values.broker_name,
+        vehicle_no: values.vehicle_no,
+        transport_name: values.transport_name,
+        lr_no: values.lr_no,
+        lr_date: values.lr_date ? values.lr_date.format("YYYY-MM-DD") : null,
+        ewaybill_no: values.ewaybill_no,
+        ewaybill_date: values.ewaybill_date
+          ? values.ewaybill_date.format("YYYY-MM-DD")
+          : null,
+        einvoice_no: values.einvoice_no,
+        payment_due_date: values.payment_due_date
+          ? values.payment_due_date.format("YYYY-MM-DD")
+          : null,
+        items: values.items.map((it) => ({
+          sale_contract_id: it.sale_contract_id,
+          sale_contract_item_id: it.sale_contract_item_id,
+          product_id: it.product_id,
+          item_name: it.item_name,
+          souda_no: it.souda_no,
+          qty: String(it.qty || 0),
+          free_qty: String(it.free_qty || 0),
+          unit: it.unit || "BAG",
+          gst_percent: String(it.gst_percent || 0),
+          rate: String(it.rate || 0),
+          discount_percent: String(it.discount_percent || 0),
+          discount_amount: String(it.discount_amount || 0),
+          taxable_amount: String(it.taxable_amount || 0),
+          sgst_amount: String(it.sgst_amount || 0),
+          cgst_amount: String(it.cgst_amount || 0),
+          igst_amount: String(it.igst_amount || 0),
+          total_amount: String(it.total_amount || 0),
+          net_weight_kg: String(it.net_weight_kg || 0),
+          gross_weight_kg: String(it.gross_weight_kg || 0),
+        })),
+        total_qty: String(values.total_qty || 0),
+        total_free_qty: String(values.total_free_qty || 0),
+        total_taxable_amount: String(values.total_taxable_amount || 0),
+        total_sgst: String(values.total_sgst || 0),
+        total_cgst: String(values.total_cgst || 0),
+        total_igst: String(values.total_igst || 0),
+        total_amount: String(values.total_amount || 0),
+        total_gross_weight_ton: String(values.total_gross_weight_ton || 0),
+        total_net_weight_ton: String(values.total_net_weight_ton || 0),
+        dispatch_from: values.dispatch_from,
+        ship_to: values.ship_to,
+        distance_km: values.distance_km ? String(values.distance_km) : null,
+        round_off_amount: String(values.round_off_amount || 0),
+        grand_total: String(values.grand_total || 0),
+      };
+
+      let finalRequestData = payload;
+
+      // Handle PDF upload
+      if (fileList.length > 0 && fileList[0].originFileObj) {
+        const formData = new FormData();
+        Object.keys(payload).forEach((key) => {
+          if (key === "items") {
+            formData.append("items", JSON.stringify(payload.items));
+          } else if (payload[key] !== null && payload[key] !== undefined) {
+            formData.append(key, payload[key]);
+          }
+        });
+        formData.append("einvoice_pdf", fileList[0].originFileObj);
+        finalRequestData = formData;
+      }
+
+      if (editingId) {
+        await updateSaleInvoice(editingId, finalRequestData);
+        message.success("Sale Invoice updated successfully");
+      } else {
+        await createSaleInvoice(finalRequestData);
+        message.success("Sale Invoice created successfully");
+      }
+
+      setModalOpen(false);
+      setEditingId(null);
+      fetchInvoices();
+    } catch (err) {
+      console.error("Error saving sale invoice:", err);
+      message.error(
+        err?.response?.data?.message || "Failed to save sale invoice"
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /* ---------------- DELETE HANDLER ---------------- */
+  const handleDelete = async (id) => {
+    try {
+      await deleteSaleInvoice(id);
+      message.success("Sale Invoice deleted successfully");
+      fetchInvoices();
+    } catch (err) {
+      console.error("Error deleting sale invoice:", err);
+      message.error("Failed to delete sale invoice");
+    }
+  };
+
+  /* ---------------- PRINT / PDF HANDLER ---------------- */
+  const handlePrint = async (record) => {
+    const invId = record.id || record.sale_invoice_id;
+    try {
+      message.loading({
+        content: `Preparing Invoice PDF...`,
+        key: "print",
+      });
+      const pdfBlob = await fetchSaleInvoicePDF(invId);
+      const blobUrl = window.URL.createObjectURL(pdfBlob);
+      const printWindow = window.open(blobUrl, "_blank");
+      if (!printWindow) throw new Error("Popup blocked. Please allow popups.");
+      message.success({ content: "PDF opened successfully", key: "print" });
+    } catch (err) {
+      console.error("Error printing invoice:", err);
+      message.error({ content: "Failed to download PDF", key: "print" });
+    }
+  };
+
+  /* ---------------- SEARCH & EXCEL EXPORT ---------------- */
+  const filteredInvoices = useMemo(() => {
+    if (!searchText) return invoices;
+    const q = searchText.toLowerCase().trim();
+    return invoices.filter((inv) => {
+      const invNo = String(
+        inv.sale_invoice_number || inv.invoice_no || ""
+      ).toLowerCase();
+      const cust = String(inv.customer_name || "").toLowerCase();
+      const veh = String(
+        inv.vehicle_no || inv.vehicle_number || ""
+      ).toLowerCase();
+      const plant = String(inv.plant_name || "").toLowerCase();
+      return (
+        invNo.includes(q) ||
+        cust.includes(q) ||
+        veh.includes(q) ||
+        plant.includes(q)
+      );
+    });
+  }, [invoices, searchText]);
+
+  const handleExport = () => {
+    const exportData = filteredInvoices.map((inv) => ({
+      "Invoice Date": fmtDate(inv.invoice_date),
+      "Invoice No": inv.sale_invoice_number || inv.invoice_no || "-",
+      "Customer Name": inv.customer_name || "-",
+      "Customer GST": inv.customer_gst || "-",
+      Place: inv.place || "-",
+      "Plant Name": inv.plant_name || "-",
+      "Broker Name": inv.broker_name || "-",
+      "Vehicle No": inv.vehicle_no || inv.vehicle_number || "-",
+      "Transport Name": inv.transport_name || "-",
+      "Total Qty": inv.total_qty || 0,
+      "Grand Total (₹)": inv.grand_total || 0,
+      "Total Gr. Wt. (Ton)": inv.total_gross_weight_ton || "-",
+      "Net Wt. (Ton)": inv.total_net_weight_ton || "-",
+    }));
+    exportToExcel(exportData, "Sale_Invoices_List", "SaleInvoices");
+  };
+
+  /* ---------------- TABLE COLUMNS (MATCHING IMAGE 2) ---------------- */
+  const columns = [
     {
-      title: <span className="text-amber-700 font-semibold">Credited Qty</span>,
-      dataIndex: "creditedQty",
-      render: (_, row) => {
-        const credited = Number(row.creditedQty ?? 0);
-        if (credited <= 0) return <span className="text-amber-600">-</span>;
-        return <span className="text-amber-800 font-medium">{credited}</span>;
+      title: <span className="text-amber-700 font-semibold">Invoice Date</span>,
+      dataIndex: "invoice_date",
+      render: (val) => fmtDate(val),
+      width: 110,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Invoice No</span>,
+      dataIndex: "sale_invoice_number",
+      render: (val, r) => (
+        <span className="font-bold text-gray-900">
+          {val || r.invoice_no || "-"}
+        </span>
+      ),
+      width: 140,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Customer Name</span>,
+      dataIndex: "customer_name",
+      render: (val, r) => (
+        <div>
+          <span className="font-semibold text-amber-900">{val || "-"}</span>
+          {r.customer_gst && (
+            <div className="text-[11px] text-gray-500 font-mono">
+              GST: {r.customer_gst}
+            </div>
+          )}
+        </div>
+      ),
+      width: 180,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Place</span>,
+      dataIndex: "place",
+      render: (val) => val || "-",
+      width: 110,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Plant Name</span>,
+      dataIndex: "plant_name",
+      render: (val) => val || "-",
+      width: 130,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Broker Name</span>,
+      dataIndex: "broker_name",
+      render: (val) => val || "-",
+      width: 130,
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Vehicle No</span>,
+      dataIndex: "vehicle_no",
+      render: (val, r) => {
+        const v = val || r.vehicle_number;
+        return v ? (
+          <Tag
+            color="success"
+            className="font-bold text-xs px-2.5 py-0.5 bg-emerald-50 text-emerald-900 border border-emerald-400"
+          >
+            {v}
+          </Tag>
+        ) : (
+          "-"
+        );
       },
-    },
-  ];
-
-  /* ---------------- INVOICE LIST COLUMNS ---------------- */
-
-  const invoiceColumns = [
-   {
-  title: <span className="text-amber-700 font-semibold">Invoice </span>,
-  dataIndex: "invoiceNumber",
-  render: (t) => <span className="text-amber-800">{t}</span>,
-},
-    {
-      title: <span className="text-amber-700 font-semibold">Order No</span>,
-      dataIndex: "orderNumber",
-      render: (t) => <span className="text-amber-800">{t}</span>,
+      width: 130,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Customer</span>,
-      dataIndex: "customerName",
-      render: (t) => <span className="text-amber-800">{t}</span>,
+      title: <span className="text-amber-700 font-semibold">Transport Name</span>,
+      dataIndex: "transport_name",
+      render: (val) => val || "-",
+      width: 140,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Date</span>,
-      dataIndex: "invoiceDate",
-      render: (d) => (
-        <span className="text-amber-800">
-          {d ? dayjs(d).format("DD-MM-YYYY") : "-"}
+      title: <span className="text-amber-700 font-semibold">Total Qty</span>,
+      dataIndex: "total_qty",
+      render: (val) => (
+        <span className="font-bold text-gray-800">{val ?? "-"}</span>
+      ),
+      width: 90,
+      align: "center",
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Grand Total</span>,
+      dataIndex: "grand_total",
+      render: (val) => (
+        <span className="font-extrabold text-amber-900">
+          ₹
+          {Number(val || 0).toLocaleString("en-IN", {
+            minimumFractionDigits: 2,
+          })}
         </span>
       ),
+      width: 130,
+      align: "right",
     },
     {
-      title: <span className="text-amber-700 font-semibold">Payable Amount</span>,
-      dataIndex: "deliveredAmount",
-      render: (n) => (
-        <span className="text-amber-800 font-medium">
-          {n}
+      title: (
+        <span className="text-amber-700 font-semibold">
+          E-Invoice Upload Status
         </span>
       ),
+      dataIndex: "einvoice_pdf",
+      render: (val, r) => {
+        const hasDoc = val || r.invoice_copy_url;
+        return hasDoc ? (
+          <Tag color="success" className="font-semibold">
+            Uploaded
+          </Tag>
+        ) : (
+          <Tag color="default">Pending</Tag>
+        );
+      },
+      width: 140,
+      align: "center",
     },
-   
-  {
-  title: <span className="text-amber-700 font-semibold">Action</span>,
-  key: "action",
-  render: (_, record) => (
-    <div className="flex gap-2">
-
-      <EditOutlined
-        size="small"
-        onClick={() => handleEdit(record)}
-        className=" text-blue-500!"
-      >
-        Edit
-      </EditOutlined>
-
-      <DownloadOutlined
-       
-        size="small"
-        onClick={() => handleDownload(record)}
-        className=" text-amber-500!"
-      />
-
-      <PrinterOutlined
-        
-        size="small"
-        onClick={() => handlePrint(record)}
-        className="text-green-500!"
-      />
-    </div>
-  ),
-}
+    {
+      title: (
+        <span className="text-amber-700 font-semibold">Total Gr. Wt.(Ton)</span>
+      ),
+      dataIndex: "total_gross_weight_ton",
+      render: (val, r) => val || r.gross_weight || "-",
+      width: 130,
+      align: "center",
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Net Wt.(Ton)</span>,
+      dataIndex: "total_net_weight_ton",
+      render: (val, r) => val || r.net_weight || "-",
+      width: 120,
+      align: "center",
+    },
+    {
+      title: <span className="text-amber-700 font-semibold">Actions</span>,
+      key: "actions",
+      fixed: "right",
+      width: 160,
+      render: (_, record) => (
+        <Space size="small">
+          <Tooltip title="View Details">
+            <Button
+              size="small"
+              icon={<EyeOutlined />}
+              className="text-blue-500 hover:text-blue-700 border-blue-300!"
+              onClick={() => {
+                setViewRecord(record);
+                setViewModalOpen(true);
+              }}
+            />
+          </Tooltip>
+          <Tooltip title="Edit Sale Invoice">
+            <Button
+              type="primary"
+              size="small"
+              icon={<EditOutlined />}
+              className="bg-amber-500! hover:bg-amber-600! border-none! text-white!"
+              onClick={() => handleEdit(record)}
+            />
+          </Tooltip>
+          <Tooltip title="Print / Download PDF">
+            <Button
+              size="small"
+              icon={<PrinterOutlined />}
+              className="text-amber-700 hover:text-amber-900 border-amber-300!"
+              onClick={() => handlePrint(record)}
+            />
+          </Tooltip>
+          <Popconfirm
+            title="Delete Sale Invoice"
+            description="Are you sure you want to delete this sale invoice?"
+            onConfirm={() => handleDelete(record.id || record.sale_invoice_id)}
+            okText="Yes, Delete"
+            cancelText="Cancel"
+            okButtonProps={{ danger: true }}
+          >
+            <Tooltip title="Delete">
+              <Button
+                danger
+                size="small"
+                icon={<DeleteOutlined />}
+                className="border-red-300!"
+              />
+            </Tooltip>
+          </Popconfirm>
+        </Space>
+      ),
+    },
   ];
-
-  /* ---------------- UI ---------------- */
 
   return (
     <div>
-      {/* HEADER */}
-     <div className="flex justify-between items-center mb-2">
-        <div className="flex gap-2">
-          <Input
-            prefix={<SearchOutlined className="text-amber-600!" />}
-            placeholder="Search..."
-            className="w-64! border-amber-300! focus:border-amber-500!"
-           // value={searchText}
-         value={searchText}
-  onChange={(e) => handleSearch(e.target.value)}  />
-       <Button
-  icon={<FilterOutlined />}
-  onClick={() => {
-    setSearchText("");
-    setFilteredInvoices(savedInvoices);
-  }}
-   className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-
->
-  Reset
-</Button>
-        </div>
-
-        <div className="flex gap-2">
-       <Button
-  icon={<DownloadOutlined />}
-  onClick={handleExport}
-  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
->
-  Export
-</Button>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            className="bg-amber-500! hover:bg-amber-600! border-none!"
-            onClick={openModal}
-          >
-            Add New
-          </Button>
-        </div>
-      </div>
-
-      {/* INVOICES TABLE CARD */}
-      <div className="border border-amber-300 rounded-lg p-4 shadow-md bg-white">
-       
-
-      <Table
-  columns={invoiceColumns}
- dataSource={filteredInvoices}
-  rowKey="id"
-  scroll={{ x: 700 }}
-  pagination={savedInvoices.length > 10 ? { pageSize: 10 } : false}
-/>
-      </div>
-
-      {/* ADD INVOICE MODAL */}
-      <Modal
-        title={
-          <span className="text-amber-700 font-semibold text-base">
-            Create Sales Invoice
-          </span>
-        }
-        open={isAddModalOpen}
-        footer={null}
-        width={960}
-        onCancel={closeModal}
-        destroyOnClose
-      >
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          {/* Order Select */}
-          <Row gutter={16}>
-            <Col md={8}>
-              <Form.Item
-                label={
-                  <span className="text-amber-700 font-medium">
-                    Sales Order
-                  </span>
-                }
-                name="orderId"
-                rules={[
-                  { required: true, message: "Please select a sales order" },
-                ]}
-              >
-                <Select
-                  allowClear
-                  showSearch
-                  placeholder="Select Sales Order"
-                  loading={loadingOrders}
-                  optionFilterProp="label"
-                  options={orderOptions}
-                  onChange={onOrderSelect}
-                  filterOption={(input, opt) =>
-                    (opt?.label ?? "")
-                      .toLowerCase()
-                      .includes(input.toLowerCase())
-                  }
-                />
-              </Form.Item>
-            </Col>
-            <Col md={8}><Form.Item
-  label={<span className="text-amber-700 font-medium">Item</span>}
-  name="itemId"
-  rules={[{ required: true, message: "Select item" }]}
->
- <Select
-  mode="multiple"
-  placeholder="Select Items"
-  options={itemOptions}
-  onChange={onItemSelect}
-/>
-</Form.Item></Col>
-{/* Checkbox */}
-
-  <Col  md={8} className="font-medium text-amber-700" >
-  Count as Credit
-    <Checkbox
-      checked={countAsCredit}
-      onChange={(e) => setCountAsCredit(e.target.checked)}
-      className=" pt-9! pl-10!"
-    >
-      
-    </Checkbox>
-  </Col>
-          </Row>
-
-          {/* Loading */}
-         {loadingOrder && (
-  <div className="flex justify-center py-8">
-    <Spin size="large" />
-  </div>
-)}
-
-          {/* Order details + items */}
-         {!loadingOrder && itemsWithDelivery.length > 0 && (
-            <>
-              {/* Order Details Card */}
-              <Card
-                size="small"
-                className="mb-4 border-amber-200 bg-amber-50/50"
-                title={
-                  <span className="text-amber-800 font-semibold">
-                    Order Details
-                  </span>
-                }
-              >
-                <Row gutter={[16, 8]}>
-                  <Col xs={24} sm={12} md={4}>
-                    <span className="text-amber-600 text-sm">Order No</span>
-                    <p className="text-amber-800 font-medium mb-0">
-                     {orderDetails?.order_number || "-"}
-                    </p>
-                  </Col>
-                  <Col xs={24} sm={12} md={4}>
-                    <span className="text-amber-600 text-sm">Order Date</span>
-                    <p className="text-amber-800 font-medium mb-0">
-                     {orderDetails?.order_date
-  ? dayjs(orderDetails.order_date).format("DD-MM-YYYY")
-  : "-"}
-                    </p>
-                  </Col>
-                  <Col xs={24} sm={12} md={4}>
-                    <span className="text-amber-600 text-sm">
-                      Delivery Date
-                    </span>
-                  <p className="text-amber-800 font-medium mb-0">
-  {orderDetails?.delivery_date
-    ? dayjs(orderDetails.delivery_date).format("DD-MM-YYYY")
-    : "-"}
-</p>
-                  </Col>
-<Col xs={24} sm={12} md={4}>
-  <span className="text-amber-600 text-sm">Invoice Date</span>
-  <p className="text-amber-800 font-medium mb-0">
-    {invoiceDate ? invoiceDate.format("DD-MM-YYYY") : "-"}
-  </p>
-</Col>
-                  <Col xs={24} sm={12} md={6}>
-                    <span className="text-amber-600 text-sm">Customer</span>
-                    <p className="text-amber-800 font-medium mb-0">
-                     {orderDetails?.customer?.name || "-"}
-                    </p>
-                  </Col>
-                           
-                </Row>
-              </Card>
-
-              {/* Items Table */}
-              <div className="mb-4">
-                <h3 className="text-amber-700 font-semibold mb-2">
-                  Items – Required vs Delivered
-                </h3>
-                <Table
-                  columns={itemColumns}
-                  dataSource={itemsWithDelivery}
-                  pagination={false}
-                  scroll={{ x: 700 }}
-                  rowKey="key"
-                />
-              </div>
-
-              {/* Totals Card */}
-              <Card
-                size="small"
-                className="mb-4 border-amber-200 bg-amber-50/30"
-              >
-      
- <Row gutter={24} align="middle" className="mt-2">
-                
-  {/* Delivered */}
-  <Col xs={24} sm={12} md={5}>
-    <div>
-      <div className="text-amber-600 text-sm">Grand Total</div>
-      <div className="text-xl font-semibold text-amber-700">
-        ₹ {totalAmount.toFixed(2)}
-      </div>
-    </div>
-  </Col>
-
-{customerWallet && (
-  <>
-    <Col xs={24} sm={12} md={5}>
-      <div>
-        <div className="text-amber-600 text-sm">Credit Balance</div>
-        <div className="text-xl font-semibold text-amber-700">
-          ₹ {Number(customerWallet.credit_balance || 0).toFixed(2)}
-        </div>
-      </div>
-    </Col>
-
-    <Col xs={24} sm={12} md={5}>
-      <div>
-        <div className="text-amber-600 text-sm">Debit Balance</div>
-        <div className="text-xl font-semibold text-amber-700">
-          ₹ {Number(customerWallet.debit_balance || 0).toFixed(2)}
-        </div>
-      </div>
-    </Col>
-  </>
-)}
-  {/* Debit Adjust */}
-  <Col xs={24} sm={12} md={4}>
-    <div>
-      <div className="text-amber-600 text-sm mb-1">
-        Debit Adjusted
-      </div>
-      <InputNumber
-        min={0}
-        value={debitAdjustedAmount}
-        onChange={(val) => setDebitAdjustedAmount(val || 0)}
-        className="w-32"
-      />
-    </div>
-  </Col> {/* Final */}
-  <Col xs={24} sm={12} md={5}>
-    <div>
-      <div className="text-amber-600 text-sm">Payable Amount</div>
-      <div
-        className={"text-xl font-bold text-amber-700" }
-      >
-        ₹ {(totalAmount - debitAdjustedAmount).toFixed(2)}
-      </div>
-    </div>
-  </Col></Row>
-
-              </Card>
-
-              {/* Actions */}
-              <div className="flex justify-end gap-2">
-                <Button
-                  onClick={closeModal}
-                  className="border-amber-400! text-amber-700! hover:bg-amber-100!"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                   className="bg-amber-500! hover:bg-amber-600! border-none!"
-                >
-                  Save Invoice
-                </Button>
-              </div>
-            </>
-          )}
-        </Form>
-      </Modal>
-    <Modal
-  title={
-    <span className="text-amber-700 font-semibold text-base">
-      Edit Sales Invoice
-    </span>
-  }
-  open={isEditModalOpen}
-  width={960}
-  onCancel={() => setIsEditModalOpen(false)}
-  footer={null}
-  destroyOnClose
->
-  <Form layout="vertical">
-    <Row gutter={16}>
-  <Col md={8}>
-    <Form.Item  label={
-                  <span className="text-amber-700 font-medium">
-                    Sales Order
-                  </span>
-                }>
-      <Select
-        value={editOrderId}
-        options={orderOptions}
-        disabled
-      />
-    </Form.Item>
-  </Col>
-
-  <Col md={8}>
-    <Form.Item  label={<span className="text-amber-700 font-medium">Item</span>}
- >
-      <Select
-        mode="multiple"
-        value={editSelectedItems}
-        options={editItemOptions}
-        onChange={onEditItemSelect}
-      />
-    </Form.Item>
-  </Col>
-  <Col md={8} className="font-medium text-amber-700" >
-  Count as Credit
-  <Checkbox
-    checked={editCountAsCredit}
-    onChange={(e) => setEditCountAsCredit(e.target.checked)}
-     className=" pt-9! pl-10!"
-  />
-</Col>
-</Row>
-    {/* Order Details Card */}
-    <Card
-      size="small"
-      className="mb-4 border-amber-200 bg-amber-50/50"
-      title={<span className="text-amber-800 font-semibold">Order Details</span>}
-    >
-      <Row gutter={[16, 8]}>
-        <Col xs={24} sm={12} md={4}>
-          <span className="text-amber-600 text-sm">Order No</span>
-          <p className="text-amber-800 font-medium mb-0">
-            {orderDetails?.order_number || "-"}
-          </p>
+      {/* FILTER AND ACTION BAR */}
+      <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
+        <Col>
+          <Space>
+            <Input
+              placeholder="Search invoice no, customer, vehicle..."
+              value={searchText}
+              prefix={<SearchOutlined className="text-amber-600!" />}
+              style={{ width: 280 }}
+              className="border-amber-300! focus:border-amber-500!"
+              onChange={(e) => setSearchText(e.target.value)}
+              allowClear
+            />
+            <Button
+              icon={<FilterOutlined />}
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+              onClick={() => setSearchText("")}
+            >
+              Reset
+            </Button>
+          </Space>
         </Col>
-        <Col xs={24} sm={12} md={4}>
-          <span className="text-amber-600 text-sm">Order Date</span>
-          <p className="text-amber-800 font-medium mb-0">
-            {orderDetails?.order_date
-              ? dayjs(orderDetails.order_date).format("DD-MM-YYYY")
-              : "-"}
-          </p>
-        </Col>
-        <Col xs={24} sm={12} md={4}>
-          <span className="text-amber-600 text-sm">Delivery Date</span>
-          <p className="text-amber-800 font-medium mb-0">
-            {orderDetails?.delivery_date
-              ? dayjs(orderDetails.delivery_date).format("DD-MM-YYYY")
-              : "-"}
-          </p>
-        </Col>
-      <Col xs={24} sm={12} md={4}>
-  <span className="text-amber-600 text-sm">Invoice Date</span>
-  <p className="text-amber-800 font-medium mb-0">
-    {invoiceDate ? dayjs(invoiceDate).format("DD-MM-YYYY") : "-"}
-  </p>
-</Col>
-        <Col xs={24} sm={12} md={6}>
-          <span className="text-amber-600 text-sm">Customer</span>
-          <p className="text-amber-800 font-medium mb-0">
-            {orderDetails?.customer?.name || "-"}
-          </p>
+        <Col>
+          <Space>
+            <Button
+              icon={<DownloadOutlined />}
+              className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+              onClick={handleExport}
+            >
+              Export
+            </Button>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              className="bg-amber-500! hover:bg-amber-600! border-none! font-semibold"
+              onClick={handleAddNew}
+            >
+              Add New Sale Invoice
+            </Button>
+          </Space>
         </Col>
       </Row>
-    </Card>
 
-    {/* Items Table */}
-    <div className="mb-4">
-      <h3 className="text-amber-700 font-semibold mb-2">
-        Items Details
-      </h3>
-      <Table
-        columns={[
-         {
-      title: <span className="text-amber-700 font-semibold">Item</span>,
-      dataIndex: "productName",
-      render: (t) => <span className="text-amber-800">{t}</span>,
-    },
-        
-         
-    
-          { title: <span className="text-amber-700 font-semibold">Rate</span>,
-      dataIndex: "rate" ,    render: (t) => <span className="text-amber-800">{t}</span>,
-  },
-          {  title: <span className="text-amber-700 font-semibold">Required Qty</span>,
-  dataIndex: "requiredQty" ,    render: (t) => <span className="text-amber-800">{t}</span>,
-  },
-          {
-            title: <span className="text-amber-700 font-semibold">Delivered Qty</span>,
-  render: (_, record, index) => (
-              <InputNumber
-                min={0}
-                value={record.deliveredQty}
-                onChange={(v) => onEditDeliveredQtyChange(v, index)}
-              />
-            ),
-          },
-          {  title: <span className="text-amber-700 font-semibold">Credited Qty</span>,
-     dataIndex: "creditedQty" ,render: (t) => <span className="text-amber-800">{t}</span>,},
-             ]}
-        dataSource={editItems}
-        pagination={false}
-        rowKey="key"
-      />
-    </div>
-
-    {/* Totals Card */}
-    <Card
-  size="small"
-  className="mb-4 border-amber-200 bg-amber-50/30"
->
-  <Row gutter={24} align="middle" className="mt-2">
-
-    {/* Delivered */}
-    <Col xs={24} sm={12} md={5}>
-      <div>
-        <div className="text-amber-600 text-sm">Grand Total</div>
-        <div className="text-xl font-semibold text-amber-700">
-          ₹ {editItems.reduce((sum, r) => sum + r.deliveredAmount, 0).toFixed(2)}
-        </div>
-      </div>
-    </Col>
-
-    {/* Wallet */}
-    {editCustomerWallet && (
-      <>
-        <Col xs={24} sm={12} md={5}>
+      {/* TABLE VIEW (MATCHING IMAGE 2) */}
+      <div className="border border-amber-300 rounded-lg p-3 shadow-md bg-white">
+        <div className="flex items-center justify-between mb-2">
           <div>
-            <div className="text-amber-600 text-sm">Credit Balance</div>
-            <div className="text-xl font-semibold text-amber-700">
-              ₹ {Number(editCustomerWallet.credit_balance || 0).toFixed(2)}
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold text-amber-800 m-0">
+                SALE INVOICE FOR GOODS
+              </h2>
+              <Tag
+                color="orange"
+                className="font-bold text-xs uppercase px-2 py-0.5 border-amber-400"
+              >
+                CREDIT INVOICE
+              </Tag>
             </div>
+            <p className="text-amber-600 text-xs mt-1 mb-0">
+              List View of Sale Invoices — Manage, track and print credit
+              invoices
+            </p>
           </div>
-        </Col>
-
-        <Col xs={24} sm={12} md={5}>
-          <div>
-            <div className="text-amber-600 text-sm">Debit Balance</div>
-            <div className="text-xl font-semibold text-amber-700">
-              ₹ {Number(editCustomerWallet.debit_balance || 0).toFixed(2)}
-            </div>
-          </div>
-        </Col>
-      </>
-    )}
-
-    {/* Debit Adjust */}
-    <Col xs={24} sm={12} md={4}>
-      <div>
-        <div className="text-amber-600 text-sm mb-1">
-          Debit Adjusted
+          <Tag color="gold" className="text-xs px-2.5 py-1 font-bold">
+            FY: {selectedFY || "All"}
+          </Tag>
         </div>
-        <InputNumber
-          min={0}
-          value={editDebitAdjustedAmount}
-          onChange={(val) => setEditDebitAdjustedAmount(val || 0)}
-          className="w-32"
+
+        <Table
+          size="small"
+          columns={columns}
+          dataSource={filteredInvoices}
+          loading={loading}
+          rowKey={(r) => r.id || r.sale_invoice_id || r.sale_invoice_number}
+          pagination={{ pageSize: 10, showSizeChanger: true }}
+          className="border-amber-100"
+          scroll={{ x: 1600 }}
         />
       </div>
-    </Col>
 
-    {/* Final */}
-    <Col xs={24} sm={12} md={5}>
-      <div>
-        <div className="text-amber-600 text-sm">Payable Amount</div>
-        <div className="text-xl font-bold text-amber-700">
-          ₹ {(
-            editItems.reduce((sum, r) => sum + r.deliveredAmount, 0) -
-            editDebitAdjustedAmount
-          ).toFixed(2)}
-        </div>
-      </div>
-    </Col>
-
-  </Row>
-</Card>
-
-    {/* Actions */}
-    <div className="flex justify-end gap-2">
-      <Button onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
-      <Button
-        type="primary"
-        onClick={handleUpdateInvoice}
-        className="bg-amber-500! hover:bg-amber-600!"
+      {/* CREATE / EDIT SALE INVOICE MODAL (MATCHING IMAGE 1) */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 pr-6">
+            <Tag
+              color="orange"
+              className="font-extrabold text-xs px-2.5 py-1 bg-amber-500 text-white border-none"
+            >
+              CREDIT INVOICE
+            </Tag>
+            <span className="text-amber-900 font-bold text-base">
+              {editingId ? "Edit Sale Invoice" : "Create New Sale Invoice"}
+            </span>
+          </div>
+        }
+        open={modalOpen}
+        onCancel={() => {
+          setModalOpen(false);
+          setEditingId(null);
+        }}
+        footer={[
+          <Button
+            key="cancel"
+            onClick={() => {
+              setModalOpen(false);
+              setEditingId(null);
+            }}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
+            Cancel
+          </Button>,
+          <Button
+            key="save"
+            type="primary"
+            loading={submitting}
+            onClick={handleSubmit}
+            className="bg-amber-500! hover:bg-amber-600! border-none! font-semibold"
+          >
+            {editingId ? "Update Sale Invoice" : "Save Sale Invoice"}
+          </Button>,
+        ]}
+        width="99vw"
+        style={{ maxWidth: "98vw", top: 10 }}
+        styles={{
+          body: {
+            padding: "14px 18px",
+            maxHeight: "calc(100vh - 120px)",
+            overflowY: "auto",
+          },
+        }}
+        destroyOnClose
       >
-        Update Invoice
-      </Button>
-    </div>
-  </Form>
-</Modal>
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={{
+            round_off_amount: 0,
+            grand_total: 0,
+            dispatch_from: "Haldia",
+          }}
+        >
+          {/* HEADER DETAILS CARD (ROW 1 & 2) */}
+          <Card
+            size="small"
+            style={{ marginBottom: 16, border: "1px solid #FDE68A" }}
+            styles={{ body: { padding: "16px 20px" } }}
+          >
+            {/* ROW 1 */}
+            <Row gutter={[14, 14]}>
+              <Col span={3}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-800 font-bold text-xs">
+                      Invoice No
+                    </span>
+                  }
+                  name="sale_invoice_number"
+                >
+                  <Input
+                    disabled
+                    placeholder="Auto generated"
+                    className="bg-gray-50! font-bold text-gray-900"
+                    style={{
+                      color: "#111827",
+                      WebkitTextFillColor: "#111827",
+                      fontWeight: 700,
+                      height: "38px",
+                      fontSize: "13px",
+                    }}
+                  />
+                </Form.Item>
+              </Col>
 
+              <Col span={3}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-800 font-bold text-xs">
+                      Invoice Date
+                    </span>
+                  }
+                  name="invoice_date"
+                  rules={[{ required: true, message: "Required" }]}
+                >
+                  <AppDatePicker
+                    className="w-full font-semibold"
+                    style={{ height: "38px", fontSize: "13px" }}
+                    disabledDate={(current) =>
+                      createFinancialYearDisabledDate(selectedFY)(current)
+                    }
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={5}>
+                <Form.Item
+                  label={
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-amber-800 font-bold text-xs">
+                        Customer Name
+                      </span>
+                      {selectedCustomerGst && (
+                        <span className="text-[11px] text-amber-700 font-mono font-bold">
+                          GST: {selectedCustomerGst}
+                        </span>
+                      )}
+                    </div>
+                  }
+                  name="customer_id"
+                  rules={[{ required: true, message: "Select Customer" }]}
+                >
+                  <Select
+                    placeholder="Select Customer"
+                    showSearch
+                    optionFilterProp="children"
+                    onChange={handleCustomerChange}
+                    className="font-semibold"
+                    style={{ height: "38px" }}
+                  >
+                    {customers.map((c) => {
+                      const cId = c.id || c.customer_id;
+                      const cName = c.name || c.customer_name;
+                      const cGst = c.gst_number || c.gst || c.customer_gst;
+                      return (
+                        <Option key={cId} value={cId}>
+                          {cName} {cGst ? `(${cGst})` : ""}
+                        </Option>
+                      );
+                    })}
+                  </Select>
+                </Form.Item>
+                <Form.Item name="customer_name" hidden>
+                  <Input />
+                </Form.Item>
+                <Form.Item name="customer_gst" hidden>
+                  <Input />
+                </Form.Item>
+              </Col>
+
+              <Col span={3}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-800 font-bold text-xs">
+                      Place
+                    </span>
+                  }
+                  name="place"
+                >
+                  <Input
+                    disabled
+                    placeholder="Auto (Place)"
+                    className="bg-gray-50! font-bold text-gray-900"
+                    style={{
+                      color: "#111827",
+                      WebkitTextFillColor: "#111827",
+                      fontWeight: 700,
+                      height: "38px",
+                      fontSize: "13px",
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={3}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-800 font-bold text-xs">
+                      Plant Name
+                    </span>
+                  }
+                  name="plant_id"
+                  rules={[{ required: true, message: "Select Plant" }]}
+                >
+                  <Select
+                    placeholder="Select Plant"
+                    showSearch
+                    allowClear
+                    optionFilterProp="children"
+                    className="font-semibold"
+                    style={{ height: "38px" }}
+                    onChange={(val) => {
+                      const p = plants.find(
+                        (item) =>
+                          String(
+                            item.id || item.plant_id || item.vendor_id || item.pk
+                          ) === String(val)
+                      );
+                      if (p) {
+                        form.setFieldsValue({
+                          plant_name:
+                            p.name || p.plant_name || p.vendor_name || "",
+                        });
+                      } else {
+                        form.setFieldsValue({ plant_name: undefined });
+                      }
+                    }}
+                  >
+                    {plants.map((p, idx) => {
+                      const pId = p.id || p.plant_id || p.vendor_id || p.pk || idx;
+                      const pName =
+                        p.name || p.plant_name || p.vendor_name || `Plant #${pId}`;
+                      const vName =
+                        p.vendor_name && p.vendor_name !== pName
+                          ? ` (${p.vendor_name})`
+                          : "";
+                      return (
+                        <Option key={pId} value={pId}>
+                          {pName}{vName}
+                        </Option>
+                      );
+                    })}
+                  </Select>
+                </Form.Item>
+                <Form.Item name="plant_name" hidden>
+                  <Input />
+                </Form.Item>
+              </Col>
+
+              <Col span={3}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-800 font-bold text-xs">
+                      Broker Name
+                    </span>
+                  }
+                  name="broker_id"
+                >
+                  <Select
+                    placeholder="Select Broker"
+                    showSearch
+                    allowClear
+                    optionFilterProp="children"
+                    className="font-semibold"
+                    style={{ height: "38px" }}
+                    onChange={(val) => {
+                      if (val === "direct") {
+                        form.setFieldsValue({ broker_name: "Direct" });
+                        return;
+                      }
+                      const b = brokers.find(
+                        (item) =>
+                          String(item.id || item.broker_id || item.pk) ===
+                          String(val)
+                      );
+                      if (b) {
+                        form.setFieldsValue({
+                          broker_name:
+                            b.name || b.broker_name || b.full_name || "",
+                        });
+                      } else {
+                        form.setFieldsValue({ broker_name: undefined });
+                      }
+                    }}
+                  >
+                    <Option key="direct" value="direct">
+                      Direct
+                    </Option>
+                    {brokers.map((b, idx) => {
+                      const bId = b.id || b.broker_id || b.pk || idx;
+                      const bName =
+                        b.name || b.broker_name || b.full_name || `Broker #${bId}`;
+                      return (
+                        <Option key={bId} value={bId}>
+                          {bName}
+                        </Option>
+                      );
+                    })}
+                  </Select>
+                </Form.Item>
+                <Form.Item name="broker_name" hidden>
+                  <Input />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-800 font-bold text-xs">
+                      Vehicle No
+                    </span>
+                  }
+                  name="vehicle_no"
+                  rules={[{ required: true, message: "Select Vehicle" }]}
+                >
+                  <Select
+                    placeholder={
+                      !form.getFieldValue("customer_id")
+                        ? "Select Customer First"
+                        : intransitVehicles.length === 0
+                        ? "No In-transit Vehicles"
+                        : "Select In-Transit Vehicle"
+                    }
+                    showSearch
+                    allowClear
+                    optionFilterProp="children"
+                    onChange={handleVehicleChange}
+                    disabled={!form.getFieldValue("customer_id")}
+                    className="font-semibold"
+                    style={{ height: "38px" }}
+                  >
+                    {intransitVehicles.map((v, idx) => {
+                      const vNo =
+                        v.vehicle_no || v.vehicle_number || v.number || `Veh-${idx}`;
+                      return (
+                        <Option key={vNo} value={vNo}>
+                          {vNo} {v.transport_name ? `(${v.transport_name})` : ""}
+                        </Option>
+                      );
+                    })}
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+
+            {/* ROW 2 */}
+            <Row gutter={[12, 12]} style={{ marginTop: 6 }}>
+              <Col span={4}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold text-xs">
+                      Transport Name
+                    </span>
+                  }
+                  name="transport_name"
+                >
+                  <Input
+                    disabled
+                    placeholder="Auto (Transport)"
+                    className="bg-gray-50! font-bold text-gray-900"
+                    style={{
+                      color: "#111827",
+                      WebkitTextFillColor: "#111827",
+                      fontWeight: 700,
+                      height: "38px",
+                      fontSize: "13px",
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={3}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold text-xs">
+                      LR No
+                    </span>
+                  }
+                  name="lr_no"
+                >
+                  <Input
+                    disabled
+                    placeholder="Auto (LR No)"
+                    className="bg-gray-50! font-bold text-gray-900"
+                    style={{
+                      color: "#111827",
+                      WebkitTextFillColor: "#111827",
+                      fontWeight: 700,
+                      height: "38px",
+                      fontSize: "13px",
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={3}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold text-xs">
+                      LR Date
+                    </span>
+                  }
+                  name="lr_date"
+                >
+                  <AppDatePicker
+                    disabled
+                    className="w-full font-bold"
+                    style={{
+                      color: "#111827",
+                      WebkitTextFillColor: "#111827",
+                      height: "38px",
+                      fontSize: "13px",
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={3}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold text-xs">
+                      E-waybill No
+                    </span>
+                  }
+                  name="ewaybill_no"
+                >
+                  <Input
+                    placeholder="Enter E-waybill No"
+                    className="font-semibold"
+                    style={{ height: "38px", fontSize: "13px" }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={3}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold text-xs">
+                      E-waybill Date
+                    </span>
+                  }
+                  name="ewaybill_date"
+                >
+                  <AppDatePicker
+                    className="w-full font-semibold"
+                    style={{ height: "38px", fontSize: "13px" }}
+                    disabledDate={(current) =>
+                      createFinancialYearDisabledDate(selectedFY)(current)
+                    }
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold text-xs">
+                      E-Invoice No
+                    </span>
+                  }
+                  name="einvoice_no"
+                >
+                  <Input
+                    placeholder="Enter E-Invoice No"
+                    className="font-semibold"
+                    style={{ height: "38px", fontSize: "13px" }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold text-xs">
+                      Payment Due Date
+                    </span>
+                  }
+                  name="payment_due_date"
+                >
+                  <AppDatePicker
+                    className="w-full font-semibold"
+                    style={{ height: "38px", fontSize: "13px" }}
+                    disabledDate={(current) =>
+                      createFinancialYearDisabledDate(selectedFY)(current)
+                    }
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+
+          {/* ITEMS TABLE CARD */}
+          <Card
+            size="small"
+            style={{
+              marginBottom: 16,
+              border: "1px solid #FDE68A",
+              overflowX: "auto",
+            }}
+            styles={{ body: { padding: "12px 16px" } }}
+          >
+            <div style={{ minWidth: 1980 }}>
+              <div className="flex items-center justify-between mb-3">
+                <h6 className="text-amber-800 font-bold m-0 text-sm tracking-wider uppercase">
+                  Items Table
+                </h6>
+                <span className="text-xs text-gray-500 font-medium">
+                  Auto-populated from approved customer contracts. Edit invoice qty, rates or remove rows as needed.
+                </span>
+              </div>
+
+              {/* TABLE HEADER */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "2.4fr 1.0fr 0.85fr 0.9fr 0.65fr 0.65fr 0.75fr 0.75fr 0.85fr 0.6fr 0.7fr 0.8fr 1.2fr 0.85fr 0.85fr 0.85fr 1.3fr 64px",
+                  gap: "8px",
+                  alignItems: "center",
+                  paddingBottom: "8px",
+                  marginBottom: "8px",
+                  fontWeight: "bold",
+                  fontSize: "13px",
+                  color: "#92400E",
+                  borderBottom: "2px solid #FDE68A",
+                }}
+              >
+                <div className="text-left">Item Name</div>
+                <div className="text-center">Souda No</div>
+                <div className="text-center">Contract Qty</div>
+                <div className="text-center">Invoice Qty</div>
+                <div className="text-center">Free Qty</div>
+                <div className="text-center">Unit</div>
+                <div className="text-center">Net Wt (Kg)</div>
+                <div className="text-center">Gr. Wt (Kg)</div>
+                <div className="text-center">Rate (₹)</div>
+                <div className="text-center">GST %</div>
+                <div className="text-center">Disc. %</div>
+                <div className="text-center">Disc. Amt</div>
+                <div className="text-center">Taxable Amt</div>
+                <div className="text-center">SGST</div>
+                <div className="text-center">CGST</div>
+                <div className="text-center">IGST</div>
+                <div className="text-center">Total Amount (₹)</div>
+                <div className="text-center">Action</div>
+              </div>
+
+              {/* ITEMS FORM LIST */}
+              <Form.List name="items">
+                {(fields, { add, remove }) => (
+                  <>
+                    {fields.map((field) => (
+                      <div
+                        key={field.key}
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "2.4fr 1.0fr 0.85fr 0.9fr 0.65fr 0.65fr 0.75fr 0.75fr 0.85fr 0.6fr 0.7fr 0.8fr 1.2fr 0.85fr 0.85fr 0.85fr 1.3fr 64px",
+                          gap: "8px",
+                          alignItems: "center",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        {/* 1. Item Name Dropdown */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "item_name"]}
+                            style={{ marginBottom: 0 }}
+                            rules={[{ required: true, message: "Select Item" }]}
+                          >
+                            <Select
+                              placeholder="Select Item / Product"
+                              showSearch
+                              optionFilterProp="children"
+                              className="w-full font-bold"
+                              style={{ height: "36px" }}
+                              onChange={(val) =>
+                                handleItemSelect(field.name, val)
+                              }
+                            >
+                              {contractItems.map((ci) => {
+                                const keyVal =
+                                  ci.sale_contract_item_id ||
+                                  ci.id ||
+                                  ci.product_id ||
+                                  ci.souda_no;
+                                return (
+                                  <Option key={keyVal} value={keyVal}>
+                                    {ci.item_name || ci.product_name} -{" "}
+                                    {ci.souda_no || "Contract"} (₹{ci.rate})
+                                  </Option>
+                                );
+                              })}
+                            </Select>
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, "sale_contract_id"]}
+                            hidden
+                          >
+                            <Input />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, "sale_contract_uuid"]}
+                            hidden
+                          >
+                            <Input />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, "sale_contract_item_id"]}
+                            hidden
+                          >
+                            <Input />
+                          </Form.Item>
+                          <Form.Item name={[field.name, "product_id"]} hidden>
+                            <Input />
+                          </Form.Item>
+                          <Form.Item name={[field.name, "product_name"]} hidden>
+                            <Input />
+                          </Form.Item>
+                        </div>
+
+                        {/* 2. Souda No */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "souda_no"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <Input
+                              disabled
+                              className="w-full bg-gray-50! text-center font-bold text-gray-900"
+                              style={{
+                                color: "#111827",
+                                WebkitTextFillColor: "#111827",
+                                fontWeight: 700,
+                                height: "36px",
+                                fontSize: "13px",
+                              }}
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 3. Contract Qty (Actual Qty) */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "actual_qty"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              disabled
+                              precision={2}
+                              className="w-full bg-amber-50! font-bold text-center text-amber-950 border-amber-200!"
+                              style={{
+                                color: "#78350F",
+                                WebkitTextFillColor: "#78350F",
+                                fontWeight: 700,
+                                height: "36px",
+                                fontSize: "13px",
+                              }}
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 4. Invoice Qty */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "qty"]}
+                            style={{ marginBottom: 0 }}
+                            rules={[{ required: true, message: "Required" }]}
+                          >
+                            <InputNumber
+                              min={0.001}
+                              precision={2}
+                              className="w-full border-amber-400! font-bold text-center text-gray-900"
+                              placeholder="Invoice Qty"
+                              style={{ height: "36px", fontSize: "13px" }}
+                              onChange={() => handleItemFieldChange(field.name)}
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 5. Free Qty */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "free_qty"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              min={0}
+                              precision={2}
+                              className="w-full text-center font-semibold"
+                              placeholder="0"
+                              style={{ height: "36px", fontSize: "13px" }}
+                              onChange={() => handleItemFieldChange(field.name)}
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 6. Unit */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "unit"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <Input
+                              disabled
+                              className="w-full bg-gray-50! text-center px-1 font-bold text-gray-900"
+                              style={{
+                                color: "#111827",
+                                WebkitTextFillColor: "#111827",
+                                fontWeight: 700,
+                                height: "36px",
+                                fontSize: "13px",
+                              }}
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 7. Net Wt (Kg) */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "net_weight_kg"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              precision={3}
+                              className="w-full text-center font-semibold"
+                              placeholder="0.000"
+                              style={{ height: "36px", fontSize: "13px" }}
+                              onChange={() => handleItemFieldChange(field.name)}
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 8. Gr. Wt (Kg) */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "gross_weight_kg"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              precision={3}
+                              className="w-full text-center font-semibold"
+                              placeholder="0.000"
+                              style={{ height: "36px", fontSize: "13px" }}
+                              onChange={() => handleItemFieldChange(field.name)}
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 9. Rate */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "rate"]}
+                            style={{ marginBottom: 0 }}
+                            rules={[{ required: true, message: "Rate" }]}
+                          >
+                            <InputNumber
+                              min={0}
+                              precision={2}
+                              className="w-full text-center font-bold"
+                              placeholder="Rate"
+                              style={{ height: "36px", fontSize: "13px" }}
+                              onChange={() => handleItemFieldChange(field.name)}
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 10. GST % */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "gst_percent"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              disabled
+                              controls={false}
+                              className="w-full bg-gray-50! text-center p-0 font-bold text-gray-900"
+                              style={{
+                                color: "#111827",
+                                WebkitTextFillColor: "#111827",
+                                fontWeight: 700,
+                                height: "36px",
+                                fontSize: "13px",
+                              }}
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 11. Disc. % */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "discount_percent"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              min={0}
+                              max={100}
+                              step={0.1}
+                              precision={2}
+                              className="w-full text-center font-semibold"
+                              placeholder="0%"
+                              style={{ height: "36px", fontSize: "13px" }}
+                              onChange={() => handleItemFieldChange(field.name)}
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 12. Disc. Amt */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "discount_amount"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              disabled
+                              precision={2}
+                              className="w-full bg-gray-50! text-center text-gray-800 font-semibold"
+                              placeholder="0.00"
+                              style={{ height: "36px", fontSize: "13px" }}
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 13. Taxable Amt */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "taxable_amount"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              disabled
+                              className="w-full bg-gray-50! text-center font-bold text-gray-900"
+                              precision={2}
+                              style={{
+                                width: "100%",
+                                color: "#111827",
+                                WebkitTextFillColor: "#111827",
+                                fontWeight: 700,
+                                height: "36px",
+                                fontSize: "13px",
+                              }}
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 14. SGST */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "sgst_amount"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              disabled
+                              controls={false}
+                              className="w-full bg-gray-50! text-center px-1 font-semibold"
+                              precision={2}
+                              placeholder="0.00"
+                              style={{ height: "36px", fontSize: "13px" }}
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 15. CGST */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "cgst_amount"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              disabled
+                              controls={false}
+                              className="w-full bg-gray-50! text-center px-1 font-semibold"
+                              precision={2}
+                              placeholder="0.00"
+                              style={{ height: "36px", fontSize: "13px" }}
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 16. IGST */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "igst_amount"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              disabled
+                              controls={false}
+                              className="w-full bg-gray-50! text-center px-1 font-semibold"
+                              precision={2}
+                              placeholder="0.00"
+                              style={{ height: "36px", fontSize: "13px" }}
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 17. Total Amount */}
+                        <div>
+                          <Form.Item
+                            name={[field.name, "total_amount"]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <InputNumber
+                              disabled
+                              className="w-full bg-amber-50! font-bold text-center text-amber-950 border-amber-300!"
+                              precision={2}
+                              style={{
+                                width: "100%",
+                                color: "#78350F",
+                                WebkitTextFillColor: "#78350F",
+                                fontWeight: 800,
+                                fontSize: "14px",
+                                height: "36px",
+                              }}
+                            />
+                          </Form.Item>
+                        </div>
+
+                        {/* 18. Actions (Add / Remove) */}
+                        <div className="text-center flex justify-center items-center gap-1">
+                          <Tooltip title="Add Row">
+                            <Button
+                              type="text"
+                              size="middle"
+                              icon={
+                                <PlusOutlined
+                                  style={{
+                                    color: "#d97706",
+                                    fontWeight: "bold",
+                                    fontSize: "15px",
+                                  }}
+                                />
+                              }
+                              onClick={() =>
+                                add({
+                                  actual_qty: 0,
+                                  qty: 1,
+                                  free_qty: 0,
+                                  rate: 0,
+                                  discount_percent: 0,
+                                  discount_amount: 0,
+                                  taxable_amount: 0,
+                                  sgst_amount: 0,
+                                  cgst_amount: 0,
+                                  igst_amount: 0,
+                                  total_amount: 0,
+                                  net_weight_kg: 0,
+                                  gross_weight_kg: 0,
+                                })
+                              }
+                            />
+                          </Tooltip>
+                          <Tooltip title="Remove Row">
+                            <Button
+                              type="text"
+                              danger
+                              size="middle"
+                              icon={<DeleteOutlined style={{ fontSize: "15px" }} />}
+                              onClick={() => {
+                                if (fields.length > 1) {
+                                  remove(field.name);
+                                  setTimeout(() => recalculateAllTotals(), 50);
+                                }
+                              }}
+                              disabled={fields.length <= 1}
+                            />
+                          </Tooltip>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </Form.List>
+
+              {/* TABLE "TOTAL" ROW */}
+              <Divider style={{ margin: "12px 0 8px 0" }} />
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "2.4fr 1.0fr 0.85fr 0.9fr 0.65fr 0.65fr 0.75fr 0.75fr 0.85fr 0.6fr 0.7fr 0.8fr 1.2fr 0.85fr 0.85fr 0.85fr 1.3fr 64px",
+                  gap: "8px",
+                  alignItems: "center",
+                }}
+              >
+                {/* 1. Item Name / Total Label */}
+                <div className="flex items-center h-[38px]">
+                  <span className="font-extrabold text-amber-950 text-sm tracking-wide">
+                    Total:
+                  </span>
+                </div>
+
+                {/* 2. Souda Spacer */}
+                <div></div>
+
+                {/* 3. Contract Qty Spacer */}
+                <div></div>
+
+                {/* 4. Total Invoice Qty */}
+                <div>
+                  <Form.Item name="total_qty" style={{ marginBottom: 0 }}>
+                    <InputNumber
+                      disabled
+                      precision={2}
+                      className="w-full bg-gray-100! font-bold text-center text-gray-900"
+                      style={{
+                        width: "100%",
+                        color: "#111827",
+                        WebkitTextFillColor: "#111827",
+                        fontWeight: 700,
+                        fontSize: "14px",
+                        height: "38px",
+                      }}
+                    />
+                  </Form.Item>
+                </div>
+
+                {/* 5. Total Free Qty */}
+                <div>
+                  <Form.Item name="total_free_qty" style={{ marginBottom: 0 }}>
+                    <InputNumber
+                      disabled
+                      precision={2}
+                      className="w-full bg-gray-100! font-bold text-center text-gray-900"
+                      style={{
+                        width: "100%",
+                        color: "#111827",
+                        WebkitTextFillColor: "#111827",
+                        fontWeight: 700,
+                        fontSize: "14px",
+                        height: "38px",
+                      }}
+                    />
+                  </Form.Item>
+                </div>
+
+                {/* 6. Unit Spacer */}
+                <div></div>
+
+                {/* 7. Net Wt Spacer */}
+                <div></div>
+
+                {/* 8. Gr Wt Spacer */}
+                <div></div>
+
+                {/* 9. Rate Spacer */}
+                <div></div>
+
+                {/* 10. GST Spacer */}
+                <div></div>
+
+                {/* 11. Disc % Spacer */}
+                <div></div>
+
+                {/* 12. Total Disc Amt */}
+                <div>
+                  <Form.Item
+                    name="total_discount_amount"
+                    style={{ marginBottom: 0 }}
+                  >
+                    <InputNumber
+                      disabled
+                      precision={2}
+                      className="w-full bg-gray-100! font-bold text-center text-gray-900"
+                      placeholder="0.00"
+                      style={{
+                        width: "100%",
+                        color: "#111827",
+                        WebkitTextFillColor: "#111827",
+                        fontWeight: 700,
+                        fontSize: "13px",
+                        height: "38px",
+                      }}
+                    />
+                  </Form.Item>
+                </div>
+
+                {/* 13. Total Taxable Amount */}
+                <div>
+                  <Form.Item
+                    name="total_taxable_amount"
+                    style={{ marginBottom: 0 }}
+                  >
+                    <InputNumber
+                      disabled
+                      precision={2}
+                      className="w-full bg-gray-100! font-bold text-center text-gray-900"
+                      style={{
+                        width: "100%",
+                        color: "#111827",
+                        WebkitTextFillColor: "#111827",
+                        fontWeight: 700,
+                        fontSize: "14px",
+                        height: "38px",
+                      }}
+                    />
+                  </Form.Item>
+                </div>
+
+                {/* 14. Total SGST */}
+                <div>
+                  <Form.Item name="total_sgst" style={{ marginBottom: 0 }}>
+                    <InputNumber
+                      disabled
+                      precision={2}
+                      className="w-full bg-gray-100! font-bold text-center text-gray-900"
+                      placeholder="0.00"
+                      style={{
+                        width: "100%",
+                        color: "#111827",
+                        WebkitTextFillColor: "#111827",
+                        fontWeight: 700,
+                        fontSize: "14px",
+                        height: "38px",
+                      }}
+                    />
+                  </Form.Item>
+                </div>
+
+                {/* 15. Total CGST */}
+                <div>
+                  <Form.Item name="total_cgst" style={{ marginBottom: 0 }}>
+                    <InputNumber
+                      disabled
+                      precision={2}
+                      className="w-full bg-gray-100! font-bold text-center text-gray-900"
+                      placeholder="0.00"
+                      style={{
+                        width: "100%",
+                        color: "#111827",
+                        WebkitTextFillColor: "#111827",
+                        fontWeight: 700,
+                        fontSize: "14px",
+                        height: "38px",
+                      }}
+                    />
+                  </Form.Item>
+                </div>
+
+                {/* 16. Total IGST */}
+                <div>
+                  <Form.Item name="total_igst" style={{ marginBottom: 0 }}>
+                    <InputNumber
+                      disabled
+                      precision={2}
+                      className="w-full bg-gray-100! font-bold text-center text-gray-900"
+                      placeholder="0.00"
+                      style={{
+                        width: "100%",
+                        color: "#111827",
+                        WebkitTextFillColor: "#111827",
+                        fontWeight: 700,
+                        fontSize: "14px",
+                        height: "38px",
+                      }}
+                    />
+                  </Form.Item>
+                </div>
+
+                {/* 17. Total Amount */}
+                <div>
+                  <Form.Item name="total_amount" style={{ marginBottom: 0 }}>
+                    <InputNumber
+                      disabled
+                      precision={2}
+                      className="w-full bg-amber-100! font-bold text-amber-950 text-center border border-amber-400!"
+                      style={{
+                        width: "100%",
+                        color: "#78350F",
+                        WebkitTextFillColor: "#78350F",
+                        fontWeight: 800,
+                        fontSize: "15px",
+                        height: "38px",
+                      }}
+                    />
+                  </Form.Item>
+                </div>
+
+                {/* 18. Action Spacer */}
+                <div></div>
+              </div>
+            </div>
+          </Card>
+
+          {/* BOTTOM SUMMARY CARD (FOOTER - WEIGHTS, SHIPMENT & GRAND TOTAL) */}
+          <Card
+            size="small"
+            style={{ border: "1px solid #FDE68A" }}
+            styles={{ body: { padding: "14px 18px" } }}
+          >
+            <Row gutter={[14, 14]} align="middle">
+              <Col span={3}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-800 font-bold text-xs">
+                      Total Gr. Wt.(Ton)
+                    </span>
+                  }
+                  name="total_gross_weight_ton"
+                >
+                  <InputNumber
+                    disabled
+                    precision={3}
+                    placeholder="0.000"
+                    className="w-full bg-gray-50! font-bold text-gray-900"
+                    style={{
+                      color: "#111827",
+                      WebkitTextFillColor: "#111827",
+                      fontWeight: 700,
+                      height: "38px",
+                      fontSize: "13px",
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={3}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-800 font-bold text-xs">
+                      Net Wt.(Ton)
+                    </span>
+                  }
+                  name="total_net_weight_ton"
+                >
+                  <InputNumber
+                    disabled
+                    precision={3}
+                    placeholder="0.000"
+                    className="w-full bg-gray-50! font-bold text-gray-900"
+                    style={{
+                      color: "#111827",
+                      WebkitTextFillColor: "#111827",
+                      fontWeight: 700,
+                      height: "38px",
+                      fontSize: "13px",
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={3}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold text-xs">
+                      Despatch From
+                    </span>
+                  }
+                  name="dispatch_from"
+                >
+                  <Input
+                    placeholder="Origin location"
+                    className="font-semibold"
+                    style={{ height: "38px", fontSize: "13px" }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={3}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold text-xs">
+                      Ship To
+                    </span>
+                  }
+                  name="ship_to"
+                >
+                  <Input
+                    placeholder="Destination city"
+                    className="font-semibold"
+                    style={{ height: "38px", fontSize: "13px" }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={3}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-800 font-bold text-xs">
+                      Distance (KM) <span className="text-red-500">*</span>
+                    </span>
+                  }
+                  name="distance_km"
+                  rules={[
+                    { required: true, message: "Distance (KM) is mandatory" },
+                  ]}
+                >
+                  <InputNumber
+                    placeholder="Enter Distance (KM)"
+                    className="w-full font-semibold border-amber-300!"
+                    min={0}
+                    style={{ height: "38px", fontSize: "13px" }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={3}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold text-xs">
+                      E-Invoice Upload
+                    </span>
+                  }
+                >
+                  <Upload
+                    beforeUpload={(file) => {
+                      setFileList([file]);
+                      return false;
+                    }}
+                    onRemove={() => setFileList([])}
+                    fileList={fileList}
+                    maxCount={1}
+                  >
+                    <Button
+                      size="middle"
+                      icon={<UploadOutlined />}
+                      className="w-full border-amber-300! font-semibold"
+                      style={{ height: "38px", fontSize: "13px" }}
+                    >
+                      {editingDocUrl && !fileList.length
+                        ? "Change PDF"
+                        : "Upload"}
+                    </Button>
+                  </Upload>
+                </Form.Item>
+              </Col>
+
+              <Col span={3}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold text-xs">
+                      Round up
+                    </span>
+                  }
+                  name="round_off_amount"
+                >
+                  <InputNumber
+                    className="w-full font-semibold border-amber-300!"
+                    onChange={() => recalculateAllTotals()}
+                    precision={2}
+                    step={0.01}
+                    placeholder="0.00"
+                    style={{ height: "38px", fontSize: "13px" }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={3}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-950 font-extrabold text-xs tracking-wide">
+                      Grand Total (₹)
+                    </span>
+                  }
+                  name="grand_total"
+                >
+                  <InputNumber
+                    disabled
+                    className="w-full bg-amber-100! font-black text-amber-950 text-center border-2 border-amber-500!"
+                    precision={2}
+                    style={{
+                      width: "100%",
+                      color: "#78350F",
+                      WebkitTextFillColor: "#78350F",
+                      fontWeight: 900,
+                      fontSize: "17px",
+                      height: "40px",
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+        </Form>
+      </Modal>
+
+      {/* VIEW DETAILS MODAL */}
+      <Modal
+        title={
+          <div className="flex items-center justify-between pr-6">
+            <span className="text-amber-800 text-xl font-bold">
+              Sale Invoice Details:{" "}
+              {viewRecord?.sale_invoice_number || viewRecord?.invoice_no}
+            </span>
+            <Tag color="orange" className="text-xs font-bold px-2 py-0.5">
+              CREDIT INVOICE
+            </Tag>
+          </div>
+        }
+        open={viewModalOpen}
+        onCancel={() => setViewModalOpen(false)}
+        footer={[
+          <Button
+            key="print"
+            icon={<PrinterOutlined />}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+            onClick={() => handlePrint(viewRecord)}
+          >
+            Print / PDF
+          </Button>,
+          <Button
+            key="close"
+            type="primary"
+            onClick={() => setViewModalOpen(false)}
+            className="bg-amber-500! hover:bg-amber-600! border-none!"
+          >
+            Close
+          </Button>,
+        ]}
+        width="85vw"
+        style={{ maxWidth: 1200, top: 20 }}
+        destroyOnClose
+      >
+        {viewRecord && (
+          <div className="space-y-4">
+            {/* TOP HEADER GRID */}
+            <Card size="small" className="bg-amber-50/40 border-amber-200">
+              <Row gutter={[16, 12]}>
+                <Col span={6}>
+                  <Text type="secondary">Customer Name:</Text>
+                  <div className="font-bold text-amber-950 text-sm">
+                    {viewRecord.customer_name || "-"}
+                  </div>
+                  {viewRecord.customer_gst && (
+                    <div className="text-xs text-gray-500 font-mono">
+                      GST: {viewRecord.customer_gst}
+                    </div>
+                  )}
+                </Col>
+                <Col span={6}>
+                  <Text type="secondary">Invoice Date & No:</Text>
+                  <div className="font-bold text-gray-900">
+                    {viewRecord.sale_invoice_number || viewRecord.invoice_no} (
+                    {fmtDate(viewRecord.invoice_date)})
+                  </div>
+                </Col>
+                <Col span={4}>
+                  <Text type="secondary">Plant:</Text>
+                  <div className="font-semibold">
+                    {viewRecord.plant_name || "-"}
+                  </div>
+                </Col>
+                <Col span={4}>
+                  <Text type="secondary">Broker:</Text>
+                  <div className="font-semibold">
+                    {viewRecord.broker_name || "-"}
+                  </div>
+                </Col>
+                <Col span={4}>
+                  <Text type="secondary">Vehicle No:</Text>
+                  <div>
+                    <Tag color="success" className="font-bold">
+                      {viewRecord.vehicle_no ||
+                        viewRecord.vehicle_number ||
+                        "-"}
+                    </Tag>
+                  </div>
+                </Col>
+
+                <Col span={6}>
+                  <Text type="secondary">Transport Name:</Text>
+                  <div className="font-semibold">
+                    {viewRecord.transport_name || "-"}
+                  </div>
+                </Col>
+                <Col span={4}>
+                  <Text type="secondary">LR No & Date:</Text>
+                  <div className="font-semibold">
+                    {viewRecord.lr_no || "-"} ({fmtDate(viewRecord.lr_date)})
+                  </div>
+                </Col>
+                <Col span={5}>
+                  <Text type="secondary">E-waybill No & Date:</Text>
+                  <div className="font-semibold">
+                    {viewRecord.ewaybill_no || "-"}{" "}
+                    {viewRecord.ewaybill_date
+                      ? `(${fmtDate(viewRecord.ewaybill_date)})`
+                      : ""}
+                  </div>
+                </Col>
+                <Col span={5}>
+                  <Text type="secondary">Payment Due Date:</Text>
+                  <div className="font-semibold text-amber-900">
+                    {fmtDate(viewRecord.payment_due_date)}
+                  </div>
+                </Col>
+                <Col span={4}>
+                  <Text type="secondary">Despatch / Ship To:</Text>
+                  <div className="font-semibold">
+                    {viewRecord.dispatch_from || "-"} ➔{" "}
+                    {viewRecord.ship_to || viewRecord.place || "-"}
+                  </div>
+                </Col>
+              </Row>
+            </Card>
+
+            {/* ITEMS TABLE */}
+            <h5 className="text-amber-800 font-bold mb-2">Invoice Items</h5>
+            <Table
+              dataSource={viewRecord.items || []}
+              rowKey={(r, i) => r.id || i}
+              pagination={false}
+              size="small"
+              className="border border-amber-100"
+              columns={[
+                { title: "Item Name", dataIndex: "item_name" },
+                { title: "Souda No", dataIndex: "souda_no" },
+                {
+                  title: "Qty",
+                  dataIndex: "qty",
+                  render: (val, r) => `${val} ${r.unit || ""}`,
+                },
+                {
+                  title: "Free Qty",
+                  dataIndex: "free_qty",
+                  render: (val) => val || "0",
+                },
+                {
+                  title: "GST %",
+                  dataIndex: "gst_percent",
+                  render: (val) => `${val}%`,
+                },
+                {
+                  title: "Rate",
+                  dataIndex: "rate",
+                  render: (val) => `₹${Number(val || 0).toFixed(2)}`,
+                },
+                {
+                  title: "Disc %",
+                  dataIndex: "discount_percent",
+                  render: (val) => `${val || 0}%`,
+                },
+                {
+                  title: "Taxable Amt",
+                  dataIndex: "taxable_amount",
+                  render: (val) => `₹${Number(val || 0).toFixed(2)}`,
+                },
+                {
+                  title: "SGST",
+                  dataIndex: "sgst_amount",
+                  render: (val) =>
+                    Number(val) > 0 ? `₹${Number(val).toFixed(2)}` : "-",
+                },
+                {
+                  title: "CGST",
+                  dataIndex: "cgst_amount",
+                  render: (val) =>
+                    Number(val) > 0 ? `₹${Number(val).toFixed(2)}` : "-",
+                },
+                {
+                  title: "IGST",
+                  dataIndex: "igst_amount",
+                  render: (val) =>
+                    Number(val) > 0 ? `₹${Number(val).toFixed(2)}` : "-",
+                },
+                {
+                  title: "Total Amount",
+                  dataIndex: "total_amount",
+                  render: (val) => (
+                    <span className="font-bold text-amber-950">
+                      ₹{Number(val || 0).toFixed(2)}
+                    </span>
+                  ),
+                },
+              ]}
+            />
+
+            {/* TOTALS & SUMMARY */}
+            <Card size="small" className="bg-amber-50/60 border-amber-200">
+              <Row gutter={16} align="middle">
+                <Col span={4}>
+                  <Text type="secondary">Total Qty:</Text>
+                  <div className="font-bold text-base">
+                    {viewRecord.total_qty || 0}
+                  </div>
+                </Col>
+                <Col span={4}>
+                  <Text type="secondary">Total Gr. Wt:</Text>
+                  <div className="font-bold text-base">
+                    {viewRecord.total_gross_weight_ton ||
+                      viewRecord.gross_weight ||
+                      "-"}{" "}
+                    Ton
+                  </div>
+                </Col>
+                <Col span={4}>
+                  <Text type="secondary">Net Wt:</Text>
+                  <div className="font-bold text-base">
+                    {viewRecord.total_net_weight_ton ||
+                      viewRecord.net_weight ||
+                      "-"}{" "}
+                    Ton
+                  </div>
+                </Col>
+                <Col span={4}>
+                  <Text type="secondary">Round Off:</Text>
+                  <div className="font-bold text-base">
+                    ₹{Number(viewRecord.round_off_amount || 0).toFixed(2)}
+                  </div>
+                </Col>
+                <Col span={8} className="text-right">
+                  <Text type="secondary">Grand Total:</Text>
+                  <div className="font-extrabold text-2xl text-amber-900">
+                    ₹
+                    {Number(viewRecord.grand_total || 0).toLocaleString(
+                      "en-IN",
+                      { minimumFractionDigits: 2 }
+                    )}
+                  </div>
+                </Col>
+              </Row>
+            </Card>
+
+            {/* DOCUMENT LINK */}
+            {(viewRecord.einvoice_pdf || viewRecord.invoice_copy_url) && (
+              <div className="p-2.5 bg-gray-50 rounded border flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FilePdfOutlined className="text-red-500 text-lg" />
+                  <span className="font-semibold text-gray-800 text-xs">
+                    Uploaded E-Invoice Copy:
+                  </span>
+                </div>
+                <a
+                  href={viewRecord.einvoice_pdf || viewRecord.invoice_copy_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-600 font-bold hover:underline text-xs"
+                >
+                  View / Download Document
+                </a>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
