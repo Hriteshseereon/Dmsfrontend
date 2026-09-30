@@ -678,19 +678,35 @@ export const getVehicleInvoices = async (vehicleNo, lrNo) => {
 export const getDepoDetails = async () => {
   const { currentOrgId } = useSessionStore.getState();
   try {
-    const res = await api.get("/organisation/organisation-branches/", {
-      params: { organisation: currentOrgId },
-    });
+    const res = await api.get(
+      "/organisation/organisation-branches/all-branches/",
+      {
+        params: { organisation: currentOrgId },
+      }
+    );
     return res.data;
   } catch (err) {
     try {
-      const fallbackRes = await api.get("/organisation/depo-details/", {
+      const depotsRes = await api.get("/organisation/depots/", {
         params: { organisation: currentOrgId },
       });
-      return fallbackRes.data;
-    } catch (fallbackErr) {
-      console.warn("Could not fetch depo/branches details from backend:", fallbackErr);
-      return [];
+      return depotsRes.data;
+    } catch (depotsErr) {
+      try {
+        const fallbackRes = await api.get(
+          "/organisation/organisation-branches/",
+          {
+            params: { organisation: currentOrgId },
+          }
+        );
+        return fallbackRes.data;
+      } catch (fallbackErr) {
+        console.warn(
+          "Could not fetch depo/branches details from backend:",
+          fallbackErr
+        );
+        return [];
+      }
     }
   }
 };
@@ -698,13 +714,46 @@ export const getDepoDetails = async () => {
 export const getOrganisationBranches = async () => {
   const { currentOrgId } = useSessionStore.getState();
   try {
-    const res = await api.get("/organisation/organisation-branches/", {
+    const res = await api.get(
+      "/organisation/organisation-branches/all-branches/",
+      {
+        params: { organisation: currentOrgId },
+      }
+    );
+    return res.data;
+  } catch (err) {
+    try {
+      const res = await api.get("/organisation/organisation-branches/", {
+        params: { organisation: currentOrgId },
+      });
+      return res.data;
+    } catch (fallbackErr) {
+      console.warn("Could not fetch organisation branches:", fallbackErr);
+      return [];
+    }
+  }
+};
+
+export const getDepots = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  try {
+    const res = await api.get("/organisation/depots/", {
       params: { organisation: currentOrgId },
     });
     return res.data;
   } catch (err) {
-    console.warn("Could not fetch organisation branches:", err);
-    return [];
+    try {
+      const res = await api.get(
+        "/organisation/organisation-branches/all-branches/",
+        {
+          params: { organisation: currentOrgId },
+        }
+      );
+      return res.data;
+    } catch (fallbackErr) {
+      console.warn("Could not fetch depots:", fallbackErr);
+      return [];
+    }
   }
 };
 
