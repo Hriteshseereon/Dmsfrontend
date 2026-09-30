@@ -356,6 +356,232 @@ export const fetchInvoicePDF = async (invoiceId) => {
   return res.data; // returns Blob
 };
 
+// Helper for executing GET requests across fallback URLs
+const safeApiGet = async (urlList, params = {}) => {
+  let lastError = null;
+  for (const url of urlList) {
+    try {
+      const res = await api.get(url, { params });
+      if (res && (res.data !== undefined || Array.isArray(res))) {
+        return res.data !== undefined ? res.data : res;
+      }
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  console.warn(`[safeApiGet] All fallback URLs failed for: ${urlList.join(", ")}`, lastError);
+  return [];
+};
+
+// ---------------- SALE INVOICE (CREDIT INVOICE) API SECTION ----------------
+export const getNextSaleInvoiceNumber = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  return await safeApiGet([
+    "/sales/invoices/next-invoice-number/",
+    "/api/sales/invoices/next-invoice-number/",
+  ], { organisation: currentOrgId });
+};
+
+export const getSaleInvoiceCustomers = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  return await safeApiGet([
+    "/sales/invoices/customers/",
+    "/api/sales/invoices/customers/",
+    "/sales/orders/customers/",
+    "/api/sales/orders/customers/",
+    "/customers/admin/by-organisation/",
+    "/api/customers/admin/by-organisation/",
+    "/customers/customers/",
+    "/api/customers/customers/",
+    "/customers/",
+  ], { organisation: currentOrgId });
+};
+
+export const getSaleInvoicePlants = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  return await safeApiGet([
+    "/sales/invoices/all-plants/",
+    "/api/sales/invoices/all-plants/",
+    "/sales/contracts/all-plants/",
+    "/api/sales/contracts/all-plants/",
+    "/vendors/vendor-dropdown/",
+    "/api/vendors/vendor-dropdown/",
+    "/vendors/company-groups/",
+    "/api/vendors/company-groups/",
+    "/vendors/vendors/",
+    "/api/vendors/vendors/",
+  ], { organisation: currentOrgId });
+};
+
+export const getSaleInvoiceBrokers = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  return await safeApiGet([
+    "/sales/invoices/all-brokers/",
+    "/api/sales/invoices/all-brokers/",
+    "/sales/contracts/all-brokers/",
+    "/api/sales/contracts/all-brokers/",
+    "/brokers/broker/",
+    "/api/brokers/broker/",
+  ], { organisation: currentOrgId });
+};
+
+export const getSaleInvoiceIntransitVehicles = async (customerId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  return await safeApiGet([
+    "/sales/invoices/intransit-vehicles/",
+    "/api/sales/invoices/intransit-vehicles/",
+    "/purchase/invoices/available-vehicles/",
+    "/api/purchase/invoices/available-vehicles/",
+    "/transport/vehicle-masters/",
+    "/api/transport/vehicle-masters/",
+  ], {
+    organisation: currentOrgId,
+    customer_id: customerId,
+  });
+};
+
+export const getSaleInvoiceCustomerContractItems = async (customerId) => {
+  const { currentOrgId, selectedFY } = useSessionStore.getState();
+  return await safeApiGet([
+    "/sales/invoices/customer-contract-items/",
+    "/api/sales/invoices/customer-contract-items/",
+    "/sales/orders/contracts/",
+    "/api/sales/orders/contracts/",
+    "/sales/contracts/",
+    "/api/sales/contracts/",
+  ], {
+    organisation: currentOrgId,
+    customer_id: customerId,
+    financial_year: selectedFY,
+  });
+};
+
+export const createSaleInvoice = async (payload) => {
+  const { currentOrgId, selectedFY } = useSessionStore.getState();
+  const isFormData = payload instanceof FormData;
+  const config = {
+    params: { organisation: currentOrgId, financial_year: selectedFY },
+    headers: isFormData ? { "Content-Type": "multipart/form-data" } : {},
+  };
+  try {
+    const res = await api.post("/sales/invoices/", payload, config);
+    return res.data;
+  } catch (err) {
+    if (err.response?.status === 404) {
+      const res2 = await api.post("/api/sales/invoices/", payload, config);
+      return res2.data;
+    }
+    throw err;
+  }
+};
+
+export const getSaleInvoices = async () => {
+  const { currentOrgId, selectedFY } = useSessionStore.getState();
+  return await safeApiGet([
+    "/sales/invoices/",
+    "/api/sales/invoices/",
+  ], { organisation: currentOrgId, financial_year: selectedFY });
+};
+
+export const getSaleInvoiceById = async (id) => {
+  const { currentOrgId } = useSessionStore.getState();
+  return await safeApiGet([
+    `/sales/invoices/${id}/`,
+    `/api/sales/invoices/${id}/`,
+  ], { organisation: currentOrgId });
+};
+
+export const updateSaleInvoice = async (id, payload) => {
+  const { currentOrgId, selectedFY } = useSessionStore.getState();
+  const isFormData = payload instanceof FormData;
+  const config = {
+    params: { organisation: currentOrgId, financial_year: selectedFY },
+    headers: isFormData ? { "Content-Type": "multipart/form-data" } : {},
+  };
+  try {
+    const res = await api.patch(`/sales/invoices/${id}/`, payload, config);
+    return res.data;
+  } catch (err) {
+    if (err.response?.status === 404) {
+      const res2 = await api.patch(`/api/sales/invoices/${id}/`, payload, config);
+      return res2.data;
+    }
+    throw err;
+  }
+};
+
+export const deleteSaleInvoice = async (id) => {
+  const { currentOrgId } = useSessionStore.getState();
+  try {
+    const res = await api.delete(`/sales/invoices/${id}/`, {
+      params: { organisation: currentOrgId },
+    });
+    return res.data;
+  } catch (err) {
+    if (err.response?.status === 404) {
+      const res2 = await api.delete(`/api/sales/invoices/${id}/`, {
+        params: { organisation: currentOrgId },
+      });
+      return res2.data;
+    }
+    throw err;
+  }
+};
+
+export const downloadSaleInvoicePDF = async (invoiceId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  try {
+    const res = await api.get(`/sales/invoices/${invoiceId}/download-pdf/`, {
+      params: { organisation: currentOrgId },
+      responseType: "blob",
+    });
+
+    const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `sale_invoice_${invoiceId}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } catch (err) {
+    if (err.response?.status === 404) {
+      const res2 = await api.get(`/api/sales/invoices/${invoiceId}/download-pdf/`, {
+        params: { organisation: currentOrgId },
+        responseType: "blob",
+      });
+      const url = window.URL.createObjectURL(new Blob([res2.data], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `sale_invoice_${invoiceId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      return;
+    }
+    throw err;
+  }
+};
+
+export const fetchSaleInvoicePDF = async (invoiceId) => {
+  const { currentOrgId } = useSessionStore.getState();
+  try {
+    const res = await api.get(`/sales/invoices/${invoiceId}/download-pdf/`, {
+      params: { organisation: currentOrgId },
+      responseType: "blob",
+    });
+    return res.data;
+  } catch (err) {
+    if (err.response?.status === 404) {
+      const res2 = await api.get(`/api/sales/invoices/${invoiceId}/download-pdf/`, {
+        params: { organisation: currentOrgId },
+        responseType: "blob",
+      });
+      return res2.data;
+    }
+    throw err;
+  }
+};
+
 //Sale Disputes API
 
 export const getSaleDisputes = async () => {

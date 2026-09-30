@@ -31,6 +31,8 @@ import {
 import {
   getCountryOptions,
   getStateOptions,
+  getStateNameOptions,
+  getCitiesForState,
   getCityOptions,
   getCountryIsoByName,
   getStateIsoByName,
@@ -41,7 +43,39 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useGetOrganization } from "../queries/useGetOrganization.js";
 import { useUpdateOrganization } from "../queries/useUpdateOrganization.js";
 import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+dayjs.extend(customParseFormat);
 import { useFormStore } from "../store/formStore.js";
+
+export const parseDateSafely = (val) => {
+  if (!val) return null;
+  if (dayjs.isDayjs(val)) return val.isValid() ? val : null;
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    if (!trimmed) return null;
+    const formats = [
+      "YYYY-MM-DD",
+      "DD-MM-YYYY",
+      "YYYY/MM/DD",
+      "DD/MM/YYYY",
+      "YYYY-MM-DDTHH:mm:ss",
+      "YYYY-MM-DDTHH:mm:ss.SSSZ",
+    ];
+    for (const fmt of formats) {
+      const parsed = dayjs(trimmed, fmt, true);
+      if (parsed.isValid()) return parsed;
+    }
+    const fallback = dayjs(trimmed);
+    if (fallback.isValid()) return fallback;
+  }
+  const fallback = dayjs(val);
+  return fallback.isValid() ? fallback : null;
+};
+
+export const formatDateForPayload = (val) => {
+  const parsed = parseDateSafely(val);
+  return parsed && parsed.isValid() ? parsed.format("YYYY-MM-DD") : null;
+};
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -180,7 +214,7 @@ export default function AddOrganisation() {
     if (cloned.partners) {
       cloned.partners = cloned.partners.map((p) => ({
         ...p,
-        dob: p?.dob ? dayjs(p.dob) : null,
+        dob: parseDateSafely(p?.dob),
       }));
     }
 
@@ -191,8 +225,8 @@ export default function AddOrganisation() {
 
         if (Array.isArray(validity)) {
           cloned.legalDetails[key].validity = [
-            validity[0] ? dayjs(validity[0]) : null,
-            validity[1] ? dayjs(validity[1]) : null,
+            parseDateSafely(validity[0]),
+            parseDateSafely(validity[1]),
           ];
         }
       });
@@ -203,7 +237,7 @@ export default function AddOrganisation() {
       cloned.customLegalDocs = cloned.customLegalDocs.map((doc) => ({
         ...doc,
         validity: doc.validity
-          ? [dayjs(doc.validity[0]), dayjs(doc.validity[1])]
+          ? [parseDateSafely(doc.validity[0]), parseDateSafely(doc.validity[1])]
           : undefined,
       }));
     }
@@ -466,7 +500,7 @@ export default function AddOrganisation() {
           photo: createExistingFile(p.photo),
 
           gender: p.gender,
-          dob: p.date_of_birth ? dayjs(p.date_of_birth) : null,
+          dob: parseDateSafely(p.date_of_birth),
           percentage: p.percentage_of_interest
             ? Number(p.percentage_of_interest)
             : null,
@@ -782,7 +816,7 @@ export default function AddOrganisation() {
         // gst_document: p.gstDocument?.[0]?.originFileObj ?? null,
         din_no: p.dinNumber ?? null,
         gender: p.gender ?? null,
-        date_of_birth: p.dob ? dayjs(p.dob).format("YYYY-MM-DD") : null,
+        date_of_birth: formatDateForPayload(p.dob),
         percentage_of_interest: p.percentage ?? null,
 
         current_address_line_1: p.currentAddress?.address1 ?? null,
@@ -848,15 +882,15 @@ export default function AddOrganisation() {
           acc[apiKey] = doc?.number ?? null;
 
           if (doc?.validity?.[0]) {
-            acc[apiKey.replace("_no", "_valid_from")] = dayjs(
+            acc[apiKey.replace("_no", "_valid_from")] = formatDateForPayload(
               doc.validity[0],
-            ).format("YYYY-MM-DD");
+            );
           }
 
           if (doc?.validity?.[1]) {
-            acc[apiKey.replace("_no", "_valid_to")] = dayjs(
+            acc[apiKey.replace("_no", "_valid_to")] = formatDateForPayload(
               doc.validity[1],
-            ).format("YYYY-MM-DD");
+            );
           }
 
           return acc;
@@ -1185,15 +1219,20 @@ export default function AddOrganisation() {
           <Form.Item
             label="State"
             name={["organisationAddress", "state"]}
-            rules={[{ required: true }]}
+            rules={[{ required: true, message: "Please select state" }]}
           >
             <Select
-              options={getStateOptions(selCountryIso)}
-              onChange={(iso, option) =>
-                handleStateChange(iso, option, "organisationAddress")
+              options={getStateNameOptions(selCountryIso || "IN")}
+              onChange={(val, option) =>
+                handleStateChange(
+                  getStateIsoByName(selCountryIso || "IN", option?.label || val),
+                  option || { label: val },
+                  "organisationAddress",
+                )
               }
               disabled={!selCountryIso}
               showSearch
+              placeholder="Select state"
               optionFilterProp="label"
             />
           </Form.Item>
@@ -1203,12 +1242,25 @@ export default function AddOrganisation() {
           <Form.Item
             label="City"
             name={["organisationAddress", "city"]}
-            rules={[{ required: true }]}
+            rules={[{ required: true, message: "Please select city" }]}
           >
             <Select
-              options={getCityOptions(selCountryIso, selStateIso)}
-              disabled={!selStateIso}
+              options={getCitiesForState(
+                selStateName ||
+                  form.getFieldValue(["organisationAddress", "state"]),
+                selCountryIso || "IN",
+              )}
+              disabled={
+                !selStateName &&
+                !form.getFieldValue(["organisationAddress", "state"])
+              }
               showSearch
+              placeholder={
+                selStateName ||
+                form.getFieldValue(["organisationAddress", "state"])
+                  ? "Select city"
+                  : "Select state first"
+              }
               optionFilterProp="label"
             />
           </Form.Item>
@@ -1761,77 +1813,100 @@ export default function AddOrganisation() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={6}>
-                    <Form.Item
-                      label="State"
-                      name={[name, "currentAddress", "state"]}
-                      rules={[{ required: true }]}
-                    >
-                      <Select
-                        options={getStateOptions(
-                          getCountryIsoByName(
-                            form.getFieldValue([
-                              "partners",
-                              name,
-                              "currentAddress",
-                              "country",
-                            ]),
-                          ),
-                        )}
-                        showSearch
-                        optionFilterProp="label"
-                        onChange={(iso, option) => {
-                          form.setFieldValue(
-                            ["partners", name, "currentAddress", "city"],
-                            undefined,
-                          );
-                          form.setFieldValue(
-                            ["partners", name, "currentAddress", "state"],
-                            option.label,
-                          );
-                        }}
-                      />
-                    </Form.Item>
-                  </Col>
+                  <Form.Item
+                    noStyle
+                    shouldUpdate={(prevValues, currentValues) =>
+                      prevValues?.partners?.[name]?.currentAddress?.country !==
+                      currentValues?.partners?.[name]?.currentAddress?.country
+                    }
+                  >
+                    {({ getFieldValue }) => {
+                      const pCountry =
+                        getFieldValue([
+                          "partners",
+                          name,
+                          "currentAddress",
+                          "country",
+                        ]) || "India";
+                      const countryIso =
+                        getCountryIsoByName(pCountry) || "IN";
+                      return (
+                        <Col span={6}>
+                          <Form.Item
+                            label="State"
+                            name={[name, "currentAddress", "state"]}
+                            rules={[{ required: true, message: "Please select state" }]}
+                          >
+                            <Select
+                              options={getStateNameOptions(countryIso)}
+                              showSearch
+                              optionFilterProp="label"
+                              placeholder="Select state"
+                              onChange={(val, option) => {
+                                form.setFieldValue(
+                                  ["partners", name, "currentAddress", "city"],
+                                  undefined,
+                                );
+                                form.setFieldValue(
+                                  ["partners", name, "currentAddress", "state"],
+                                  option?.label || val,
+                                );
+                              }}
+                            />
+                          </Form.Item>
+                        </Col>
+                      );
+                    }}
+                  </Form.Item>
 
-                  <Col span={6}>
-                    <Form.Item
-                      label="City"
-                      name={[name, "currentAddress", "city"]}
-                      rules={[{ required: true }]}
-                    >
-                      <Select
-                        options={getCityOptions(
-                          getCountryIsoByName(
-                            form.getFieldValue([
-                              "partners",
-                              name,
-                              "currentAddress",
-                              "country",
-                            ]),
-                          ),
-                          getStateIsoByName(
-                            getCountryIsoByName(
-                              form.getFieldValue([
-                                "partners",
-                                name,
-                                "currentAddress",
-                                "country",
-                              ]),
-                            ),
-                            form.getFieldValue([
-                              "partners",
-                              name,
-                              "currentAddress",
-                              "state",
-                            ]),
-                          ),
-                        )}
-                        showSearch
-                        optionFilterProp="label"
-                      />
-                    </Form.Item>
-                  </Col>
+                  <Form.Item
+                    noStyle
+                    shouldUpdate={(prevValues, currentValues) =>
+                      prevValues?.partners?.[name]?.currentAddress?.state !==
+                        currentValues?.partners?.[name]?.currentAddress?.state ||
+                      prevValues?.partners?.[name]?.currentAddress?.country !==
+                        currentValues?.partners?.[name]?.currentAddress?.country
+                    }
+                  >
+                    {({ getFieldValue }) => {
+                      const pCountry =
+                        getFieldValue([
+                          "partners",
+                          name,
+                          "currentAddress",
+                          "country",
+                        ]) || "India";
+                      const pState = getFieldValue([
+                        "partners",
+                        name,
+                        "currentAddress",
+                        "state",
+                      ]);
+                      const countryIso =
+                        getCountryIsoByName(pCountry) || "IN";
+                      const cityOptions = getCitiesForState(pState, countryIso);
+
+                      return (
+                        <Col span={6}>
+                          <Form.Item
+                            label="City"
+                            name={[name, "currentAddress", "city"]}
+                            rules={[{ required: true, message: "Please select city" }]}
+                          >
+                            <Select
+                              placeholder={
+                                pState ? "Select city" : "Select state first"
+                              }
+                              disabled={!pState}
+                              options={cityOptions}
+                              showSearch
+                              optionFilterProp="label"
+                            />
+                          </Form.Item>
+                        </Col>
+                      );
+                    }}
+                  </Form.Item>
                   <Col xs={24} sm={12} md={4}>
                     <Form.Item
                       {...restField}
@@ -1935,77 +2010,100 @@ export default function AddOrganisation() {
                     </Form.Item>
                   </Col>
 
-                  <Col span={6}>
-                    <Form.Item
-                      label="State"
-                      name={[name, "permanentAddress", "state"]}
-                      rules={[{ required: true }]}
-                    >
-                      <Select
-                        options={getStateOptions(
-                          getCountryIsoByName(
-                            form.getFieldValue([
-                              "partners",
-                              name,
-                              "permanentAddress",
-                              "country",
-                            ]),
-                          ),
-                        )}
-                        showSearch
-                        optionFilterProp="label"
-                        onChange={(iso, option) => {
-                          form.setFieldValue(
-                            ["partners", name, "permanentAddress", "city"],
-                            undefined,
-                          );
-                          form.setFieldValue(
-                            ["partners", name, "permanentAddress", "state"],
-                            option.label,
-                          );
-                        }}
-                      />
-                    </Form.Item>
-                  </Col>
+                  <Form.Item
+                    noStyle
+                    shouldUpdate={(prevValues, currentValues) =>
+                      prevValues?.partners?.[name]?.permanentAddress?.country !==
+                      currentValues?.partners?.[name]?.permanentAddress?.country
+                    }
+                  >
+                    {({ getFieldValue }) => {
+                      const pCountry =
+                        getFieldValue([
+                          "partners",
+                          name,
+                          "permanentAddress",
+                          "country",
+                        ]) || "India";
+                      const countryIso =
+                        getCountryIsoByName(pCountry) || "IN";
+                      return (
+                        <Col span={6}>
+                          <Form.Item
+                            label="State"
+                            name={[name, "permanentAddress", "state"]}
+                            rules={[{ required: true, message: "Please select state" }]}
+                          >
+                            <Select
+                              options={getStateNameOptions(countryIso)}
+                              showSearch
+                              optionFilterProp="label"
+                              placeholder="Select state"
+                              onChange={(val, option) => {
+                                form.setFieldValue(
+                                  ["partners", name, "permanentAddress", "city"],
+                                  undefined,
+                                );
+                                form.setFieldValue(
+                                  ["partners", name, "permanentAddress", "state"],
+                                  option?.label || val,
+                                );
+                              }}
+                            />
+                          </Form.Item>
+                        </Col>
+                      );
+                    }}
+                  </Form.Item>
 
-                  <Col span={6}>
-                    <Form.Item
-                      label="City"
-                      name={[name, "permanentAddress", "city"]}
-                      rules={[{ required: true }]}
-                    >
-                      <Select
-                        options={getCityOptions(
-                          getCountryIsoByName(
-                            form.getFieldValue([
-                              "partners",
-                              name,
-                              "permanentAddress",
-                              "country",
-                            ]),
-                          ),
-                          getStateIsoByName(
-                            getCountryIsoByName(
-                              form.getFieldValue([
-                                "partners",
-                                name,
-                                "permanentAddress",
-                                "country",
-                              ]),
-                            ),
-                            form.getFieldValue([
-                              "partners",
-                              name,
-                              "permanentAddress",
-                              "state",
-                            ]),
-                          ),
-                        )}
-                        showSearch
-                        optionFilterProp="label"
-                      />
-                    </Form.Item>
-                  </Col>
+                  <Form.Item
+                    noStyle
+                    shouldUpdate={(prevValues, currentValues) =>
+                      prevValues?.partners?.[name]?.permanentAddress?.state !==
+                        currentValues?.partners?.[name]?.permanentAddress?.state ||
+                      prevValues?.partners?.[name]?.permanentAddress?.country !==
+                        currentValues?.partners?.[name]?.permanentAddress?.country
+                    }
+                  >
+                    {({ getFieldValue }) => {
+                      const pCountry =
+                        getFieldValue([
+                          "partners",
+                          name,
+                          "permanentAddress",
+                          "country",
+                        ]) || "India";
+                      const pState = getFieldValue([
+                        "partners",
+                        name,
+                        "permanentAddress",
+                        "state",
+                      ]);
+                      const countryIso =
+                        getCountryIsoByName(pCountry) || "IN";
+                      const cityOptions = getCitiesForState(pState, countryIso);
+
+                      return (
+                        <Col span={6}>
+                          <Form.Item
+                            label="City"
+                            name={[name, "permanentAddress", "city"]}
+                            rules={[{ required: true, message: "Please select city" }]}
+                          >
+                            <Select
+                              placeholder={
+                                pState ? "Select city" : "Select state first"
+                              }
+                              disabled={!pState}
+                              options={cityOptions}
+                              showSearch
+                              optionFilterProp="label"
+                            />
+                          </Form.Item>
+                        </Col>
+                      );
+                    }}
+                  </Form.Item>
                   <Col xs={24} sm={12} md={4}>
                     <Form.Item
                       {...restField}
@@ -2884,7 +2982,7 @@ export default function AddOrganisation() {
                             label="Country"
                             name={[name, "country"]}
                             initialValue="India"
-                            rules={[{ required: true }]}
+                            rules={[{ required: true, message: "Please select country" }]}
                           >
                             <Select
                               options={getCountryOptions()}
@@ -2893,7 +2991,7 @@ export default function AddOrganisation() {
                               onChange={(iso, option) => {
                                 form.setFieldValue(
                                   ["branches", name, "country"],
-                                  option.label,
+                                  option?.label || "India",
                                 );
                                 form.setFieldValue(
                                   ["branches", name, "state"],
@@ -2908,73 +3006,96 @@ export default function AddOrganisation() {
                           </Form.Item>
                         </Col>
 
-                        <Col span={6}>
-                          <Form.Item
-                            label="State"
-                            name={[name, "state"]}
-                            rules={[{ required: true }]}
-                          >
-                            <Select
-                              options={getStateOptions(
-                                getCountryIsoByName(
-                                  form.getFieldValue([
-                                    "branches",
-                                    name,
-                                    "country",
-                                  ]),
-                                ),
-                              )}
-                              showSearch
-                              optionFilterProp="label"
-                              onChange={(iso, option) => {
-                                form.setFieldValue(
-                                  ["branches", name, "state"],
-                                  option.label,
-                                );
-                                form.setFieldValue(
-                                  ["branches", name, "city"],
-                                  undefined,
-                                );
-                              }}
-                            />
-                          </Form.Item>
-                        </Col>
+                        <Form.Item
+                          noStyle
+                          shouldUpdate={(prevValues, currentValues) =>
+                            prevValues?.branches?.[name]?.country !==
+                            currentValues?.branches?.[name]?.country
+                          }
+                        >
+                          {({ getFieldValue }) => {
+                            const branchCountry =
+                              getFieldValue(["branches", name, "country"]) ||
+                              "India";
+                            const countryIso =
+                              getCountryIsoByName(branchCountry) || "IN";
+                            return (
+                              <Col span={6}>
+                                <Form.Item
+                                  label="State"
+                                  name={[name, "state"]}
+                                  rules={[{ required: true, message: "Please select state" }]}
+                                >
+                                  <Select
+                                    placeholder="Select state"
+                                    options={getStateNameOptions(countryIso)}
+                                    showSearch
+                                    optionFilterProp="label"
+                                    onChange={(val, option) => {
+                                      form.setFieldValue(
+                                        ["branches", name, "state"],
+                                        option?.label || val,
+                                      );
+                                      form.setFieldValue(
+                                        ["branches", name, "city"],
+                                        undefined,
+                                      );
+                                    }}
+                                  />
+                                </Form.Item>
+                              </Col>
+                            );
+                          }}
+                        </Form.Item>
 
-                        <Col span={6}>
-                          <Form.Item
-                            label="City"
-                            name={[name, "city"]}
-                            rules={[{ required: true }]}
-                          >
-                            <Select
-                              options={getCityOptions(
-                                getCountryIsoByName(
-                                  form.getFieldValue([
-                                    "branches",
-                                    name,
-                                    "country",
-                                  ]),
-                                ),
-                                getStateIsoByName(
-                                  getCountryIsoByName(
-                                    form.getFieldValue([
-                                      "branches",
-                                      name,
-                                      "country",
-                                    ]),
-                                  ),
-                                  form.getFieldValue([
-                                    "branches",
-                                    name,
-                                    "state",
-                                  ]),
-                                ),
-                              )}
-                              showSearch
-                              optionFilterProp="label"
-                            />
-                          </Form.Item>
-                        </Col>
+                        <Form.Item
+                          noStyle
+                          shouldUpdate={(prevValues, currentValues) =>
+                            prevValues?.branches?.[name]?.state !==
+                              currentValues?.branches?.[name]?.state ||
+                            prevValues?.branches?.[name]?.country !==
+                              currentValues?.branches?.[name]?.country
+                          }
+                        >
+                          {({ getFieldValue }) => {
+                            const branchCountry =
+                              getFieldValue(["branches", name, "country"]) ||
+                              "India";
+                            const branchState = getFieldValue([
+                              "branches",
+                              name,
+                              "state",
+                            ]);
+                            const countryIso =
+                              getCountryIsoByName(branchCountry) || "IN";
+                            const cityOptions = getCitiesForState(
+                              branchState,
+                              countryIso,
+                            );
+
+                            return (
+                              <Col span={6}>
+                                <Form.Item
+                                  label="City"
+                                  name={[name, "city"]}
+                                  rules={[{ required: true, message: "Please select city" }]}
+                                >
+                                  <Select
+                                    placeholder={
+                                      branchState
+                                        ? "Select city"
+                                        : "Select state first"
+                                    }
+                                    disabled={!branchState}
+                                    options={cityOptions}
+                                    showSearch
+                                    optionFilterProp="label"
+                                  />
+                                </Form.Item>
+                              </Col>
+                            );
+                          }}
+                        </Form.Item>
                         <Col xs={12} sm={6} md={5}>
                           <Form.Item
                             {...restField}
