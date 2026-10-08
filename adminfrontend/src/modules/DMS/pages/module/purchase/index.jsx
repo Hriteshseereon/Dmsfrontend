@@ -6,6 +6,7 @@ import PurchaseIndent from "./PurchaseIndent";
 import PurchaseInvoice from "./PurchaseInvoice";
 import PurchaseReturn from "./PurchaseReturn";
 import PurchaseSouda from "./PurchaseSouda";
+import StockReport from "./StockReport";
 import {
   getVisiblePurchaseTabs,
   PURCHASE_TAB_DEFINITIONS,
@@ -19,6 +20,7 @@ const tabComponentMap = {
   loading: <LoadingAdvice />,
   invoice: <Invoice />,
   return: <PurchaseReturn />,
+  stock: <StockReport />,
 };
 
 export default function PurchaseRoutes({ allowedTabs }) {
@@ -48,8 +50,8 @@ export default function PurchaseRoutes({ allowedTabs }) {
         element={guard("loading", tabComponentMap.loading)}
       />
       <Route path="invoice" element={guard("invoice", tabComponentMap.invoice)} />
-        <Route path="return" element={guard("return", tabComponentMap.return)} />
-   
+      <Route path="return" element={guard("return", tabComponentMap.return)} />
+      <Route path="stock" element={guard("stock", tabComponentMap.stock)} />
     </Routes>
   );
 }

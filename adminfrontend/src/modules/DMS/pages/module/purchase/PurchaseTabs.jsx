@@ -8,6 +8,7 @@ import {
   FaTachometerAlt,
   FaPaperPlane,
   FaShippingFast,
+  FaBoxes,
 } from "react-icons/fa";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 
@@ -53,6 +54,12 @@ export const PURCHASE_TAB_DEFINITIONS = [
     label: "purchase Intransit",
     path: "return",
     Icon: FaUndo,
+  },
+  {
+    id: "stock",
+    label: "Stock Status",
+    path: "stock",
+    Icon: FaBoxes,
   },
 ];
 
