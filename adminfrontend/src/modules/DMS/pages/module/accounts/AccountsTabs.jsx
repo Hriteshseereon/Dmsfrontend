@@ -20,11 +20,13 @@ import {
 } from "@ant-design/icons";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useFinancialPeriod } from "./hooks/useAccountsData";
+import { useAuth } from "../../../../../context/AuthContext";
 import "./AccountsTabs.css";
 
 export const ACCOUNTS_MAIN_TABS = [
   {
     id: "overview",
+    submoduleKey: "reports_overview",
     label: "Dashboard Overview",
     icon: PieChartOutlined,
     defaultPath: "",
@@ -36,11 +38,11 @@ export const ACCOUNTS_MAIN_TABS = [
     icon: BookOutlined,
     defaultPath: "day-book",
     subTabs: [
-      { id: "day-book", label: "Day Book", path: "day-book", icon: ScheduleOutlined },
-      { id: "sales-register", label: "Sales Register", path: "sales-register", icon: TagsOutlined },
-      { id: "purchase-register", label: "Purchase Register", path: "purchase-register", icon: ShoppingOutlined },
-      { id: "receipts-payments", label: "Receipts & Payments", path: "receipts-payments", icon: WalletOutlined },
-      { id: "cash-bank-book", label: "Cash & Bank Book", path: "cash-bank-book", icon: BankOutlined },
+      { id: "day-book", submoduleKey: "day_book", label: "Day Book", path: "day-book", icon: ScheduleOutlined },
+      { id: "sales-register", submoduleKey: "sales_register", label: "Sales Register", path: "sales-register", icon: TagsOutlined },
+      { id: "purchase-register", submoduleKey: "purchase_register", label: "Purchase Register", path: "purchase-register", icon: ShoppingOutlined },
+      { id: "receipts-payments", submoduleKey: "receipts_payments", label: "Receipts & Payments", path: "receipts-payments", icon: WalletOutlined },
+      { id: "cash-bank-book", submoduleKey: "cash_bank_book", label: "Cash & Bank Book", path: "cash-bank-book", icon: BankOutlined },
     ],
   },
   {
@@ -49,9 +51,9 @@ export const ACCOUNTS_MAIN_TABS = [
     icon: TeamOutlined,
     defaultPath: "customer-ledger",
     subTabs: [
-      { id: "customer-ledger", label: "Customer Ledger", path: "customer-ledger", icon: SolutionOutlined },
-      { id: "receivables", label: "Receivables & Ageing", path: "receivables", icon: FundOutlined },
-      { id: "broker-commission", label: "Broker Commission", path: "broker-commission", icon: PercentageOutlined },
+      { id: "customer-ledger", submoduleKey: "customer_ledger", label: "Customer Ledger", path: "customer-ledger", icon: SolutionOutlined },
+      { id: "receivables", submoduleKey: "receivables_ageing", label: "Receivables & Ageing", path: "receivables", icon: FundOutlined },
+      { id: "broker-commission", submoduleKey: "broker_commission", label: "Broker Commission", path: "broker-commission", icon: PercentageOutlined },
     ],
   },
   {
@@ -60,8 +62,8 @@ export const ACCOUNTS_MAIN_TABS = [
     icon: InboxOutlined,
     defaultPath: "stock-summary",
     subTabs: [
-      { id: "stock-summary", label: "Stock Summary", path: "stock-summary", icon: InboxOutlined },
-      { id: "stock-movement", label: "Stock Movement", path: "stock-movement", icon: SwapOutlined },
+      { id: "stock-summary", submoduleKey: "stock_movement", label: "Stock Summary", path: "stock-summary", icon: InboxOutlined },
+      { id: "stock-movement", submoduleKey: "stock_movement", label: "Stock Movement", path: "stock-movement", icon: SwapOutlined },
     ],
   },
   {
@@ -70,9 +72,9 @@ export const ACCOUNTS_MAIN_TABS = [
     icon: FileTextOutlined,
     defaultPath: "gst-summary",
     subTabs: [
-      { id: "gst-summary", label: "GST Summary", path: "gst-summary", icon: PercentageOutlined },
-      { id: "balance-sheet", label: "Balance Sheet", path: "balance-sheet", icon: PieChartOutlined },
-      { id: "asset-register", label: "Fixed Asset Register", path: "asset-register", icon: GoldOutlined },
+      { id: "gst-summary", submoduleKey: "gst_summary", label: "GST Summary", path: "gst-summary", icon: PercentageOutlined },
+      { id: "balance-sheet", submoduleKey: "balance_sheet", label: "Balance Sheet", path: "balance-sheet", icon: PieChartOutlined },
+      { id: "asset-register", submoduleKey: "asset_register", label: "Fixed Asset Register", path: "asset-register", icon: GoldOutlined },
     ],
   },
 ];
@@ -81,6 +83,27 @@ export default function AccountsTabs() {
   const navigate = useNavigate();
   const location = useLocation();
   const { fy } = useFinancialPeriod();
+  const { hasPermission, isAdmin } = useAuth();
+
+  // Filter main tabs and their subtabs based on permissions
+  const filteredMainTabs = useMemo(() => {
+    return ACCOUNTS_MAIN_TABS.map((mainTab) => {
+      if (mainTab.id === "overview") {
+        return mainTab;
+      }
+      const allowedSubTabs = (mainTab.subTabs || []).filter(
+        (sub) => isAdmin || hasPermission(sub.submoduleKey, "view")
+      );
+      if (allowedSubTabs.length === 0 && !isAdmin) {
+        return null;
+      }
+      return {
+        ...mainTab,
+        defaultPath: allowedSubTabs[0]?.path || mainTab.defaultPath,
+        subTabs: allowedSubTabs,
+      };
+    }).filter(Boolean);
+  }, [hasPermission, isAdmin]);
 
   // Extract current segment after /dms/accounts/
   const currentSegment = useMemo(() => {
@@ -97,11 +120,11 @@ export default function AccountsTabs() {
       return { activeMainTab: "overview", activeSubTab: "" };
     }
 
-    for (const mainTab of ACCOUNTS_MAIN_TABS) {
+    for (const mainTab of filteredMainTabs) {
       if (mainTab.id === currentSegment) {
         return { activeMainTab: mainTab.id, activeSubTab: mainTab.defaultPath };
       }
-      const matchedSub = mainTab.subTabs.find(
+      const matchedSub = (mainTab.subTabs || []).find(
         (sub) => sub.path === currentSegment || sub.id === currentSegment
       );
       if (matchedSub) {
@@ -109,16 +132,16 @@ export default function AccountsTabs() {
       }
     }
 
-    return { activeMainTab: "overview", activeSubTab: "" };
-  }, [currentSegment]);
+    return { activeMainTab: filteredMainTabs[0]?.id || "overview", activeSubTab: "" };
+  }, [currentSegment, filteredMainTabs]);
 
   const currentMainTabObj = useMemo(
-    () => ACCOUNTS_MAIN_TABS.find((t) => t.id === activeMainTab) || ACCOUNTS_MAIN_TABS[0],
-    [activeMainTab]
+    () => filteredMainTabs.find((t) => t.id === activeMainTab) || filteredMainTabs[0] || ACCOUNTS_MAIN_TABS[0],
+    [activeMainTab, filteredMainTabs]
   );
 
   const handleMainTabChange = (key) => {
-    const target = ACCOUNTS_MAIN_TABS.find((t) => t.id === key);
+    const target = filteredMainTabs.find((t) => t.id === key);
     if (!target) return;
     const dest = target.defaultPath
       ? `/dms/accounts/${target.defaultPath}`
@@ -127,12 +150,12 @@ export default function AccountsTabs() {
   };
 
   const handleSubTabChange = (key) => {
-    const target = currentMainTabObj.subTabs.find((s) => s.id === key);
+    const target = currentMainTabObj.subTabs?.find((s) => s.id === key);
     if (!target) return;
     navigate(`/dms/accounts/${target.path}`);
   };
 
-  const mainTabItems = ACCOUNTS_MAIN_TABS.map((tab) => {
+  const mainTabItems = filteredMainTabs.map((tab) => {
     const Icon = tab.icon;
     return {
       key: tab.id,
@@ -191,7 +214,7 @@ export default function AccountsTabs() {
       </div>
 
       {/* Secondary Sub-Tabs */}
-      {currentMainTabObj.subTabs && currentMainTabObj.subTabs.length > 0 && (
+      {currentMainTabObj?.subTabs && currentMainTabObj.subTabs.length > 0 && (
         <div className="accounts-sub-tabs bg-amber-50/60 border border-amber-200 rounded-lg p-1.5 shadow-xs">
           <Tabs
             size="small"

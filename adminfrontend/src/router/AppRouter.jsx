@@ -4,19 +4,21 @@ import { LoadScript } from "@react-google-maps/api";
 import Login from "../pages/Login";
 import Dashboard from "../pages/Dashboard";
 import NotFound from "../pages/NotFound";
+import RestrictedAccess from "../pages/RestrictedAccess";
 import DMS from "../modules/DMS";
-import AMS from "../modules/AMS";
-import WMS from "../modules/WMS";
 import OrganizationDashboard from "../pages/OrganizationDashboard";
-import OrganizationList from "../pages/OrganizationList";
 import AddOrganisation from "../pages/AddOrganisation";
 import AppLayout from "../pages/AppLayout";
 import AssetModule from "../modules/AMS/AssetModule";
 import WealthModule from "../modules/WMS/WealthModule";
 import OrgTabs from "../pages/OrgTabs";
+
 const LIBRARIES = ["places"];
+
 export default function AppRouter() {
   const { user } = useAuth();
+
+  const isUserAdmin = Boolean(user?.is_admin || user?.is_super_admin || user?.role === "admin");
 
   return (
     <LoadScript
@@ -32,7 +34,7 @@ export default function AppRouter() {
                 <Login />
               ) : (
                 <Navigate
-                  to={user.is_admin ? "/organizations" : "/dashboard"}
+                  to={isUserAdmin ? "/organizations" : "/dms"}
                 />
               )
             }
@@ -72,15 +74,11 @@ export default function AppRouter() {
           <Route path="/organization" element={<OrganizationDashboard />} />
 
           {/* DMS (protected) */}
-
           <Route path="/" element={<AppLayout />}>
             <Route
               path="/dms/*"
               element={user ? <DMS /> : <Navigate to="/" />}
             />
-            {/* ams module - currently imported assetmodule,
-           AMS/index.jsx is path based but we are using tab based
-          for using path based use <AMS /> */}
             <Route
               path="/ams/*"
               element={user ? <AssetModule /> : <Navigate to="/" />}
@@ -91,6 +89,7 @@ export default function AppRouter() {
             />
           </Route>
 
+          <Route path="/unauthorized" element={<RestrictedAccess />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
