@@ -465,7 +465,7 @@ export default function StockInTransit() {
     try {
       setBatchReceiving(true);
       const todayStr = dayjs().format("YYYY-MM-DD");
-      const defaultPlace = selectedVehicle.place || "Bhadrak";
+      const defaultPlace = "Direct";
 
       let successCount = 0;
       for (const inv of invoicesToReceive) {
@@ -639,10 +639,12 @@ export default function StockInTransit() {
     setToReceiveAtValue(initialReceivedAt);
 
     const defaultPlace =
-      invoiceRecord.received_place ||
-      parentVehicle?.place ||
-      invoiceRecord.place ||
-      "Bhadrak";
+      initialReceivedAt === "direct"
+        ? invoiceRecord.received_place || "Direct"
+        : invoiceRecord.received_place ||
+          parentVehicle?.place ||
+          invoiceRecord.place ||
+          "Direct";
     const defaultDepo = invoiceRecord.depo_name || invoiceRecord.depo || "";
 
     const formattedItems = (invoiceRecord.items || []).map((item) => {
@@ -787,11 +789,13 @@ export default function StockInTransit() {
       items: updated,
       depo: value !== "direct" ? form.getFieldValue("depo") || "" : null,
       received_place:
-        value !== "depo"
-          ? form.getFieldValue("received_place") ||
-            selectedVehicle?.place ||
-            "Bhadrak"
-          : null,
+        value === "direct"
+          ? "Direct"
+          : value !== "depo"
+            ? form.getFieldValue("received_place") ||
+              selectedVehicle?.place ||
+              "Direct"
+            : null,
     });
   };
 
@@ -1028,9 +1032,11 @@ export default function StockInTransit() {
         transit_days: Number(values.transit_days || 0),
         to_be_received_at: values.to_be_received_at || "direct",
         received_place:
-          values.to_be_received_at !== "depo"
-            ? values.received_place || selectedVehicle?.place || "Bhadrak"
-            : null,
+          values.to_be_received_at === "direct"
+            ? values.received_place || "Direct"
+            : values.to_be_received_at !== "depo"
+              ? values.received_place || selectedVehicle?.place || "Direct"
+              : null,
         depo: values.to_be_received_at !== "direct" ? values.depo : null,
         depo_name: values.to_be_received_at !== "direct" ? values.depo : null,
         status: "Received",
@@ -2004,7 +2010,7 @@ export default function StockInTransit() {
                     rules={[{ required: true, message: "Place is required" }]}
                   >
                     <Input
-                      placeholder="e.g. Bhadrak / Haldia"
+                      placeholder="Direct"
                       className="w-full font-medium"
                     />
                   </Form.Item>
