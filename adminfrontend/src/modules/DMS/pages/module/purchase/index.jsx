@@ -7,52 +7,41 @@ import PurchaseInvoice from "./PurchaseInvoice";
 import PurchaseReturn from "./PurchaseReturn";
 import PurchaseSouda from "./PurchaseSouda";
 import StockReport from "./StockReport";
-import {
-  getVisiblePurchaseTabs,
-  PURCHASE_TAB_DEFINITIONS,
-} from "./PurchaseTabs";
+import { PURCHASE_TAB_DEFINITIONS } from "./PurchaseTabs";
+import { useAuth } from "../../../../../context/AuthContext";
+import RestrictedAccess from "../../../../../pages/RestrictedAccess";
 
 const tabComponentMap = {
-  dashboard: <PurchaseDashboard />,
-  souda: <PurchaseSouda />,
-  indent: <PurchaseIndent />,
-  assign: <PurchaseInvoice />,
-  loading: <LoadingAdvice />,
-  invoice: <Invoice />,
-  return: <PurchaseReturn />,
-  stock: <StockReport />,
+  purchase_dashboard: <PurchaseDashboard />,
+  purchase_contract: <PurchaseSouda />,
+  purchase_indent: <PurchaseIndent />,
+  vehicle_placement: <PurchaseInvoice />,
+  transport_freight: <LoadingAdvice />,
+  purchase_invoice: <Invoice />,
+  purchase_intransit: <PurchaseReturn />,
+  stock_status: <StockReport />,
 };
 
-export default function PurchaseRoutes({ allowedTabs }) {
-  const visibleTabs = getVisiblePurchaseTabs(allowedTabs);
-  const allowedIds = new Set(visibleTabs.map((tab) => tab.id));
-  const fallbackTab = visibleTabs[0] || PURCHASE_TAB_DEFINITIONS[0];
+export default function PurchaseRoutes() {
+  const { hasPermission, isAdmin } = useAuth();
 
-  const redirectTarget =
-    fallbackTab.path === ""
-      ? "/dms/purchase"
-      : `/dms/purchase/${fallbackTab.path}`;
-
-  const guard = (tabId, element) =>
-    allowedIds.has(tabId) ? element : <Navigate to={redirectTarget} replace />;
+  const guard = (submoduleKey, element) => {
+    if (isAdmin || hasPermission(submoduleKey, "view")) {
+      return element;
+    }
+    return <RestrictedAccess submoduleKey={submoduleKey} />;
+  };
 
   return (
     <Routes>
-      <Route index element={guard("dashboard", tabComponentMap.dashboard)} />
-      <Route path="souda" element={guard("souda", tabComponentMap.souda)} />
-      <Route path="indent" element={guard("indent", tabComponentMap.indent)} />
-      <Route
-        path="assign"
-        element={guard("assign", tabComponentMap.assign)}
-      />
-       <Route
-        path="loading"
-        element={guard("loading", tabComponentMap.loading)}
-      />
-      <Route path="invoice" element={guard("invoice", tabComponentMap.invoice)} />
-      <Route path="return" element={guard("return", tabComponentMap.return)} />
-      <Route path="stock" element={guard("stock", tabComponentMap.stock)} />
+      <Route index element={guard("purchase_dashboard", tabComponentMap.purchase_dashboard)} />
+      <Route path="souda" element={guard("purchase_contract", tabComponentMap.purchase_contract)} />
+      <Route path="indent" element={guard("purchase_indent", tabComponentMap.purchase_indent)} />
+      <Route path="assign" element={guard("vehicle_placement", tabComponentMap.vehicle_placement)} />
+      <Route path="loading" element={guard("transport_freight", tabComponentMap.transport_freight)} />
+      <Route path="invoice" element={guard("purchase_invoice", tabComponentMap.purchase_invoice)} />
+      <Route path="return" element={guard("purchase_intransit", tabComponentMap.purchase_intransit)} />
+      <Route path="stock" element={guard("stock_status", tabComponentMap.stock_status)} />
     </Routes>
   );
 }
-//

@@ -11,80 +11,80 @@ import {
   FaBoxes,
 } from "react-icons/fa";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
+import { useAuth } from "../../../../../context/AuthContext";
 
 export const PURCHASE_TAB_DEFINITIONS = [
   {
     id: "dashboard",
+    submoduleKey: "purchase_dashboard",
     label: "Dashboard",
     path: "",
     Icon: FaTachometerAlt,
   },
   {
     id: "souda",
+    submoduleKey: "purchase_contract",
     label: "Purchase Contract",
     path: "souda",
     Icon: FaBoxOpen,
   },
   {
     id: "indent",
+    submoduleKey: "purchase_indent",
     label: "Purchase Order",
     path: "indent",
     Icon: FaShoppingCart,
   },
   {
     id: "assign",
+    submoduleKey: "vehicle_placement",
     label: "Vehicle Placement",
     path: "assign",
     Icon: FaPaperPlane,
   },
   {
     id: "loading",
+    submoduleKey: "transport_freight",
     label: "Transport Freight Details",
     path: "loading",
     Icon: FaShippingFast,
   },
   {
     id: "invoice",
+    submoduleKey: "purchase_invoice",
     label: "Purchase Invoice Entry",
     path: "invoice",
     Icon: FaFileInvoice,
   },
   {
     id: "return",
-    label: "purchase Intransit",
+    submoduleKey: "purchase_intransit",
+    label: "Purchase In-Transit",
     path: "return",
     Icon: FaUndo,
   },
   {
     id: "stock",
+    submoduleKey: "stock_status",
     label: "Stock Status",
     path: "stock",
     Icon: FaBoxes,
   },
 ];
 
-const normalize = (values = []) =>
-  values.map((value) => value?.toLowerCase()).filter(Boolean);
-
-export const getVisiblePurchaseTabs = (allowedTabs) => {
-  const normalized = new Set(normalize(allowedTabs));
-  const filtered =
-    normalized.size > 0
-      ? PURCHASE_TAB_DEFINITIONS.filter((tab) => normalized.has(tab.id))
-      : PURCHASE_TAB_DEFINITIONS;
-
-  return filtered.length > 0 ? filtered : PURCHASE_TAB_DEFINITIONS;
-};
-
-export default function PurchaseTabs({ allowedTabs }) {
+export default function PurchaseTabs() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { hasPermission, isAdmin } = useAuth();
 
-  const visibleTabs = useMemo(
-    () => getVisiblePurchaseTabs(allowedTabs),
-    [allowedTabs],
-  );
-  const defaultTab = visibleTabs[0];
+  // Filter tabs where user has 'view' permission
+  const visibleTabs = useMemo(() => {
+    return PURCHASE_TAB_DEFINITIONS.filter(
+      (tab) => isAdmin || hasPermission(tab.submoduleKey, "view")
+    );
+  }, [hasPermission, isAdmin]);
+
+  const defaultTab = visibleTabs[0] || PURCHASE_TAB_DEFINITIONS[0];
 
   const currentSegment = useMemo(() => {
     const cleanedPath = location.pathname.replace(/\/+$/, "");
@@ -97,10 +97,10 @@ export default function PurchaseTabs({ allowedTabs }) {
     () =>
       new Set(
         visibleTabs.map((tab) =>
-          tab.path === "" ? "" : tab.path.toLowerCase(),
-        ),
+          tab.path === "" ? "" : tab.path.toLowerCase()
+        )
       ),
-    [visibleTabs],
+    [visibleTabs]
   );
 
   const derivedActiveTab = useMemo(() => {
@@ -108,7 +108,7 @@ export default function PurchaseTabs({ allowedTabs }) {
       visibleTabs.find(
         (tab) =>
           (tab.path === "" && currentSegment === "") ||
-          tab.path === currentSegment,
+          tab.path === currentSegment
       ) || defaultTab;
     return match?.id || "";
   }, [currentSegment, defaultTab, visibleTabs]);
@@ -122,14 +122,14 @@ export default function PurchaseTabs({ allowedTabs }) {
   }, [derivedActiveTab, activeKey]);
 
   useEffect(() => {
-    if (!allowedSegments.has(currentSegment) && defaultTab) {
+    if (visibleTabs.length > 0 && !allowedSegments.has(currentSegment) && defaultTab) {
       const redirectPath =
         defaultTab.path === ""
           ? "/dms/purchase"
           : `/dms/purchase/${defaultTab.path}`;
       navigate(redirectPath, { replace: true });
     }
-  }, [allowedSegments, currentSegment, defaultTab, navigate]);
+  }, [allowedSegments, currentSegment, defaultTab, navigate, visibleTabs.length]);
 
   const handleChange = (key) => {
     const selected = visibleTabs.find((tab) => tab.id === key);
@@ -162,11 +162,16 @@ export default function PurchaseTabs({ allowedTabs }) {
         Manage purchase contracts, indents, transit, invoices and returns
       </p>
 
-      <div className="mb-0 ">
-        <Tabs activeKey={activeKey} onChange={handleChange} items={tabItems} />
-      </div>
+      {visibleTabs.length > 0 ? (
+        <div className="mb-0">
+          <Tabs activeKey={activeKey} onChange={handleChange} items={tabItems} />
+        </div>
+      ) : (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
+          No submodules are permitted for your account in Purchase Module.
+        </div>
+      )}
 
-      {/* 👉 This renders the component from PurchaseRoutes */}
       <Outlet />
     </div>
   );

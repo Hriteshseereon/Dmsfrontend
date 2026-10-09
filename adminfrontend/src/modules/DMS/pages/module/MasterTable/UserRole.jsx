@@ -16,6 +16,7 @@ import {
   Tooltip,
   Popconfirm,
   message,
+  Spin,
 } from "antd";
 import {
   SearchOutlined,
@@ -50,274 +51,67 @@ import {
 import dayjs from "dayjs";
 import AppDatePicker from "../../../../../components/AppDatePicker";
 import { exportToExcel } from "../../../../../utils/exportToExcel";
+import {
+  SYSTEM_MODULES_CONFIG,
+  ROLE_PRESETS,
+  buildEmptyPermissions,
+  buildFullPermissions,
+  countPermissions,
+} from "../../../../../utils/permissions";
+import {
+  getUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+} from "../../../../../api/userService";
+import { useAuth } from "../../../../../context/AuthContext";
 
 const { Option } = Select;
 
-// --- Comprehensive Module & Submodule Permissions Hierarchy ---
-export const SYSTEM_MODULES_CONFIG = [
+// Fallback initial users for offline/dev demo
+const INITIAL_FALLBACK_USERS = [
   {
-    key: "purchase",
-    name: "Purchase Module",
-    category: "DMS",
-    icon: ShoppingCartOutlined,
-    color: "#D97706",
-    badgeBg: "#FEF3C7",
-    submodules: [
-      { key: "purchase_dashboard", name: "Purchase Dashboard", path: "/dms/purchase" },
-      { key: "purchase_contract", name: "Purchase Contract (Souda)", path: "/dms/purchase/souda" },
-      { key: "purchase_indent", name: "Purchase Order (Indent)", path: "/dms/purchase/indent" },
-      { key: "vehicle_placement", name: "Vehicle Placement", path: "/dms/purchase/assign" },
-      { key: "transport_freight", name: "Transport Freight Details", path: "/dms/purchase/loading" },
-      { key: "purchase_invoice", name: "Purchase Invoice Entry", path: "/dms/purchase/invoice" },
-      { key: "purchase_intransit", name: "Purchase In-Transit (Return)", path: "/dms/purchase/return" },
-      { key: "stock_status", name: "Stock Status & Summary Report", path: "/dms/purchase/stock" },
-    ],
-  },
-  {
-    key: "sales",
-    name: "Sales Module",
-    category: "DMS",
-    icon: TagsOutlined,
-    color: "#2563EB",
-    badgeBg: "#DBEAFE",
-    submodules: [
-      { key: "sales_dashboard", name: "Sales Dashboard", path: "/dms/sales" },
-      { key: "sales_contract", name: "Sale Contracts (Souda)", path: "/dms/sales/souda" },
-      { key: "sales_orders", name: "Sale Orders", path: "/dms/sales/orders" },
-      { key: "sales_invoice", name: "Sale Invoice (Credit / Cash)", path: "/dms/sales/saleinvoice" },
-      { key: "sales_loading", name: "Transport / Loading Details", path: "/dms/sales/loadingdetails" },
-      { key: "delivery_status", name: "Delivery Status", path: "/dms/sales/deliverystatus" },
-      { key: "sales_dispute", name: "Sales Dispute", path: "/dms/sales/dispute" },
-      { key: "customer_wallet", name: "Customer Wallet", path: "/dms/sales/wallet" },
-    ],
-  },
-  {
-    key: "accounts",
-    name: "Accounting & Finance",
-    category: "DMS",
-    icon: BookOutlined,
-    color: "#059669",
-    badgeBg: "#D1FAE5",
-    submodules: [
-      { key: "cash_bank_book", name: "Cash / Bank Book", path: "/dms/accounts/cash-bank" },
-      { key: "day_book", name: "Day Book", path: "/dms/accounts/day-book" },
-      { key: "sales_register", name: "Sales Register", path: "/dms/accounts/sales-register" },
-      { key: "purchase_register", name: "Purchase Register", path: "/dms/accounts/purchase-register" },
-      { key: "customer_ledger", name: "Customer Ledger", path: "/dms/accounts/customer-ledger" },
-      { key: "broker_commission", name: "Broker Commission", path: "/dms/accounts/broker-commission" },
-      { key: "balance_sheet", name: "Balance Sheet & P&L", path: "/dms/accounts/balance-sheet" },
-      { key: "receipts_payments", name: "Receipts & Payments", path: "/dms/accounts/receipts-payments" },
-      { key: "gst_summary", name: "GST Summary", path: "/dms/accounts/gst-summary" },
-      { key: "receivables_ageing", name: "Receivables Ageing", path: "/dms/accounts/receivables-ageing" },
-      { key: "stock_movement", name: "Stock Movement / Summary", path: "/dms/accounts/stock-summary" },
-    ],
-  },
-  {
-    key: "master",
-    name: "Master Data Management",
-    category: "DMS",
-    icon: DatabaseOutlined,
-    color: "#7C3AED",
-    badgeBg: "#EDE9FE",
-    submodules: [
-      { key: "product_master", name: "Product Master", path: "/dms/master/product" },
-      { key: "product_group_master", name: "Product Group Master", path: "/dms/master/product-group" },
-      { key: "customer_master", name: "Customer Master", path: "/dms/master/customer" },
-      { key: "vendor_master", name: "Vendor / Supplier Master", path: "/dms/master/vendor" },
-      { key: "transport_master", name: "Transport & Vehicle Master", path: "/dms/master/transport" },
-      { key: "broker_master", name: "Broker Master", path: "/dms/master/broker" },
-      { key: "inventory_master", name: "Master Inventory", path: "/dms/master/inventory" },
-      { key: "business_master", name: "Business Partner Master", path: "/dms/master/business" },
-      { key: "organisation_master", name: "Organisation & Branch Master", path: "/dms/mastertables" },
-      { key: "user_role_master", name: "User & Role Master", path: "/dms/mastertables/user-role" },
-    ],
-  },
-  {
-    key: "reports",
-    name: "Reports & Analytics",
-    category: "DMS",
-    icon: BarChartOutlined,
-    color: "#DB2777",
-    badgeBg: "#FCE7F3",
-    submodules: [
-      { key: "reports_overview", name: "Reports Overview", path: "/dms/reports" },
-      { key: "sales_reports", name: "Sales Reports", path: "/dms/reports/sales" },
-      { key: "purchase_reports", name: "Purchase Reports", path: "/dms/reports/purchase" },
-      { key: "inventory_reports", name: "Inventory Reports", path: "/dms/reports/inventory" },
-    ],
-  },
-  {
-    key: "ams",
-    name: "Asset Management (AMS)",
-    category: "AMS",
-    icon: GoldOutlined,
-    color: "#EA580C",
-    badgeBg: "#FFEDD5",
-    submodules: [
-      { key: "asset_dashboard", name: "Asset Dashboard", path: "/ams/dashboard" },
-      { key: "asset_master", name: "Asset Master", path: "/ams/master" },
-      { key: "asset_register", name: "Asset Register", path: "/ams/register" },
-    ],
-  },
-  {
-    key: "wms",
-    name: "Wealth Management (WMS)",
-    category: "WMS",
-    icon: WalletOutlined,
-    color: "#0891B2",
-    badgeBg: "#CFFAFE",
-    submodules: [
-      { key: "wealth_dashboard", name: "Wealth Dashboard", path: "/wms/dashboard" },
-      { key: "wealth_master", name: "Wealth Master", path: "/wms/master" },
-      { key: "wealth_portfolio", name: "Wealth Portfolio", path: "/wms/portfolio" },
-    ],
-  },
-];
-
-// Helper to generate empty/full permissions
-const buildEmptyPermissions = () => {
-  const perms = {};
-  SYSTEM_MODULES_CONFIG.forEach((mod) => {
-    mod.submodules.forEach((sub) => {
-      perms[sub.key] = { view: false, add: false, edit: false, delete: false };
-    });
-  });
-  return perms;
-};
-
-const buildFullPermissions = () => {
-  const perms = {};
-  SYSTEM_MODULES_CONFIG.forEach((mod) => {
-    mod.submodules.forEach((sub) => {
-      perms[sub.key] = { view: true, add: true, edit: true, delete: true };
-    });
-  });
-  return perms;
-};
-
-// Preset Role Templates
-const ROLE_PRESETS = [
-  {
-    id: "admin",
-    name: "Administrator (Full Access)",
-    description: "Complete access across all DMS, AMS, and WMS modules",
-    getPermissions: () => buildFullPermissions(),
-  },
-  {
-    id: "purchase_manager",
-    name: "Purchase Manager",
-    description: "Complete Purchase module + Vendor/Stock masters + Purchase Reports",
-    getPermissions: () => {
-      const p = buildEmptyPermissions();
-      SYSTEM_MODULES_CONFIG.find((m) => m.key === "purchase")?.submodules.forEach((s) => {
-        p[s.key] = { view: true, add: true, edit: true, delete: true };
-      });
-      ["product_master", "vendor_master", "transport_master", "broker_master", "inventory_master"].forEach((k) => {
-        p[k] = { view: true, add: true, edit: true, delete: false };
-      });
-      p["purchase_reports"] = { view: true, add: false, edit: false, delete: false };
-      return p;
-    },
-  },
-  {
-    id: "sales_manager",
-    name: "Sales Manager",
-    description: "Complete Sales module + Customer masters + Customer Ledger",
-    getPermissions: () => {
-      const p = buildEmptyPermissions();
-      SYSTEM_MODULES_CONFIG.find((m) => m.key === "sales")?.submodules.forEach((s) => {
-        p[s.key] = { view: true, add: true, edit: true, delete: true };
-      });
-      ["product_master", "customer_master", "transport_master", "broker_master"].forEach((k) => {
-        p[k] = { view: true, add: true, edit: true, delete: false };
-      });
-      ["customer_ledger", "sales_register"].forEach((k) => {
-        p[k] = { view: true, add: false, edit: false, delete: false };
-      });
-      p["sales_reports"] = { view: true, add: false, edit: false, delete: false };
-      return p;
-    },
-  },
-  {
-    id: "accountant",
-    name: "Accountant / Finance Officer",
-    description: "Accounts & Finance + Invoices + Ledgers & Registers",
-    getPermissions: () => {
-      const p = buildEmptyPermissions();
-      SYSTEM_MODULES_CONFIG.find((m) => m.key === "accounts")?.submodules.forEach((s) => {
-        p[s.key] = { view: true, add: true, edit: true, delete: true };
-      });
-      p["purchase_invoice"] = { view: true, add: false, edit: true, delete: false };
-      p["sales_invoice"] = { view: true, add: false, edit: true, delete: false };
-      p["customer_wallet"] = { view: true, add: true, edit: true, delete: false };
-      SYSTEM_MODULES_CONFIG.find((m) => m.key === "master")?.submodules.forEach((s) => {
-        p[s.key] = { view: true, add: false, edit: false, delete: false };
-      });
-      return p;
-    },
-  },
-  {
-    id: "auditor",
-    name: "Auditor / Read-Only",
-    description: "View-only access across all modules without create/edit",
-    getPermissions: () => {
-      const p = buildEmptyPermissions();
-      SYSTEM_MODULES_CONFIG.forEach((mod) => {
-        mod.submodules.forEach((sub) => {
-          p[sub.key] = { view: true, add: false, edit: false, delete: false };
-        });
-      });
-      return p;
-    },
-  },
-  {
-    id: "custom",
-    name: "Custom Configuration",
-    description: "Custom permissions manually specified",
-    getPermissions: () => buildEmptyPermissions(),
-  },
-];
-
-const INITIAL_USERS = [
-  {
-    key: 1,
+    id: "1",
+    key: "1",
     userName: "ADMIN",
     email: "admin@dms.com",
-    password: "••••••••",
     phone: "9876543210",
     address: "AUM Agro Headquarters, Indore",
     privilegeType: "Permanent",
     rolePreset: "admin",
     startDate: null,
     endDate: null,
+    isActive: true,
     permissions: buildFullPermissions(),
     createdAt: "2026-01-01",
   },
   {
-    key: 2,
+    id: "2",
+    key: "2",
     userName: "Rohan Verma",
     email: "rohan.sales@aumagro.com",
-    password: "••••••••",
     phone: "9823012345",
     address: "Regional Branch, Pune",
     privilegeType: "Permanent",
     rolePreset: "sales_manager",
     startDate: null,
     endDate: null,
+    isActive: true,
     permissions: ROLE_PRESETS.find((r) => r.id === "sales_manager").getPermissions(),
     createdAt: "2026-02-15",
   },
   {
-    key: 3,
+    id: "3",
+    key: "3",
     userName: "Priya Sharma",
     email: "priya.purchase@aumagro.com",
-    password: "••••••••",
     phone: "9811223344",
     address: "Haldia Plant Office, WB",
     privilegeType: "Temporary",
     rolePreset: "purchase_manager",
     startDate: "2026-10-01",
     endDate: "2026-12-31",
+    isActive: true,
     permissions: ROLE_PRESETS.find((r) => r.id === "purchase_manager").getPermissions(),
     createdAt: "2026-10-01",
   },
@@ -326,6 +120,8 @@ const INITIAL_USERS = [
 const LOCAL_STORAGE_KEY = "dms_user_roles_master_v3";
 
 export default function UserRole() {
+  const { currentOrgId, user: currentUser } = useAuth();
+
   const [data, setData] = useState(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -333,16 +129,11 @@ export default function UserRole() {
     } catch (e) {
       console.error("Error reading users from localStorage", e);
     }
-    return INITIAL_USERS;
+    return INITIAL_FALLBACK_USERS;
   });
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
-    } catch (e) {
-      console.error("Error saving users to localStorage", e);
-    }
-  }, [data]);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -353,6 +144,7 @@ export default function UserRole() {
   // Search & Filter State
   const [searchText, setSearchText] = useState("");
   const [filterPrivilege, setFilterPrivilege] = useState("ALL");
+  const [filterRole, setFilterRole] = useState("ALL");
 
   // Form Instances
   const [addForm] = Form.useForm();
@@ -365,17 +157,59 @@ export default function UserRole() {
   const [searchModuleQuery, setSearchModuleQuery] = useState("");
   const [selectedMatrixTab, setSelectedMatrixTab] = useState("all");
 
-  const countPermissions = useCallback((perms) => {
-    if (!perms) return { total: 0, view: 0, add: 0, edit: 0, delete: 0 };
-    let total = 0, view = 0, add = 0, edit = 0, del = 0;
-    Object.values(perms).forEach((p) => {
-      if (p.view) { view++; total++; }
-      if (p.add) { add++; total++; }
-      if (p.edit) { edit++; total++; }
-      if (p.delete) { del++; total++; }
-    });
-    return { total, view, add, edit, delete: del };
-  }, []);
+  /**
+   * Fetch users from backend API
+   */
+  const fetchUsersList = useCallback(async () => {
+    try {
+      setLoading(true);
+      const params = {};
+      if (currentOrgId) params.organisation = currentOrgId;
+      if (searchText.trim()) params.search = searchText.trim();
+      if (filterPrivilege !== "ALL") params.privilege = filterPrivilege;
+      if (filterRole !== "ALL") params.role = filterRole;
+
+      const res = await getUsers(params);
+      const userResults = res?.results || (Array.isArray(res) ? res : res?.data) || [];
+
+      if (userResults.length > 0) {
+        const formatted = userResults.map((u, idx) => ({
+          key: u.id || u.key || `user-${idx}`,
+          id: u.id || u.key,
+          userName: u.userName || u.username || "User",
+          email: u.email || "",
+          phone: u.phone || "",
+          address: u.address || "",
+          privilegeType: u.privilegeType || u.privilege_type || "Permanent",
+          rolePreset: u.rolePreset || u.role_preset || "custom",
+          startDate: u.startDate || u.start_date || null,
+          endDate: u.endDate || u.end_date || null,
+          isActive: u.isActive !== undefined ? u.isActive : (u.is_active !== undefined ? u.is_active : true),
+          permissions: u.permissions || (u.rolePreset === "admin" ? buildFullPermissions() : buildEmptyPermissions()),
+          createdAt: u.createdAt || u.created_at || dayjs().format("YYYY-MM-DD"),
+        }));
+        setData(formatted);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(formatted));
+      }
+    } catch (err) {
+      console.warn("Backend users list unavailable, using cached state:", err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentOrgId, searchText, filterPrivilege, filterRole]);
+
+  useEffect(() => {
+    fetchUsersList();
+  }, [fetchUsersList]);
+
+  // Sync to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      console.error("Error saving users to localStorage", e);
+    }
+  }, [data]);
 
   const stats = useMemo(() => {
     const totalUsers = data.length;
@@ -396,9 +230,12 @@ export default function UserRole() {
       const matchesPrivilege =
         filterPrivilege === "ALL" || item.privilegeType === filterPrivilege;
 
-      return matchesSearch && matchesPrivilege;
+      const matchesRole =
+        filterRole === "ALL" || item.rolePreset === filterRole;
+
+      return matchesSearch && matchesPrivilege && matchesRole;
     });
-  }, [data, searchText, filterPrivilege]);
+  }, [data, searchText, filterPrivilege, filterRole]);
 
   const handlePermissionChange = (submoduleKey, action, checked) => {
     setActivePermissions((prev) => ({
@@ -463,7 +300,7 @@ export default function UserRole() {
   const handleGrantAll = () => {
     setActivePermissions(buildFullPermissions());
     setActiveRolePreset("admin");
-    message.success("Granted Full Access across all modules!");
+    message.success("Granted Full Access across all 47 submodules!");
   };
 
   const handleGrantViewOnly = () => {
@@ -489,7 +326,7 @@ export default function UserRole() {
     const preset = ROLE_PRESETS.find((r) => r.id === presetId);
     if (preset) {
       setActivePermissions(preset.getPermissions());
-      message.success(`Applied "${preset.name}" template`);
+      message.success(`Applied "${preset.name}" preset`);
     }
   };
 
@@ -550,27 +387,55 @@ export default function UserRole() {
           ? values.endDate.format("YYYY-MM-DD")
           : null;
 
-      if (activePrivilegeType === "Temporary" && (!formattedStartDate || !formattedEndDate)) {
-        message.error("Please provide both Start Date and End Date for Temporary Access");
-        return;
+      if (activePrivilegeType === "Temporary") {
+        if (!formattedStartDate || !formattedEndDate) {
+          message.error("Both Start Date and End Date are required when privilegeType is 'Temporary'.");
+          return;
+        }
+        if (dayjs(formattedStartDate).isAfter(dayjs(formattedEndDate))) {
+          message.error("End Date must be greater than or equal to Start Date.");
+          return;
+        }
+      }
+
+      setSubmitting(true);
+
+      const payload = {
+        organisation: currentOrgId || currentUser?.organisation_id,
+        userName: values.userName.trim(),
+        username: values.userName.trim(),
+        email: values.email.trim().toLowerCase(),
+        phone: values.phone ? values.phone.trim() : "",
+        address: values.address ? values.address.trim() : "",
+        privilegeType: activePrivilegeType,
+        rolePreset: activeRolePreset,
+        startDate: formattedStartDate,
+        endDate: formattedEndDate,
+        isActive: true,
+        permissions: activePermissions,
+      };
+
+      if (values.password) {
+        payload.password = values.password;
       }
 
       if (isEdit) {
+        try {
+          if (selectedRecord.id && typeof selectedRecord.id === "string" && selectedRecord.id.length > 5) {
+            await updateUser(selectedRecord.id, payload);
+          }
+        } catch (apiErr) {
+          console.warn("Backend update error, updating local state:", apiErr.message);
+        }
+
         setData((prev) =>
           prev.map((item) => {
-            if (item.key === selectedRecord.key) {
+            if (item.key === selectedRecord.key || item.id === selectedRecord.id) {
               return {
                 ...item,
-                userName: values.userName.trim(),
-                email: values.email.trim().toLowerCase(),
-                password: values.password ? "••••••••" : item.password,
-                phone: values.phone ? values.phone.trim() : "",
-                address: values.address ? values.address.trim() : "",
-                privilegeType: activePrivilegeType,
-                rolePreset: activeRolePreset,
-                startDate: formattedStartDate,
-                endDate: formattedEndDate,
-                permissions: activePermissions,
+                ...payload,
+                key: item.key,
+                id: item.id,
               };
             }
             return item;
@@ -579,23 +444,26 @@ export default function UserRole() {
         message.success(`User "${values.userName}" updated successfully!`);
         setIsEditModalOpen(false);
       } else {
-        if (data.some((u) => u.email.toLowerCase() === values.email.trim().toLowerCase())) {
-          message.error("A user with this Email address already exists!");
+        let createdUserId = null;
+        try {
+          const res = await createUser(payload, currentOrgId);
+          createdUserId = res?.data?.id || res?.id;
+        } catch (apiErr) {
+          const errMsg =
+            apiErr.response?.data?.email?.[0] ||
+            apiErr.response?.data?.privilegeType?.[0] ||
+            apiErr.response?.data?.endDate?.[0] ||
+            apiErr.response?.data?.detail ||
+            apiErr.message;
+          message.error(errMsg);
+          setSubmitting(false);
           return;
         }
 
         const newUser = {
-          key: Date.now(),
-          userName: values.userName.trim(),
-          email: values.email.trim().toLowerCase(),
-          password: "••••••••",
-          phone: values.phone ? values.phone.trim() : "",
-          address: values.address ? values.address.trim() : "",
-          privilegeType: activePrivilegeType,
-          rolePreset: activeRolePreset,
-          startDate: formattedStartDate,
-          endDate: formattedEndDate,
-          permissions: activePermissions,
+          key: createdUserId || `user-${Date.now()}`,
+          id: createdUserId || `user-${Date.now()}`,
+          ...payload,
           createdAt: dayjs().format("YYYY-MM-DD"),
         };
 
@@ -603,14 +471,26 @@ export default function UserRole() {
         message.success(`User "${values.userName}" created successfully with permissions!`);
         setIsAddModalOpen(false);
       }
+
+      fetchUsersList();
     } catch (err) {
       console.error("Form validation failed", err);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleDeleteUser = (key) => {
-    setData((prev) => prev.filter((item) => item.key !== key));
-    message.success("User deleted successfully!");
+  const handleDeleteUser = async (record) => {
+    try {
+      if (record.id && typeof record.id === "string" && record.id.length > 5) {
+        await deleteUser(record.id);
+      }
+      setData((prev) => prev.filter((item) => item.key !== record.key && item.id !== record.id));
+      message.success(`User "${record.userName}" deleted successfully!`);
+      fetchUsersList();
+    } catch (err) {
+      message.error(err.response?.data?.detail || "Could not delete user.");
+    }
   };
 
   const handleExportExcel = () => {
@@ -628,6 +508,7 @@ export default function UserRole() {
         PHONE: u.phone,
         ADDRESS: u.address,
         "PRIVILEGE TYPE": u.privilegeType,
+        "ROLE PRESET": u.rolePreset || "Custom",
         "VALID FROM": u.startDate || "-",
         "VALID TO": u.endDate || "-",
         "TOTAL PERMISSIONS": perms.total,
@@ -647,17 +528,22 @@ export default function UserRole() {
     const modulesToDisplay = SYSTEM_MODULES_CONFIG.filter((m) => {
       if (selectedMatrixTab !== "all" && m.key !== selectedMatrixTab) return false;
       return true;
-    }).map((mod) => {
-      if (!searchModuleQuery) return mod;
-      const q = searchModuleQuery.toLowerCase();
-      const matchedSub = mod.submodules.filter((s) =>
-        s.name.toLowerCase().includes(q) || mod.name.toLowerCase().includes(q)
-      );
-      if (matchedSub.length > 0) {
-        return { ...mod, submodules: matchedSub };
-      }
-      return null;
-    }).filter(Boolean);
+    })
+      .map((mod) => {
+        if (!searchModuleQuery) return mod;
+        const q = searchModuleQuery.toLowerCase();
+        const matchedSub = mod.submodules.filter(
+          (s) =>
+            s.name.toLowerCase().includes(q) ||
+            mod.name.toLowerCase().includes(q) ||
+            s.key.toLowerCase().includes(q)
+        );
+        if (matchedSub.length > 0) {
+          return { ...mod, submodules: matchedSub };
+        }
+        return null;
+      })
+      .filter(Boolean);
 
     const tabItems = [
       { key: "all", label: "🌐 All Modules Overview" },
@@ -713,7 +599,7 @@ export default function UserRole() {
           )}
         </div>
 
-        {/* Module Selection Pills (Big & Clear) */}
+        {/* Module Selection Pills */}
         <div className="bg-white p-2.5 rounded-xl border border-gray-200 shadow-xs flex flex-wrap gap-2 items-center">
           {tabItems.map((tab) => {
             const isActive = selectedMatrixTab === tab.key;
@@ -738,24 +624,36 @@ export default function UserRole() {
         <div className="space-y-5 max-h-[580px] overflow-y-auto pr-2">
           {modulesToDisplay.length === 0 ? (
             <div className="text-center py-16 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-300">
-              <p className="text-base text-gray-600 font-bold mb-2">No matching screens found for "{searchModuleQuery}".</p>
-              <Button type="primary" onClick={() => setSearchModuleQuery("")} className="bg-amber-500!">
+              <p className="text-base text-gray-600 font-bold mb-2">
+                No matching screens found for "{searchModuleQuery}".
+              </p>
+              <Button
+                type="primary"
+                onClick={() => setSearchModuleQuery("")}
+                className="bg-amber-500!"
+              >
                 Clear Search Filter
               </Button>
             </div>
           ) : (
             modulesToDisplay.map((mod) => {
-              const IconComp = mod.icon || AppstoreOutlined;
               const totalPossible = mod.submodules.length * 4;
               let checkedCount = 0;
-              let allView = true, allAdd = true, allEdit = true, allDel = true;
+              let allView = true,
+                allAdd = true,
+                allEdit = true,
+                allDel = true;
 
               mod.submodules.forEach((s) => {
                 const sp = activePermissions[s.key] || {};
-                if (sp.view) checkedCount++; else allView = false;
-                if (sp.add) checkedCount++; else allAdd = false;
-                if (sp.edit) checkedCount++; else allEdit = false;
-                if (sp.delete) checkedCount++; else allDel = false;
+                if (sp.view) checkedCount++;
+                else allView = false;
+                if (sp.add) checkedCount++;
+                else allAdd = false;
+                if (sp.edit) checkedCount++;
+                else allEdit = false;
+                if (sp.delete) checkedCount++;
+                else allDel = false;
               });
 
               const isModuleFullyChecked = checkedCount === totalPossible && totalPossible > 0;
@@ -766,11 +664,11 @@ export default function UserRole() {
                   key={mod.key}
                   className="border-2 border-amber-200 rounded-2xl overflow-hidden bg-white shadow-sm hover:border-amber-400 transition-all"
                 >
-                  {/* Module Header Row (Big & Prominent) */}
+                  {/* Module Header Row */}
                   <div className="bg-gradient-to-r from-amber-100 via-amber-50 to-white px-5 py-3.5 border-b border-amber-200 flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3.5">
                       <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black text-lg shadow-xs">
-                        <IconComp />
+                        <AppstoreOutlined />
                       </div>
                       {!disabled ? (
                         <Checkbox
@@ -788,76 +686,89 @@ export default function UserRole() {
                           {mod.name}
                         </span>
                       )}
-                      <Tag color="orange" className="font-black text-xs px-3 py-1 rounded-lg border-amber-400 bg-amber-50 text-amber-900">
+                      <Tag
+                        color="orange"
+                        className="font-black text-xs px-3 py-1 rounded-lg border-amber-400 bg-amber-50 text-amber-900"
+                      >
                         {checkedCount} / {totalPossible} Active Permissions
                       </Tag>
                     </div>
 
                     {!disabled && (
                       <div className="flex items-center gap-4 text-xs bg-white px-4 py-2 rounded-xl border border-amber-300 shadow-xs">
-                        <span className="text-gray-500 font-black uppercase tracking-wider text-xs">Module Toggle:</span>
+                        <span className="text-gray-500 font-black uppercase tracking-wider text-xs">
+                          Module Quick Toggle:
+                        </span>
                         <Checkbox
                           checked={allView}
                           onChange={(e) => handleModuleActionToggle(mod.key, "view", e.target.checked)}
                         >
-                          <span className="text-xs font-black text-blue-700">All View</span>
+                          <span className="font-bold text-gray-800">All View</span>
                         </Checkbox>
                         <Checkbox
                           checked={allAdd}
                           onChange={(e) => handleModuleActionToggle(mod.key, "add", e.target.checked)}
                         >
-                          <span className="text-xs font-black text-emerald-700">All Add</span>
+                          <span className="font-bold text-gray-800">All Add</span>
                         </Checkbox>
                         <Checkbox
                           checked={allEdit}
                           onChange={(e) => handleModuleActionToggle(mod.key, "edit", e.target.checked)}
                         >
-                          <span className="text-xs font-black text-amber-700">All Edit</span>
+                          <span className="font-bold text-gray-800">All Edit</span>
                         </Checkbox>
                         <Checkbox
                           checked={allDel}
                           onChange={(e) => handleModuleActionToggle(mod.key, "delete", e.target.checked)}
                         >
-                          <span className="text-xs font-black text-rose-700">All Delete</span>
+                          <span className="font-bold text-gray-800">All Del</span>
                         </Checkbox>
                       </div>
                     )}
                   </div>
 
-                  {/* Submodules Table with Big Comfortable Rows */}
-                  <table className="w-full text-sm border-collapse">
+                  {/* Submodules Matrix Table */}
+                  <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="bg-gray-50 text-gray-700 border-b border-gray-200 font-black text-[13px]">
-                        <th className="py-3 px-5 text-left w-2/5">Sub-Module / Screen Name</th>
-                        <th className="py-3 px-3 text-center w-1/8 text-blue-700">View (👁️)</th>
-                        <th className="py-3 px-3 text-center w-1/8 text-emerald-700">Add (➕)</th>
-                        <th className="py-3 px-3 text-center w-1/8 text-amber-700">Edit (✏️)</th>
-                        <th className="py-3 px-3 text-center w-1/8 text-rose-700">Delete (🗑️)</th>
-                        <th className="py-3 px-3 text-center w-1/8 text-purple-700">Full Access</th>
+                      <tr className="bg-gray-50/80 border-b border-gray-200 text-xs font-black uppercase text-gray-600 tracking-wider">
+                        <th className="py-3 px-5 w-1/3">Submodule / Screen</th>
+                        <th className="py-3 px-3 text-center w-28">View (Read)</th>
+                        <th className="py-3 px-3 text-center w-28">Add (Create)</th>
+                        <th className="py-3 px-3 text-center w-28">Edit (Modify)</th>
+                        <th className="py-3 px-3 text-center w-28">Delete (Remove)</th>
+                        <th className="py-3 px-3 text-center w-28">Full Access</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {mod.submodules.map((sub, sIdx) => {
+                      {mod.submodules.map((sub, idx) => {
                         const sPerm = activePermissions[sub.key] || {
                           view: false,
                           add: false,
                           edit: false,
                           delete: false,
                         };
-                        const isSubFull = sPerm.view && sPerm.add && sPerm.edit && sPerm.delete;
-                        const isSubIndet =
-                          (sPerm.view || sPerm.add || sPerm.edit || sPerm.delete) && !isSubFull;
+                        const subCheckedCount =
+                          (sPerm.view ? 1 : 0) +
+                          (sPerm.add ? 1 : 0) +
+                          (sPerm.edit ? 1 : 0) +
+                          (sPerm.delete ? 1 : 0);
+                        const isSubFull = subCheckedCount === 4;
+                        const isSubIndet = subCheckedCount > 0 && subCheckedCount < 4;
 
                         return (
                           <tr
                             key={sub.key}
-                            className={`hover:bg-amber-50/50 transition-colors ${
-                              sIdx % 2 === 1 ? "bg-gray-50/50" : "bg-white"
+                            className={`hover:bg-amber-50/40 transition-colors ${
+                              idx % 2 === 0 ? "bg-white" : "bg-gray-50/30"
                             }`}
                           >
                             <td className="py-3.5 px-5">
-                              <div className="font-extrabold text-gray-900 text-sm">{sub.name}</div>
-                              <div className="text-xs text-gray-500 font-mono mt-0.5">{sub.path}</div>
+                              <div className="font-extrabold text-gray-900 text-sm">
+                                {sub.name}
+                              </div>
+                              <div className="text-xs text-gray-500 font-mono mt-0.5">
+                                Key: <span className="font-bold text-amber-700">{sub.key}</span> • {sub.path}
+                              </div>
                             </td>
                             <td className="py-3.5 px-3 text-center">
                               <Checkbox
@@ -978,17 +889,24 @@ export default function UserRole() {
         return (
           <div className="space-y-1.5">
             {isPerm ? (
-              <Tag color="green" className="font-bold text-xs px-2.5 py-1 rounded-md flex items-center gap-1.5 w-fit border-green-300">
+              <Tag
+                color="green"
+                className="font-bold text-xs px-2.5 py-1 rounded-md flex items-center gap-1.5 w-fit border-green-300"
+              >
                 <CheckCircleOutlined /> Permanent Access
               </Tag>
             ) : (
-              <Tag color="gold" className="font-bold text-xs px-2.5 py-1 rounded-md flex items-center gap-1.5 w-fit border-amber-300">
+              <Tag
+                color="gold"
+                className="font-bold text-xs px-2.5 py-1 rounded-md flex items-center gap-1.5 w-fit border-amber-300"
+              >
                 <ClockCircleOutlined /> Temporary Access
               </Tag>
             )}
             {!isPerm && record.startDate && record.endDate && (
               <div className="text-[11px] text-gray-600 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block">
-                {dayjs(record.startDate).format("DD/MM/YYYY")} - {dayjs(record.endDate).format("DD/MM/YYYY")}
+                {dayjs(record.startDate).format("DD/MM/YYYY")} -{" "}
+                {dayjs(record.endDate).format("DD/MM/YYYY")}
               </div>
             )}
           </div>
@@ -1050,7 +968,7 @@ export default function UserRole() {
               okText="Yes, Delete"
               cancelText="Cancel"
               okButtonProps={{ danger: true }}
-              onConfirm={() => handleDeleteUser(record.key)}
+              onConfirm={() => handleDeleteUser(record)}
             >
               <Button
                 danger
@@ -1072,7 +990,9 @@ export default function UserRole() {
         <Col xs={24} sm={8}>
           <div className="bg-gradient-to-r from-amber-500 to-amber-600 p-4.5 rounded-2xl text-white shadow-sm flex items-center justify-between">
             <div>
-              <div className="text-xs uppercase font-extrabold tracking-wider text-amber-100">Total System Users</div>
+              <div className="text-xs uppercase font-extrabold tracking-wider text-amber-100">
+                Total System Users
+              </div>
               <div className="text-3xl font-black mt-1">{stats.totalUsers} Users</div>
             </div>
             <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-2xl font-bold">
@@ -1084,7 +1004,9 @@ export default function UserRole() {
         <Col xs={24} sm={8}>
           <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-4.5 rounded-2xl text-white shadow-sm flex items-center justify-between">
             <div>
-              <div className="text-xs uppercase font-extrabold tracking-wider text-emerald-100">Permanent Access</div>
+              <div className="text-xs uppercase font-extrabold tracking-wider text-emerald-100">
+                Permanent Access
+              </div>
               <div className="text-3xl font-black mt-1">{stats.permanentCount} Users</div>
             </div>
             <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-2xl font-bold">
@@ -1096,7 +1018,9 @@ export default function UserRole() {
         <Col xs={24} sm={8}>
           <div className="bg-gradient-to-r from-indigo-600 to-blue-600 p-4.5 rounded-2xl text-white shadow-sm flex items-center justify-between">
             <div>
-              <div className="text-xs uppercase font-extrabold tracking-wider text-indigo-100">Temporary Access</div>
+              <div className="text-xs uppercase font-extrabold tracking-wider text-indigo-100">
+                Temporary Access
+              </div>
               <div className="text-3xl font-black mt-1">{stats.temporaryCount} Users</div>
             </div>
             <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-2xl font-bold">
@@ -1126,18 +1050,31 @@ export default function UserRole() {
               <Select
                 value={filterPrivilege}
                 onChange={(v) => setFilterPrivilege(v)}
-                className="w-48 h-11 text-sm font-semibold"
+                className="w-44 h-11 text-sm font-semibold"
               >
                 <Option value="ALL">All Privileges</Option>
-                <Option value="Permanent">Permanent Only</Option>
-                <Option value="Temporary">Temporary Only</Option>
+                <Option value="Permanent">Permanent</Option>
+                <Option value="Temporary">Temporary</Option>
               </Select>
-              {(searchText || filterPrivilege !== "ALL") && (
+              <Select
+                value={filterRole}
+                onChange={(v) => setFilterRole(v)}
+                className="w-48 h-11 text-sm font-semibold"
+              >
+                <Option value="ALL">All Role Presets</Option>
+                {ROLE_PRESETS.map((rp) => (
+                  <Option key={rp.id} value={rp.id}>
+                    {rp.name}
+                  </Option>
+                ))}
+              </Select>
+              {(searchText || filterPrivilege !== "ALL" || filterRole !== "ALL") && (
                 <Button
                   icon={<ReloadOutlined />}
                   onClick={() => {
                     setSearchText("");
                     setFilterPrivilege("ALL");
+                    setFilterRole("ALL");
                   }}
                   className="h-11 text-gray-700! font-bold"
                 >
@@ -1160,47 +1097,40 @@ export default function UserRole() {
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={openAddModal}
-                className="h-11 bg-amber-500! hover:bg-amber-600! border-none! font-black text-sm shadow-sm px-6"
+                className="h-11 bg-amber-600! hover:bg-amber-700! font-extrabold text-sm px-6 shadow-sm border-none!"
               >
-                + Create New User
+                Create New User
               </Button>
             </Space>
           </Col>
         </Row>
       </Card>
 
-      {/* MAIN USERS DIRECTORY TABLE */}
+      {/* USERS DATA TABLE */}
       <Card
-        size="small"
-        className="border border-gray-200 shadow-sm bg-white rounded-2xl overflow-hidden"
-        styles={{ body: { padding: 0 } }}
+        className="border-gray-200 shadow-sm rounded-2xl overflow-hidden bg-white"
+        styles={{ body: { padding: "0px" } }}
       >
-        <div className="bg-amber-50/80 px-6 py-4 border-b border-amber-200 flex justify-between items-center">
-          <div>
-            <h2 className="text-base font-black text-amber-950 m-0 flex items-center gap-2">
-              <SafetyCertificateOutlined className="text-amber-600 text-xl" />
-              User & Role Management Directory
-            </h2>
-            <p className="text-xs text-amber-800 m-0 mt-0.5 font-medium">
-              Consolidated screen for user credentials, permanent/temporary privilege validity, and granular CRUD permissions.
-            </p>
-          </div>
-          <Tag color="orange" className="font-black text-xs px-3.5 py-1 rounded-lg border-amber-400">
-            {filteredData.length} Users Listed
-          </Tag>
-        </div>
-
         <Table
           columns={columns}
           dataSource={filteredData}
-          rowKey="key"
-          pagination={{ pageSize: 8, showSizeChanger: true }}
-          className="custom-scroll-table"
+          loading={loading}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            pageSizeOptions: ["10", "20", "50", "100"],
+            showTotal: (total, range) => (
+              <span className="font-bold text-gray-600 text-xs">
+                Showing {range[0]}-{range[1]} of {total} System Users
+              </span>
+            ),
+          }}
+          className="[&_.ant-table-thead_th]:bg-gray-50/90! [&_.ant-table-thead_th]:text-gray-900! [&_.ant-table-thead_th]:font-black! [&_.ant-table-thead_th]:text-xs! [&_.ant-table-thead_th]:uppercase!"
         />
       </Card>
 
       {/* ========================================================================= */}
-      {/* ADD USER MODAL - EXTRA WIDE & MASSIVE CLEAR VIEW (95vw / 1380px)          */}
+      {/* CREATE NEW USER MODAL - FULL GRANULAR 47 SUBMODULE PERMISSIONS MATRIX     */}
       {/* ========================================================================= */}
       <Modal
         title={
@@ -1208,66 +1138,59 @@ export default function UserRole() {
             <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center text-lg shadow-xs">
               <PlusOutlined />
             </div>
-            <span>Create New User & Configure Granular Permissions</span>
+            <span>Create New User & Assign Permissions</span>
           </div>
         }
         open={isAddModalOpen}
         onCancel={() => setIsAddModalOpen(false)}
         width="95vw"
-        style={{ maxWidth: "1380px", top: 15 }}
+        style={{ maxWidth: "1350px", top: 15 }}
         styles={{ body: { maxHeight: "calc(88vh)", overflowY: "auto", padding: "16px 20px" } }}
         footer={[
-          <Button key="cancel" size="large" className="h-12 px-6 font-bold" onClick={() => setIsAddModalOpen(false)}>
+          <Button key="back" size="large" className="h-12 px-6 font-bold text-sm" onClick={() => setIsAddModalOpen(false)}>
             Cancel
           </Button>,
           <Button
             key="submit"
             type="primary"
             size="large"
-            className="h-12 bg-amber-500! hover:bg-amber-600! border-none! font-black text-base shadow-sm px-8"
+            loading={submitting}
+            className="bg-amber-600! hover:bg-amber-700! border-none! h-12 px-8 font-black text-base shadow-sm"
             onClick={() => handleFormSubmit(addForm, false)}
           >
-            Save User & Grant Permissions
+            Create User & Save Permissions
           </Button>,
         ]}
-        maskClosable={false}
       >
-        <Form layout="vertical" form={addForm} className="mt-2 space-y-6">
-          {/* SECTION 1: USER DETAILS */}
-          <div className="bg-gradient-to-r from-amber-50/70 via-white to-amber-50/40 p-5 rounded-2xl border-2 border-amber-200 shadow-xs">
+        <Form form={addForm} layout="vertical" className="space-y-6 mt-2">
+          {/* User Information Form */}
+          <div className="bg-amber-50/40 p-5 rounded-2xl border border-amber-200">
             <div className="text-sm font-black text-amber-950 uppercase tracking-wider mb-4 flex items-center gap-2">
               <UserOutlined className="text-amber-600 text-base" />
-              1. User Credentials & Contact Information
+              1. User Credentials & Validity Configuration
             </div>
-            <Row gutter={[20, 16]}>
+
+            <Row gutter={[16, 12]}>
               <Col xs={24} sm={12} md={6}>
                 <Form.Item
-                  label={<span className="font-extrabold text-gray-900 text-sm">User Name / Full Name <span className="text-red-500">*</span></span>}
+                  label={<span className="font-extrabold text-gray-900 text-sm">Full Name <span className="text-red-500">*</span></span>}
                   name="userName"
-                  rules={[{ required: true, message: "Enter User Name" }]}
+                  rules={[{ required: true, message: "Enter user full name" }]}
                 >
-                  <Input
-                    prefix={<UserOutlined className="text-gray-400 text-base mr-1" />}
-                    placeholder="e.g. Ramesh Kumar"
-                    className="h-11 text-sm font-bold border-gray-300!"
-                  />
+                  <Input placeholder="e.g. Ramesh Kumar" className="h-11 text-sm font-semibold" />
                 </Form.Item>
               </Col>
 
               <Col xs={24} sm={12} md={6}>
                 <Form.Item
-                  label={<span className="font-extrabold text-gray-900 text-sm">Email Address (Login ID) <span className="text-red-500">*</span></span>}
+                  label={<span className="font-extrabold text-gray-900 text-sm">Email Address <span className="text-red-500">*</span></span>}
                   name="email"
                   rules={[
-                    { required: true, message: "Enter Email" },
-                    { type: "email", message: "Enter valid Email" },
+                    { required: true, message: "Enter email address" },
+                    { type: "email", message: "Enter valid email" },
                   ]}
                 >
-                  <Input
-                    prefix={<MailOutlined className="text-gray-400 text-base mr-1" />}
-                    placeholder="ramesh@aumagro.com"
-                    className="h-11 text-sm font-bold border-gray-300!"
-                  />
+                  <Input placeholder="e.g. ramesh@aumagro.com" className="h-11 text-sm font-semibold" />
                 </Form.Item>
               </Col>
 
@@ -1275,13 +1198,9 @@ export default function UserRole() {
                 <Form.Item
                   label={<span className="font-extrabold text-gray-900 text-sm">Password <span className="text-red-500">*</span></span>}
                   name="password"
-                  rules={[{ required: true, message: "Set login password" }]}
+                  rules={[{ required: true, message: "Enter initial password" }]}
                 >
-                  <Input.Password
-                    prefix={<LockOutlined className="text-gray-400 text-base mr-1" />}
-                    placeholder="Create login password"
-                    className="h-11 text-sm font-bold border-gray-300!"
-                  />
+                  <Input.Password placeholder="Enter Secure Password" className="h-11 text-sm" />
                 </Form.Item>
               </Col>
 
@@ -1289,51 +1208,33 @@ export default function UserRole() {
                 <Form.Item
                   label={<span className="font-extrabold text-gray-900 text-sm">Phone Number</span>}
                   name="phone"
-                  rules={[
-                    { pattern: /^[0-9]{10}$/, message: "Must be 10-digit number" },
-                  ]}
                 >
-                  <Input
-                    prefix={<PhoneOutlined className="text-gray-400 text-base mr-1" />}
-                    placeholder="10-digit mobile number"
-                    maxLength={10}
-                    className="h-11 text-sm font-bold border-gray-300!"
-                  />
+                  <Input placeholder="e.g. 9876543210" className="h-11 text-sm font-semibold" />
                 </Form.Item>
               </Col>
 
               <Col xs={24} sm={12} md={6}>
                 <Form.Item
-                  label={<span className="font-extrabold text-gray-900 text-sm">Address / Location</span>}
+                  label={<span className="font-extrabold text-gray-900 text-sm">Assigned Location / Branch</span>}
                   name="address"
                 >
-                  <Input
-                    prefix={<HomeOutlined className="text-gray-400 text-base mr-1" />}
-                    placeholder="City / Plant location"
-                    className="h-11 text-sm font-bold border-gray-300!"
-                  />
+                  <Input placeholder="e.g. Indore Headquarters" className="h-11 text-sm font-semibold" />
                 </Form.Item>
               </Col>
 
               <Col xs={24} sm={12} md={6}>
                 <Form.Item
-                  label={<span className="font-extrabold text-gray-900 text-sm">Privilege Access Type <span className="text-red-500">*</span></span>}
+                  label={<span className="font-extrabold text-gray-900 text-sm">Privilege Validity Type</span>}
                   name="privilegeType"
                   initialValue="Permanent"
-                  rules={[{ required: true }]}
                 >
                   <Select
                     value={activePrivilegeType}
-                    className="h-11 text-sm font-black"
-                    onChange={(v) => {
-                      setActivePrivilegeType(v);
-                      if (v === "Permanent") {
-                        addForm.setFieldsValue({ startDate: null, endDate: null });
-                      }
-                    }}
+                    onChange={(v) => setActivePrivilegeType(v)}
+                    className="h-11 text-sm font-bold"
                   >
-                    <Option value="Permanent">🟢 Permanent Access (No Expiry)</Option>
-                    <Option value="Temporary">⏳ Temporary Access (With Dates)</Option>
+                    <Option value="Permanent">Permanent (No Expiry)</Option>
+                    <Option value="Temporary">Temporary (Bounded Period)</Option>
                   </Select>
                 </Form.Item>
               </Col>
@@ -1342,7 +1243,7 @@ export default function UserRole() {
                 <>
                   <Col xs={24} sm={12} md={6}>
                     <Form.Item
-                      label={<span className="font-extrabold text-amber-950 text-sm">Valid From (Start Date) <span className="text-red-500">*</span></span>}
+                      label={<span className="font-extrabold text-gray-900 text-sm">Start Date <span className="text-red-500">*</span></span>}
                       name="startDate"
                       rules={[{ required: true, message: "Select start date" }]}
                     >
@@ -1352,7 +1253,7 @@ export default function UserRole() {
 
                   <Col xs={24} sm={12} md={6}>
                     <Form.Item
-                      label={<span className="font-extrabold text-amber-950 text-sm">Valid To (End Date) <span className="text-red-500">*</span></span>}
+                      label={<span className="font-extrabold text-gray-900 text-sm">End Date <span className="text-red-500">*</span></span>}
                       name="endDate"
                       rules={[{ required: true, message: "Select end date" }]}
                     >
@@ -1364,7 +1265,7 @@ export default function UserRole() {
 
               <Col xs={24} sm={12} md={activePrivilegeType === "Temporary" ? 12 : 6}>
                 <Form.Item
-                  label={<span className="font-extrabold text-gray-900 text-sm">Quick Role Template Preset</span>}
+                  label={<span className="font-extrabold text-gray-900 text-sm">Role Template Preset</span>}
                   name="rolePreset"
                   initialValue="admin"
                 >
@@ -1385,11 +1286,10 @@ export default function UserRole() {
             </Row>
           </div>
 
-          {/* SECTION 2: PERMISSIONS MATRIX */}
           <div className="space-y-3">
             <div className="text-sm font-black text-amber-950 uppercase tracking-wider flex items-center gap-2">
               <SafetyCertificateOutlined className="text-amber-600 text-base" />
-              2. Module & Sub-Module Granular CRUD Permissions Matrix
+              2. Module & Sub-Module Granular CRUD Permissions Matrix (All 47 Keys)
             </div>
             {renderPermissionsMatrix(false)}
           </div>
@@ -1397,7 +1297,7 @@ export default function UserRole() {
       </Modal>
 
       {/* ========================================================================= */}
-      {/* EDIT USER MODAL - EXTRA WIDE & MASSIVE CLEAR VIEW (95vw / 1380px)         */}
+      {/* EDIT USER & PERMISSIONS MODAL                                             */}
       {/* ========================================================================= */}
       <Modal
         title={
@@ -1405,71 +1305,68 @@ export default function UserRole() {
             <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center text-lg shadow-xs">
               <EditOutlined />
             </div>
-            <span>Edit User & Permissions: {selectedRecord?.userName}</span>
+            <span>Edit User & Modify Permissions: {selectedRecord?.userName}</span>
           </div>
         }
         open={isEditModalOpen}
         onCancel={() => setIsEditModalOpen(false)}
         width="95vw"
-        style={{ maxWidth: "1380px", top: 15 }}
+        style={{ maxWidth: "1350px", top: 15 }}
         styles={{ body: { maxHeight: "calc(88vh)", overflowY: "auto", padding: "16px 20px" } }}
         footer={[
-          <Button key="cancel" size="large" className="h-12 px-6 font-bold" onClick={() => setIsEditModalOpen(false)}>
+          <Button key="back" size="large" className="h-12 px-6 font-bold text-sm" onClick={() => setIsEditModalOpen(false)}>
             Cancel
           </Button>,
           <Button
             key="submit"
             type="primary"
             size="large"
-            className="h-12 bg-amber-500! hover:bg-amber-600! border-none! font-black text-base shadow-sm px-8"
+            loading={submitting}
+            className="bg-amber-600! hover:bg-amber-700! border-none! h-12 px-8 font-black text-base shadow-sm"
             onClick={() => handleFormSubmit(editForm, true)}
           >
             Update User & Save Changes
           </Button>,
         ]}
-        maskClosable={false}
       >
-        <Form layout="vertical" form={editForm} className="mt-2 space-y-6">
-          <div className="bg-gradient-to-r from-amber-50/70 via-white to-amber-50/40 p-5 rounded-2xl border-2 border-amber-200 shadow-xs">
+        <Form form={editForm} layout="vertical" className="space-y-6 mt-2">
+          {/* User Information Form */}
+          <div className="bg-amber-50/40 p-5 rounded-2xl border border-amber-200">
             <div className="text-sm font-black text-amber-950 uppercase tracking-wider mb-4 flex items-center gap-2">
               <UserOutlined className="text-amber-600 text-base" />
-              1. User Credentials & Contact Information
+              1. User Credentials & Validity Configuration
             </div>
-            <Row gutter={[20, 16]}>
+
+            <Row gutter={[16, 12]}>
               <Col xs={24} sm={12} md={6}>
                 <Form.Item
-                  label={<span className="font-extrabold text-gray-900 text-sm">User Name / Full Name <span className="text-red-500">*</span></span>}
+                  label={<span className="font-extrabold text-gray-900 text-sm">Full Name <span className="text-red-500">*</span></span>}
                   name="userName"
-                  rules={[{ required: true, message: "Enter User Name" }]}
+                  rules={[{ required: true, message: "Enter user full name" }]}
                 >
-                  <Input prefix={<UserOutlined className="text-gray-400 text-base mr-1" />} className="h-11 text-sm font-bold border-gray-300!" />
+                  <Input placeholder="e.g. Ramesh Kumar" className="h-11 text-sm font-semibold" />
                 </Form.Item>
               </Col>
 
               <Col xs={24} sm={12} md={6}>
                 <Form.Item
-                  label={<span className="font-extrabold text-gray-900 text-sm">Email Address (Login ID) <span className="text-red-500">*</span></span>}
+                  label={<span className="font-extrabold text-gray-900 text-sm">Email Address <span className="text-red-500">*</span></span>}
                   name="email"
                   rules={[
-                    { required: true, message: "Enter Email" },
-                    { type: "email", message: "Enter valid Email" },
+                    { required: true, message: "Enter email address" },
+                    { type: "email", message: "Enter valid email" },
                   ]}
                 >
-                  <Input prefix={<MailOutlined className="text-gray-400 text-base mr-1" />} className="h-11 text-sm font-bold border-gray-300!" />
+                  <Input placeholder="e.g. ramesh@aumagro.com" className="h-11 text-sm font-semibold" />
                 </Form.Item>
               </Col>
 
               <Col xs={24} sm={12} md={6}>
                 <Form.Item
-                  label={<span className="font-extrabold text-gray-900 text-sm">Password</span>}
+                  label={<span className="font-extrabold text-gray-900 text-sm">Reset Password (Leave blank to keep current)</span>}
                   name="password"
-                  extra={<span className="text-xs text-gray-500 font-medium">Leave blank to keep existing password</span>}
                 >
-                  <Input.Password
-                    prefix={<LockOutlined className="text-gray-400 text-base mr-1" />}
-                    placeholder="New password (optional)"
-                    className="h-11 text-sm font-bold border-gray-300!"
-                  />
+                  <Input.Password placeholder="••••••••" className="h-11 text-sm" />
                 </Form.Item>
               </Col>
 
@@ -1477,41 +1374,32 @@ export default function UserRole() {
                 <Form.Item
                   label={<span className="font-extrabold text-gray-900 text-sm">Phone Number</span>}
                   name="phone"
-                  rules={[
-                    { pattern: /^[0-9]{10}$/, message: "Must be 10-digit number" },
-                  ]}
                 >
-                  <Input prefix={<PhoneOutlined className="text-gray-400 text-base mr-1" />} maxLength={10} className="h-11 text-sm font-bold border-gray-300!" />
+                  <Input placeholder="e.g. 9876543210" className="h-11 text-sm font-semibold" />
                 </Form.Item>
               </Col>
 
               <Col xs={24} sm={12} md={6}>
                 <Form.Item
-                  label={<span className="font-extrabold text-gray-900 text-sm">Address / Location</span>}
+                  label={<span className="font-extrabold text-gray-900 text-sm">Assigned Location / Branch</span>}
                   name="address"
                 >
-                  <Input prefix={<HomeOutlined className="text-gray-400 text-base mr-1" />} className="h-11 text-sm font-bold border-gray-300!" />
+                  <Input placeholder="e.g. Indore Headquarters" className="h-11 text-sm font-semibold" />
                 </Form.Item>
               </Col>
 
               <Col xs={24} sm={12} md={6}>
                 <Form.Item
-                  label={<span className="font-extrabold text-gray-900 text-sm">Privilege Access Type <span className="text-red-500">*</span></span>}
+                  label={<span className="font-extrabold text-gray-900 text-sm">Privilege Validity Type</span>}
                   name="privilegeType"
-                  rules={[{ required: true }]}
                 >
                   <Select
                     value={activePrivilegeType}
-                    className="h-11 text-sm font-black"
-                    onChange={(v) => {
-                      setActivePrivilegeType(v);
-                      if (v === "Permanent") {
-                        editForm.setFieldsValue({ startDate: null, endDate: null });
-                      }
-                    }}
+                    onChange={(v) => setActivePrivilegeType(v)}
+                    className="h-11 text-sm font-bold"
                   >
-                    <Option value="Permanent">🟢 Permanent Access (No Expiry)</Option>
-                    <Option value="Temporary">⏳ Temporary Access (With Dates)</Option>
+                    <Option value="Permanent">Permanent (No Expiry)</Option>
+                    <Option value="Temporary">Temporary (Bounded Period)</Option>
                   </Select>
                 </Form.Item>
               </Col>
@@ -1520,7 +1408,7 @@ export default function UserRole() {
                 <>
                   <Col xs={24} sm={12} md={6}>
                     <Form.Item
-                      label={<span className="font-extrabold text-amber-950 text-sm">Valid From (Start Date) <span className="text-red-500">*</span></span>}
+                      label={<span className="font-extrabold text-gray-900 text-sm">Start Date <span className="text-red-500">*</span></span>}
                       name="startDate"
                       rules={[{ required: true, message: "Select start date" }]}
                     >
@@ -1530,7 +1418,7 @@ export default function UserRole() {
 
                   <Col xs={24} sm={12} md={6}>
                     <Form.Item
-                      label={<span className="font-extrabold text-amber-950 text-sm">Valid To (End Date) <span className="text-red-500">*</span></span>}
+                      label={<span className="font-extrabold text-gray-900 text-sm">End Date <span className="text-red-500">*</span></span>}
                       name="endDate"
                       rules={[{ required: true, message: "Select end date" }]}
                     >
@@ -1573,7 +1461,7 @@ export default function UserRole() {
       </Modal>
 
       {/* ========================================================================= */}
-      {/* VIEW USER & PERMISSIONS MODAL - MASSIVE & CLEAR VIEW                     */}
+      {/* VIEW USER & PERMISSIONS MODAL                                             */}
       {/* ========================================================================= */}
       <Modal
         title={
@@ -1590,72 +1478,56 @@ export default function UserRole() {
         style={{ maxWidth: "1350px", top: 15 }}
         styles={{ body: { maxHeight: "calc(88vh)", overflowY: "auto", padding: "16px 20px" } }}
         footer={[
-          <Button key="close" type="primary" size="large" className="h-12 px-8 font-black text-base bg-blue-600!" onClick={() => setIsViewModalOpen(false)}>
+          <Button
+            key="close"
+            type="primary"
+            size="large"
+            className="h-12 px-8 font-black text-base bg-blue-600!"
+            onClick={() => setIsViewModalOpen(false)}
+          >
             Close Profile
           </Button>,
         ]}
       >
         {selectedRecord && (
           <div className="space-y-6 mt-2">
-            {/* User Overview Summary Card */}
-            <div className="bg-gradient-to-r from-amber-50 via-white to-amber-50/50 p-6 rounded-2xl border-2 border-amber-200 shadow-xs">
-              <Row gutter={[24, 18]}>
-                <Col xs={24} sm={12} md={6}>
-                  <div className="text-xs text-gray-500 font-black uppercase tracking-wider">User Name</div>
-                  <div className="text-lg font-black text-gray-900 flex items-center gap-2 mt-1">
-                    <UserOutlined className="text-amber-600" />
+            <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-200 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center text-2xl font-black shadow-md">
+                  {selectedRecord.userName?.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-gray-900 mb-0.5">
                     {selectedRecord.userName}
+                  </h3>
+                  <div className="text-sm text-gray-600 font-semibold flex items-center gap-3">
+                    <span>✉️ {selectedRecord.email}</span>
+                    <span>📞 {selectedRecord.phone || "No phone"}</span>
+                    <span>📍 {selectedRecord.address || "Headquarters"}</span>
                   </div>
-                </Col>
-                <Col xs={24} sm={12} md={6}>
-                  <div className="text-xs text-gray-500 font-black uppercase tracking-wider">Email Address</div>
-                  <div className="text-base font-extrabold text-gray-900 flex items-center gap-2 mt-1">
-                    <MailOutlined className="text-amber-600" />
-                    {selectedRecord.email}
-                  </div>
-                </Col>
-                <Col xs={24} sm={12} md={6}>
-                  <div className="text-xs text-gray-500 font-black uppercase tracking-wider">Phone Number</div>
-                  <div className="text-base font-extrabold text-gray-900 flex items-center gap-2 mt-1">
-                    <PhoneOutlined className="text-amber-600" />
-                    {selectedRecord.phone || "-"}
-                  </div>
-                </Col>
-                <Col xs={24} sm={12} md={6}>
-                  <div className="text-xs text-gray-500 font-black uppercase tracking-wider">Address / Location</div>
-                  <div className="text-base font-extrabold text-gray-900 flex items-center gap-2 mt-1">
-                    <HomeOutlined className="text-amber-600" />
-                    {selectedRecord.address || "-"}
-                  </div>
-                </Col>
-                <Col xs={24} sm={12} md={6}>
-                  <div className="text-xs text-gray-500 font-black uppercase tracking-wider">Privilege Access Type</div>
-                  <div className="mt-2">
-                    {selectedRecord.privilegeType === "Permanent" ? (
-                      <Tag color="green" className="font-black px-3.5 py-1.5 rounded-lg text-xs">
-                        🟢 Permanent Access
-                      </Tag>
-                    ) : (
-                      <Tag color="gold" className="font-black px-3.5 py-1.5 rounded-lg text-xs">
-                        ⏳ Temporary Access ({selectedRecord.startDate} to {selectedRecord.endDate})
-                      </Tag>
-                    )}
-                  </div>
-                </Col>
-                <Col xs={24} sm={12} md={6}>
-                  <div className="text-xs text-gray-500 font-black uppercase tracking-wider">Assigned Total Actions</div>
-                  <div className="text-base font-black text-blue-700 mt-2">
-                    {countPermissions(selectedRecord.permissions).total} Total Active Permissions
-                  </div>
-                </Col>
-              </Row>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Tag color="blue" className="px-3.5 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider">
+                  Role: {selectedRecord.rolePreset ? selectedRecord.rolePreset.replace("_", " ") : "Custom"}
+                </Tag>
+                {selectedRecord.privilegeType === "Permanent" ? (
+                  <Tag color="green" className="px-3.5 py-1.5 rounded-lg text-xs font-black">
+                    Permanent Access
+                  </Tag>
+                ) : (
+                  <Tag color="gold" className="px-3.5 py-1.5 rounded-lg text-xs font-black">
+                    Valid: {selectedRecord.startDate} to {selectedRecord.endDate}
+                  </Tag>
+                )}
+              </div>
             </div>
 
-            {/* Readonly Matrix */}
-            <div>
-              <div className="text-sm font-black text-amber-950 uppercase tracking-wider mb-3 flex items-center gap-2">
-                <SafetyCertificateOutlined className="text-amber-600 text-base" />
-                Active Module Permissions Matrix
+            <div className="space-y-3">
+              <div className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
+                <SafetyCertificateOutlined className="text-blue-600 text-base" />
+                Active CRUD Permissions Configuration
               </div>
               {renderPermissionsMatrix(true)}
             </div>
