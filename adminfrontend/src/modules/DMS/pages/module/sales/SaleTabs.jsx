@@ -1,102 +1,43 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Tabs } from "antd";
-import {
-  FaBoxOpen,
-  FaFileInvoice,
-  FaTruck,
-  FaUndo,
-  FaShoppingCart,
-  FaTachometerAlt,
-  FaWallet,
-} from "react-icons/fa";
+import { FaBoxOpen, FaFileInvoice } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import SaleSouda from "./SaleSouda";
-import SaleOrders from "./SaleOrdersInvoice";
-import SaleReturn from "./SaleReturn";
-import DeliveryStatus from "./DeliveryStatus";
-import SaleDashboard from "./SaleDashboard";
-import SalesDispute from "./SalesDispute";
-import LoadingDetails from "./LoadingDetails";
 import SaleInvoice from "./SaleInvoice";
-import Wallet from "./Wallet";
+import { useAuth } from "../../../../../context/AuthContext";
 
 export const SALES_TAB_DEFINITIONS = [
   {
-    id: "dashboard",
-    label: "Dashboard",
-    path: "",
-    Icon: FaTachometerAlt,
-    Component: SaleDashboard,
-  },
-  {
     id: "souda",
+    submoduleKey: "sales_contract",
     label: "Sale Contracts",
     path: "souda",
     Icon: FaBoxOpen,
     Component: SaleSouda,
   },
-  // {
-  //   id: "orders",
-  //   label: "Sale Orders",
-  //   path: "orders",
-  //   Icon: FaShoppingCart,
-  //   Component: SaleOrders,
-  // },
-
   {
     id: "saleinvoice",
+    submoduleKey: "sales_invoice",
     label: "Sale Invoice",
     path: "saleinvoice",
     Icon: FaFileInvoice,
     Component: SaleInvoice,
   },
-  // {
-  //   id: "loadingdetails",
-  //   label: "Loading Details",
-  //   path: "loadingdetails",
-  //   Icon: FaTruck,
-  //   Component: LoadingDetails,
-  // },
-
-  // {
-  //   id: "dispute",
-  //   label: "Sale Dispute",
-  //   path: "dispute",
-  //   Icon: FaUndo,
-  //   Component: SalesDispute,
-
-  // },
-  // {
-  //   id: "wallet",
-  //   label: "Wallet",
-  //   path: "wallet",
-  //   Icon: FaWallet,
-  //   Component: Wallet,
-  // }
 ];
 
-const normalize = (values = []) =>
-  values.map((value) => value?.toLowerCase()).filter(Boolean);
-
-export const getVisibleSalesTabs = (allowedTabs) => {
-  const normalized = new Set(normalize(allowedTabs));
-  const filtered =
-    normalized.size > 0
-      ? SALES_TAB_DEFINITIONS.filter((tab) => normalized.has(tab.id))
-      : SALES_TAB_DEFINITIONS;
-
-  return filtered.length > 0 ? filtered : SALES_TAB_DEFINITIONS;
-};
-
-export default function SaleTabs({ allowedTabs }) {
+export default function SaleTabs() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { hasPermission, isAdmin } = useAuth();
 
-  const visibleTabs = useMemo(
-    () => getVisibleSalesTabs(allowedTabs),
-    [allowedTabs],
-  );
-  const defaultTab = visibleTabs[0];
+  // Filter tabs where user has 'view' permission
+  const visibleTabs = useMemo(() => {
+    return SALES_TAB_DEFINITIONS.filter(
+      (tab) => isAdmin || hasPermission(tab.submoduleKey, "view")
+    );
+  }, [hasPermission, isAdmin]);
+
+  const defaultTab = visibleTabs[0] || SALES_TAB_DEFINITIONS[0];
 
   const currentSegment = useMemo(() => {
     const cleanedPath = location.pathname.replace(/\/+$/, "");
@@ -109,10 +50,10 @@ export default function SaleTabs({ allowedTabs }) {
     () =>
       new Set(
         visibleTabs.map((tab) =>
-          tab.path === "" ? "" : tab.path.toLowerCase(),
-        ),
+          tab.path === "" ? "" : tab.path.toLowerCase()
+        )
       ),
-    [visibleTabs],
+    [visibleTabs]
   );
 
   const derivedActiveTab = useMemo(() => {
@@ -120,7 +61,7 @@ export default function SaleTabs({ allowedTabs }) {
       visibleTabs.find(
         (tab) =>
           (tab.path === "" && currentSegment === "") ||
-          tab.path === currentSegment,
+          tab.path === currentSegment
       ) || defaultTab;
     return match?.id || "";
   }, [currentSegment, defaultTab, visibleTabs]);
@@ -134,12 +75,12 @@ export default function SaleTabs({ allowedTabs }) {
   }, [derivedActiveTab, activeKey]);
 
   useEffect(() => {
-    if (!allowedSegments.has(currentSegment) && defaultTab) {
+    if (visibleTabs.length > 0 && !allowedSegments.has(currentSegment) && defaultTab) {
       const redirectPath =
         defaultTab.path === "" ? "/dms/sales" : `/dms/sales/${defaultTab.path}`;
       navigate(redirectPath, { replace: true });
     }
-  }, [allowedSegments, currentSegment, defaultTab, navigate]);
+  }, [allowedSegments, currentSegment, defaultTab, navigate, visibleTabs.length]);
 
   const handleChange = (key) => {
     const selected = visibleTabs.find((tab) => tab.id === key);
@@ -168,15 +109,21 @@ export default function SaleTabs({ allowedTabs }) {
   return (
     <div className="p-2 mt-4 h-[625px] w-full overflow-auto rounded">
       <h1 className="text-2xl font-bold text-amber-800 mb-0">Sales Module</h1>
-      <p className="text-amber-700 mb-3">Manage your sales data</p>
-      <div className="overflow-auto">
-        <Tabs
-          activeKey={activeKey}
-          onChange={handleChange}
-          items={tabItems}
-          destroyInactiveTabPane={false}
-        />
-      </div>
+      <p className="text-amber-700 mb-3">Manage your sales operations and contracts</p>
+      {visibleTabs.length > 0 ? (
+        <div className="overflow-auto">
+          <Tabs
+            activeKey={activeKey}
+            onChange={handleChange}
+            items={tabItems}
+            destroyInactiveTabPane={false}
+          />
+        </div>
+      ) : (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
+          No submodules are permitted for your account in Sales Module.
+        </div>
+      )}
     </div>
   );
 }

@@ -66,7 +66,6 @@ const parseApiDate = (value) => {
   const str = String(value).trim();
   if (!str) return null;
 
-  // Try standard known formats first
   const formats = [
     "DD-MM-YYYY",
     "YYYY-MM-DD",
@@ -84,7 +83,6 @@ const parseApiDate = (value) => {
     if (d.isValid()) return d;
   }
 
-  // Fallback to relaxed dayjs parsing
   const d = dayjs(str);
   return d.isValid() ? d : null;
 };
@@ -102,7 +100,6 @@ const fmtDate = (value) => {
   return str || "-";
 };
 
-// Helper to extract array from any DRF response structure
 const extractArray = (res) => {
   if (!res) return [];
   if (Array.isArray(res)) return res;
@@ -113,15 +110,28 @@ const extractArray = (res) => {
   return [];
 };
 
-// GST Helper: Checks if customer GST starts with "21" (Odisha - Intra State)
+const getCustomerBusinessName = (c) => {
+  if (!c) return "";
+  if (typeof c === "string") return c;
+  return (
+    c.business_name ||
+    c.company_name ||
+    c.trade_name ||
+    c.customer_name ||
+    c.name ||
+    ""
+  );
+};
+
 const isIntraStateGst = (gstNo) => {
-  if (!gstNo) return true; // default to intra-state if not specified
+  if (!gstNo) return true;
   const cleanGst = String(gstNo).trim();
   return cleanGst.startsWith("21");
 };
 
+// 16 columns (Net Wt kg & Gr Wt kg hidden from visible grid to optimize horizontal space)
 const ITEM_GRID_TEMPLATE =
-  "3.4fr 1.0fr 0.9fr 1.0fr 0.8fr 0.7fr 0.9fr 0.9fr 1.0fr 0.7fr 0.8fr 0.9fr 1.25fr 0.95fr 0.95fr 0.95fr 1.4fr 64px";
+  "3.2fr 1.1fr 1.0fr 1.0fr 0.8fr 0.8fr 1.0fr 0.8fr 0.8fr 1.0fr 1.25fr 0.95fr 0.95fr 0.95fr 1.35fr 60px";
 
 export default function SaleInvoice() {
   const [form] = Form.useForm();
@@ -135,10 +145,14 @@ export default function SaleInvoice() {
   const [searchText, setSearchText] = useState("");
 
   // Master Dropdown Data
-  const [customers, setCustomers] = useState([]);
   const [plants, setPlants] = useState([]);
   const [brokers, setBrokers] = useState([]);
+  const [customers, setCustomers] = useState([]);
+
+  // Cascaded Dynamic Data
   const [intransitVehicles, setIntransitVehicles] = useState([]);
+  const [availableCustomers, setAvailableCustomers] = useState([]);
+  const [availableBrokers, setAvailableBrokers] = useState([]);
   const [contractItems, setContractItems] = useState([]);
 
   // Selected Customer metadata
@@ -154,21 +168,21 @@ export default function SaleInvoice() {
 
   // Form field focus and navigation refs
   const invoiceDateRef = useRef(null);
-  const customerSelectRef = useRef(null);
   const plantSelectRef = useRef(null);
-  const brokerSelectRef = useRef(null);
   const vehicleSelectRef = useRef(null);
+  const customerSelectRef = useRef(null);
+  const brokerSelectRef = useRef(null);
+
   const ewaybillNoRef = useRef(null);
   const ewaybillDateRef = useRef(null);
   const einvoiceNoRef = useRef(null);
+  const einvoiceDateRef = useRef(null);
   const paymentDueDateRef = useRef(null);
 
   // Items table row refs
   const itemSelectRefs = useRef([]);
   const itemQtyRefs = useRef([]);
   const itemFreeQtyRefs = useRef([]);
-  const itemNetWtRefs = useRef([]);
-  const itemGrossWtRefs = useRef([]);
   const itemRateRefs = useRef([]);
   const itemDiscPercentRefs = useRef([]);
 
@@ -187,10 +201,6 @@ export default function SaleInvoice() {
         targetEl = itemQtyRefs.current[index];
       } else if (fieldType === "free_qty") {
         targetEl = itemFreeQtyRefs.current[index];
-      } else if (fieldType === "net_weight_kg") {
-        targetEl = itemNetWtRefs.current[index];
-      } else if (fieldType === "gross_weight_kg") {
-        targetEl = itemGrossWtRefs.current[index];
       } else if (fieldType === "rate") {
         targetEl = itemRateRefs.current[index];
       } else if (fieldType === "discount_percent") {
@@ -220,27 +230,94 @@ export default function SaleInvoice() {
     loadMasterDropdowns();
   }, [selectedFY, currentOrgId]);
 
+  const loadPlants = async () => {
+    try {
+      const res = await getSaleInvoicePlants();
+      const list = extractArray(res);
+      const validList = Array.isArray(list) ? list.filter(Boolean) : [];
+
+      const hasDirect = validList.some(
+        (p) =>
+          String(p.id).toLowerCase() === "direct" ||
+          String(p.name).toLowerCase() === "direct" ||
+          p.is_direct === true
+      );
+
+      let formattedPlants = [];
+      if (hasDirect) {
+        const directItem = validList.find(
+          (p) =>
+            String(p.id).toLowerCase() === "direct" ||
+            String(p.name).toLowerCase() === "direct" ||
+            p.is_direct === true
+        );
+        const otherItems = validList.filter(
+          (p) =>
+            p !== directItem &&
+            String(p.id).toLowerCase() !== "direct" &&
+            String(p.name).toLowerCase() !== "direct"
+        );
+        formattedPlants = [
+          {
+            id: directItem.id || "direct",
+            name: directItem.name || "Direct",
+            code: directItem.code || "INV",
+            short_name: directItem.short_name || "Direct",
+            is_direct: true,
+            type: "DIRECT",
+            ...directItem,
+          },
+          ...otherItems,
+        ];
+      } else {
+        formattedPlants = [
+          {
+            id: "direct",
+            name: "Direct",
+            code: "INV",
+            short_name: "Direct",
+            is_direct: true,
+            type: "DIRECT",
+          },
+          ...validList,
+        ];
+      }
+
+      setPlants(formattedPlants);
+      return formattedPlants;
+    } catch (err) {
+      console.error("Error loading plants:", err);
+      const defaultList = [
+        {
+          id: "direct",
+          name: "Direct",
+          code: "INV",
+          short_name: "Direct",
+          is_direct: true,
+          type: "DIRECT",
+        },
+      ];
+      setPlants(defaultList);
+      return defaultList;
+    }
+  };
+
   const loadMasterDropdowns = async () => {
     try {
-      const [custRes, plantRes, brokerRes] = await Promise.allSettled([
-        getSaleInvoiceCustomers(),
-        getSaleInvoicePlants(),
+      const [plantList, brokerRes, custRes] = await Promise.allSettled([
+        loadPlants(),
         getSaleInvoiceBrokers(),
+        getSaleInvoiceCustomers(),
       ]);
-
-      if (custRes.status === "fulfilled" && custRes.value) {
-        const custList = extractArray(custRes.value);
-        setCustomers(custList);
-      }
-
-      if (plantRes.status === "fulfilled" && plantRes.value) {
-        const plantList = extractArray(plantRes.value);
-        setPlants(plantList);
-      }
 
       if (brokerRes.status === "fulfilled" && brokerRes.value) {
         const brokerList = extractArray(brokerRes.value);
         setBrokers(brokerList);
+      }
+
+      if (custRes.status === "fulfilled" && custRes.value) {
+        const custList = extractArray(custRes.value);
+        setCustomers(custList);
       }
     } catch (err) {
       console.error("Error loading master dropdowns:", err);
@@ -261,16 +338,188 @@ export default function SaleInvoice() {
     }
   };
 
-  /* ---------------- CUSTOMER CHANGE HANDLER ---------------- */
-  const handleCustomerChange = async (customerId) => {
-    const cust = customers.find(
-      (c) => String(c.id || c.customer_id || c.pk) === String(customerId)
+  /* ---------------- PLANT CHANGE HANDLER ---------------- */
+  const handlePlantChange = async (plantVal) => {
+    const p = plants.find(
+      (item) =>
+        String(item.id || item.plant_id || item.pk) === String(plantVal)
     );
-    if (!cust) return;
 
-    const custName = cust.name || cust.customer_name || cust.company_name || "";
-    const custGst = cust.gst_number || cust.gst || cust.customer_gst || "";
-    const place = cust.place || cust.city || cust.billing_city || cust.address_city || "";
+    const isDirect =
+      String(plantVal).toLowerCase() === "direct" ||
+      String(p?.name).toLowerCase() === "direct" ||
+      p?.is_direct === true;
+    const plantName = isDirect ? "Direct" : p?.name || p?.plant_name || "Depo";
+    const plantId = p?.id || plantVal;
+
+    form.setFieldsValue({
+      plant_id: plantId,
+      plant_name: plantName,
+      vehicle_no: undefined,
+      customer_id: undefined,
+      customer_name: undefined,
+      customer_gst: undefined,
+      place: undefined,
+      ship_to: undefined,
+      broker_id: undefined,
+      broker_name: undefined,
+      transport_name: undefined,
+      lr_no: undefined,
+      lr_date: null,
+      ewaybill_no: undefined,
+      ewaybill_date: null,
+      einvoice_no: undefined,
+      einvoice_date: null,
+      payment_due_date: null,
+      items: [
+        {
+          qty: 1,
+          free_qty: 0,
+          discount_percent: 0,
+          discount_amount: 0,
+          taxable_amount: 0,
+          sgst_amount: 0,
+          cgst_amount: 0,
+          igst_amount: 0,
+          total_amount: 0,
+          net_weight_kg: 0,
+          gross_weight_kg: 0,
+        },
+      ],
+      round_off_amount: 0,
+      grand_total: 0,
+    });
+
+    setSelectedCustomerGst("");
+    setAvailableCustomers([]);
+    setAvailableBrokers([]);
+    setContractItems([]);
+
+    try {
+      const vehRes = await getSaleInvoiceIntransitVehicles({
+        plant_name: isDirect ? "Direct" : plantName,
+        is_direct: isDirect,
+      });
+      const vList = extractArray(vehRes);
+      setIntransitVehicles(vList);
+    } catch (err) {
+      console.error("Error loading intransit vehicles for plant:", err);
+      setIntransitVehicles([]);
+    }
+
+    setTimeout(() => vehicleSelectRef.current?.focus(), 60);
+  };
+
+  /* ---------------- VEHICLE CHANGE HANDLER ---------------- */
+  const handleVehicleChange = async (vehicleNo) => {
+    if (!vehicleNo) {
+      form.setFieldsValue({
+        vehicle_no: undefined,
+        transport_name: undefined,
+        lr_no: undefined,
+        lr_date: null,
+        payment_due_date: null,
+        dispatch_from: "Haldia",
+        customer_id: undefined,
+        customer_name: undefined,
+        customer_gst: undefined,
+        place: undefined,
+        ship_to: undefined,
+        broker_id: undefined,
+        broker_name: undefined,
+      });
+      setAvailableCustomers([]);
+      setAvailableBrokers([]);
+      setContractItems([]);
+      return;
+    }
+
+    const veh = intransitVehicles.find(
+      (v) => String(v.vehicle_no || v.vehicle_number) === String(vehicleNo)
+    );
+
+    const vehicleUpdate = {
+      vehicle_no: vehicleNo,
+      transport_name: veh?.transport_name || veh?.transporter_name || "",
+      lr_no: veh?.lr_no || "",
+      lr_date: parseApiDate(veh?.lr_date),
+      payment_due_date: parseApiDate(veh?.payment_due_date),
+      dispatch_from:
+        veh?.dispatch_from ||
+        veh?.source_location ||
+        form.getFieldValue("dispatch_from") ||
+        "Haldia",
+      customer_id: undefined,
+      customer_name: undefined,
+      customer_gst: undefined,
+      place: undefined,
+      ship_to: undefined,
+      broker_id: undefined,
+      broker_name: undefined,
+    };
+
+    if (veh?.ewaybill_no) vehicleUpdate.ewaybill_no = veh.ewaybill_no;
+    if (veh?.ewaybill_date)
+      vehicleUpdate.ewaybill_date = parseApiDate(veh.ewaybill_date);
+
+    form.setFieldsValue(vehicleUpdate);
+    setSelectedCustomerGst("");
+    setContractItems([]);
+    setAvailableBrokers([]);
+
+    // Extract or fetch customers for this vehicle
+    let custList = [];
+    if (Array.isArray(veh?.customers) && veh.customers.length > 0) {
+      custList = veh.customers;
+    } else {
+      try {
+        const custRes = await getSaleInvoiceCustomers(vehicleNo);
+        custList = extractArray(custRes);
+      } catch (err) {
+        console.error("Error fetching customers for vehicle:", err);
+        custList = [];
+      }
+    }
+
+    setAvailableCustomers(custList);
+
+    // If exactly 1 customer linked to vehicle, auto-select!
+    if (custList.length === 1) {
+      const singleCust = custList[0];
+      const custId = singleCust.id || singleCust.customer_id || singleCust.pk;
+      await handleCustomerChange(custId, vehicleNo, singleCust, custList);
+      setTimeout(() => ewaybillNoRef.current?.focus(), 80);
+    } else {
+      setTimeout(() => customerSelectRef.current?.focus(), 60);
+    }
+  };
+
+  /* ---------------- CUSTOMER CHANGE HANDLER ---------------- */
+  const handleCustomerChange = async (
+    customerId,
+    vehicleNoArg = null,
+    customCust = null,
+    custListArg = null
+  ) => {
+    const custList =
+      custListArg || (availableCustomers.length ? availableCustomers : customers);
+    const cust =
+      customCust ||
+      custList.find(
+        (c) => String(c.id || c.customer_id || c.pk) === String(customerId)
+      ) ||
+      customers.find(
+        (c) => String(c.id || c.customer_id || c.pk) === String(customerId)
+      );
+
+    const custName = getCustomerBusinessName(cust);
+    const custGst = cust?.gst_number || cust?.gst || cust?.customer_gst || "";
+    const place =
+      cust?.place ||
+      cust?.city ||
+      cust?.billing_city ||
+      cust?.address_city ||
+      "";
 
     setSelectedCustomerGst(custGst);
 
@@ -280,203 +529,142 @@ export default function SaleInvoice() {
       customer_gst: custGst,
       place: place,
       ship_to: place,
-      vehicle_no: undefined,
-      transport_name: undefined,
-      lr_no: undefined,
-      lr_date: null,
-      payment_due_date: null,
-      dispatch_from: undefined,
     });
 
-    // Load in-transit vehicles and contract items for this customer
+    const selectedVehicleNo = vehicleNoArg || form.getFieldValue("vehicle_no");
+
+    // Load contract items and extract brokers for this customer + vehicle
     try {
-      const [vehRes, itemRes] = await Promise.allSettled([
-        getSaleInvoiceIntransitVehicles(customerId),
-        getSaleInvoiceCustomerContractItems(customerId),
-      ]);
+      const itemRes = await getSaleInvoiceCustomerContractItems(
+        customerId,
+        selectedVehicleNo
+      );
+      const iList = extractArray(itemRes);
+      setContractItems(iList);
 
-      if (vehRes.status === "fulfilled" && vehRes.value) {
-        const vList = extractArray(vehRes.value);
-        setIntransitVehicles(vList);
-      } else {
-        setIntransitVehicles([]);
-      }
-
-      if (itemRes.status === "fulfilled" && itemRes.value) {
-        const iList = extractArray(itemRes.value);
-        setContractItems(iList);
-
-        // Auto populate all contract items into the items table
-        if (iList && iList.length > 0) {
-          const isIntra = isIntraStateGst(custGst);
-          const mappedItems = iList.map((ci) => {
-            const actualQty = Number(ci.qty || ci.actual_qty || 0);
-            const freeQty = Number(ci.free_qty || 0);
-            const rate = Number(ci.rate || 0);
-            const gstPercent = Number(ci.gst_percent || 0);
-            const discPercent = Number(ci.discount_percent || 0);
-            const netWeightKg = Number(ci.net_weight_kg || 0);
-            const grossWeightKg = Number(ci.gross_weight_kg || netWeightKg);
-
-            const invoiceQty = actualQty; // Default billing quantity to contract quantity
-            const discAmt = Number(((invoiceQty * rate * discPercent) / 100).toFixed(2));
-            const taxableAmt = Number((invoiceQty * rate - discAmt).toFixed(2));
-
-            let sgst = 0;
-            let cgst = 0;
-            let igst = 0;
-
-            if (isIntra) {
-              sgst = Number(((taxableAmt * gstPercent) / 200).toFixed(2));
-              cgst = Number(((taxableAmt * gstPercent) / 200).toFixed(2));
-            } else {
-              igst = Number(((taxableAmt * gstPercent) / 100).toFixed(2));
-            }
-
-            const totalAmt = Number((taxableAmt + sgst + cgst + igst).toFixed(2));
-
-            return {
-              sale_contract_id: ci.sale_contract_id,
-              sale_contract_uuid: ci.sale_contract_uuid,
-              sale_contract_item_id: ci.sale_contract_item_id,
-              product_id: ci.product_id,
-              item_name: ci.item_name || ci.product_name,
-              product_name: ci.product_name || ci.item_name,
-              souda_no: ci.souda_no || "-",
-              unit: ci.unit || "PACKATE",
-              actual_qty: actualQty,
-              qty: invoiceQty,
-              free_qty: freeQty,
-              rate: rate,
-              gst_percent: gstPercent,
-              discount_percent: discPercent,
-              discount_amount: discAmt,
-              taxable_amount: taxableAmt,
-              sgst_amount: sgst,
-              cgst_amount: cgst,
-              igst_amount: igst,
-              total_amount: totalAmt,
-              net_weight_kg: netWeightKg,
-              gross_weight_kg: grossWeightKg,
-            };
-          });
-
-          form.setFieldsValue({ items: mappedItems });
-          setTimeout(() => recalculateAllTotals(), 50);
-        } else {
-          form.setFieldsValue({
-            items: [
-              {
-                actual_qty: 0,
-                qty: 1,
-                free_qty: 0,
-                discount_percent: 0,
-                discount_amount: 0,
-                taxable_amount: 0,
-                sgst_amount: 0,
-                cgst_amount: 0,
-                igst_amount: 0,
-                total_amount: 0,
-              },
-            ],
-          });
-          recalculateAllTotals();
+      // Extract unique brokers from contract items
+      const brokerMap = new Map();
+      iList.forEach((it) => {
+        const bId = it.broker_id || it.broker_uuid;
+        const bName = it.broker_name || it.broker_code;
+        if (bId && bName) {
+          brokerMap.set(String(bId), { id: bId, name: bName });
         }
-      } else {
-        setContractItems([]);
-      }
-    } catch (err) {
-      console.error("Error loading customer dependent data:", err);
-    }
-  };
-
-  /* ---------------- VEHICLE CHANGE HANDLER ---------------- */
-  const handleVehicleChange = (vehicleNo) => {
-    const veh = intransitVehicles.find(
-      (v) => String(v.vehicle_no || v.vehicle_number) === String(vehicleNo)
-    );
-    if (!veh) return;
-
-    const custGst = form.getFieldValue("customer_gst") || selectedCustomerGst;
-    const isIntra = isIntraStateGst(custGst);
-
-    const vehicleUpdate = {
-      vehicle_no: vehicleNo,
-      transport_name: veh.transport_name || veh.transporter_name || "",
-      lr_no: veh.lr_no || "",
-      lr_date: parseApiDate(veh.lr_date),
-      payment_due_date: parseApiDate(veh.payment_due_date),
-      dispatch_from: veh.dispatch_from || veh.source_location || "Haldia",
-    };
-
-    if (veh.ewaybill_no) vehicleUpdate.ewaybill_no = veh.ewaybill_no;
-    if (veh.ewaybill_date) vehicleUpdate.ewaybill_date = parseApiDate(veh.ewaybill_date);
-    if (veh.plant_id) vehicleUpdate.plant_id = veh.plant_id;
-    if (veh.plant_name) vehicleUpdate.plant_name = veh.plant_name;
-    if (veh.broker_id) vehicleUpdate.broker_id = veh.broker_id;
-    if (veh.broker_name) vehicleUpdate.broker_name = veh.broker_name;
-
-    // If the selected vehicle includes its matched items array, populate them into the Items Table!
-    if (Array.isArray(veh.items) && veh.items.length > 0) {
-      const mappedVehicleItems = veh.items.map((ci) => {
-        const actualQty = Number(ci.contract_qty || ci.actual_qty || ci.qty || 0);
-        const freeQty = Number(ci.free_qty || 0);
-        const rate = Number(ci.rate || 0);
-        const gstPercent = Number(ci.gst_percent || ci.gst || 0);
-        const discPercent = Number(ci.discount_percent || 0);
-        const netWeightKg = Number(ci.net_weight_kg || ci.net_weight || 0);
-        const grossWeightKg = Number(
-          ci.gross_weight_kg || ci.gross_weight || ci.unit_gross_wt || netWeightKg
-        );
-
-        const invoiceQty = Number(ci.invoice_qty || ci.qty || actualQty || 0);
-        const discAmt = Number(((invoiceQty * rate * discPercent) / 100).toFixed(2));
-        const taxableAmt = Number((invoiceQty * rate - discAmt).toFixed(2));
-
-        let sgst = 0;
-        let cgst = 0;
-        let igst = 0;
-
-        if (isIntra) {
-          sgst = Number(((taxableAmt * gstPercent) / 200).toFixed(2));
-          cgst = Number(((taxableAmt * gstPercent) / 200).toFixed(2));
-        } else {
-          igst = Number(((taxableAmt * gstPercent) / 100).toFixed(2));
-        }
-
-        const totalAmt = Number((taxableAmt + sgst + cgst + igst).toFixed(2));
-
-        return {
-          sale_contract_id: ci.sale_contract_id || ci.contract_id,
-          sale_contract_uuid: ci.sale_contract_uuid,
-          sale_contract_item_id: ci.sale_contract_item_id || ci.id,
-          product_id: ci.product_id || ci.product,
-          item_name: ci.item_name || ci.product_name,
-          product_name: ci.product_name || ci.item_name,
-          souda_no: ci.souda_no || ci.contract_number || "-",
-          unit: ci.unit || "PACKATE",
-          actual_qty: actualQty,
-          qty: invoiceQty,
-          free_qty: freeQty,
-          rate: rate,
-          gst_percent: gstPercent,
-          discount_percent: discPercent,
-          discount_amount: discAmt,
-          taxable_amount: taxableAmt,
-          sgst_amount: sgst,
-          cgst_amount: cgst,
-          igst_amount: igst,
-          total_amount: totalAmt,
-          net_weight_kg: netWeightKg,
-          gross_weight_kg: grossWeightKg,
-        };
       });
 
-      vehicleUpdate.items = mappedVehicleItems;
-    }
+      const uniqueBrokers = Array.from(brokerMap.values());
+      if (uniqueBrokers.length > 0) {
+        setAvailableBrokers(uniqueBrokers);
+        if (uniqueBrokers.length === 1) {
+          form.setFieldsValue({
+            broker_id: uniqueBrokers[0].id,
+            broker_name: uniqueBrokers[0].name,
+          });
+        }
+      } else {
+        setAvailableBrokers(brokers);
+        if (cust?.broker_id || cust?.broker_name) {
+          form.setFieldsValue({
+            broker_id: cust.broker_id,
+            broker_name: cust.broker_name,
+          });
+        }
+      }
 
-    form.setFieldsValue(vehicleUpdate);
-    setTimeout(() => recalculateAllTotals(), 50);
+      if (iList && iList.length > 0) {
+        const isIntra = isIntraStateGst(custGst);
+        const mappedItems = iList.map((ci) => {
+          const actualQty = Number(
+            ci.qty || ci.actual_qty || ci.contract_qty || 0
+          );
+          const freeQty = Number(ci.free_qty || 0);
+          const rate = Number(ci.rate || 0);
+          const gstPercent = Number(ci.gst_percent || ci.gst || 0);
+          const discPercent = Number(ci.discount_percent || 0);
+          const netWeightKg = Number(
+            ci.net_weight_kg || ci.net_weight || ci.unit_net_wt || 0
+          );
+          const grossWeightKg = Number(
+            ci.gross_weight_kg ||
+              ci.gross_weight ||
+              ci.unit_gross_wt ||
+              netWeightKg
+          );
+
+          const invoiceQty = actualQty;
+          const discAmt = Number(
+            ((invoiceQty * rate * discPercent) / 100).toFixed(2)
+          );
+          const taxableAmt = Number((invoiceQty * rate - discAmt).toFixed(2));
+
+          let sgst = 0;
+          let cgst = 0;
+          let igst = 0;
+
+          if (isIntra) {
+            sgst = Number(((taxableAmt * gstPercent) / 200).toFixed(2));
+            cgst = Number(((taxableAmt * gstPercent) / 200).toFixed(2));
+          } else {
+            igst = Number(((taxableAmt * gstPercent) / 100).toFixed(2));
+          }
+
+          const totalAmt = Number((taxableAmt + sgst + cgst + igst).toFixed(2));
+
+          return {
+            sale_contract_id: ci.sale_contract_id || ci.contract_id,
+            sale_contract_uuid: ci.sale_contract_uuid,
+            sale_contract_item_id: ci.sale_contract_item_id || ci.id,
+            product_id: ci.product_id || ci.product,
+            item_name: ci.item_name || ci.product_name,
+            product_name: ci.product_name || ci.item_name,
+            souda_no: ci.souda_no || ci.contract_number || "-",
+            unit: ci.unit || "PACKATE",
+            actual_qty: actualQty,
+            qty: invoiceQty,
+            free_qty: freeQty,
+            rate: rate,
+            gst_percent: gstPercent,
+            discount_percent: discPercent,
+            discount_amount: discAmt,
+            taxable_amount: taxableAmt,
+            sgst_amount: sgst,
+            cgst_amount: cgst,
+            igst_amount: igst,
+            total_amount: totalAmt,
+            net_weight_kg: netWeightKg,
+            gross_weight_kg: grossWeightKg,
+            broker_id: ci.broker_id || ci.broker_uuid,
+            broker_name: ci.broker_name || ci.broker_code,
+          };
+        });
+
+        form.setFieldsValue({ items: mappedItems });
+        setTimeout(() => recalculateAllTotals(), 50);
+      } else {
+        form.setFieldsValue({
+          items: [
+            {
+              actual_qty: 0,
+              qty: 1,
+              free_qty: 0,
+              rate: 0,
+              discount_percent: 0,
+              discount_amount: 0,
+              taxable_amount: 0,
+              sgst_amount: 0,
+              cgst_amount: 0,
+              igst_amount: 0,
+              total_amount: 0,
+              net_weight_kg: 0,
+              gross_weight_kg: 0,
+            },
+          ],
+        });
+        recalculateAllTotals();
+      }
+    } catch (err) {
+      console.error("Error loading customer contract items:", err);
+    }
   };
 
   /* ---------------- ITEM SELECTION & CALCULATIONS ---------------- */
@@ -493,7 +681,9 @@ export default function SaleInvoice() {
     const currentItem = items[rowIndex] || {};
 
     if (selectedContractItem) {
-      const actualQty = Number(selectedContractItem.qty || selectedContractItem.actual_qty || 0);
+      const actualQty = Number(
+        selectedContractItem.qty || selectedContractItem.actual_qty || 0
+      );
       const rate = Number(selectedContractItem.rate || 0);
       const gstPercent = Number(
         selectedContractItem.gst_percent || selectedContractItem.gst || 5
@@ -627,40 +817,6 @@ export default function SaleInvoice() {
     recalculateAllTotals();
   };
 
-  const recalculateAllItemTaxes = (custGst) => {
-    const isIntra = isIntraStateGst(custGst);
-    const items = form.getFieldValue("items") || [];
-
-    const updatedItems = items.map((item) => {
-      const taxableAmt = Number(item.taxable_amount || 0);
-      const gstPercent = Number(item.gst_percent || 0);
-
-      let sgst = 0;
-      let cgst = 0;
-      let igst = 0;
-
-      if (isIntra) {
-        sgst = Number(((taxableAmt * gstPercent) / 200).toFixed(2));
-        cgst = Number(((taxableAmt * gstPercent) / 200).toFixed(2));
-      } else {
-        igst = Number(((taxableAmt * gstPercent) / 100).toFixed(2));
-      }
-
-      const totalAmt = Number((taxableAmt + sgst + cgst + igst).toFixed(2));
-
-      return {
-        ...item,
-        sgst_amount: sgst,
-        cgst_amount: cgst,
-        igst_amount: igst,
-        total_amount: totalAmt,
-      };
-    });
-
-    form.setFieldsValue({ items: updatedItems });
-    recalculateAllTotals();
-  };
-
   const recalculateAllTotals = () => {
     const items = form.getFieldValue("items") || [];
 
@@ -725,52 +881,62 @@ export default function SaleInvoice() {
     setEditingId(null);
     setFileList([]);
     setEditingDocUrl(null);
-    setIntransitVehicles([]);
-    setContractItems([]);
     setSelectedCustomerGst("");
+    setAvailableCustomers([]);
+    setAvailableBrokers([]);
+    setContractItems([]);
 
-    // Refresh master dropdowns to guarantee latest options
+    const plantList = await loadPlants();
     loadMasterDropdowns();
 
-    try {
-      // Auto-fetch next invoice number
-      const nextInvRes = await getNextSaleInvoiceNumber();
-      const nextNo =
-        nextInvRes?.invoice_number ||
-        nextInvRes?.next_invoice_number ||
-        nextInvRes?.data?.invoice_number ||
-        "";
+    const directPlant =
+      plantList.find(
+        (p) =>
+          String(p.id).toLowerCase() === "direct" ||
+          String(p.name).toLowerCase() === "direct" ||
+          p.is_direct === true
+      ) || { id: "direct", name: "Direct", is_direct: true };
 
-      form.setFieldsValue({
-        sale_invoice_number: nextNo,
-        invoice_date: dayjs(),
-        items: [
-          {
-            qty: 1,
-            free_qty: 0,
-            discount_percent: 0,
-            discount_amount: 0,
-            taxable_amount: 0,
-            sgst_amount: 0,
-            cgst_amount: 0,
-            igst_amount: 0,
-            total_amount: 0,
-          },
-        ],
-        round_off_amount: 0,
-        grand_total: 0,
+    form.setFieldsValue({
+      invoice_date: dayjs(),
+      plant_id: directPlant.id || "direct",
+      plant_name: directPlant.name || "Direct",
+      dispatch_from: "Haldia",
+      items: [
+        {
+          qty: 1,
+          free_qty: 0,
+          discount_percent: 0,
+          discount_amount: 0,
+          taxable_amount: 0,
+          sgst_amount: 0,
+          cgst_amount: 0,
+          igst_amount: 0,
+          total_amount: 0,
+          net_weight_kg: 0,
+          gross_weight_kg: 0,
+        },
+      ],
+      round_off_amount: 0,
+      grand_total: 0,
+    });
+
+    // Load in-transit vehicles for Direct by default
+    try {
+      const vehRes = await getSaleInvoiceIntransitVehicles({
+        is_direct: true,
+        plant_name: "Direct",
       });
+      const vList = extractArray(vehRes);
+      setIntransitVehicles(vList);
     } catch (err) {
-      console.error("Error generating next invoice number:", err);
-      form.setFieldsValue({
-        invoice_date: dayjs(),
-        items: [{}],
-      });
+      console.error("Error fetching direct intransit vehicles:", err);
+      setIntransitVehicles([]);
     }
 
     setModalOpen(true);
     setTimeout(() => {
-      customerSelectRef.current?.focus();
+      plantSelectRef.current?.focus();
     }, 150);
   };
 
@@ -783,31 +949,40 @@ export default function SaleInvoice() {
 
     const custId = record.customer_id;
     const custGst = record.customer_gst || "";
+    const vehNo = record.vehicle_no || record.vehicle_number;
     setSelectedCustomerGst(custGst);
 
-    // Refresh master dropdowns
+    await loadPlants();
     loadMasterDropdowns();
+
+    if (vehNo) {
+      try {
+        const custRes = await getSaleInvoiceCustomers(vehNo);
+        const custList = extractArray(custRes);
+        setAvailableCustomers(custList);
+      } catch (e) {
+        console.error(e);
+      }
+    }
 
     if (custId) {
       try {
-        const [vehRes, itemRes] = await Promise.allSettled([
-          getSaleInvoiceIntransitVehicles(custId),
-          getSaleInvoiceCustomerContractItems(custId),
-        ]);
+        const itemRes = await getSaleInvoiceCustomerContractItems(
+          custId,
+          vehNo
+        );
+        const iList = extractArray(itemRes);
+        setContractItems(iList);
 
-        if (vehRes.status === "fulfilled" && vehRes.value) {
-          const vList = Array.isArray(vehRes.value)
-            ? vehRes.value
-            : vehRes.value.data || vehRes.value.results || [];
-          setIntransitVehicles(vList);
-        }
-
-        if (itemRes.status === "fulfilled" && itemRes.value) {
-          const iList = Array.isArray(itemRes.value)
-            ? itemRes.value
-            : itemRes.value.data || itemRes.value.results || [];
-          setContractItems(iList);
-        }
+        const brokerMap = new Map();
+        iList.forEach((it) => {
+          const bId = it.broker_id || it.broker_uuid;
+          const bName = it.broker_name || it.broker_code;
+          if (bId && bName)
+            brokerMap.set(String(bId), { id: bId, name: bName });
+        });
+        const uniqueBrokers = Array.from(brokerMap.values());
+        if (uniqueBrokers.length > 0) setAvailableBrokers(uniqueBrokers);
       } catch (e) {
         console.error("Error fetching dependencies on edit:", e);
       }
@@ -831,6 +1006,7 @@ export default function SaleInvoice() {
       ewaybill_no: record.ewaybill_no,
       ewaybill_date: parseApiDate(record.ewaybill_date),
       einvoice_no: record.einvoice_no,
+      einvoice_date: parseApiDate(record.einvoice_date),
       payment_due_date: parseApiDate(record.payment_due_date),
       items: (record.items || []).map((it) => ({
         ...it,
@@ -845,9 +1021,12 @@ export default function SaleInvoice() {
         cgst_amount: Number(it.cgst_amount || 0),
         igst_amount: Number(it.igst_amount || 0),
         total_amount: Number(it.total_amount || 0),
+        net_weight_kg: Number(it.net_weight_kg || 0),
+        gross_weight_kg: Number(it.gross_weight_kg || 0),
       })),
       total_qty: Number(record.total_qty || 0),
       total_free_qty: Number(record.total_free_qty || 0),
+      total_discount_amount: Number(record.total_discount_amount || 0),
       total_taxable_amount: Number(record.total_taxable_amount || 0),
       total_sgst: Number(record.total_sgst || 0),
       total_cgst: Number(record.total_cgst || 0),
@@ -892,11 +1071,15 @@ export default function SaleInvoice() {
         plant_id: values.plant_id,
         plant_name:
           plants.find((p) => String(p.id) === String(values.plant_id))?.name ||
-          values.plant_name,
+          values.plant_name ||
+          "Direct",
         broker_id: values.broker_id,
         broker_name:
+          availableBrokers.find((b) => String(b.id) === String(values.broker_id))
+            ?.name ||
           brokers.find((b) => String(b.id) === String(values.broker_id))
-            ?.name || values.broker_name,
+            ?.name ||
+          values.broker_name,
         vehicle_no: values.vehicle_no,
         transport_name: values.transport_name,
         lr_no: values.lr_no,
@@ -906,6 +1089,9 @@ export default function SaleInvoice() {
           ? values.ewaybill_date.format("YYYY-MM-DD")
           : null,
         einvoice_no: values.einvoice_no,
+        einvoice_date: values.einvoice_date
+          ? values.einvoice_date.format("YYYY-MM-DD")
+          : null,
         payment_due_date: values.payment_due_date
           ? values.payment_due_date.format("YYYY-MM-DD")
           : null,
@@ -946,6 +1132,10 @@ export default function SaleInvoice() {
         grand_total: String(values.grand_total || 0),
       };
 
+      if (editingId && values.sale_invoice_number) {
+        payload.sale_invoice_number = values.sale_invoice_number;
+      }
+
       let finalRequestData = payload;
 
       // Handle PDF upload
@@ -976,7 +1166,9 @@ export default function SaleInvoice() {
     } catch (err) {
       console.error("Error saving sale invoice:", err);
       message.error(
-        err?.response?.data?.message || "Failed to save sale invoice"
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to save sale invoice"
       );
     } finally {
       setSubmitting(false);
@@ -1018,11 +1210,12 @@ export default function SaleInvoice() {
       const blobUrl = window.URL.createObjectURL(pdfBlob);
       const printWindow = window.open(blobUrl, "_blank");
 
-      // If browser blocked popup, trigger direct download
       if (!printWindow) {
         const link = document.createElement("a");
         link.href = blobUrl;
-        link.download = `Sale_Invoice_${record.sale_invoice_number || record.invoice_no || invId}.pdf`;
+        link.download = `Sale_Invoice_${
+          record.sale_invoice_number || record.invoice_no || invId
+        }.pdf`;
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -1077,12 +1270,12 @@ export default function SaleInvoice() {
       "Total Qty": inv.total_qty || 0,
       "Grand Total (₹)": inv.grand_total || 0,
       "Total Gr. Wt. (Ton)": inv.total_gross_weight_ton || "-",
-      "Net Wt. (Ton)": inv.total_net_weight_ton || "-",
+      "Total Net Wt. (Ton)": inv.total_net_weight_ton || "-",
     }));
     exportToExcel(exportData, "Sale_Invoices_List", "SaleInvoices");
   };
 
-  /* ---------------- TABLE COLUMNS (MATCHING IMAGE 2) ---------------- */
+  /* ---------------- TABLE COLUMNS ---------------- */
   const columns = [
     {
       title: <span className="text-amber-700 font-semibold">Invoice Date</span>,
@@ -1202,10 +1395,12 @@ export default function SaleInvoice() {
       align: "center",
     },
     {
-      title: <span className="text-amber-700 font-semibold">Net Wt.(Ton)</span>,
+      title: (
+        <span className="text-amber-700 font-semibold">Total Net Wt. (Ton)</span>
+      ),
       dataIndex: "total_net_weight_ton",
       render: (val, r) => val || r.net_weight || "-",
-      width: 120,
+      width: 130,
       align: "center",
     },
     {
@@ -1310,7 +1505,7 @@ export default function SaleInvoice() {
         </Col>
       </Row>
 
-      {/* TABLE VIEW (MATCHING IMAGE 2) */}
+      {/* TABLE VIEW */}
       <div className="border border-amber-300 rounded-lg p-3 shadow-md bg-white">
         <div className="flex items-center justify-between mb-2">
           <div>
@@ -1347,7 +1542,7 @@ export default function SaleInvoice() {
         />
       </div>
 
-      {/* CREATE / EDIT SALE INVOICE MODAL (MATCHING IMAGE 1) */}
+      {/* CREATE / EDIT SALE INVOICE MODAL */}
       <Modal
         title={
           <div className="flex items-center gap-2 pr-6">
@@ -1358,7 +1553,11 @@ export default function SaleInvoice() {
               CREDIT INVOICE
             </Tag>
             <span className="text-amber-900 font-bold text-base">
-              {editingId ? "Edit Sale Invoice" : "Create New Sale Invoice"}
+              {editingId
+                ? `Edit Sale Invoice: ${
+                    form.getFieldValue("sale_invoice_number") || ""
+                  }`
+                : "Create New Sale Invoice"}
             </span>
           </div>
         }
@@ -1408,39 +1607,20 @@ export default function SaleInvoice() {
             dispatch_from: "Haldia",
           }}
         >
+          {/* Hidden invoice number field */}
+          <Form.Item name="sale_invoice_number" hidden>
+            <Input />
+          </Form.Item>
+
           {/* HEADER DETAILS CARD (ROW 1 & 2) */}
           <Card
             size="small"
             style={{ marginBottom: 16, border: "1px solid #FDE68A" }}
             styles={{ body: { padding: "16px 20px" } }}
           >
-            {/* ROW 1 */}
+            {/* ROW 1: Invoice Date, Plant Name, Vehicle No, Customer Name, Place, Broker Name */}
             <Row gutter={[14, 14]}>
-              <Col span={3}>
-                <Form.Item
-                  label={
-                    <span className="text-amber-800 font-bold text-xs">
-                      Invoice No
-                    </span>
-                  }
-                  name="sale_invoice_number"
-                >
-                  <Input
-                    disabled
-                    placeholder="Auto generated"
-                    className="bg-gray-50! font-bold text-gray-900"
-                    style={{
-                      color: "#111827",
-                      WebkitTextFillColor: "#111827",
-                      fontWeight: 700,
-                      height: "38px",
-                      fontSize: "13px",
-                    }}
-                  />
-                </Form.Item>
-              </Col>
-
-              <Col span={3}>
+              <Col span={4}>
                 <Form.Item
                   label={
                     <span className="text-amber-800 font-bold text-xs">
@@ -1458,15 +1638,108 @@ export default function SaleInvoice() {
                       createFinancialYearDisabledDate(selectedFY)(current)
                     }
                     onTabComplete={() => {
-                      setTimeout(() => customerSelectRef.current?.focus(), 50);
+                      setTimeout(() => plantSelectRef.current?.focus(), 50);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        plantSelectRef.current?.focus();
+                      }
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-800 font-bold text-xs">
+                      Plant Name
+                    </span>
+                  }
+                  name="plant_id"
+                  rules={[{ required: true, message: "Select Plant" }]}
+                >
+                  <Select
+                    ref={plantSelectRef}
+                    placeholder="Select Plant / Depo"
+                    showSearch
+                    optionFilterProp="children"
+                    className="font-semibold"
+                    style={{ height: "38px" }}
+                    onChange={handlePlantChange}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        vehicleSelectRef.current?.focus();
+                      }
+                    }}
+                  >
+                    {plants.map((p, idx) => {
+                      const pId =
+                        p.id || p.plant_id || p.vendor_id || p.pk || idx;
+                      const pName =
+                        p.name ||
+                        p.plant_name ||
+                        p.short_name ||
+                        (p.is_direct ? "Direct" : `Plant #${pId}`);
+                      return (
+                        <Option key={pId} value={pId}>
+                          {pName}
+                        </Option>
+                      );
+                    })}
+                  </Select>
+                </Form.Item>
+                <Form.Item name="plant_name" hidden>
+                  <Input />
+                </Form.Item>
+              </Col>
+
+              <Col span={4}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-800 font-bold text-xs">
+                      Vehicle No
+                    </span>
+                  }
+                  name="vehicle_no"
+                  rules={[{ required: true, message: "Select Vehicle" }]}
+                >
+                  <Select
+                    ref={vehicleSelectRef}
+                    placeholder={
+                      intransitVehicles.length === 0
+                        ? "No In-transit Vehicles"
+                        : "Select In-Transit Vehicle"
+                    }
+                    showSearch
+                    allowClear
+                    optionFilterProp="children"
+                    onChange={handleVehicleChange}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
                         customerSelectRef.current?.focus();
                       }
                     }}
-                  />
+                    className="font-semibold"
+                    style={{ height: "38px" }}
+                  >
+                    {intransitVehicles.map((v, idx) => {
+                      const vNo =
+                        v.vehicle_no ||
+                        v.vehicle_number ||
+                        v.number ||
+                        `Veh-${idx}`;
+                      return (
+                        <Option key={vNo} value={vNo}>
+                          {vNo}{" "}
+                          {v.transport_name ? `(${v.transport_name})` : ""}
+                        </Option>
+                      );
+                    })}
+                  </Select>
                 </Form.Item>
               </Col>
 
@@ -1489,25 +1762,34 @@ export default function SaleInvoice() {
                 >
                   <Select
                     ref={customerSelectRef}
-                    placeholder="Select Customer"
+                    placeholder={
+                      !form.getFieldValue("vehicle_no")
+                        ? "Select Vehicle First"
+                        : availableCustomers.length === 0
+                        ? "No Customer for Vehicle"
+                        : "Select Customer"
+                    }
                     showSearch
                     optionFilterProp="children"
-                    onChange={handleCustomerChange}
+                    onChange={(cId) => handleCustomerChange(cId)}
                     onSelect={() => {
-                      setTimeout(() => plantSelectRef.current?.focus(), 50);
+                      setTimeout(() => ewaybillNoRef.current?.focus(), 50);
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
-                        plantSelectRef.current?.focus();
+                        ewaybillNoRef.current?.focus();
                       }
                     }}
                     className="font-semibold"
                     style={{ height: "38px" }}
                   >
-                    {customers.map((c) => {
-                      const cId = c.id || c.customer_id;
-                      const cName = c.name || c.customer_name;
+                    {(availableCustomers.length > 0
+                      ? availableCustomers
+                      : customers
+                    ).map((c) => {
+                      const cId = c.id || c.customer_id || c.pk;
+                      const cName = getCustomerBusinessName(c);
                       const cGst = c.gst_number || c.gst || c.customer_gst;
                       return (
                         <Option key={cId} value={cId}>
@@ -1549,72 +1831,7 @@ export default function SaleInvoice() {
                 </Form.Item>
               </Col>
 
-              <Col span={3}>
-                <Form.Item
-                  label={
-                    <span className="text-amber-800 font-bold text-xs">
-                      Plant Name
-                    </span>
-                  }
-                  name="plant_id"
-                  rules={[{ required: true, message: "Select Plant" }]}
-                >
-                  <Select
-                    ref={plantSelectRef}
-                    placeholder="Select Plant"
-                    showSearch
-                    allowClear
-                    optionFilterProp="children"
-                    className="font-semibold"
-                    style={{ height: "38px" }}
-                    onSelect={() => {
-                      setTimeout(() => brokerSelectRef.current?.focus(), 50);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        brokerSelectRef.current?.focus();
-                      }
-                    }}
-                    onChange={(val) => {
-                      const p = plants.find(
-                        (item) =>
-                          String(
-                            item.id || item.plant_id || item.vendor_id || item.pk
-                          ) === String(val)
-                      );
-                      if (p) {
-                        form.setFieldsValue({
-                          plant_name:
-                            p.name || p.plant_name || p.vendor_name || "",
-                        });
-                      } else {
-                        form.setFieldsValue({ plant_name: undefined });
-                      }
-                    }}
-                  >
-                    {plants.map((p, idx) => {
-                      const pId = p.id || p.plant_id || p.vendor_id || p.pk || idx;
-                      const pName =
-                        p.name || p.plant_name || p.vendor_name || `Plant #${pId}`;
-                      const vName =
-                        p.vendor_name && p.vendor_name !== pName
-                          ? ` (${p.vendor_name})`
-                          : "";
-                      return (
-                        <Option key={pId} value={pId}>
-                          {pName}{vName}
-                        </Option>
-                      );
-                    })}
-                  </Select>
-                </Form.Item>
-                <Form.Item name="plant_name" hidden>
-                  <Input />
-                </Form.Item>
-              </Col>
-
-              <Col span={3}>
+              <Col span={4}>
                 <Form.Item
                   label={
                     <span className="text-amber-800 font-bold text-xs">
@@ -1631,21 +1848,16 @@ export default function SaleInvoice() {
                     optionFilterProp="children"
                     className="font-semibold"
                     style={{ height: "38px" }}
-                    onSelect={() => {
-                      setTimeout(() => vehicleSelectRef.current?.focus(), 50);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        vehicleSelectRef.current?.focus();
-                      }
-                    }}
                     onChange={(val) => {
                       if (val === "direct") {
                         form.setFieldsValue({ broker_name: "Direct" });
                         return;
                       }
-                      const b = brokers.find(
+                      const bList =
+                        availableBrokers.length > 0
+                          ? availableBrokers
+                          : brokers;
+                      const b = bList.find(
                         (item) =>
                           String(item.id || item.broker_id || item.pk) ===
                           String(val)
@@ -1663,10 +1875,16 @@ export default function SaleInvoice() {
                     <Option key="direct" value="direct">
                       Direct
                     </Option>
-                    {brokers.map((b, idx) => {
+                    {(availableBrokers.length > 0
+                      ? availableBrokers
+                      : brokers
+                    ).map((b, idx) => {
                       const bId = b.id || b.broker_id || b.pk || idx;
                       const bName =
-                        b.name || b.broker_name || b.full_name || `Broker #${bId}`;
+                        b.name ||
+                        b.broker_name ||
+                        b.full_name ||
+                        `Broker #${bId}`;
                       return (
                         <Option key={bId} value={bId}>
                           {bName}
@@ -1679,58 +1897,9 @@ export default function SaleInvoice() {
                   <Input />
                 </Form.Item>
               </Col>
-
-              <Col span={4}>
-                <Form.Item
-                  label={
-                    <span className="text-amber-800 font-bold text-xs">
-                      Vehicle No
-                    </span>
-                  }
-                  name="vehicle_no"
-                  rules={[{ required: true, message: "Select Vehicle" }]}
-                >
-                  <Select
-                    ref={vehicleSelectRef}
-                    placeholder={
-                      !form.getFieldValue("customer_id")
-                        ? "Select Customer First"
-                        : intransitVehicles.length === 0
-                        ? "No In-transit Vehicles"
-                        : "Select In-Transit Vehicle"
-                    }
-                    showSearch
-                    allowClear
-                    optionFilterProp="children"
-                    onChange={handleVehicleChange}
-                    onSelect={() => {
-                      setTimeout(() => ewaybillNoRef.current?.focus(), 50);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        ewaybillNoRef.current?.focus();
-                      }
-                    }}
-                    disabled={!form.getFieldValue("customer_id")}
-                    className="font-semibold"
-                    style={{ height: "38px" }}
-                  >
-                    {intransitVehicles.map((v, idx) => {
-                      const vNo =
-                        v.vehicle_no || v.vehicle_number || v.number || `Veh-${idx}`;
-                      return (
-                        <Option key={vNo} value={vNo}>
-                          {vNo} {v.transport_name ? `(${v.transport_name})` : ""}
-                        </Option>
-                      );
-                    })}
-                  </Select>
-                </Form.Item>
-              </Col>
             </Row>
 
-            {/* ROW 2 */}
+            {/* ROW 2: Transport Name, LR No, LR Date, E-waybill No, E-waybill Date, E-Invoice No, E-Invoice Date, Payment Due Date */}
             <Row gutter={[12, 12]} style={{ marginTop: 6 }}>
               <Col span={4}>
                 <Form.Item
@@ -1855,7 +2024,7 @@ export default function SaleInvoice() {
                 </Form.Item>
               </Col>
 
-              <Col span={4}>
+              <Col span={3}>
                 <Form.Item
                   label={
                     <span className="text-amber-700 font-semibold text-xs">
@@ -1872,6 +2041,35 @@ export default function SaleInvoice() {
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
+                        einvoiceDateRef.current?.focus();
+                      }
+                    }}
+                  />
+                </Form.Item>
+              </Col>
+
+              <Col span={3}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold text-xs">
+                      E-Invoice Date
+                    </span>
+                  }
+                  name="einvoice_date"
+                >
+                  <AppDatePicker
+                    ref={einvoiceDateRef}
+                    className="w-full font-semibold"
+                    style={{ height: "38px", fontSize: "13px" }}
+                    disabledDate={(current) =>
+                      createFinancialYearDisabledDate(selectedFY)(current)
+                    }
+                    onTabComplete={() => {
+                      setTimeout(() => paymentDueDateRef.current?.focus(), 50);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
                         paymentDueDateRef.current?.focus();
                       }
                     }}
@@ -1879,11 +2077,11 @@ export default function SaleInvoice() {
                 </Form.Item>
               </Col>
 
-              <Col span={4}>
+              <Col span={2}>
                 <Form.Item
                   label={
                     <span className="text-amber-700 font-semibold text-xs">
-                      Payment Due Date
+                      Due Date
                     </span>
                   }
                   name="payment_due_date"
@@ -1920,17 +2118,18 @@ export default function SaleInvoice() {
             }}
             styles={{ body: { padding: "12px 16px" } }}
           >
-            <div style={{ minWidth: 2150 }}>
+            <div style={{ minWidth: 1550 }}>
               <div className="flex items-center justify-between mb-3">
                 <h6 className="text-amber-800 font-bold m-0 text-sm tracking-wider uppercase">
                   Items Table
                 </h6>
                 <span className="text-xs text-gray-500 font-medium">
-                  Auto-populated from approved customer contracts. Edit invoice qty, rates or remove rows as needed.
+                  Auto-populated from approved customer contracts. Edit invoice
+                  qty, rates or remove rows as needed.
                 </span>
               </div>
 
-              {/* TABLE HEADER */}
+              {/* TABLE HEADER - 16 columns without Net Wt (Kg) & Gr Wt (Kg) */}
               <div
                 style={{
                   display: "grid",
@@ -1951,8 +2150,6 @@ export default function SaleInvoice() {
                 <div className="text-center">Invoice Qty</div>
                 <div className="text-center">Free Qty</div>
                 <div className="text-center">Unit</div>
-                <div className="text-center">Net Wt (Kg)</div>
-                <div className="text-center">Gr. Wt (Kg)</div>
                 <div className="text-center">Rate (₹)</div>
                 <div className="text-center">GST %</div>
                 <div className="text-center">Disc. %</div>
@@ -1988,15 +2185,20 @@ export default function SaleInvoice() {
                             rules={[{ required: true, message: "Select Item" }]}
                           >
                             <Select
-                              ref={(el) => (itemSelectRefs.current[field.name] = el)}
-                              placeholder="Select Item / Product"
+                              ref={(el) =>
+                                (itemSelectRefs.current[field.name] = el)
+                              }
+                              placeholder="Select Item"
                               showSearch
                               optionFilterProp="children"
                               className="w-full font-bold"
                               style={{ height: "36px" }}
                               onChange={(val) => {
                                 handleItemSelect(field.name, val);
-                                setTimeout(() => focusItemField(field.name, "qty"), 50);
+                                setTimeout(
+                                  () => focusItemField(field.name, "qty"),
+                                  50
+                                );
                               }}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
@@ -2013,7 +2215,8 @@ export default function SaleInvoice() {
                                   ci.souda_no;
                                 return (
                                   <Option key={keyVal} value={keyVal}>
-                                    {ci.item_name || ci.product_name} - {ci.souda_no || "Contract"} (₹{ci.rate})
+                                    {ci.item_name || ci.product_name} -{" "}
+                                    {ci.souda_no || "Contract"} (₹{ci.rate})
                                   </Option>
                                 );
                               })}
@@ -2043,6 +2246,16 @@ export default function SaleInvoice() {
                           <Form.Item name={[field.name, "product_name"]} hidden>
                             <Input />
                           </Form.Item>
+                          {/* Hidden weights to compute footer tonnage */}
+                          <Form.Item name={[field.name, "net_weight_kg"]} hidden>
+                            <Input />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, "gross_weight_kg"]}
+                            hidden
+                          >
+                            <Input />
+                          </Form.Item>
                         </div>
 
                         {/* 2. Souda No */}
@@ -2065,7 +2278,7 @@ export default function SaleInvoice() {
                           </Form.Item>
                         </div>
 
-                        {/* 3. Contract Qty (Actual Qty) */}
+                        {/* 3. Contract Qty */}
                         <div>
                           <Form.Item
                             name={[field.name, "actual_qty"]}
@@ -2094,13 +2307,17 @@ export default function SaleInvoice() {
                             rules={[{ required: true, message: "Required" }]}
                           >
                             <InputNumber
-                              ref={(el) => (itemQtyRefs.current[field.name] = el)}
+                              ref={(el) =>
+                                (itemQtyRefs.current[field.name] = el)
+                              }
                               min={0.001}
                               precision={2}
                               className="w-full border-amber-400! font-bold text-center text-gray-900"
-                              placeholder="Invoice Qty"
+                              placeholder="Qty"
                               style={{ height: "36px", fontSize: "13px" }}
-                              onFocus={(e) => setTimeout(() => e.target.select(), 0)}
+                              onFocus={(e) =>
+                                setTimeout(() => e.target.select(), 0)
+                              }
                               onChange={() => handleItemFieldChange(field.name)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
@@ -2119,18 +2336,22 @@ export default function SaleInvoice() {
                             style={{ marginBottom: 0 }}
                           >
                             <InputNumber
-                              ref={(el) => (itemFreeQtyRefs.current[field.name] = el)}
+                              ref={(el) =>
+                                (itemFreeQtyRefs.current[field.name] = el)
+                              }
                               min={0}
                               precision={2}
                               className="w-full text-center font-semibold"
                               placeholder="0"
                               style={{ height: "36px", fontSize: "13px" }}
-                              onFocus={(e) => setTimeout(() => e.target.select(), 0)}
+                              onFocus={(e) =>
+                                setTimeout(() => e.target.select(), 0)
+                              }
                               onChange={() => handleItemFieldChange(field.name)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
                                   e.preventDefault();
-                                  focusItemField(field.name, "net_weight_kg");
+                                  focusItemField(field.name, "rate");
                                 }
                               }}
                             />
@@ -2157,55 +2378,7 @@ export default function SaleInvoice() {
                           </Form.Item>
                         </div>
 
-                        {/* 7. Net Wt (Kg) */}
-                        <div>
-                          <Form.Item
-                            name={[field.name, "net_weight_kg"]}
-                            style={{ marginBottom: 0 }}
-                          >
-                            <InputNumber
-                              ref={(el) => (itemNetWtRefs.current[field.name] = el)}
-                              precision={3}
-                              className="w-full text-center font-semibold"
-                              placeholder="0.000"
-                              style={{ height: "36px", fontSize: "13px" }}
-                              onFocus={(e) => setTimeout(() => e.target.select(), 0)}
-                              onChange={() => handleItemFieldChange(field.name)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  focusItemField(field.name, "gross_weight_kg");
-                                }
-                              }}
-                            />
-                          </Form.Item>
-                        </div>
-
-                        {/* 8. Gr. Wt (Kg) */}
-                        <div>
-                          <Form.Item
-                            name={[field.name, "gross_weight_kg"]}
-                            style={{ marginBottom: 0 }}
-                          >
-                            <InputNumber
-                              ref={(el) => (itemGrossWtRefs.current[field.name] = el)}
-                              precision={3}
-                              className="w-full text-center font-semibold"
-                              placeholder="0.000"
-                              style={{ height: "36px", fontSize: "13px" }}
-                              onFocus={(e) => setTimeout(() => e.target.select(), 0)}
-                              onChange={() => handleItemFieldChange(field.name)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  focusItemField(field.name, "rate");
-                                }
-                              }}
-                            />
-                          </Form.Item>
-                        </div>
-
-                        {/* 9. Rate */}
+                        {/* 7. Rate */}
                         <div>
                           <Form.Item
                             name={[field.name, "rate"]}
@@ -2213,25 +2386,32 @@ export default function SaleInvoice() {
                             rules={[{ required: true, message: "Rate" }]}
                           >
                             <InputNumber
-                              ref={(el) => (itemRateRefs.current[field.name] = el)}
+                              ref={(el) =>
+                                (itemRateRefs.current[field.name] = el)
+                              }
                               min={0}
                               precision={2}
                               className="w-full text-center font-bold"
                               placeholder="Rate"
                               style={{ height: "36px", fontSize: "13px" }}
-                              onFocus={(e) => setTimeout(() => e.target.select(), 0)}
+                              onFocus={(e) =>
+                                setTimeout(() => e.target.select(), 0)
+                              }
                               onChange={() => handleItemFieldChange(field.name)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
                                   e.preventDefault();
-                                  focusItemField(field.name, "discount_percent");
+                                  focusItemField(
+                                    field.name,
+                                    "discount_percent"
+                                  );
                                 }
                               }}
                             />
                           </Form.Item>
                         </div>
 
-                        {/* 10. GST % */}
+                        {/* 8. GST % */}
                         <div>
                           <Form.Item
                             name={[field.name, "gst_percent"]}
@@ -2252,14 +2432,16 @@ export default function SaleInvoice() {
                           </Form.Item>
                         </div>
 
-                        {/* 11. Disc. % */}
+                        {/* 9. Disc. % */}
                         <div>
                           <Form.Item
                             name={[field.name, "discount_percent"]}
                             style={{ marginBottom: 0 }}
                           >
                             <InputNumber
-                              ref={(el) => (itemDiscPercentRefs.current[field.name] = el)}
+                              ref={(el) =>
+                                (itemDiscPercentRefs.current[field.name] = el)
+                              }
                               min={0}
                               max={100}
                               step={0.1}
@@ -2267,12 +2449,15 @@ export default function SaleInvoice() {
                               className="w-full text-center font-semibold"
                               placeholder="0%"
                               style={{ height: "36px", fontSize: "13px" }}
-                              onFocus={(e) => setTimeout(() => e.target.select(), 0)}
+                              onFocus={(e) =>
+                                setTimeout(() => e.target.select(), 0)
+                              }
                               onChange={() => handleItemFieldChange(field.name)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
                                   e.preventDefault();
-                                  const allItems = form.getFieldValue("items") || [];
+                                  const allItems =
+                                    form.getFieldValue("items") || [];
                                   if (field.name < allItems.length - 1) {
                                     focusItemField(field.name + 1, "qty");
                                   } else {
@@ -2284,7 +2469,7 @@ export default function SaleInvoice() {
                           </Form.Item>
                         </div>
 
-                        {/* 12. Disc. Amt */}
+                        {/* 10. Disc. Amt */}
                         <div>
                           <Form.Item
                             name={[field.name, "discount_amount"]}
@@ -2300,7 +2485,7 @@ export default function SaleInvoice() {
                           </Form.Item>
                         </div>
 
-                        {/* 13. Taxable Amt */}
+                        {/* 11. Taxable Amt */}
                         <div>
                           <Form.Item
                             name={[field.name, "taxable_amount"]}
@@ -2322,7 +2507,7 @@ export default function SaleInvoice() {
                           </Form.Item>
                         </div>
 
-                        {/* 14. SGST */}
+                        {/* 12. SGST */}
                         <div>
                           <Form.Item
                             name={[field.name, "sgst_amount"]}
@@ -2339,7 +2524,7 @@ export default function SaleInvoice() {
                           </Form.Item>
                         </div>
 
-                        {/* 15. CGST */}
+                        {/* 13. CGST */}
                         <div>
                           <Form.Item
                             name={[field.name, "cgst_amount"]}
@@ -2356,7 +2541,7 @@ export default function SaleInvoice() {
                           </Form.Item>
                         </div>
 
-                        {/* 16. IGST */}
+                        {/* 14. IGST */}
                         <div>
                           <Form.Item
                             name={[field.name, "igst_amount"]}
@@ -2373,7 +2558,7 @@ export default function SaleInvoice() {
                           </Form.Item>
                         </div>
 
-                        {/* 17. Total Amount */}
+                        {/* 15. Total Amount */}
                         <div>
                           <Form.Item
                             name={[field.name, "total_amount"]}
@@ -2395,7 +2580,7 @@ export default function SaleInvoice() {
                           </Form.Item>
                         </div>
 
-                        {/* 18. Actions (Add / Remove) */}
+                        {/* 16. Actions (Add / Remove) */}
                         <div className="text-center flex justify-center items-center gap-1">
                           <Tooltip title="Add Row">
                             <Button
@@ -2434,7 +2619,9 @@ export default function SaleInvoice() {
                               type="text"
                               danger
                               size="middle"
-                              icon={<DeleteOutlined style={{ fontSize: "15px" }} />}
+                              icon={
+                                <DeleteOutlined style={{ fontSize: "15px" }} />
+                              }
                               onClick={() => {
                                 if (fields.length > 1) {
                                   remove(field.name);
@@ -2451,7 +2638,7 @@ export default function SaleInvoice() {
                 )}
               </Form.List>
 
-              {/* TABLE "TOTAL" ROW */}
+              {/* TABLE "TOTAL" ROW - 16 columns aligned perfectly */}
               <Divider style={{ margin: "12px 0 8px 0" }} />
               <div
                 style={{
@@ -2469,10 +2656,14 @@ export default function SaleInvoice() {
                 </div>
 
                 {/* 2. Souda Spacer */}
-                <div className="flex items-center justify-center text-gray-400 font-bold">-</div>
+                <div className="flex items-center justify-center text-gray-400 font-bold">
+                  -
+                </div>
 
                 {/* 3. Contract Qty Spacer */}
-                <div className="flex items-center justify-center text-gray-400 font-bold">-</div>
+                <div className="flex items-center justify-center text-gray-400 font-bold">
+                  -
+                </div>
 
                 {/* 4. Total Invoice Qty */}
                 <div>
@@ -2513,24 +2704,26 @@ export default function SaleInvoice() {
                 </div>
 
                 {/* 6. Unit Spacer */}
-                <div className="flex items-center justify-center text-gray-400 font-bold">-</div>
+                <div className="flex items-center justify-center text-gray-400 font-bold">
+                  -
+                </div>
 
-                {/* 7. Net Wt Spacer */}
-                <div className="flex items-center justify-center text-gray-400 font-bold">-</div>
+                {/* 7. Rate Spacer */}
+                <div className="flex items-center justify-center text-gray-400 font-bold">
+                  -
+                </div>
 
-                {/* 8. Gr Wt Spacer */}
-                <div className="flex items-center justify-center text-gray-400 font-bold">-</div>
+                {/* 8. GST Spacer */}
+                <div className="flex items-center justify-center text-gray-400 font-bold">
+                  -
+                </div>
 
-                {/* 9. Rate Spacer */}
-                <div className="flex items-center justify-center text-gray-400 font-bold">-</div>
+                {/* 9. Disc % Spacer */}
+                <div className="flex items-center justify-center text-gray-400 font-bold">
+                  -
+                </div>
 
-                {/* 10. GST Spacer */}
-                <div className="flex items-center justify-center text-gray-400 font-bold">-</div>
-
-                {/* 11. Disc % Spacer */}
-                <div className="flex items-center justify-center text-gray-400 font-bold">-</div>
-
-                {/* 12. Total Disc Amt */}
+                {/* 10. Total Disc Amt */}
                 <div>
                   <Form.Item
                     name="total_discount_amount"
@@ -2553,7 +2746,7 @@ export default function SaleInvoice() {
                   </Form.Item>
                 </div>
 
-                {/* 13. Total Taxable Amount */}
+                {/* 11. Total Taxable Amount */}
                 <div>
                   <Form.Item
                     name="total_taxable_amount"
@@ -2575,7 +2768,7 @@ export default function SaleInvoice() {
                   </Form.Item>
                 </div>
 
-                {/* 14. Total SGST */}
+                {/* 12. Total SGST */}
                 <div>
                   <Form.Item name="total_sgst" style={{ marginBottom: 0 }}>
                     <InputNumber
@@ -2595,7 +2788,7 @@ export default function SaleInvoice() {
                   </Form.Item>
                 </div>
 
-                {/* 15. Total CGST */}
+                {/* 13. Total CGST */}
                 <div>
                   <Form.Item name="total_cgst" style={{ marginBottom: 0 }}>
                     <InputNumber
@@ -2615,7 +2808,7 @@ export default function SaleInvoice() {
                   </Form.Item>
                 </div>
 
-                {/* 16. Total IGST */}
+                {/* 14. Total IGST */}
                 <div>
                   <Form.Item name="total_igst" style={{ marginBottom: 0 }}>
                     <InputNumber
@@ -2635,7 +2828,7 @@ export default function SaleInvoice() {
                   </Form.Item>
                 </div>
 
-                {/* 17. Total Amount */}
+                {/* 15. Total Amount */}
                 <div>
                   <Form.Item name="total_amount" style={{ marginBottom: 0 }}>
                     <InputNumber
@@ -2654,7 +2847,7 @@ export default function SaleInvoice() {
                   </Form.Item>
                 </div>
 
-                {/* 18. Action Spacer */}
+                {/* 16. Action Spacer */}
                 <div></div>
               </div>
             </div>
@@ -2696,7 +2889,7 @@ export default function SaleInvoice() {
                 <Form.Item
                   label={
                     <span className="text-amber-800 font-bold text-xs">
-                      Net Wt.(Ton)
+                      Total Net Wt. (Ton)
                     </span>
                   }
                   name="total_net_weight_ton"
@@ -2925,7 +3118,7 @@ export default function SaleInvoice() {
             <Card size="small" className="bg-amber-50/40 border-amber-200">
               <Row gutter={[16, 12]}>
                 <Col span={6}>
-                  <Text type="secondary">Customer Name:</Text>
+                  <Text type="secondary">Customer Business Name:</Text>
                   <div className="font-bold text-amber-950 text-sm">
                     {viewRecord.customer_name || "-"}
                   </div>
@@ -2985,6 +3178,15 @@ export default function SaleInvoice() {
                   </div>
                 </Col>
                 <Col span={5}>
+                  <Text type="secondary">E-Invoice No & Date:</Text>
+                  <div className="font-semibold">
+                    {viewRecord.einvoice_no || "-"}{" "}
+                    {viewRecord.einvoice_date
+                      ? `(${fmtDate(viewRecord.einvoice_date)})`
+                      : ""}
+                  </div>
+                </Col>
+                <Col span={4}>
                   <Text type="secondary">Payment Due Date:</Text>
                   <div className="font-semibold text-amber-900">
                     {fmtDate(viewRecord.payment_due_date)}
@@ -2995,6 +3197,14 @@ export default function SaleInvoice() {
                   <div className="font-semibold">
                     {viewRecord.dispatch_from || "-"} ➔{" "}
                     {viewRecord.ship_to || viewRecord.place || "-"}
+                  </div>
+                </Col>
+                <Col span={4}>
+                  <Text type="secondary">Distance:</Text>
+                  <div className="font-semibold">
+                    {viewRecord.distance_km
+                      ? `${viewRecord.distance_km} KM`
+                      : "-"}
                   </div>
                 </Col>
               </Row>
@@ -3090,7 +3300,7 @@ export default function SaleInvoice() {
                   </div>
                 </Col>
                 <Col span={4}>
-                  <Text type="secondary">Net Wt:</Text>
+                  <Text type="secondary">Total Net Wt:</Text>
                   <div className="font-bold text-base">
                     {viewRecord.total_net_weight_ton ||
                       viewRecord.net_weight ||

@@ -40,15 +40,15 @@ export default function MasterTables() {
   const { component, title, icon } = componentsMap[currentPath] || componentsMap["organisation"];
 
   return (
-    <div className="p-0 mt-4 h-[625px] w-full overflow-auto rounded">
+    <div className="p-0 mt-2 min-h-[calc(100vh-140px)] w-full rounded">
       <h1 className="text-2xl font-bold text-amber-700 mb-0">Master Tables</h1>
       <p className="text-amber-500 mb-4">
         Manage all master data for your business operations
       </p>
-      <h1 className="flex items-center text-xl font-semibold text-amber-700 border border-amber-300 p-2 bg-amber-100 rounded-md">
+      <h1 className="flex items-center text-xl font-semibold text-amber-700 border border-amber-300 p-2.5 bg-amber-100 rounded-md shadow-xs">
         {icon} {title}
       </h1>
-      <div className="overflow-auto mt-4">
+      <div className="mt-4">
         {component}
       </div>
     </div>

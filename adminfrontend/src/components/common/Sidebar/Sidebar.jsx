@@ -151,74 +151,74 @@ const baseMenuItems = [
     label: "Purchase Module",
     path: "/dms/purchase",
     icon: <ShoppingCartOutlined />,
-    module: "dms",
-    required: "purchase",
+    moduleKey: "purchase",
+    category: "dms",
   },
   {
     key: "sales",
     label: "Sales Module",
     path: "/dms/sales",
     icon: <TagsOutlined />,
-    module: "dms",
-    required: "sales",
+    moduleKey: "sales",
+    category: "dms",
   },
   {
     key: "accounts",
     label: "Accounting Module",
     path: "/dms/accounts",
     icon: <BookOutlined />,
-    module: "dms",
-    required: "reports",
+    moduleKey: "accounts",
+    category: "dms",
   },
   {
     key: "reports",
     label: "Reports & Analytics",
     path: "/dms/reports",
     icon: <FileTextOutlined />,
-    module: "dms",
-    required: "reports",
+    moduleKey: "reports",
+    category: "dms",
   },
   {
     key: "master",
     label: "Master Data",
     path: "/dms/mastermodule",
     icon: <DatabaseOutlined />,
-    module: "dms",
-    required: "master",
+    moduleKey: "master",
+    category: "dms",
   },
   {
     isSection: true,
     label: "Asset Module",
-    module: "ams",
-    required: "asset",
+    moduleKey: "ams",
+    category: "ams",
   },
   {
     key: "asset-product",
     label: "Asset Master",
     path: "/ams/dashboard",
     icon: <GoldOutlined />,
-    module: "ams",
-    required: "asset",
+    moduleKey: "ams",
+    category: "ams",
   },
   {
     isSection: true,
     label: "Wealth Module",
-    module: "wms",
-    required: "wealth",
+    moduleKey: "wms",
+    category: "wms",
   },
   {
     key: "wealth-product",
     label: "Wealth Master",
     path: "/wms/dashboard",
     icon: <WalletOutlined />,
-    module: "wms",
-    required: "wealth",
+    moduleKey: "wms",
+    category: "wms",
   },
 ];
 
 const SidebarMenu = ({ collapsed, onNavClick }) => {
   const location = useLocation();
-  const { user, orgModules } = useAuth();
+  const { user, orgModules, hasModuleAccess, isAdmin } = useAuth();
 
   const getActiveKey = (pathname) => {
     if (pathname.startsWith("/dms/purchase")) return "purchase";
@@ -237,53 +237,32 @@ const SidebarMenu = ({ collapsed, onNavClick }) => {
   const activeKey = getActiveKey(location.pathname);
 
   const menuItems = baseMenuItems.filter((item) => {
-    // check if module is in orgModules
-    if (item.module) {
-      // safe-check: normalize orgModules to uppercase if it's an array of strings/objects
+    // Check if category is enabled in organisation orgModules (if present)
+    if (item.category) {
       const modulesNormalized = Array.isArray(orgModules)
         ? orgModules.map((m) =>
             typeof m === "string"
               ? m.toUpperCase()
-              : (m.key || m.module || m.name || "").toUpperCase(),
+              : (m.key || m.module || m.name || "").toUpperCase()
           )
         : [];
 
       if (
         modulesNormalized.length > 0 &&
-        !modulesNormalized.includes(item.module.toUpperCase())
+        !modulesNormalized.includes(item.category.toUpperCase())
       ) {
         return false;
       }
     }
 
-    // if admin then allow all submodules
-    if (user?.role === "admin") {
+    // Admins have access to everything
+    if (isAdmin || user?.role === "admin" || user?.is_admin) {
       return true;
     }
 
-    // check if user has permission to this module
-    if (item.required) {
-      const modulePermission = Array.isArray(user?.permissions)
-        ? user.permissions.find(
-            (p) => (p.module || "").toLowerCase() === item.module,
-          )
-        : user?.permissions?.[item.module?.toUpperCase?.()] || null;
-
-      if (!modulePermission) {
-        return false;
-      }
-
-      // support both object submodules or map of flags
-      const subs =
-        modulePermission?.submodules || modulePermission?.submodule || {};
-      if (Array.isArray(subs)) {
-        return subs.includes(item.required);
-      }
-      if (typeof subs === "object") {
-        return !!subs[item.required];
-      }
-
-      return false;
+    // Check granular module permission
+    if (item.moduleKey) {
+      return hasModuleAccess(item.moduleKey);
     }
 
     return true;

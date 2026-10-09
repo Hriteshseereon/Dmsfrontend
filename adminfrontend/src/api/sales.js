@@ -374,42 +374,48 @@ const safeApiGet = async (urlList, params = {}) => {
 };
 
 // ---------------- SALE INVOICE (CREDIT INVOICE) API SECTION ----------------
-export const getNextSaleInvoiceNumber = async () => {
+export const getNextSaleInvoiceNumber = async (params = {}) => {
   const { currentOrgId } = useSessionStore.getState();
-  return await safeApiGet([
-    "/sales/invoices/next-invoice-number/",
-    "/api/sales/invoices/next-invoice-number/",
-  ], { organisation: currentOrgId });
+  const queryParams = typeof params === "object" ? params : { plant_name: params };
+  try {
+    const res = await api.get("/sales/invoices/next-invoice-number/", {
+      params: { organisation: currentOrgId, ...queryParams },
+    });
+    return res.data;
+  } catch (err) {
+    if (err.response?.status === 404) {
+      const res2 = await api.get("/sales/sales-invoices/next-invoice-number/", {
+        params: { organisation: currentOrgId, ...queryParams },
+      });
+      return res2.data;
+    }
+    throw err;
+  }
 };
 
-export const getSaleInvoiceCustomers = async () => {
+export const getSaleInvoiceCustomers = async (vehicleNo = null) => {
   const { currentOrgId } = useSessionStore.getState();
+  const params = { organisation: currentOrgId };
+  if (vehicleNo) params.vehicle_no = vehicleNo;
   return await safeApiGet([
     "/sales/invoices/customers/",
-    "/api/sales/invoices/customers/",
+    "/sales/sales-invoices/customers/",
     "/sales/orders/customers/",
-    "/api/sales/orders/customers/",
     "/customers/admin/by-organisation/",
-    "/api/customers/admin/by-organisation/",
     "/customers/customers/",
-    "/api/customers/customers/",
     "/customers/",
-  ], { organisation: currentOrgId });
+  ], params);
 };
 
 export const getSaleInvoicePlants = async () => {
   const { currentOrgId } = useSessionStore.getState();
   return await safeApiGet([
     "/sales/invoices/all-plants/",
-    "/api/sales/invoices/all-plants/",
+    "/sales/sales-invoices/all-plants/",
     "/sales/contracts/all-plants/",
-    "/api/sales/contracts/all-plants/",
     "/vendors/vendor-dropdown/",
-    "/api/vendors/vendor-dropdown/",
     "/vendors/company-groups/",
-    "/api/vendors/company-groups/",
     "/vendors/vendors/",
-    "/api/vendors/vendors/",
   ], { organisation: currentOrgId });
 };
 
@@ -417,43 +423,47 @@ export const getSaleInvoiceBrokers = async () => {
   const { currentOrgId } = useSessionStore.getState();
   return await safeApiGet([
     "/sales/invoices/all-brokers/",
-    "/api/sales/invoices/all-brokers/",
+    "/sales/sales-invoices/all-brokers/",
     "/sales/contracts/all-brokers/",
-    "/api/sales/contracts/all-brokers/",
     "/brokers/broker/",
-    "/api/brokers/broker/",
   ], { organisation: currentOrgId });
 };
 
-export const getSaleInvoiceIntransitVehicles = async (customerId) => {
+export const getSaleInvoiceIntransitVehicles = async (params = {}) => {
   const { currentOrgId } = useSessionStore.getState();
+  const queryParams = typeof params === "object" ? params : { customer_id: params };
   return await safeApiGet([
     "/sales/invoices/intransit-vehicles/",
-    "/api/sales/invoices/intransit-vehicles/",
+    "/sales/sales-invoices/intransit-vehicles/",
     "/purchase/invoices/available-vehicles/",
-    "/api/purchase/invoices/available-vehicles/",
     "/transport/vehicle-masters/",
-    "/api/transport/vehicle-masters/",
   ], {
     organisation: currentOrgId,
-    customer_id: customerId,
+    ...queryParams,
   });
 };
 
-export const getSaleInvoiceCustomerContractItems = async (customerId) => {
-  const { currentOrgId, selectedFY } = useSessionStore.getState();
-  return await safeApiGet([
-    "/sales/invoices/customer-contract-items/",
-    "/api/sales/invoices/customer-contract-items/",
-    "/sales/orders/contracts/",
-    "/api/sales/orders/contracts/",
-    "/sales/contracts/",
-    "/api/sales/contracts/",
-  ], {
+export const getSaleInvoiceCustomerContractItems = async (customerId, vehicleNo = null) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const cId = typeof customerId === "object" ? customerId?.customer_id : customerId;
+  const vNo = typeof customerId === "object" ? customerId?.vehicle_no : vehicleNo;
+
+  const params = {
     organisation: currentOrgId,
-    customer_id: customerId,
-    financial_year: selectedFY,
-  });
+    customer_id: cId,
+  };
+  if (vNo) params.vehicle_no = vNo;
+
+  try {
+    const res = await api.get("/sales/invoices/customer-contract-items/", { params });
+    return res.data;
+  } catch (err) {
+    if (err.response?.status === 404) {
+      const res2 = await api.get("/sales/sales-invoices/customer-contract-items/", { params });
+      return res2.data;
+    }
+    throw err;
+  }
 };
 
 export const createSaleInvoice = async (payload) => {
@@ -468,7 +478,7 @@ export const createSaleInvoice = async (payload) => {
     return res.data;
   } catch (err) {
     if (err.response?.status === 404) {
-      const res2 = await api.post("/api/sales/invoices/", payload, config);
+      const res2 = await api.post("/sales/sales-invoices/", payload, config);
       return res2.data;
     }
     throw err;
@@ -479,7 +489,7 @@ export const getSaleInvoices = async () => {
   const { currentOrgId, selectedFY } = useSessionStore.getState();
   return await safeApiGet([
     "/sales/invoices/",
-    "/api/sales/invoices/",
+    "/sales/sales-invoices/",
   ], { organisation: currentOrgId, financial_year: selectedFY });
 };
 
@@ -487,7 +497,7 @@ export const getSaleInvoiceById = async (id) => {
   const { currentOrgId } = useSessionStore.getState();
   return await safeApiGet([
     `/sales/invoices/${id}/`,
-    `/api/sales/invoices/${id}/`,
+    `/sales/sales-invoices/${id}/`,
   ], { organisation: currentOrgId });
 };
 
@@ -503,7 +513,7 @@ export const updateSaleInvoice = async (id, payload) => {
     return res.data;
   } catch (err) {
     if (err.response?.status === 404) {
-      const res2 = await api.patch(`/api/sales/invoices/${id}/`, payload, config);
+      const res2 = await api.patch(`/sales/sales-invoices/${id}/`, payload, config);
       return res2.data;
     }
     throw err;
@@ -519,7 +529,7 @@ export const deleteSaleInvoice = async (id) => {
     return res.data;
   } catch (err) {
     if (err.response?.status === 404) {
-      const res2 = await api.delete(`/api/sales/invoices/${id}/`, {
+      const res2 = await api.delete(`/sales/sales-invoices/${id}/`, {
         params: { organisation: currentOrgId },
       });
       return res2.data;
@@ -545,7 +555,7 @@ export const downloadSaleInvoicePDF = async (invoiceId) => {
     link.remove();
   } catch (err) {
     if (err.response?.status === 404) {
-      const res2 = await api.get(`/api/sales/invoices/${invoiceId}/download-pdf/`, {
+      const res2 = await api.get(`/sales/sales-invoices/${invoiceId}/download-pdf/`, {
         params: { organisation: currentOrgId },
         responseType: "blob",
       });
@@ -572,7 +582,7 @@ export const fetchSaleInvoicePDF = async (invoiceId) => {
     return res.data;
   } catch (err) {
     if (err.response?.status === 404) {
-      const res2 = await api.get(`/api/sales/invoices/${invoiceId}/download-pdf/`, {
+      const res2 = await api.get(`/sales/sales-invoices/${invoiceId}/download-pdf/`, {
         params: { organisation: currentOrgId },
         responseType: "blob",
       });
@@ -666,6 +676,33 @@ export const getAllPassingWeight = async () => {
   });
 
   return res.data;
-}
+};
 
-getAllPassingWeight()
+// ---------------- STOCK STATUS & SUMMARY STOCK STATEMENT API SECTION ----------------
+export const getStockStatusSuppliers = async () => {
+  const { currentOrgId } = useSessionStore.getState();
+  return await safeApiGet([
+    "/sales/invoices/stock-status-suppliers/",
+    "/sales/sales-invoices/stock-status-suppliers/",
+    "/vendors/vendor-dropdown/",
+    "/vendors/vendors/",
+    "/vendors/company-groups/",
+  ], { organisation: currentOrgId });
+};
+
+export const getStockStatusReport = async (params = {}) => {
+  const { currentOrgId } = useSessionStore.getState();
+  return await safeApiGet([
+    "/sales/invoices/stock-status/",
+    "/sales/sales-invoices/stock-status/",
+  ], { organisation: currentOrgId, ...params });
+};
+
+export const getSummaryStockStatementReport = async (params = {}) => {
+  const { currentOrgId } = useSessionStore.getState();
+  return await safeApiGet([
+    "/sales/invoices/summary-stock-statement/",
+    "/sales/sales-invoices/summary-stock-statement/",
+  ], { organisation: currentOrgId, ...params });
+};
+
