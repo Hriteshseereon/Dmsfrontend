@@ -1,0 +1,110 @@
+
+name: DMS Admin Frontend Deployment
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'adminfrontend/**'
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dms-admin-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Prepare Build Directory
+        env:
+          HOST: ${{ secrets.VPS_HOST }}
+          USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh "$USER@$HOST" '
+            mkdir -p /root/new_build/DMS/adminfrontend
+            mkdir -p /root/backup/DMS/adminfrontend
+          '
+
+      - name: Backup Existing Admin
+        env:
+          HOST: ${{ secrets.VPS_HOST }}
+          USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh "$USER@$HOST" '
+            set -e
+            cd /root/frontend
+
+            tar --exclude=node_modules \
+              -czf /root/backup/DMS/adminfrontend/admin_$(date +%Y%m%d_%H%M%S).tar.gz \
+              adminfrontend
+          '
+
+      - name: Upload Admin Code
+        env:
+          HOST: ${{ secrets.VPS_HOST }}
+          USER: ${{ secrets.VPS_USER }}
+        run: |
+          rsync -az --delete \
+            --exclude=node_modules \
+            --exclude=dist \
+            --exclude=.env \
+            --exclude='.env.*' \
+            adminfrontend/ \
+            "$USER@$HOST:/root/new_build/DMS/adminfrontend/"
+
+      - name: Deploy Admin Frontend
+        env:
+          HOST: ${{ secrets.VPS_HOST }}
+          USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh "$USER@$HOST" 'bash -se' <<'EOF'
+            set -e
+
+            rsync -a --delete \
+              --exclude=node_modules \
+              --exclude=dist \
+              --exclude=.env \
+              --exclude='.env.*' \
+              /root/new_build/DMS/adminfrontend/ \
+              /root/frontend/adminfrontend/
+
+            cd /root/frontend
+
+            docker compose build dms_admin
+
+            docker compose up -d --no-deps dms_admin
+
+            docker compose ps dms_admin
+          EOF
+
+      - name: Docker Cleanup
+        if: success()
+        env:
+          HOST: ${{ secrets.VPS_HOST }}
+          USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh "$USER@$HOST" 'docker image prune -f'
