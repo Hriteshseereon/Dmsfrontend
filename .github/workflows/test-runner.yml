@@ -1,1 +1,17 @@
+name: Test GitHub Runner
 
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check Runner
+        run: |
+          echo "GitHub Actions working successfully"
+          hostname
+          whoami
+          pwd
+          docker --version
