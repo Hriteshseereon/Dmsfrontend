@@ -1,17 +1,31 @@
 name: Test GitHub Runner
 
 on:
+  push:
+    branches:
+      - main
+
   workflow_dispatch:
 
 jobs:
   test:
+    name: Test Runner Connection
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check Runner
+      - name: Test GitHub Actions
         run: |
-          echo "GitHub Actions working successfully"
+          echo "================================"
+          echo "GitHub Runner Working Successfully"
+          echo "================================"
+
+          echo "Hostname:"
           hostname
+
+          echo "Current User:"
           whoami
-          pwd
+
+          echo "Docker Version:"
           docker --version
+
+          echo "TEST SUCCESSFUL"
