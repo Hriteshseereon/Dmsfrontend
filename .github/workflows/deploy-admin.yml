@@ -1,4 +1,3 @@
-
 name: DMS Admin Frontend Deployment
 
 on:
@@ -22,14 +21,19 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
+      # STEP 1: Checkout Repository
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # STEP 2: Configure SSH
       - name: Configure SSH
         env:
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
         run: |
+          set -e
+
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
@@ -39,16 +43,20 @@ jobs:
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
+      # STEP 3: Prepare Build Directory
       - name: Prepare Build Directory
         env:
           HOST: ${{ secrets.VPS_HOST }}
           USER: ${{ secrets.VPS_USER }}
         run: |
           ssh "$USER@$HOST" '
+            set -e
+
             mkdir -p /root/new_build/DMS/adminfrontend
             mkdir -p /root/backup/DMS/adminfrontend
           '
 
+      # STEP 4: Backup Existing Admin Frontend
       - name: Backup Existing Admin
         env:
           HOST: ${{ secrets.VPS_HOST }}
@@ -56,26 +64,33 @@ jobs:
         run: |
           ssh "$USER@$HOST" '
             set -e
+
             cd /root/frontend
 
             tar --exclude=node_modules \
               -czf /root/backup/DMS/adminfrontend/admin_$(date +%Y%m%d_%H%M%S).tar.gz \
               adminfrontend
+
+            echo "Admin frontend backup completed"
           '
 
+      # STEP 5: Upload Admin Code to VPS
       - name: Upload Admin Code
         env:
           HOST: ${{ secrets.VPS_HOST }}
           USER: ${{ secrets.VPS_USER }}
         run: |
-          rsync -az --delete \
+          rsync -az \
             --exclude=node_modules \
             --exclude=dist \
             --exclude=.env \
             --exclude='.env.*' \
+            --exclude='Dockerfile' \
+            --exclude='nginx.conf' \
             adminfrontend/ \
             "$USER@$HOST:/root/new_build/DMS/adminfrontend/"
 
+      # STEP 6: Deploy Admin Frontend
       - name: Deploy Admin Frontend
         env:
           HOST: ${{ secrets.VPS_HOST }}
@@ -84,27 +99,67 @@ jobs:
           ssh "$USER@$HOST" 'bash -se' <<'EOF'
             set -e
 
-            rsync -a --delete \
+            echo "=================================="
+            echo "Starting Admin Frontend Deployment"
+            echo "=================================="
+
+            # Copy new code without deleting existing production files
+            rsync -av \
               --exclude=node_modules \
               --exclude=dist \
               --exclude=.env \
               --exclude='.env.*' \
+              --exclude='Dockerfile' \
+              --exclude='nginx.conf' \
               /root/new_build/DMS/adminfrontend/ \
               /root/frontend/adminfrontend/
 
             cd /root/frontend
 
+            echo "Checking Docker Compose Configuration"
+            docker compose config --quiet
+
+            echo "Checking Admin Dockerfile"
+
+            # Show resolved Docker build configuration
+            docker compose config --format json | python3 -c '
+          import json, sys, os
+          config = json.load(sys.stdin)
+          build = config["services"]["dms_admin"].get("build")
+          if not build:
+              sys.exit("ERROR: dms_admin has no build configuration")
+          if isinstance(build, str):
+              context, dockerfile = build, "Dockerfile"
+          else:
+              context = build.get("context", ".")
+              dockerfile = build.get("dockerfile", "Dockerfile")
+          path = dockerfile if os.path.isabs(dockerfile) else os.path.join(context, dockerfile)
+          print("Expected Dockerfile:", path)
+          if not os.path.isfile(path):
+              sys.exit("ERROR: Dockerfile missing. Restore it before deploying.")
+          '
+
+            echo "Building Admin Docker Image"
             docker compose build dms_admin
 
+            echo "Starting Admin Container"
             docker compose up -d --no-deps dms_admin
 
+            echo "Checking Admin Container Status"
             docker compose ps dms_admin
+
+            echo "=================================="
+            echo "Admin Deployment Completed"
+            echo "=================================="
           EOF
 
+      # STEP 7: Docker Cleanup
       - name: Docker Cleanup
         if: success()
         env:
           HOST: ${{ secrets.VPS_HOST }}
           USER: ${{ secrets.VPS_USER }}
         run: |
-          ssh "$USER@$HOST" 'docker image prune -f'
+          ssh "$USER@$HOST" '
+            docker image prune -f
+          '
