@@ -3,7 +3,7 @@ name: DMS Admin Frontend Deployment
 on:
   push:
     branches:
-      - main
+      - server-deployment
     paths:
       - 'adminfrontend/**'
 
