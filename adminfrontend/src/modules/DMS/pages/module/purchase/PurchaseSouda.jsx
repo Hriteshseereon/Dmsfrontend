@@ -151,6 +151,12 @@ export default function PurchaseSouda() {
     setData(filtered);
   };
 
+  const extractTrailingNumber = (str) => {
+    if (!str) return 0;
+    const match = String(str).match(/(\d+)(?!.*\d)/);
+    return match ? parseInt(match[1], 10) : 0;
+  };
+
   const fetchPurchaseContracts = async () => {
     try {
       setLoading(true);
@@ -175,7 +181,15 @@ export default function PurchaseSouda() {
         status: item.status,
       }));
 
-      setData(formattedData.reverse());
+      // Sort descending by souda_number (e.g. SDA_002 on top, SDA_001 on bottom)
+      formattedData.sort((a, b) => {
+        const numA = extractTrailingNumber(a.souda_number);
+        const numB = extractTrailingNumber(b.souda_number);
+        if (numA !== numB) return numB - numA;
+        return String(b.souda_number || "").localeCompare(String(a.souda_number || ""));
+      });
+
+      setData(formattedData);
     } catch (error) {
       console.error("Failed to fetch purchase contracts", error);
     } finally {
@@ -463,8 +477,13 @@ export default function PurchaseSouda() {
     {
       title: <span className="text-amber-700 font-semibold">Serial No</span>,
       dataIndex: "souda_number",
-
       width: 60,
+      sorter: (a, b) => {
+        const numA = extractTrailingNumber(a.souda_number);
+        const numB = extractTrailingNumber(b.souda_number);
+        return numA - numB;
+      },
+      defaultSortOrder: "descend",
       render: (t) => <span className="text-amber-800">{t || "-"}</span>,
     },
 
