@@ -51,40 +51,51 @@ const ReportAnaytics = () => {
 
       <Tabs
         className="report-tabs"
-  defaultActiveKey="reports"
-        items={[{
-  key: "reports",
-  label: (
-    <span className="flex items-center gap-2">
-      <FaChartBar /> Reports Overview
-    </span>
-  ),
-  children: <ReportsOverview />
-}
-,
-        //    { key: "all", label: (<span className="flex items-center gap-2"><FaListAlt /> All Records</span>), children: <AllRecords />,  },
-            { key: "pc", label: (<span className="flex items-center gap-2"><FaFileContract /> Purchase Contract</span>), children: <PurchaseContract />,  },
-            { key: "pi", label: (<span className="flex items-center gap-2"><FaShoppingCart /> Purchase Order</span>), children: <PurchaseOrder />,  },
-            { key: "pr", label: (<span className="flex items-center gap-2"><FaUndoAlt /> Purchase Return</span>), children: <PurchaseReturn />,  },
-            { key: "pinv", label: (<span className="flex items-center gap-2"><FaFileInvoice /> Purchase Invoice</span>), children: <PurchaseInvoice />, },
-            { key: "sc", label: (<span className="flex items-center gap-2"><FaFileContract /> Sale Contract</span>), children: <SaleContract />, },
-            { key: "si", label: (<span className="flex items-center gap-2"><FaShoppingCart /> Sale Order</span>), children: <SaleOrder />, },
-            { key: "sr", label: (<span className="flex items-center gap-2"><FaUndoAlt /> Sale Return</span>), children: <SaleReturn />, },
-            { key: "sinv", label: (<span className="flex items-center gap-2"><FaFileInvoice /> Sale Invoice</span>), children: <SaleInvoice />, },
-            { key: "la", label: (<span className="flex items-center gap-2"><FaTruck /> Loading Advice</span>), children: <LoadingAdvice />, },
-            { key: "ec", label: (<span className="flex items-center gap-2"><FaFileContract /> Purchase Expired Contract</span>), children: <PurchaseExpiredContract />, },
-            { key: "esc", label: (<span className="flex items-center gap-2"><FaFileContract /> Sale Expired Contract</span>), children: <SaleExpiredContract />, },
-            // { key: "dn", label: (<span className="flex items-center gap-2"><FaFileInvoice /> Debit Notes</span>), children: <DebitNotes/>, },
-            // { key: "cn", label: (<span className="flex items-center gap-2"><FaFileInvoice /> Credit Notes</span>), children: <CreditNotes />, },
-            // { key: "cr", label: (<span className="flex items-center gap-2"><FaFileContract /> Purchase Contract Renewal</span>), children: <PurchaseContractRenewal />, },
-            // { key: "scr", label: (<span className="flex items-center gap-2"><FaFileContract /> Sale Contract Renewal</span>), children: <SaleContractRenewal />, },
-            // { key: "ao", label: (<span className="flex items-center gap-2"><FaShoppingCart /> Approved Orders</span>), children: <ApprovedOrders />, },
-            // { key: "po", label: (<span className="flex items-center gap-2"><FaShoppingCart /> Pending Orders</span>), children: <PendingOrders />, },
-            // { key: "do", label: (<span className="flex items-center gap-2"><FaShoppingCart /> Delivered Orders</span>), children: <DeliveredOrder />, },
-            // { key: "ppc", label: (<span className="flex items-center gap-2"><FaFileContract /> Pending Purchase Contract</span>), children: <PendingPurchaseContract />, },
-            // { key: "psc", label: (<span className="flex items-center gap-2"><FaFileContract /> Pending Sale Contract</span>), children: <PendingSaleContract />, },
-             ]}
-        />
+        defaultActiveKey="purchase_invoice_pending"
+        items={[
+          {
+            key: "purchase_invoice_pending",
+            label: (
+              <span className="flex items-center gap-2">
+                <FaFileInvoice /> Purchase Invoice Pending
+              </span>
+            ),
+            children: <PurchaseInvoice />,
+          },
+          /*
+          {
+            key: "reports",
+            label: (
+              <span className="flex items-center gap-2">
+                <FaChartBar /> Reports Overview
+              </span>
+            ),
+            children: <ReportsOverview />,
+          },
+          // { key: "all", label: (<span className="flex items-center gap-2"><FaListAlt /> All Records</span>), children: <AllRecords />, },
+          { key: "pc", label: (<span className="flex items-center gap-2"><FaFileContract /> Purchase Contract</span>), children: <PurchaseContract />, },
+          { key: "pi", label: (<span className="flex items-center gap-2"><FaShoppingCart /> Purchase Order</span>), children: <PurchaseOrder />, },
+          { key: "pr", label: (<span className="flex items-center gap-2"><FaUndoAlt /> Purchase Return</span>), children: <PurchaseReturn />, },
+          { key: "pinv", label: (<span className="flex items-center gap-2"><FaFileInvoice /> Purchase Invoice</span>), children: <PurchaseInvoice />, },
+          { key: "sc", label: (<span className="flex items-center gap-2"><FaFileContract /> Sale Contract</span>), children: <SaleContract />, },
+          { key: "si", label: (<span className="flex items-center gap-2"><FaShoppingCart /> Sale Order</span>), children: <SaleOrder />, },
+          { key: "sr", label: (<span className="flex items-center gap-2"><FaUndoAlt /> Sale Return</span>), children: <SaleReturn />, },
+          { key: "sinv", label: (<span className="flex items-center gap-2"><FaFileInvoice /> Sale Invoice</span>), children: <SaleInvoice />, },
+          { key: "la", label: (<span className="flex items-center gap-2"><FaTruck /> Loading Advice</span>), children: <LoadingAdvice />, },
+          { key: "ec", label: (<span className="flex items-center gap-2"><FaFileContract /> Purchase Expired Contract</span>), children: <PurchaseExpiredContract />, },
+          { key: "esc", label: (<span className="flex items-center gap-2"><FaFileContract /> Sale Expired Contract</span>), children: <SaleExpiredContract />, },
+          // { key: "dn", label: (<span className="flex items-center gap-2"><FaFileInvoice /> Debit Notes</span>), children: <DebitNotes/>, },
+          // { key: "cn", label: (<span className="flex items-center gap-2"><FaFileInvoice /> Credit Notes</span>), children: <CreditNotes />, },
+          // { key: "cr", label: (<span className="flex items-center gap-2"><FaFileContract /> Purchase Contract Renewal</span>), children: <PurchaseContractRenewal />, },
+          // { key: "scr", label: (<span className="flex items-center gap-2"><FaFileContract /> Sale Contract Renewal</span>), children: <SaleContractRenewal />, },
+          // { key: "ao", label: (<span className="flex items-center gap-2"><FaShoppingCart /> Approved Orders</span>), children: <ApprovedOrders />, },
+          // { key: "po", label: (<span className="flex items-center gap-2"><FaShoppingCart /> Pending Orders</span>), children: <PendingOrders />, },
+          // { key: "do", label: (<span className="flex items-center gap-2"><FaShoppingCart /> Delivered Orders</span>), children: <DeliveredOrder />, },
+          // { key: "ppc", label: (<span className="flex items-center gap-2"><FaFileContract /> Pending Purchase Contract</span>), children: <PendingPurchaseContract />, },
+          // { key: "psc", label: (<span className="flex items-center gap-2"><FaFileContract /> Pending Sale Contract</span>), children: <PendingSaleContract />, },
+          */
+        ]}
+      />
 
     </div>
   )
