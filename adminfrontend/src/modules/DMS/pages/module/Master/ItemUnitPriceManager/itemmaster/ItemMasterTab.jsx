@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import {
   Table,
   Button,
@@ -95,6 +95,37 @@ export default function ItemMasterTab({ items, setItems }) {
     is_active: true,
   });
   const [search, setSearch] = useState("");
+  const [selectedGroupFilter, setSelectedGroupFilter] = useState("");
+  const [collapsedGroups, setCollapsedGroups] = useState({});
+
+  const toggleGroupCollapse = (groupName) => {
+    setCollapsedGroups((prev) => ({
+      ...prev,
+      [groupName]: !prev[groupName],
+    }));
+  };
+
+  const handleExpandAll = () => {
+    setCollapsedGroups({});
+  };
+
+  const uniqueGroupNames = useMemo(() => {
+    const set = new Set();
+    (items || []).forEach((item) => {
+      if (item.product_group_name) {
+        set.add(item.product_group_name);
+      }
+    });
+    return Array.from(set).sort();
+  }, [items]);
+
+  const handleCollapseAll = () => {
+    const allCollapsed = {};
+    uniqueGroupNames.forEach((name) => {
+      allCollapsed[name] = true;
+    });
+    setCollapsedGroups(allCollapsed);
+  };
 
   // Draft state
   // const [activeDraftId, setActiveDraftId] = useState(null);
@@ -375,48 +406,190 @@ export default function ItemMasterTab({ items, setItems }) {
     }
   };
 
-  /* ================= TABLE ================= */
-  const columns = [
-    { title: "Item Name", dataIndex: "name" },
-    { title: "Type", dataIndex: "product_type" },
-    { title: "Company", dataIndex: "company_group_name" },
-    { title: "Base Unit", dataIndex: "base_unit" },
-    { title: "Lower Unit", dataIndex: "lower_unit" },
-    { title: "Upper Unit", dataIndex: "upper_unit" },
+  /* ================= GROUPING & FILTERING ================= */
 
-    { title: "Net Weight", dataIndex: "net_weight" },
-    { title: "Gross Weight", dataIndex: "gross_weight" },
+  const filteredData = useMemo(() => {
+    let result = items || [];
+
+    if (selectedGroupFilter) {
+      result = result.filter(
+        (it) => it.product_group_name === selectedGroupFilter
+      );
+    }
+
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter((item) =>
+        Object.values(item).some((val) => {
+          if (!val) return false;
+          return JSON.stringify(val).toLowerCase().includes(q);
+        })
+      );
+    }
+
+    return result;
+  }, [items, selectedGroupFilter, search]);
+
+  const tableData = useMemo(() => {
+    const groupsMap = {};
+    (filteredData || []).forEach((item) => {
+      const groupName = item.product_group_name || "OTHER PRODUCTS";
+      if (!groupsMap[groupName]) {
+        groupsMap[groupName] = [];
+      }
+      groupsMap[groupName].push(item);
+    });
+
+    const rows = [];
+    let slCounter = 1;
+
+    Object.keys(groupsMap)
+      .sort()
+      .forEach((groupName) => {
+        const groupItems = groupsMap[groupName];
+        const isCollapsed = Boolean(collapsedGroups[groupName]);
+
+        // Group Header Row
+        rows.push({
+          isGroupHeader: true,
+          id: `group-header-${groupName}`,
+          groupName,
+          itemCount: groupItems.length,
+        });
+
+        // Items in this group
+        if (!isCollapsed) {
+          groupItems.forEach((item) => {
+            rows.push({
+              ...item,
+              isGroupHeader: false,
+              slNo: slCounter++,
+            });
+          });
+        }
+      });
+
+    return rows;
+  }, [filteredData, collapsedGroups]);
+
+  /* ================= TABLE COLUMNS WITH SL NO & GROUP HEADERS ================= */
+  const columns = [
     {
-      title: "Action",
+      title: <span className="font-semibold text-amber-800">SL No.</span>,
+      dataIndex: "slNo",
+      width: 75,
+      align: "center",
+      onCell: (record) => {
+        if (record.isGroupHeader) {
+          return {
+            colSpan: 10,
+            className: "!p-0 cursor-pointer select-none",
+            onClick: () => toggleGroupCollapse(record.groupName),
+          };
+        }
+        return { className: "text-center" };
+      },
+      render: (val, record) => {
+        if (record.isGroupHeader) {
+          const isCollapsed = collapsedGroups[record.groupName];
+          return (
+            <div className="bg-[#fff3d4] hover:bg-[#ffecc0] transition-colors py-2 px-3 flex items-center justify-between border-y-2 border-amber-300">
+              <div className="flex items-center gap-2.5">
+                <span className="text-amber-800 text-xs font-bold transition-transform inline-block">
+                  {isCollapsed ? "▶" : "▼"}
+                </span>
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block shadow-xs" />
+                <span className="text-xs uppercase text-amber-700 font-bold tracking-wider">
+                  Product Group:
+                </span>
+                <span className="uppercase text-amber-950 font-black text-sm tracking-wide">
+                  {record.groupName}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs bg-amber-200 text-amber-900 font-bold px-2.5 py-0.5 rounded-full border border-amber-300">
+                  {record.itemCount} {record.itemCount === 1 ? "Item" : "Items"}
+                </span>
+                <span className="text-[11px] text-amber-700 italic">
+                  {isCollapsed ? "(Click to expand)" : "(Click to collapse)"}
+                </span>
+              </div>
+            </div>
+          );
+        }
+        return <span className="font-semibold text-amber-800">{val}</span>;
+      },
+    },
+    {
+      title: <span className="font-semibold text-amber-800">Item Name</span>,
+      dataIndex: "name",
+      onCell: (record) => (record.isGroupHeader ? { colSpan: 0 } : {}),
+      render: (t) => <span className="font-medium text-amber-950">{t}</span>,
+    },
+    {
+      title: <span className="font-semibold text-amber-800">Type</span>,
+      dataIndex: "product_type",
+      onCell: (record) => (record.isGroupHeader ? { colSpan: 0 } : {}),
+    },
+    {
+      title: <span className="font-semibold text-amber-800">Company</span>,
+      dataIndex: "company_group_name",
+      onCell: (record) => (record.isGroupHeader ? { colSpan: 0 } : {}),
+    },
+    {
+      title: <span className="font-semibold text-amber-800">Base Unit</span>,
+      dataIndex: "base_unit",
+      onCell: (record) => (record.isGroupHeader ? { colSpan: 0 } : {}),
+    },
+    {
+      title: <span className="font-semibold text-amber-800">Lower Unit</span>,
+      dataIndex: "lower_unit",
+      onCell: (record) => (record.isGroupHeader ? { colSpan: 0 } : {}),
+    },
+    {
+      title: <span className="font-semibold text-amber-800">Upper Unit</span>,
+      dataIndex: "upper_unit",
+      onCell: (record) => (record.isGroupHeader ? { colSpan: 0 } : {}),
+    },
+    {
+      title: <span className="font-semibold text-amber-800">Net Weight</span>,
+      dataIndex: "net_weight",
+      onCell: (record) => (record.isGroupHeader ? { colSpan: 0 } : {}),
+    },
+    {
+      title: <span className="font-semibold text-amber-800">Gross Weight</span>,
+      dataIndex: "gross_weight",
+      onCell: (record) => (record.isGroupHeader ? { colSpan: 0 } : {}),
+    },
+    {
+      title: <span className="font-semibold text-amber-800">Action</span>,
+      width: 100,
+      align: "center",
+      onCell: (record) => (record.isGroupHeader ? { colSpan: 0 } : {}),
       render: (_, r) => (
         <Space>
-          <EyeOutlined
-            className="action-view"
-            onClick={() => openEdit(r, true)}
-          />
-          <EditOutlined className="action-edit" onClick={() => openEdit(r)} />
-          <DeleteOutlined
-            className="text-gray-500! cursor-pointer! text-base! hover:text-gray-700!"
-            onClick={() => handleDeleteProduct(r.id)}
-          />
+          <Tooltip title="View Item">
+            <EyeOutlined
+              className="action-view cursor-pointer text-amber-600 hover:text-amber-800"
+              onClick={() => openEdit(r, true)}
+            />
+          </Tooltip>
+          <Tooltip title="Edit Item">
+            <EditOutlined
+              className="action-edit cursor-pointer text-blue-600 hover:text-blue-800"
+              onClick={() => openEdit(r)}
+            />
+          </Tooltip>
+          <Tooltip title="Delete Item">
+            <DeleteOutlined
+              className="text-gray-500! cursor-pointer! text-base! hover:text-red-600!"
+              onClick={() => handleDeleteProduct(r.id)}
+            />
+          </Tooltip>
         </Space>
       ),
     },
   ];
-
-  const getFilteredData = () => {
-    if (!search) return items;
-
-    const value = search.toLowerCase();
-
-    return items.filter((item) => {
-      return Object.values(item).some((val) => {
-        if (!val) return false;
-        return JSON.stringify(val).toLowerCase().includes(value);
-      });
-    });
-  };
-  const filteredData = getFilteredData();
 
   // Draft Table Component
   // function ItemMasterDraftTable({ refreshKey, onContinue, onDelete }) {
@@ -603,26 +776,59 @@ export default function ItemMasterTab({ items, setItems }) {
         style={{
           display: "flex",
           justifyContent: "space-between",
-          marginBottom: 10,
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 10,
+          marginBottom: 12,
         }}
       >
-        {/* LEFT: SEARCH */}
-        <div style={{ display: "flex", gap: 8 }}>
+        {/* LEFT: SEARCH & PRODUCT GROUP FILTER */}
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
           <Input
             prefix={<SearchOutlined className="text-amber-500" />}
             placeholder="Search item..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             allowClear
-            style={{ width: 250 }}
+            style={{ width: 220 }}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           />
 
+          <Select
+            placeholder="All Product Groups"
+            value={selectedGroupFilter || undefined}
+            onChange={(val) => setSelectedGroupFilter(val || "")}
+            allowClear
+            style={{ width: 220 }}
+            className="border-amber-400! text-amber-700!"
+            options={[
+              { value: "", label: "All Product Groups" },
+              ...uniqueGroupNames.map((g) => ({ value: g, label: g })),
+            ]}
+          />
+
           <Button
-            onClick={() => setSearch("")}
+            onClick={() => {
+              setSearch("");
+              setSelectedGroupFilter("");
+            }}
             className="border-amber-400! text-amber-700! hover:bg-amber-100!"
           >
             Reset
+          </Button>
+
+          <Button
+            onClick={handleExpandAll}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
+            Expand All
+          </Button>
+
+          <Button
+            onClick={handleCollapseAll}
+            className="border-amber-400! text-amber-700! hover:bg-amber-100!"
+          >
+            Collapse All
           </Button>
         </div>
 
@@ -641,8 +847,6 @@ export default function ItemMasterTab({ items, setItems }) {
             });
             setEditingId(null);
             setViewMode(false);
-            // activeDraftIdRef.current = null; // ← reset ref for fresh session
-            // setActiveDraftId(null);
             setOpen(true);
           }}
         >
@@ -650,18 +854,13 @@ export default function ItemMasterTab({ items, setItems }) {
         </Button>
       </div>
 
-      {/* Draft Table */}
-      {/* <ItemMasterDraftTable
-        refreshKey={draftTableKey}
-        onContinue={handleContinueDraft}
-        onDelete={() => setDraftTableKey((k) => k + 1)}
-      /> */}
-
       <Table
         className="amber-table"
         rowKey="id"
         columns={columns}
-        dataSource={filteredData}
+        dataSource={tableData}
+        pagination={false}
+        scroll={{ x: 1000 }}
         style={{ marginTop: 16 }}
       />
 

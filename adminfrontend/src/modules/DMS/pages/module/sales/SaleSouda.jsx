@@ -403,6 +403,12 @@ export default function SalesSouda() {
       },
     };
   };
+  const extractContractNumber = (str) => {
+    if (!str) return 0;
+    const match = String(str).match(/(\d+)(?!.*\d)/);
+    return match ? parseInt(match[1], 10) : 0;
+  };
+
   const fetchSalesContracts = async () => {
     try {
       const res = await getSalescontractGroups(); // or whatever API fetches all contracts
@@ -439,6 +445,14 @@ export default function SalesSouda() {
         igst: contract.igst,
         tcs_amount: contract.tcs_amount,
       }));
+
+      // Sort descending by contract number's trailing digits (e.g. 002 on top, 001 on bottom)
+      mappedData.sort((a, b) => {
+        const numA = extractContractNumber(a.saleContractNumber);
+        const numB = extractContractNumber(b.saleContractNumber);
+        if (numA !== numB) return numB - numA;
+        return String(b.saleContractNumber || "").localeCompare(String(a.saleContractNumber || ""));
+      });
 
       setData(mappedData);
     } catch (err) {
@@ -892,6 +906,12 @@ export default function SalesSouda() {
       title: <span className="text-amber-700 font-semibold">Contract No</span>,
       dataIndex: "saleContractNumber",
       width: 80,
+      sorter: (a, b) => {
+        const numA = extractContractNumber(a.saleContractNumber);
+        const numB = extractContractNumber(b.saleContractNumber);
+        return numA - numB;
+      },
+      defaultSortOrder: "descend",
       render: (text) => <span> {text || "-"}</span>,
     },
 
