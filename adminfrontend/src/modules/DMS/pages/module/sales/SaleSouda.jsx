@@ -418,6 +418,7 @@ export default function SalesSouda() {
       const mappedData = (res || []).map((contract) => ({
         key: contract.sale_contract_id,
         saleContractNumber: contract.sale_contract_number,
+        customerId: contract.customer_business_id || contract.customer_id,
         customer: contract.customer_business_name,
         customerEmail: contract.customer_email, // Map email
         customerMobile: contract.customer_mobile, // Map mobile
@@ -1129,6 +1130,92 @@ export default function SalesSouda() {
     },
   ];
 
+  // Helper to find previous contract rate for an item
+  const findPreviousContractRate = (
+    productId,
+    customerId = null,
+    currentContractId = null,
+  ) => {
+    if (!productId || !data || data.length === 0) return null;
+
+    const extractItemId = (it) => {
+      if (!it) return null;
+      return (
+        it.product?.product_id ||
+        it.product_id ||
+        (typeof it.product === "object" ? it.product?.id : it.product) ||
+        it.item
+      );
+    };
+
+    const extractItemRate = (it) => {
+      if (!it) return 0;
+      return Number(it.contract_rate ?? it.contractRate ?? it.rate ?? 0);
+    };
+
+    // 1. Try to find the latest previous contract for the same customer
+    if (customerId) {
+      for (const contract of data) {
+        if (
+          currentContractId &&
+          (contract.key === currentContractId ||
+            contract.saleContractNumber === currentContractId)
+        ) {
+          continue;
+        }
+        const isCustMatch =
+          contract.customerId === customerId ||
+          String(contract.customerId) === String(customerId);
+
+        if (isCustMatch && Array.isArray(contract.items)) {
+          const matchedItem = contract.items.find(
+            (it) =>
+              String(extractItemId(it)) === String(productId) &&
+              extractItemRate(it) > 0,
+          );
+          if (matchedItem) {
+            return {
+              rate: extractItemRate(matchedItem),
+              contractNumber: contract.saleContractNumber || "Previous",
+              date: contract.contractDate,
+              customerName: contract.customer,
+              isSameCustomer: true,
+            };
+          }
+        }
+      }
+    }
+
+    // 2. Fallback: Find the latest contract overall with this product
+    for (const contract of data) {
+      if (
+        currentContractId &&
+        (contract.key === currentContractId ||
+          contract.saleContractNumber === currentContractId)
+      ) {
+        continue;
+      }
+      if (Array.isArray(contract.items)) {
+        const matchedItem = contract.items.find(
+          (it) =>
+            String(extractItemId(it)) === String(productId) &&
+            extractItemRate(it) > 0,
+        );
+        if (matchedItem) {
+          return {
+            rate: extractItemRate(matchedItem),
+            contractNumber: contract.saleContractNumber || "Previous",
+            date: contract.contractDate,
+            customerName: contract.customer,
+            isSameCustomer: false,
+          };
+        }
+      }
+    }
+
+    return null;
+  };
+
   // ItemsTable (Form.List) — moved company selection into each item row
   const ItemsTable = ({
     form,
@@ -1277,6 +1364,35 @@ export default function SalesSouda() {
             }
           }, 100);
         }, 50);
+      }
+    };
+
+    const notifyRateDiff = (fieldName) => {
+      const items = form.getFieldValue("items") || [];
+      const it = items[fieldName];
+      if (!it || !it.item || it.contractRate === undefined || it.contractRate === null) return;
+      const currentRate = Number(it.contractRate || 0);
+      if (currentRate <= 0) return;
+
+      const customerId = form.getFieldValue("customerId");
+      const contractId = form.getFieldValue("key");
+      const prevInfo = findPreviousContractRate(it.item, customerId, contractId);
+      if (!prevInfo || !prevInfo.rate) return;
+
+      const prevRate = prevInfo.rate;
+      const diff = currentRate - prevRate;
+      const diffPercent = (diff / prevRate) * 100;
+      const absDiff = Math.abs(diffPercent);
+
+      if (absDiff > 0.5) {
+        const prod = productList.find((p) => p.product_id === it.item);
+        const prodName = prod?.product_name || "Item";
+        const direction = diffPercent > 0 ? "higher" : "lower";
+        message.warning({
+          content: `${prodName}: Rate ₹${currentRate.toFixed(2)} is ${absDiff.toFixed(2)}% ${direction} than previous contract (${prevInfo.contractNumber}: ₹${prevRate.toFixed(2)})`,
+          duration: 4,
+          key: `rate-diff-${fieldName}`,
+        });
       }
     };
 
@@ -1464,11 +1580,71 @@ export default function SalesSouda() {
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === "Tab") {
                           e.preventDefault();
+                          notifyRateDiff(field.name);
                           handleAutoAddRow(add);
                         }
                       }}
-                      onBlur={() => handleAutoAddRow(add)}
+                      onBlur={() => {
+                        notifyRateDiff(field.name);
+                        handleAutoAddRow(add);
+                      }}
                     />
+                  </Form.Item>
+                  <Form.Item
+                    noStyle
+                    shouldUpdate={(prev, curr) => {
+                      const prevItem = prev?.items?.[field.name];
+                      const currItem = curr?.items?.[field.name];
+                      return (
+                        prevItem?.item !== currItem?.item ||
+                        prevItem?.contractRate !== currItem?.contractRate ||
+                        prev?.customerId !== curr?.customerId
+                      );
+                    }}
+                  >
+                    {({ getFieldValue }) => {
+                      const itemObj = getFieldValue(["items", field.name]);
+                      const currentRate = Number(itemObj?.contractRate || 0);
+                      const productId = itemObj?.item;
+                      const customerId = getFieldValue("customerId");
+                      const contractId = getFieldValue("key");
+
+                      if (!productId || currentRate <= 0) return null;
+
+                      const prevInfo = findPreviousContractRate(
+                        productId,
+                        customerId,
+                        contractId,
+                      );
+                      if (!prevInfo || !prevInfo.rate) return null;
+
+                      const prevRate = prevInfo.rate;
+                      const diff = currentRate - prevRate;
+                      const diffPercent = (diff / prevRate) * 100;
+                      const absDiffPercent = Math.abs(diffPercent);
+
+                      if (absDiffPercent <= 0.5) return null;
+
+                      const isHigher = diffPercent > 0;
+                      const sign = isHigher ? "+" : "";
+                      const formattedDiff = `${sign}${diffPercent.toFixed(2)}%`;
+                      const tooltipText = `Previous Contract (${prevInfo.contractNumber}): ₹${prevRate.toFixed(2)}${prevInfo.customerName ? ` • ${prevInfo.customerName}` : ""} | Diff: ${formattedDiff}`;
+
+                      return (
+                        <Tooltip title={tooltipText} placement="bottom">
+                          <div
+                            className={`text-[10px] leading-tight font-semibold mt-0.5 cursor-pointer flex items-center gap-0.5 ${
+                              isHigher ? "text-amber-700" : "text-orange-600"
+                            }`}
+                          >
+                            <span>⚠️ {formattedDiff}</span>
+                            <span className="text-[9px] opacity-75 font-normal">
+                              (Prev: ₹{prevRate})
+                            </span>
+                          </div>
+                        </Tooltip>
+                      );
+                    }}
                   </Form.Item>
                 </Col>
 
@@ -1616,6 +1792,10 @@ export default function SalesSouda() {
       const row = {
         key: contract.sale_contract_id,
         saleContractNumber: contract.sale_contract_number,
+        customerId:
+          contract.customer_business_id ||
+          contract.customer_id ||
+          values.customerId,
         customer: contract.customer_business_name,
         customerEmail: contract.customer_email,
         customerMobile: contract.customer_mobile,
