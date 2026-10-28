@@ -60,6 +60,71 @@ import AppDatePicker from "../../../../../components/AppDatePicker";
 
 const { Option } = Select;
 
+const extractBackendErrorMessage = (
+  error,
+  defaultMessage = "Failed to create Purchase Contract",
+) => {
+  const errorData = error?.response?.data;
+  if (!errorData) return error?.message || defaultMessage;
+
+  if (typeof errorData === "string") {
+    if (errorData.includes("<html") || errorData.includes("<!DOCTYPE")) {
+      return defaultMessage;
+    }
+    return errorData;
+  }
+
+  if (typeof errorData === "object") {
+    if (typeof errorData.message === "string" && errorData.message.trim()) {
+      return errorData.message;
+    }
+    if (typeof errorData.error === "string" && errorData.error.trim()) {
+      return errorData.error;
+    }
+    if (typeof errorData.detail === "string" && errorData.detail.trim()) {
+      return errorData.detail;
+    }
+
+    const priorityFields = [
+      "created_date",
+      "contract_date",
+      "souda_date",
+      "from_date",
+      "to_date",
+      "date",
+      "non_field_errors",
+    ];
+
+    for (const key of priorityFields) {
+      if (errorData[key]) {
+        const val = errorData[key];
+        if (Array.isArray(val)) {
+          return val
+            .map((v) => (typeof v === "object" ? JSON.stringify(v) : String(v)))
+            .join(", ");
+        }
+        if (typeof val === "string") return val;
+      }
+    }
+
+    const keys = Object.keys(errorData);
+    if (keys.length > 0) {
+      const firstVal = errorData[keys[0]];
+      if (Array.isArray(firstVal)) {
+        return firstVal
+          .map((v) => (typeof v === "object" ? JSON.stringify(v) : String(v)))
+          .join(", ");
+      }
+      if (typeof firstVal === "string") return firstVal;
+      if (typeof firstVal === "object" && firstVal !== null) {
+        return JSON.stringify(firstVal);
+      }
+    }
+  }
+
+  return defaultMessage;
+};
+
 export default function PurchaseSouda() {
   // forms
   const [addForm] = Form.useForm();
@@ -345,20 +410,28 @@ export default function PurchaseSouda() {
       alert("Purchase Contract updated successfully");
     } catch (error) {
       console.error("Update failed:", error);
-      alert(
-        error?.response?.data?.message || "Failed to update Purchase Contract",
+      console.error("Backend error response:", error?.response?.data);
+      const errorMessage = extractBackendErrorMessage(
+        error,
+        "Failed to update Purchase Contract",
       );
+      message.error(errorMessage);
+      alert(errorMessage);
     }
   };
-  // handle delete
   const handleDelete = async (record) => {
     try {
       await deletePurchaseContract(record.key);
       message.success("Purchase Contract deleted successfully");
       await fetchPurchaseContracts();
-    } catch {
-      message.error("Failed to delete purchase contract");
-      alert(`Purchase Contract is linked with other model Status: ${status}`);
+    } catch (error) {
+      console.error("Delete failed:", error);
+      const errorMessage = extractBackendErrorMessage(
+        error,
+        "Failed to delete purchase contract",
+      );
+      message.error(errorMessage);
+      alert(errorMessage);
     }
   };
   const handleViewClick = async (record) => {
@@ -454,17 +527,27 @@ export default function PurchaseSouda() {
     setIsExtendModalOpen(true);
   };
   const handleExtendSubmit = async (values) => {
-    await updatePurchaseContract(selectedContract.key, {
-      extended_upto: dayjs(values.extended_upto).format("YYYY-MM-DD"),
+    try {
+      await updatePurchaseContract(selectedContract.key, {
+        extended_upto: dayjs(values.extended_upto).format("YYYY-MM-DD"),
 
-      status: "Approved",
-    });
+        status: "Approved",
+      });
 
-    message.success("Extended");
+      message.success("Extended");
 
-    setIsExtendModalOpen(false);
+      setIsExtendModalOpen(false);
 
-    fetchPurchaseContracts();
+      fetchPurchaseContracts();
+    } catch (error) {
+      console.error("Extend failed:", error);
+      const errorMessage = extractBackendErrorMessage(
+        error,
+        "Failed to extend Purchase Contract",
+      );
+      message.error(errorMessage);
+      alert(errorMessage);
+    }
   };
   // ---------- Table columns ----------
   const columns = [
@@ -865,9 +948,13 @@ export default function PurchaseSouda() {
       alert("Purchase Contract created successfully");
     } catch (error) {
       console.error("Failed to create purchase contract", error);
-      alert(
-        error?.response?.data?.message || "Failed to create Purchase Contract",
+      console.error("Backend error response:", error?.response?.data);
+      const errorMessage = extractBackendErrorMessage(
+        error,
+        "Failed to create Purchase Contract",
       );
+      message.error(errorMessage);
+      alert(errorMessage);
     }
   };
 
