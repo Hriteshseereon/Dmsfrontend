@@ -1135,6 +1135,7 @@ export default function SalesSouda() {
     productId,
     currentContractId = null,
     productList = [],
+    currentContractNumber = null,
   ) => {
     if (!productId || !data || data.length === 0) return null;
 
@@ -1191,18 +1192,46 @@ export default function SalesSouda() {
       );
     });
 
-    for (const contract of sortedContracts) {
-      // Exclude the contract currently being edited
-      if (
-        currentContractId &&
-        (contract.key === currentContractId ||
-          contract.saleContractNumber === currentContractId ||
-          String(contract.key) === String(currentContractId) ||
-          String(contract.saleContractNumber) === String(currentContractId))
-      ) {
-        continue;
-      }
+    // If an existing contract is being edited, only consider contracts that were created
+    // BEFORE it (older contracts). Never check contracts created after it (reverse from latest).
+    let candidateContracts = sortedContracts;
 
+    if (currentContractId || currentContractNumber) {
+      const currentContractIndex = sortedContracts.findIndex((c) => {
+        const idMatches =
+          currentContractId &&
+          (c.key === currentContractId ||
+            c.saleContractNumber === currentContractId ||
+            String(c.key) === String(currentContractId) ||
+            String(c.saleContractNumber) === String(currentContractId));
+        const numMatches =
+          currentContractNumber &&
+          (c.saleContractNumber === currentContractNumber ||
+            String(c.saleContractNumber) === String(currentContractNumber) ||
+            c.key === currentContractNumber ||
+            String(c.key) === String(currentContractNumber));
+        return idMatches || numMatches;
+      });
+
+      if (currentContractIndex !== -1) {
+        // Since sortedContracts is descending (newest to oldest),
+        // all contracts after currentContractIndex were created BEFORE the current contract.
+        candidateContracts = sortedContracts.slice(currentContractIndex + 1);
+      } else {
+        // Fallback: If not found by index in data, filter strictly by contract number
+        const targetNum = extractContractNumber(
+          currentContractNumber || currentContractId,
+        );
+        if (targetNum > 0) {
+          candidateContracts = sortedContracts.filter((c) => {
+            const cNum = extractContractNumber(c.saleContractNumber);
+            return cNum > 0 && cNum < targetNum;
+          });
+        }
+      }
+    }
+
+    for (const contract of candidateContracts) {
       if (Array.isArray(contract.items)) {
         const matchedItem = contract.items.find((it) => {
           const itemId = extractItemId(it);
@@ -1393,11 +1422,15 @@ export default function SalesSouda() {
       const currentRate = Number(it.contractRate || 0);
       if (currentRate <= 0) return;
 
-      const contractId = form.getFieldValue("key");
+      const contractId = form.getFieldValue("key") || selectedRecord?.key;
+      const contractNumber =
+        form.getFieldValue("saleContractNumber") ||
+        selectedRecord?.saleContractNumber;
       const prevInfo = findPreviousContractRate(
         it.item,
         contractId,
         productList,
+        contractNumber,
       );
       if (!prevInfo || !prevInfo.rate) return;
 
@@ -1629,7 +1662,11 @@ export default function SalesSouda() {
                       const itemObj = getFieldValue(["items", field.name]);
                       const currentRate = Number(itemObj?.contractRate || 0);
                       const productId = itemObj?.item;
-                      const contractId = getFieldValue("key");
+                      const contractId =
+                        getFieldValue("key") || selectedRecord?.key;
+                      const contractNumber =
+                        getFieldValue("saleContractNumber") ||
+                        selectedRecord?.saleContractNumber;
 
                       if (!productId || currentRate <= 0) return null;
 
@@ -1637,6 +1674,7 @@ export default function SalesSouda() {
                         productId,
                         contractId,
                         productList,
+                        contractNumber,
                       );
                       if (!prevInfo || !prevInfo.rate) return null;
 
