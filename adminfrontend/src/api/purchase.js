@@ -289,9 +289,21 @@ export const getPurchaseInvoiceById = async (invoiceId) => {
 
 //Assign dropdown
 export const getAllTransport = async () => {
-  const res = await api.get("transport/dropdown/transporters/");
-  return res.data;
-}
+  const { currentOrgId } = useSessionStore.getState();
+  try {
+    const res = await api.get("/transport/transporters/", {
+      params: currentOrgId ? { organisation: currentOrgId } : {},
+    });
+    return res.data;
+  } catch (err) {
+    try {
+      const fallbackRes = await api.get("/transport/dropdown/transporters/");
+      return fallbackRes.data;
+    } catch {
+      return [];
+    }
+  }
+};
 
 //Assign to transport
 export const addAssignment= async (payload) => {
@@ -559,7 +571,7 @@ export const getPurchaseInvoices = async (filters = {}) => {
 };
 
 export const createPurchaseInvoice = async (payload) => {
-  const { currentOrgId } = useSessionStore.getState();
+  const { currentOrgId, selectedFY } = useSessionStore.getState();
   
   const hasFile =
     payload.invoice_copy instanceof File ||
@@ -578,16 +590,26 @@ export const createPurchaseInvoice = async (payload) => {
       } else if (key === "invoice_copy") {
         const fileObj = payload[key].originFileObj || payload[key];
         formData.append(key, fileObj);
-      } else {
+      } else if (payload[key] !== null && payload[key] !== undefined) {
         formData.append(key, payload[key]);
       }
     });
     dataToPost = formData;
     headers["Content-Type"] = "multipart/form-data";
   }
+
+  const params = {};
+  if (currentOrgId) params.organisation = currentOrgId;
+  if (selectedFY) params.financial_year = selectedFY;
+
+  console.log("createPurchaseInvoice dispatching POST /purchase/invoices/ with:", {
+    dataToPost,
+    params,
+    headers,
+  });
   
   const res = await api.post("/purchase/invoices/", dataToPost, {
-    params: { organisation: currentOrgId },
+    params,
     headers,
   });
   return res.data;
