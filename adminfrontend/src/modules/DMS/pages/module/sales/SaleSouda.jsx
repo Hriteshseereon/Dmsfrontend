@@ -820,6 +820,9 @@ export default function SalesSouda() {
       const contract = await getSalesContractById(record.key);
 
       const mapped = mapContractToForm(contract);
+      if (!mapped.saleContractNumber && record?.saleContractNumber) {
+        mapped.saleContractNumber = record.saleContractNumber;
+      }
 
       // Load products for selected plant
       if (contract.plant_id) {
@@ -1135,6 +1138,7 @@ export default function SalesSouda() {
     productId,
     currentContractId = null,
     productList = [],
+    currentContractNumber = null,
   ) => {
     if (!productId || !data || data.length === 0) return null;
 
@@ -1191,18 +1195,46 @@ export default function SalesSouda() {
       );
     });
 
-    for (const contract of sortedContracts) {
-      // Exclude the contract currently being edited
-      if (
-        currentContractId &&
-        (contract.key === currentContractId ||
-          contract.saleContractNumber === currentContractId ||
-          String(contract.key) === String(currentContractId) ||
-          String(contract.saleContractNumber) === String(currentContractId))
-      ) {
-        continue;
-      }
+    // If an existing contract is being edited, only consider contracts that were created
+    // BEFORE it (older contracts). Never check contracts created after it (reverse from latest).
+    let candidateContracts = sortedContracts;
 
+    if (currentContractId || currentContractNumber) {
+      const currentContractIndex = sortedContracts.findIndex((c) => {
+        const idMatches =
+          currentContractId &&
+          (c.key === currentContractId ||
+            c.saleContractNumber === currentContractId ||
+            String(c.key) === String(currentContractId) ||
+            String(c.saleContractNumber) === String(currentContractId));
+        const numMatches =
+          currentContractNumber &&
+          (c.saleContractNumber === currentContractNumber ||
+            String(c.saleContractNumber) === String(currentContractNumber) ||
+            c.key === currentContractNumber ||
+            String(c.key) === String(currentContractNumber));
+        return idMatches || numMatches;
+      });
+
+      if (currentContractIndex !== -1) {
+        // Since sortedContracts is descending (newest to oldest),
+        // all contracts after currentContractIndex were created BEFORE the current contract.
+        candidateContracts = sortedContracts.slice(currentContractIndex + 1);
+      } else {
+        // Fallback: If not found by index in data, filter strictly by contract number
+        const targetNum = extractContractNumber(
+          currentContractNumber || currentContractId,
+        );
+        if (targetNum > 0) {
+          candidateContracts = sortedContracts.filter((c) => {
+            const cNum = extractContractNumber(c.saleContractNumber);
+            return cNum > 0 && cNum < targetNum;
+          });
+        }
+      }
+    }
+
+    for (const contract of candidateContracts) {
       if (Array.isArray(contract.items)) {
         const matchedItem = contract.items.find((it) => {
           const itemId = extractItemId(it);
@@ -1393,11 +1425,15 @@ export default function SalesSouda() {
       const currentRate = Number(it.contractRate || 0);
       if (currentRate <= 0) return;
 
-      const contractId = form.getFieldValue("key");
+      const contractId = form.getFieldValue("key") || selectedRecord?.key;
+      const contractNumber =
+        form.getFieldValue("saleContractNumber") ||
+        selectedRecord?.saleContractNumber;
       const prevInfo = findPreviousContractRate(
         it.item,
         contractId,
         productList,
+        contractNumber,
       );
       if (!prevInfo || !prevInfo.rate) return;
 
@@ -1629,7 +1665,11 @@ export default function SalesSouda() {
                       const itemObj = getFieldValue(["items", field.name]);
                       const currentRate = Number(itemObj?.contractRate || 0);
                       const productId = itemObj?.item;
-                      const contractId = getFieldValue("key");
+                      const contractId =
+                        getFieldValue("key") || selectedRecord?.key;
+                      const contractNumber =
+                        getFieldValue("saleContractNumber") ||
+                        selectedRecord?.saleContractNumber;
 
                       if (!productId || currentRate <= 0) return null;
 
@@ -1637,6 +1677,7 @@ export default function SalesSouda() {
                         productId,
                         contractId,
                         productList,
+                        contractNumber,
                       );
                       if (!prevInfo || !prevInfo.rate) return null;
 
@@ -1925,6 +1966,36 @@ export default function SalesSouda() {
         (c) => c.customer_id === values.customerId,
       );
 
+      // Resolve broker details
+      const rawBroker = values.brokerId;
+      let resolvedBrokerId = null;
+      let resolvedBrokerName = null;
+
+      if (rawBroker && typeof rawBroker === "object") {
+        resolvedBrokerId =
+          rawBroker.value === "direct" ? null : rawBroker.value;
+        resolvedBrokerName =
+          rawBroker.label === "Direct" ? null : rawBroker.label;
+      } else if (typeof rawBroker === "string") {
+        resolvedBrokerId = rawBroker === "direct" ? null : rawBroker;
+      }
+
+      if (resolvedBrokerId) {
+        const found = brokers.find(
+          (b) => String(b.id) === String(resolvedBrokerId),
+        );
+        resolvedBrokerName =
+          found?.name ||
+          (typeof values.brokerName === "object"
+            ? values.brokerName?.label
+            : values.brokerName) ||
+          resolvedBrokerName ||
+          null;
+      } else {
+        resolvedBrokerId = null;
+        resolvedBrokerName = null;
+      }
+
       const payload = {
         customer_id: values.customerId || selectedRecord.customerId, // Use newly selected customer ID from form values
         customer_email:
@@ -1947,14 +2018,9 @@ export default function SalesSouda() {
           null, // ✅
         plant_id: values.plantId || null, // ✅
 
-        broker_id:
-          values.brokerId?.value === "direct"
-            ? null
-            : values.brokerId?.value || null,
-        broker_name:
-          values.brokerId?.value === "direct"
-            ? null
-            : values.brokerId?.label || null,
+        broker_id: resolvedBrokerId,
+        broker: resolvedBrokerId,
+        broker_name: resolvedBrokerName,
         contrat_gross_weight:
           values.contratGrossWeight === "loose"
             ? null
@@ -1994,49 +2060,13 @@ export default function SalesSouda() {
 
       const res = await updateSalesContract(selectedRecord.key, payload);
 
-      // Update local state
-      setData((prev) =>
-        prev.map((d) =>
-          d.key === selectedRecord.key
-            ? {
-                ...d,
-                ...mapApiRecordToForm(res || {}), // reuse mapper if possible or manually map
-                key: d.key,
-                // Manually update core fields if mapper return structure differs slightly for table
-                saleContractNumber:
-                  res.sale_contract_number || d.saleContractNumber,
-                customer:
-                  res.customer_business_name ||
-                  res.customer_name ||
-                  selectedCustomer?.business_name ||
-                  d.customer,
-                customerEmail:
-                  res.customer_email ||
-                  selectedCustomer?.email_address ||
-                  selectedCustomer?.email ||
-                  d.customerEmail,
-                customerMobile:
-                  res.customer_mobile ||
-                  selectedCustomer?.mobile_number ||
-                  selectedCustomer?.phone_number ||
-                  d.customerMobile,
-                location: res.location || d.location, // 👈 add karo
-                brokerName: res.broker_name || d.brokerName || "Direct",
-                startDate: res.from_date || d.startDate,
-                endDate: res.to_date || d.endDate,
-                status: res.status || d.status,
-                grandTotal: res.grand_total || d.grandTotal,
-                items: res.items || d.items,
-              }
-            : d,
-        ),
-      );
+      message.success("Sales Contract updated successfully");
+
+      await fetchSalesContracts();
 
       setIsEditModalOpen(false);
       editForm.resetFields();
       setSelectedRecord(null);
-      alert("Contract updated successfully"); // Optional
-      fetchSalesContracts();
     } catch (err) {
       console.error("Failed to update contract", err);
       alert(err?.response?.data?.message || "Failed to update Sales Contract");
@@ -2701,7 +2731,14 @@ export default function SalesSouda() {
 
       {/* Edit Modal */}
       <Modal
-        title="Edit Sales Contract"
+        title={
+          <span className="text-amber-700 text-2xl font-semibold">
+            Edit Sales Contract
+            {selectedRecord?.saleContractNumber
+              ? ` (${selectedRecord.saleContractNumber})`
+              : ""}
+          </span>
+        }
         open={isEditModalOpen}
         onCancel={() => {
           setIsEditModalOpen(false);
@@ -2812,26 +2849,18 @@ export default function SalesSouda() {
                     ref={editBrokerRef}
                     open={editBrokerDropdownOpen}
                     onDropdownVisibleChange={setEditBrokerDropdownOpen}
-                    labelInValue
                     placeholder="Select Broker"
-                    onChange={(option) => {
-                      if (option?.value === "direct") {
+                    onChange={(value, option) => {
+                      if (value === "direct") {
                         editForm.setFieldsValue({
-                          brokerId: null,
-                          brokerName: {
-                            value: "direct",
-                            label: "Direct",
-                          },
+                          brokerId: "direct",
+                          brokerName: "Direct",
                         });
                       } else {
-                        const firstWord = option.label?.split(" ")[0] || "";
-
+                        const brokerLabel = option?.children || "";
                         editForm.setFieldsValue({
-                          brokerId: option.value,
-                          brokerName: {
-                            value: option.value,
-                            label: firstWord,
-                          },
+                          brokerId: value,
+                          brokerName: brokerLabel,
                         });
                       }
 
@@ -2853,6 +2882,9 @@ export default function SalesSouda() {
                       </Select.Option>
                     ))}
                   </Select>
+                </Form.Item>
+                <Form.Item name="brokerName" hidden>
+                  <Input />
                 </Form.Item>
               </Col>
               <Col span={2}>
@@ -3253,6 +3285,9 @@ export default function SalesSouda() {
                   name="brokerId"
                 >
                   <Select disabled placeholder="Broker">
+                    <Select.Option key="direct" value="direct">
+                      Direct
+                    </Select.Option>
                     {brokers.map((broker) => (
                       <Select.Option key={broker.id} value={broker.id}>
                         {broker.name}
