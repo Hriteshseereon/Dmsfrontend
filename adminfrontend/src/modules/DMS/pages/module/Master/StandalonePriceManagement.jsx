@@ -5,7 +5,6 @@ import PriceManagementTab from "./ItemUnitPriceManager/PriceManagement/PriceMana
 
 export default function StandalonePriceManagement() {
   const [items, setItems] = useState([]);
-  const [selectedItem, setSelectedItem] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const loadProducts = async () => {
@@ -49,13 +48,10 @@ export default function StandalonePriceManagement() {
         `}
       </style>
 
-     
-        <PriceManagementTab
-          items={items}
-          selectedItem={selectedItem}
-          setSelectedItem={setSelectedItem}
-        />
-    
+      {/* Same container as the Item Master tab so both screens look alike */}
+      <Card className="bg-amber-50">
+        <PriceManagementTab items={items} loading={loading} />
+      </Card>
     </div>
   );
 }
