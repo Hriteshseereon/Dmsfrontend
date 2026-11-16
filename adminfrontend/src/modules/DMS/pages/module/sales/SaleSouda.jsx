@@ -77,6 +77,13 @@ const salesSoudaJSONModified2 = {
   transporterOptions: ["Blue Transport", "Green Express", "Fast Logistics"],
 };
 
+// Item rate supplied by the product master (GST-inclusive, same basis as the contract rate).
+// Returns 0 when the product has no rate, which switches the row to manual contract-rate entry.
+const getProductItemRate = (product) =>
+  Number(
+    product?.item_rate ?? product?.itemRate ?? product?.default_rate ?? 0,
+  ) || 0;
+
 export default function SalesSouda() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -126,6 +133,8 @@ export default function SalesSouda() {
 
   const qtyRefs = useRef({});
   const contractRateRefs = useRef({});
+  const discountRefs = useRef({});
+  const premiumRefs = useRef({});
   const [extendForm] = Form.useForm();
 
   const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
@@ -352,6 +361,9 @@ export default function SalesSouda() {
 
         // ✅ NEW: correct field mappings
         contractRate: Number(it.contract_rate || it.contractRate || 0),
+        itemRate: Number(it.item_rate ?? it.itemRate ?? 0),
+        discount: Number(it.discount || 0),
+        premium: Number(it.premium || 0),
         rate: Number(it.mrp || 0),
         weightTon: Number(it.total_net_wt_in_ton || it.totalnetWtinTon || 0),
         gstPercent: Number(
@@ -489,6 +501,9 @@ export default function SalesSouda() {
           free_qty: freeQty,
           mrp,
           contract_rate: contractRate, // ✅ was missing
+          item_rate: round2(it.itemRate),
+          discount: round2(it.discount),
+          premium: round2(it.premium),
           gst_percentage: Number(it.gstPercent || 0),
           discount_percent: discountPercent,
           discount_amount: Number(discountAmount.toFixed(2)),
@@ -1276,13 +1291,27 @@ export default function SalesSouda() {
 
       const items = form.getFieldValue("items") || [];
       const updatedItems = [...items];
+      const prevRow = updatedItems[fieldName] || {};
+      const itemRate = getProductItemRate(product);
 
       updatedItems[fieldName] = {
-        ...updatedItems[fieldName],
+        ...prevRow,
         item: productId,
         uom: product.base_unit || "",
         gstPercent: product.gst_percentage || 0,
         grossWt: product.gross_weight || 0, // kg per unit
+        // Item rate comes from the product; discount / premium start fresh for the new item.
+        itemRate,
+        discount: null,
+        premium: null,
+        // With an item rate, recalculateRow derives the contract rate. Without one the row
+        // is manual — drop only a stale auto-derived rate left by the previous product.
+        contractRate:
+          itemRate > 0
+            ? itemRate
+            : Number(prevRow.itemRate || 0) > 0
+              ? null
+              : prevRow.contractRate,
       };
 
       form.setFieldsValue({ items: updatedItems });
@@ -1306,7 +1335,16 @@ export default function SalesSouda() {
       const freeQty = Number(it.freeQty || 0);
       const grossWtPerUnit = Number(it.grossWt || 0); // in kg
       const gstPercent = Number(it.gstPercent || 0);
-      const contractRate = Number(it.contractRate || 0);
+      const itemRate = Number(it.itemRate || 0);
+      const discount = Number(it.discount || 0);
+      const premium = Number(it.premium || 0);
+
+      // With an item rate, contract rate = item rate − discount (or + premium).
+      // Without one (no rate on the product / legacy contract) it stays a manual entry.
+      const hasItemRate = itemRate > 0;
+      const contractRate = hasItemRate
+        ? Math.max(0, Number((itemRate - discount + premium).toFixed(2)))
+        : Number(it.contractRate || 0);
 
       // Weight in ton: qty * gross_weight(kg) / 1000
       const weightTon = ((qty + freeQty) * grossWtPerUnit) / 1000;
@@ -1332,6 +1370,7 @@ export default function SalesSouda() {
       const updatedItems = [...items];
       updatedItems[index] = {
         ...updatedItems[index],
+        contractRate: hasItemRate ? contractRate : it.contractRate,
         weightTon: Number(weightTon.toFixed(3)),
         rate: Number(rate.toFixed(2)),
         amount: Number(amount.toFixed(2)),
@@ -1383,6 +1422,9 @@ export default function SalesSouda() {
           uom: "",
           weightTon: null,
           gstPercent: null,
+          itemRate: null,
+          discount: null,
+          premium: null,
           contractRate: null,
           rate: null,
           amount: null,
@@ -1410,6 +1452,23 @@ export default function SalesSouda() {
           }, 100);
         }, 50);
       }
+    };
+
+    // Re-render a row's rate cells only when item rate / discount / premium change.
+    const rateInputsChanged = (index) => (prev, curr) => {
+      const p = prev?.items?.[index];
+      const c = curr?.items?.[index];
+      return (
+        p?.itemRate !== c?.itemRate ||
+        p?.discount !== c?.discount ||
+        p?.premium !== c?.premium
+      );
+    };
+
+    // Last keyboard step of a row: warn on rate change vs previous contract, then add a row.
+    const finishRateEntry = (fieldName, add) => {
+      notifyRateDiff(fieldName);
+      handleAutoAddRow(add);
     };
 
     const notifyRateDiff = (fieldName) => {
@@ -1469,12 +1528,15 @@ export default function SalesSouda() {
               gutter={4}
               className="pb-2 mb-2 text-amber-800 font-semibold text-xs"
             >
-              <Col span={5}>Item Name</Col>
-              <Col span={2}>Quantity</Col>
+              <Col span={4}>Item Name</Col>
+              <Col span={1}>Quantity</Col>
               <Col span={1}>Free Qty</Col>
-              <Col span={2}>Unit</Col>
+              <Col span={1}>Unit</Col>
               <Col span={1}>Gross wt</Col>
               <Col span={1}>GST %</Col>
+              <Col span={1}>Item Rate</Col>
+              <Col span={1}>Discount</Col>
+              <Col span={1}>Premium</Col>
               <Col span={2}>Contract Rate</Col>
               <Col span={2}>Rate</Col>
               <Col span={2}>Amount</Col>
@@ -1486,8 +1548,8 @@ export default function SalesSouda() {
 
             {fields.map((field) => (
               <Row key={field.key} gutter={4} align="middle" className="mb-5">
-                {/* Item Select — auto fills UOM + GST */}
-                <Col span={5}>
+                {/* Item Select — auto fills UOM + GST + Item Rate */}
+                <Col span={4}>
                   <Form.Item
                     name={[field.name, "item"]}
                     style={{ marginBottom: 0 }}
@@ -1525,7 +1587,7 @@ export default function SalesSouda() {
                 </Col>
 
                 {/* Qty — recalculate on change */}
-                <Col span={2}>
+                <Col span={1}>
                   <Form.Item
                     name={[field.name, "qty"]}
                     style={{ marginBottom: 0 }}
@@ -1550,7 +1612,13 @@ export default function SalesSouda() {
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === "Tab") {
                           e.preventDefault();
-                          contractRateRefs.current[field.name]?.focus();
+                          // Item rate present → next is Discount; otherwise manual Contract Rate.
+                          const row = form.getFieldValue(["items", field.name]);
+                          if (Number(row?.itemRate || 0) > 0) {
+                            discountRefs.current[field.name]?.focus();
+                          } else {
+                            contractRateRefs.current[field.name]?.focus();
+                          }
                         }
                       }}
                     />
@@ -1588,12 +1656,12 @@ export default function SalesSouda() {
                   </Form.Item>
                 </Col>
                 {/* UOM — auto filled */}
-                <Col span={2}>
+                <Col span={1}>
                   <Form.Item
                     name={[field.name, "uom"]}
                     style={{ marginBottom: 0 }}
                   >
-                    <Input disabled />
+                    <Input disabled className="px-1!" />
                   </Form.Item>
                 </Col>
 
@@ -1617,38 +1685,169 @@ export default function SalesSouda() {
                   </Form.Item>
                 </Col>
 
-                {/* Contract Rate — user inputs this, triggers calculation */}
-                <Col span={2}>
+                {/* Item Rate — auto filled from the product */}
+                <Col span={1}>
                   <Form.Item
-                    name={[field.name, "contractRate"]}
+                    name={[field.name, "itemRate"]}
                     style={{ marginBottom: 0 }}
                   >
                     <InputNumber
-                      ref={(el) => (contractRateRefs.current[field.name] = el)}
-                      className="w-full!"
+                      className="w-full! [&_input]:px-1!"
+                      disabled
                       controls={false}
-                      min={0}
-                      precision={2} // 👈 decimal ko max 2 digit tak khud limit karega, typing ke time bhi
-                      step={0.01}
-                      defaultValue={0} // 👈 shuru me sirf "0" dikhega, "0.00" nahi
-                      onFocus={(e) => {
-                        setTimeout(() => e.target.select(), 0);
-                      }}
-                      onChange={() => {
-                        setTimeout(() => recalculateRow(field.name), 0);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === "Tab") {
-                          e.preventDefault();
-                          notifyRateDiff(field.name);
-                          handleAutoAddRow(add);
-                        }
-                      }}
-                      onBlur={() => {
-                        notifyRateDiff(field.name);
-                        handleAutoAddRow(add);
-                      }}
+                      precision={2}
+                      formatter={(value) =>
+                        value !== undefined && value !== null
+                          ? Number(value).toFixed(2)
+                          : "0.00"
+                      }
                     />
+                  </Form.Item>
+                </Col>
+
+                {/* Discount — user inputs either Discount or Premium (not both) */}
+                <Col span={1}>
+                  <Form.Item noStyle shouldUpdate={rateInputsChanged(field.name)}>
+                    {({ getFieldValue }) => {
+                      const row = getFieldValue(["items", field.name]) || {};
+                      const itemRate = Number(row.itemRate || 0);
+                      const discount = Number(row.discount || 0);
+                      const premium = Number(row.premium || 0);
+
+                      return (
+                        <Form.Item
+                          name={[field.name, "discount"]}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <InputNumber
+                            ref={(el) => (discountRefs.current[field.name] = el)}
+                            className="w-full! [&_input]:px-1!"
+                            controls={false}
+                            min={0}
+                            max={itemRate > 0 ? itemRate : undefined}
+                            precision={2}
+                            step={0.01}
+                            disabled={
+                              itemRate <= 0 || (premium > 0 && discount <= 0)
+                            }
+                            onFocus={(e) => {
+                              setTimeout(() => e.target.select(), 0);
+                            }}
+                            onChange={() => {
+                              setTimeout(() => recalculateRow(field.name), 0);
+                            }}
+                            onKeyDown={(e) => {
+                              if (
+                                (e.key === "Enter" || e.key === "Tab") &&
+                                !e.shiftKey
+                              ) {
+                                e.preventDefault();
+                                const current = form.getFieldValue([
+                                  "items",
+                                  field.name,
+                                ]);
+                                if (Number(current?.discount || 0) > 0) {
+                                  // Discount given → Premium is locked, rate row is done.
+                                  finishRateEntry(field.name, add);
+                                } else {
+                                  premiumRefs.current[field.name]?.focus();
+                                }
+                              }
+                            }}
+                          />
+                        </Form.Item>
+                      );
+                    }}
+                  </Form.Item>
+                </Col>
+
+                {/* Premium — added on top of the item rate */}
+                <Col span={1}>
+                  <Form.Item noStyle shouldUpdate={rateInputsChanged(field.name)}>
+                    {({ getFieldValue }) => {
+                      const row = getFieldValue(["items", field.name]) || {};
+                      const itemRate = Number(row.itemRate || 0);
+                      const discount = Number(row.discount || 0);
+
+                      return (
+                        <Form.Item
+                          name={[field.name, "premium"]}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <InputNumber
+                            ref={(el) => (premiumRefs.current[field.name] = el)}
+                            className="w-full! [&_input]:px-1!"
+                            controls={false}
+                            min={0}
+                            precision={2}
+                            step={0.01}
+                            disabled={itemRate <= 0 || discount > 0}
+                            onFocus={(e) => {
+                              setTimeout(() => e.target.select(), 0);
+                            }}
+                            onChange={() => {
+                              setTimeout(() => recalculateRow(field.name), 0);
+                            }}
+                            onKeyDown={(e) => {
+                              if (
+                                (e.key === "Enter" || e.key === "Tab") &&
+                                !e.shiftKey
+                              ) {
+                                e.preventDefault();
+                                finishRateEntry(field.name, add);
+                              }
+                            }}
+                          />
+                        </Form.Item>
+                      );
+                    }}
+                  </Form.Item>
+                </Col>
+
+                {/* Contract Rate — auto (item rate ∓ discount/premium); manual only when the item has no rate */}
+                <Col span={2}>
+                  <Form.Item noStyle shouldUpdate={rateInputsChanged(field.name)}>
+                    {({ getFieldValue }) => {
+                      const hasItemRate =
+                        Number(
+                          getFieldValue(["items", field.name, "itemRate"]) || 0,
+                        ) > 0;
+
+                      return (
+                        <Form.Item
+                          name={[field.name, "contractRate"]}
+                          style={{ marginBottom: 0 }}
+                        >
+                          <InputNumber
+                            ref={(el) =>
+                              (contractRateRefs.current[field.name] = el)
+                            }
+                            className="w-full!"
+                            controls={false}
+                            min={0}
+                            precision={2} // 👈 decimal ko max 2 digit tak khud limit karega, typing ke time bhi
+                            step={0.01}
+                            defaultValue={0} // 👈 shuru me sirf "0" dikhega, "0.00" nahi
+                            disabled={hasItemRate}
+                            onFocus={(e) => {
+                              setTimeout(() => e.target.select(), 0);
+                            }}
+                            onChange={() => {
+                              setTimeout(() => recalculateRow(field.name), 0);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === "Tab") {
+                                e.preventDefault();
+                                finishRateEntry(field.name, add);
+                              }
+                            }}
+                            onBlur={() => {
+                              finishRateEntry(field.name, add);
+                            }}
+                          />
+                        </Form.Item>
+                      );
+                    }}
                   </Form.Item>
                   <Form.Item
                     noStyle
@@ -1949,6 +2148,9 @@ export default function SalesSouda() {
             uom: it.uom ? it.uom.toLowerCase() : null,
             mrp,
             contract_rate: contractRate, // ✅
+            item_rate: round2(it.itemRate),
+            discount: round2(it.discount),
+            premium: round2(it.premium),
             gross_qty: grossQty,
             free_qty: freeQty,
             net_qty: netQty,
@@ -2566,7 +2768,7 @@ export default function SalesSouda() {
             {/* <h6 className="text-amber-500">Summary</h6> */}
 
             <Row gutter={8}>
-              <Col span={5}>
+              <Col span={4}>
                 <span className="text-amber-700 font-bold text-2xl">
                   Gross Total
                 </span>
@@ -2576,7 +2778,7 @@ export default function SalesSouda() {
                   <Input disabled />
                 </Form.Item>
               </Col>
-              <Col span={3}></Col>
+              <Col span={1}></Col>
               <Col span={2}>
                 <Form.Item
                   shouldUpdate={(prev, current) =>
@@ -2659,7 +2861,7 @@ export default function SalesSouda() {
                   }}
                 </Form.Item>
               </Col>
-              <Col span={4}></Col>
+              <Col span={7}></Col>
 
               <Col span={2}>
                 <Form.Item name={["orderTotals", "totalAmount"]}>
@@ -3052,7 +3254,7 @@ export default function SalesSouda() {
             {/* <h6 className="text-amber-500">Summary</h6> */}
 
             <Row gutter={8}>
-              <Col span={5}>
+              <Col span={4}>
                 <span className="text-amber-700 font-bold text-2xl">
                   Gross Total
                 </span>
@@ -3062,7 +3264,7 @@ export default function SalesSouda() {
                   <Input disabled />
                 </Form.Item>
               </Col>
-              <Col span={3}></Col>
+              <Col span={1}></Col>
               <Col span={1}>
                 <Form.Item
                   shouldUpdate={(prev, current) =>
@@ -3145,7 +3347,7 @@ export default function SalesSouda() {
                   }}
                 </Form.Item>
               </Col>
-              <Col span={5}></Col>
+              <Col span={8}></Col>
 
               <Col span={2}>
                 <Form.Item name={["orderTotals", "totalAmount"]}>
@@ -3372,11 +3574,14 @@ export default function SalesSouda() {
               className="pb-2 mb-2 text-amber-800 font-semibold text-xs"
             >
               <Col span={4}>Item Name</Col>
-              <Col span={2}>Qty</Col>
-              <Col span={2}>F.Qty</Col>
-              <Col span={2}>Unit</Col>
-              <Col span={2}>Wt (Ton)</Col>
+              <Col span={1}>Qty</Col>
+              <Col span={1}>F.Qty</Col>
+              <Col span={1}>Unit</Col>
+              <Col span={1}>Wt (Ton)</Col>
               <Col span={1}>GST %</Col>
+              <Col span={1}>Item Rate</Col>
+              <Col span={1}>Discount</Col>
+              <Col span={1}>Premium</Col>
               <Col span={2}>Con. Rate</Col>
               <Col span={2}>Rate</Col>
               <Col span={2}>Amount</Col>
@@ -3396,20 +3601,41 @@ export default function SalesSouda() {
                 <Col span={4}>
                   <Input disabled value={it.itemName || "-"} />
                 </Col>
-                <Col span={2}>
-                  <Input disabled value={it.qty} />
-                </Col>
-                <Col span={2}>
-                  <Input disabled value={it.freeQty} />
-                </Col>
-                <Col span={2}>
-                  <Input disabled value={it.uom || "-"} />
-                </Col>
-                <Col span={2}>
-                  <Input disabled value={it.weightTon} />
+                <Col span={1}>
+                  <Input disabled className="px-1!" value={it.qty} />
                 </Col>
                 <Col span={1}>
-                  <Input disabled value={it.gstPercent} />
+                  <Input disabled className="px-1!" value={it.freeQty} />
+                </Col>
+                <Col span={1}>
+                  <Input disabled className="px-1!" value={it.uom || "-"} />
+                </Col>
+                <Col span={1}>
+                  <Input disabled className="px-1!" value={it.weightTon} />
+                </Col>
+                <Col span={1}>
+                  <Input disabled className="px-1!" value={it.gstPercent} />
+                </Col>
+                <Col span={1}>
+                  <Input
+                    disabled
+                    className="px-1!"
+                    value={Number(it.itemRate || 0).toFixed(2)}
+                  />
+                </Col>
+                <Col span={1}>
+                  <Input
+                    disabled
+                    className="px-1!"
+                    value={Number(it.discount || 0).toFixed(2)}
+                  />
+                </Col>
+                <Col span={1}>
+                  <Input
+                    disabled
+                    className="px-1!"
+                    value={Number(it.premium || 0).toFixed(2)}
+                  />
                 </Col>
                 <Col span={2}>
                   <Input disabled value={it.contractRate} />
@@ -3451,13 +3677,13 @@ export default function SalesSouda() {
                   <Input disabled />
                 </Form.Item>
               </Col>
-              <Col span={4}></Col>
+              <Col span={1}></Col>
               <Col span={2}>
                 <Form.Item name={["orderTotals", "totalWeightTon"]}>
                   <Input disabled />
                 </Form.Item>
               </Col>
-              <Col span={5}></Col>
+              <Col span={7}></Col>
               <Col span={2}>
                 <Form.Item name={["orderTotals", "totalAmount"]}>
                   <Input disabled />
