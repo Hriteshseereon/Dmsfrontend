@@ -17,6 +17,8 @@ import {
   Divider,
   Space,
   Tooltip,
+  Dropdown,
+  AutoComplete,
 } from "antd";
 import {
   SearchOutlined,
@@ -28,6 +30,9 @@ import {
   EyeOutlined,
   EditOutlined,
   PrinterOutlined,
+  DownOutlined,
+  TruckOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
@@ -43,7 +48,12 @@ import {
   getPurchaseInvoices,
   createPurchaseInvoice,
   updatePurchaseInvoice,
+  getproductbyVendor,
+  getAllTransport,
+  getPurchaseContract,
 } from "../../../../../api/purchase";
+import { getAllTransport as getMasterTransporters } from "../../../../../api/transport";
+import { getAllVehicles } from "../../../../../api/vehiclemaster";
 import {
   createFinancialYearDisabledDate,
   useSelectedFinancialYear,
@@ -84,6 +94,7 @@ export default function PurchaseInvoice() {
 
   // Modal and Form controls
   const [modalOpen, setModalOpen] = useState(false);
+  const [invoiceCreationMode, setInvoiceCreationMode] = useState("with_flow"); // "with_flow" | "by_contract"
   const [editingId, setEditingId] = useState(null);
   const [editingRecordDocUrl, setEditingRecordDocUrl] = useState(null);
   const [supplierInvoicesModalOpen, setSupplierInvoicesModalOpen] =
@@ -96,7 +107,13 @@ export default function PurchaseInvoice() {
 
   // Lists for dropdown selections
   const [suppliers, setSuppliers] = useState([]);
+  const [allVendorsList, setAllVendorsList] = useState([]);
   const [availableVehicles, setAvailableVehicles] = useState([]);
+  const [transportersList, setTransportersList] = useState([]);
+  const [masterVehiclesList, setMasterVehiclesList] = useState([]);
+  const [vendorProducts, setVendorProducts] = useState([]);
+  const [customVehicleInput, setCustomVehicleInput] = useState("");
+  const [customTransporterInput, setCustomTransporterInput] = useState("");
   const [soudaRatesMap, setSoudaRatesMap] = useState({}); // keyed by item_name
   const [fileList, setFileList] = useState([]);
 
@@ -111,6 +128,70 @@ export default function PurchaseInvoice() {
   const rateSelectRefs = useRef([]);
 
   const selectedFY = useSelectedFinancialYear();
+
+  // Known vehicles gathered from vehicle master + available vehicles + past table data for By Contract mode
+  const allKnownVehicles = useMemo(() => {
+    const set = new Set();
+    (masterVehiclesList || []).forEach((v) => {
+      const vNo =
+        v?.vehicle_number ||
+        v?.vehicle_no ||
+        v?.vehicleNo ||
+        (typeof v === "string" ? v : "");
+      if (vNo && String(vNo).trim() && String(vNo).trim() !== "-") {
+        set.add(String(vNo).trim());
+      }
+    });
+    (availableVehicles || []).forEach((v) => {
+      const vNo = v?.vehicle_no || v?.vehicle_number;
+      if (vNo && String(vNo).trim() && String(vNo).trim() !== "-") {
+        set.add(String(vNo).trim());
+      }
+    });
+    (data || []).forEach((d) => {
+      const vNo = d?.vehicle_no || d?.vehicle_number;
+      if (vNo && String(vNo).trim() && String(vNo).trim() !== "-") {
+        set.add(String(vNo).trim());
+      }
+    });
+    return Array.from(set).map((vNo) => ({ value: vNo, label: vNo }));
+  }, [masterVehiclesList, availableVehicles, data]);
+
+  // Known transporters gathered from transport master + available vehicles + past table data
+  const allKnownTransporters = useMemo(() => {
+    const set = new Set();
+    (transportersList || []).forEach((t) => {
+      const name =
+        t?.registered_name ||
+        t?.name ||
+        t?.transporter_name ||
+        t?.company_name ||
+        t?.agency_name ||
+        (typeof t === "string" ? t : "");
+      if (name && String(name).trim() && String(name).trim() !== "-") {
+        set.add(String(name).trim());
+      }
+    });
+    (availableVehicles || []).forEach((v) => {
+      if (
+        v?.transport_name &&
+        String(v.transport_name).trim() &&
+        v.transport_name !== "-"
+      ) {
+        set.add(String(v.transport_name).trim());
+      }
+    });
+    (data || []).forEach((d) => {
+      if (
+        d?.transport_name &&
+        String(d.transport_name).trim() &&
+        d.transport_name !== "-"
+      ) {
+        set.add(String(d.transport_name).trim());
+      }
+    });
+    return Array.from(set).map((tName) => ({ value: tName, label: tName }));
+  }, [transportersList, availableVehicles, data]);
 
   // Helper to determine if an invoice has all 3 required elements complete:
   // 1. E-waybill No, 2. E-waybill Date, 3. Uploaded Document
@@ -232,14 +313,24 @@ export default function PurchaseInvoice() {
 
   const fetchSuppliers = async () => {
     try {
-      const [invSuppliersRes, vendorsRes] = await Promise.allSettled([
-        getInvoiceSuppliers(),
-        getVendors(),
-      ]);
+      const [invSuppliersRes, vendorsRes, transRes, masterTransRes, vehiclesRes] =
+        await Promise.allSettled([
+          getInvoiceSuppliers(),
+          getVendors(),
+          getAllTransport(),
+          getMasterTransporters(),
+          getAllVehicles(),
+        ]);
       const rawInv =
         invSuppliersRes.status === "fulfilled" ? invSuppliersRes.value : [];
       const rawVendors =
         vendorsRes.status === "fulfilled" ? vendorsRes.value : [];
+      const rawTrans =
+        transRes.status === "fulfilled" ? transRes.value : [];
+      const rawMasterTrans =
+        masterTransRes.status === "fulfilled" ? masterTransRes.value : [];
+      const rawVehicles =
+        vehiclesRes.status === "fulfilled" ? vehiclesRes.value : [];
 
       const invSuppliers = Array.isArray(rawInv)
         ? rawInv
@@ -247,64 +338,82 @@ export default function PurchaseInvoice() {
       const vendors = Array.isArray(rawVendors)
         ? rawVendors
         : rawVendors?.data || rawVendors?.results || [];
+      const t1 = Array.isArray(rawTrans)
+        ? rawTrans
+        : rawTrans?.data || rawTrans?.results || [];
+      const t2 = Array.isArray(rawMasterTrans)
+        ? rawMasterTrans
+        : rawMasterTrans?.data || rawMasterTrans?.results || [];
+      setTransportersList([...t1, ...t2]);
+
+      const vList = Array.isArray(rawVehicles)
+        ? rawVehicles
+        : rawVehicles?.data || rawVehicles?.results || [];
+      setMasterVehiclesList(vList);
 
       // Merge vendor details (GSTIN, city, address) into suppliers list for complete auto-fill
-      const listToMap = invSuppliers.length > 0 ? invSuppliers : vendors;
-      const mergedSuppliers = listToMap.map((s) => {
-        const sId = String(s.id || s.vendor_id || "");
-        const sName = String(s.name || s.company_name || "")
-          .trim()
-          .toLowerCase();
-
-        const matchingVendor = vendors.find((v) => {
-          const vId = String(v.id || v.vendor_id || "");
-          const vName = String(v.name || v.company_name || "")
+      const formatSupplierList = (list) =>
+        list.map((s) => {
+          const sId = String(s.id || s.vendor_id || "");
+          const sName = String(s.name || s.company_name || "")
             .trim()
             .toLowerCase();
-          return (
-            (sId && vId && sId === vId) || (sName && vName && sName === vName)
-          );
+
+          const matchingVendor = vendors.find((v) => {
+            const vId = String(v.id || v.vendor_id || "");
+            const vName = String(v.name || v.company_name || "")
+              .trim()
+              .toLowerCase();
+            return (
+              (sId && vId && sId === vId) || (sName && vName && sName === vName)
+            );
+          });
+
+          const resolvedGst =
+            s.gst_number ||
+            s.gst_no ||
+            s.gstin ||
+            s.supplier_gst ||
+            s.business_details?.gstin ||
+            s.business_details?.gstin_no ||
+            matchingVendor?.business_details?.gstin ||
+            matchingVendor?.business_details?.gstin_no ||
+            matchingVendor?.gstin ||
+            matchingVendor?.gst_number ||
+            matchingVendor?.gst_no ||
+            matchingVendor?.gst ||
+            "";
+          const resolvedCity =
+            s.city ||
+            s.place ||
+            s.location ||
+            s.addresses?.[0]?.city ||
+            s.addresses?.[0]?.location ||
+            s.addresses?.[0]?.district ||
+            matchingVendor?.addresses?.[0]?.city ||
+            matchingVendor?.addresses?.[0]?.location ||
+            matchingVendor?.addresses?.[0]?.district ||
+            matchingVendor?.city ||
+            matchingVendor?.place ||
+            "";
+          return {
+            ...s,
+            id: s.id || matchingVendor?.id,
+            name: s.name || matchingVendor?.name || matchingVendor?.company_name,
+            gst_number: resolvedGst,
+            supplier_gst: resolvedGst,
+            city: resolvedCity,
+            place: resolvedCity,
+          };
         });
 
-        const resolvedGst =
-          s.gst_number ||
-          s.gst_no ||
-          s.gstin ||
-          s.supplier_gst ||
-          s.business_details?.gstin ||
-          s.business_details?.gstin_no ||
-          matchingVendor?.business_details?.gstin ||
-          matchingVendor?.business_details?.gstin_no ||
-          matchingVendor?.gstin ||
-          matchingVendor?.gst_number ||
-          matchingVendor?.gst_no ||
-          matchingVendor?.gst ||
-          "";
-        const resolvedCity =
-          s.city ||
-          s.place ||
-          s.location ||
-          s.addresses?.[0]?.city ||
-          s.addresses?.[0]?.location ||
-          s.addresses?.[0]?.district ||
-          matchingVendor?.addresses?.[0]?.city ||
-          matchingVendor?.addresses?.[0]?.location ||
-          matchingVendor?.addresses?.[0]?.district ||
-          matchingVendor?.city ||
-          matchingVendor?.place ||
-          "";
-        return {
-          ...s,
-          id: s.id || matchingVendor?.id,
-          name: s.name || matchingVendor?.name || matchingVendor?.company_name,
-          gst_number: resolvedGst,
-          supplier_gst: resolvedGst,
-          city: resolvedCity,
-          place: resolvedCity,
-        };
-      });
+      const mergedWithFlowSuppliers = formatSupplierList(
+        invSuppliers.length > 0 ? invSuppliers : vendors,
+      );
+      const mergedAllVendors = formatSupplierList(vendors);
 
-      setSuppliers(mergedSuppliers);
+      setSuppliers(mergedWithFlowSuppliers);
+      setAllVendorsList(mergedAllVendors);
     } catch (error) {
       console.error("Error fetching suppliers:", error);
     }
@@ -378,8 +487,14 @@ export default function PurchaseInvoice() {
     });
     setSoudaRatesMap({});
     setAvailableVehicles([]);
+    setVendorProducts([]);
+    setCustomVehicleInput("");
 
-    const selectedSupplier = suppliers.find(
+    const suppliersPool =
+      invoiceCreationMode === "by_contract" && allVendorsList.length > 0
+        ? allVendorsList
+        : suppliers;
+    const selectedSupplier = suppliersPool.find(
       (s) => s.id === supplierId || String(s.id) === String(supplierId),
     );
     if (!selectedSupplier) return;
@@ -440,6 +555,101 @@ export default function PurchaseInvoice() {
       }
     }
 
+    // Branch: BY CONTRACT MODE
+    if (invoiceCreationMode === "by_contract") {
+      try {
+        message.loading({
+          content: "Loading vendor products & contracts...",
+          key: "load_vendor_products",
+        });
+        const [prodRes, contractRes] = await Promise.allSettled([
+          getproductbyVendor(supplierId),
+          getPurchaseContract(),
+        ]);
+
+        let productsList = [];
+        if (prodRes.status === "fulfilled") {
+          const pData = prodRes.value?.data || prodRes.value || [];
+          if (Array.isArray(pData)) productsList = [...pData];
+        }
+
+        // Also extract products from active purchase contracts of this vendor
+        if (contractRes.status === "fulfilled") {
+          const cData = contractRes.value?.data || contractRes.value || [];
+          const vendorContracts = Array.isArray(cData)
+            ? cData.filter(
+                (c) =>
+                  String(c.vendor || c.vendor_id || c.company_group_id) ===
+                  String(supplierId),
+              )
+            : [];
+          vendorContracts.forEach((vc) => {
+            (vc.items || []).forEach((it) => {
+              const itName =
+                it.product_name || it.product?.product_name || it.item_name;
+              const itId =
+                it.product_id ||
+                it.product?.product_id ||
+                it.product?.id ||
+                it.product;
+              if (
+                itName &&
+                !productsList.some(
+                  (p) => (p.name || p.product_name) === itName,
+                )
+              ) {
+                productsList.push({
+                  id: itId,
+                  product_id: itId,
+                  name: itName,
+                  product_name: itName,
+                  base_unit: it.unit || it.uom || it.base_unit || "MT",
+                  gst_percentage: it.gst_percent || it.gst_percentage || 5,
+                  gross_weight: it.gross_weight || it.gross_weight_kg || 0,
+                  net_weight: it.net_weight || it.net_weight_kg || 0,
+                });
+              }
+            });
+          });
+        }
+
+        setVendorProducts(productsList);
+        message.destroy("load_vendor_products");
+
+        // Initialize with 1 empty item row for immediate user input
+        form.setFieldsValue({
+          items: [
+            {
+              item_name: undefined,
+              product: undefined,
+              qty: 0,
+              available_qty: 0,
+              invoice_qty: undefined,
+              unit: "MT",
+              net_wt: 0,
+              gst_percent: 5,
+              rate: undefined,
+              taxable_amount: 0,
+              sgst_amount: 0,
+              cgst_amount: 0,
+              igst_amount: 0,
+              total_amount: 0,
+            },
+          ],
+        });
+
+        // Focus vehicle input
+        setTimeout(() => {
+          vehicleSelectRef.current?.focus();
+        }, 150);
+      } catch (err) {
+        console.error("Error loading vendor products:", err);
+        message.destroy("load_vendor_products");
+      }
+      return;
+    }
+
+    // Branch: WITH FLOW MODE (Existing Flow)
     try {
       message.loading({
         content: "Loading available vehicles...",
@@ -729,18 +939,20 @@ export default function PurchaseInvoice() {
 
     let inputQty = Number(newQty || 0);
 
-    // If user enters more than available balance quantity
-    if (newQty !== null && newQty !== undefined && inputQty > maxAllowed) {
-      message.error(
-        `Quantity cannot exceed remaining available balance (${maxAllowed} ${
-          currentItem.unit || ""
-        }). You entered ${newQty}. Value adjusted to ${maxAllowed}.`
-      );
-      inputQty = maxAllowed;
+    // If user enters more than available balance quantity in With Flow mode
+    if (invoiceCreationMode !== "by_contract") {
+      if (newQty !== null && newQty !== undefined && inputQty > maxAllowed) {
+        message.error(
+          `Quantity cannot exceed remaining available balance (${maxAllowed} ${
+            currentItem.unit || ""
+          }). You entered ${newQty}. Value adjusted to ${maxAllowed}.`
+        );
+        inputQty = maxAllowed;
+      }
     }
 
     const validQty = Math.max(0, inputQty);
-    const unitNetWt = Number(
+    let unitNetWt = Number(
       currentItem.unit_net_wt !== undefined
         ? currentItem.unit_net_wt
         : (currentItem.original_qty > 0
@@ -749,7 +961,17 @@ export default function PurchaseInvoice() {
                 ? Number(currentItem.net_wt || 0) / currentItem.qty
                 : 0))
     );
-    const newNetWt = Number((unitNetWt * validQty).toFixed(3));
+
+    // If unit is MT or TON and unitNetWt is 0, default to 1 ton per MT
+    if (!unitNetWt || unitNetWt <= 0) {
+      const uStr = String(currentItem.unit || "").toUpperCase();
+      if (uStr === "MT" || uStr === "TON" || uStr === "TONS") {
+        unitNetWt = 1;
+      }
+    }
+
+    const calculatedNetWt = Number((unitNetWt * validQty).toFixed(3));
+    const newNetWt = calculatedNetWt > 0 ? calculatedNetWt : Number(currentItem.net_wt || 0);
 
     const rate = Number(currentItem.rate || 0);
     const gstPercent = Number(currentItem.gst_percent || 0);
@@ -841,6 +1063,8 @@ export default function PurchaseInvoice() {
         rate: rateVal,
         purchase_contract: rateOption.purchase_contract_id,
         purchase_contract_item: rateOption.purchase_contract_item_id,
+        qty: invoiceCreationMode === "by_contract" ? contractBalance : currentItem.qty,
+        available_qty: invoiceCreationMode === "by_contract" ? contractBalance : currentItem.available_qty,
         taxable_amount: currentTaxable,
         sgst_amount: currentTaxes.sgst_amount,
         cgst_amount: currentTaxes.cgst_amount,
@@ -904,6 +1128,8 @@ export default function PurchaseInvoice() {
       rate: rateVal,
       purchase_contract: rateOption.purchase_contract_id,
       purchase_contract_item: rateOption.purchase_contract_item_id,
+      qty: invoiceCreationMode === "by_contract" ? contractBalance : updatedItems[index].qty,
+      available_qty: invoiceCreationMode === "by_contract" ? contractBalance : updatedItems[index].available_qty,
       taxable_amount: taxableAmount,
       sgst_amount: taxes.sgst_amount,
       cgst_amount: taxes.cgst_amount,
@@ -1027,6 +1253,113 @@ export default function PurchaseInvoice() {
     recalculateGrandTotals(updatedItems);
   };
 
+  // Handler when user selects an item in 'By Contract' mode
+  const handleByContractItemSelect = async (index, itemName, option) => {
+    const items = form.getFieldValue("items") || [];
+    if (!items[index]) return;
+
+    const prod =
+      option?.data ||
+      vendorProducts.find((p) => (p.name || p.product_name) === itemName);
+    const vendorId = form.getFieldValue("vendor");
+
+    const gstPercent = Number(prod?.gst_percentage || prod?.gst_percent || 5);
+    const unit = prod?.base_unit || prod?.unit || "MT";
+    const unitGrossKg = Number(
+      prod?.gross_weight || prod?.gross_weight_kg || 0,
+    );
+    const unitNetKg = Number(prod?.net_weight || prod?.net_weight_kg || 0);
+
+    const unitNetWt =
+      unitNetKg > 0
+        ? unitNetKg > 5
+          ? unitNetKg / 1000
+          : unitNetKg
+        : unit.toUpperCase() === "MT" || unit.toUpperCase() === "TON"
+        ? 1
+        : 0;
+
+    const unitGrossWt =
+      unitGrossKg > 0
+        ? unitGrossKg > 5
+          ? unitGrossKg / 1000
+          : unitGrossKg
+        : unitNetWt;
+
+    const updatedItem = {
+      ...items[index],
+      item_name: itemName,
+      product: prod?.product_id || prod?.id,
+      unit: unit,
+      gst_percent: gstPercent,
+      unit_net_wt: unitNetWt,
+      unit_gross_wt: unitGrossWt,
+      rate: undefined,
+      purchase_contract: undefined,
+      purchase_contract_item: undefined,
+      taxable_amount: 0,
+      sgst_amount: 0,
+      cgst_amount: 0,
+      igst_amount: 0,
+      total_amount: 0,
+    };
+
+    items[index] = updatedItem;
+    form.setFieldsValue({ items });
+
+    // Fetch Souda rates for this item & vendor
+    if (vendorId && itemName) {
+      try {
+        message.loading({
+          content: `Fetching contract rates for ${itemName}...`,
+          key: "load_item_rates",
+        });
+        const res = await getSoudaRates(vendorId, itemName);
+        const rates = res?.data || res || [];
+        setSoudaRatesMap((prev) => ({
+          ...prev,
+          [itemName]: Array.isArray(rates) ? rates : [],
+          [index]: Array.isArray(rates) ? rates : [],
+        }));
+        message.destroy("load_item_rates");
+
+        if (Array.isArray(rates) && rates.length === 0) {
+          message.warning(
+            `No active purchase contract/Souda found for ${itemName}`,
+          );
+        }
+      } catch (err) {
+        console.error(`Failed to fetch rates for ${itemName}:`, err);
+        message.destroy("load_item_rates");
+      }
+    }
+  };
+
+  // Handler to add a new empty item row in 'By Contract' mode
+  const handleAddByContractItemRow = () => {
+    const currentItems = form.getFieldValue("items") || [];
+    const newItems = [
+      ...currentItems,
+      {
+        item_name: undefined,
+        product: undefined,
+        qty: 0,
+        available_qty: 0,
+        invoice_qty: undefined,
+        unit: "MT",
+        net_wt: 0,
+        gst_percent: 5,
+        rate: undefined,
+        taxable_amount: 0,
+        sgst_amount: 0,
+        cgst_amount: 0,
+        igst_amount: 0,
+        total_amount: 0,
+      },
+    ];
+    form.setFieldsValue({ items: newItems });
+  };
+
   const recalculateGrandTotals = (itemsOverride) => {
     const items = itemsOverride || form.getFieldValue("items") || [];
     const totalQty = items.reduce(
@@ -1106,7 +1439,8 @@ export default function PurchaseInvoice() {
     });
   };
 
-  const openAddModal = () => {
+  const openAddModal = (mode = "with_flow") => {
+    setInvoiceCreationMode(mode);
     setEditingId(null);
     setEditingRecordDocUrl(null);
     form.resetFields();
@@ -1121,20 +1455,57 @@ export default function PurchaseInvoice() {
       total_taxable_amount: 0,
       total_amount: 0,
       grand_total: 0,
+      items:
+        mode === "by_contract"
+          ? [
+              {
+                item_name: undefined,
+                product: undefined,
+                qty: 0,
+                available_qty: 0,
+                invoice_qty: undefined,
+                unit: "MT",
+                net_wt: 0,
+                gst_percent: 5,
+                rate: undefined,
+                taxable_amount: 0,
+                sgst_amount: 0,
+                cgst_amount: 0,
+                igst_amount: 0,
+                total_amount: 0,
+              },
+            ]
+          : [],
     });
     setFileList([]);
     setSoudaRatesMap({});
     setAvailableVehicles([]);
+    setVendorProducts([]);
+    setCustomVehicleInput("");
+    setCustomTransporterInput("");
     setVehicleDropdownOpen(false);
     setModalOpen(true);
   };
 
   const handleEdit = async (record) => {
     setEditingId(record.id);
+    setInvoiceCreationMode(
+      record.invoice_type || (record.loading_advice_id ? "with_flow" : "by_contract"),
+    );
     setEditingRecordDocUrl(
       record.invoice_copy_url || record.invoice_copy || record.file || null,
     );
     form.resetFields();
+
+    if (record.vendor) {
+      try {
+        const prodRes = await getproductbyVendor(record.vendor);
+        const pList = prodRes?.data || prodRes || [];
+        setVendorProducts(Array.isArray(pList) ? pList : []);
+      } catch (e) {
+        console.warn("Could not load vendor products for edit:", e);
+      }
+    }
 
     const supplierGst = record.supplier_gst || "";
     const formattedItems = (record.items || []).map((item) => {
@@ -1287,7 +1658,23 @@ export default function PurchaseInvoice() {
 
   const handleSubmit = async () => {
     try {
+      // Clean up any extra empty items before validating (e.g. if user added an item row but left it completely blank)
+      const currentItems = form.getFieldValue("items") || [];
+      if (currentItems.length > 1) {
+        const filled = currentItems.filter(
+          (it) => it && (it.item_name || it.invoice_qty || it.rate),
+        );
+        if (filled.length > 0 && filled.length !== currentItems.length) {
+          form.setFieldsValue({ items: filled });
+        }
+      }
+
       const values = await form.validateFields();
+
+      if (!values.items || values.items.length === 0) {
+        message.warning("Please add at least one item");
+        return;
+      }
 
       // Duplicate check for purchase invoice number and e-waybill number when adding new
       if (!editingId) {
@@ -1329,41 +1716,56 @@ export default function PurchaseInvoice() {
 
       setSubmitting(true);
 
+      const formatFormDate = (val) => {
+        if (!val) return null;
+        if (dayjs.isDayjs(val)) return val.format("DD-MM-YYYY");
+        const parsed = parseApiDate(val);
+        return parsed && parsed.isValid() ? parsed.format("DD-MM-YYYY") : null;
+      };
+
+      const suppliersPool =
+        invoiceCreationMode === "by_contract" && allVendorsList.length > 0
+          ? allVendorsList
+          : suppliers;
+      const matchedSup = suppliersPool.find(
+        (s) => String(s.id) === String(values.vendor),
+      );
+      const resolvedSupplierName =
+        values.supplier_name ||
+        matchedSup?.name ||
+        matchedSup?.company_name ||
+        "";
+
       const totalNetWtVal = Number(form.getFieldValue("total_net_wt") || 0);
       const totalCgstVal = Number(form.getFieldValue("total_cgst") || 0);
       const totalSgstVal = Number(form.getFieldValue("total_sgst") || 0);
       const totalIgstVal = Number(form.getFieldValue("total_igst") || 0);
-      const totalTaxableVal = Number(form.getFieldValue("total_taxable_amount") || 0);
+      const totalTaxableVal = Number(
+        form.getFieldValue("total_taxable_amount") || 0,
+      );
       const totalAmtVal = Number(form.getFieldValue("total_amount") || 0);
       const grandTotalVal = Number(form.getFieldValue("grand_total") || 0);
       const roundOffVal = Number(form.getFieldValue("round_off_amount") || 0);
 
       const formattedPayload = {
+        invoice_type: invoiceCreationMode,
         vendor: values.vendor,
-        supplier_name: values.supplier_name,
+        supplier_name: resolvedSupplierName,
         supplier_gst: values.supplier_gst || null,
         place: values.place,
-        lr_no: values.lr_no,
-        lr_date: values.lr_date
-          ? dayjs(values.lr_date).format("DD-MM-YYYY")
-          : null,
-        transport_name: values.transport_name,
+        lr_no: values.lr_no || null,
+        lr_date: formatFormDate(values.lr_date),
+        transport_name: values.transport_name || null,
         vehicle_no: values.vehicle_no,
         ewaybill_no: values.ewaybill_no || null,
-        ewaybill_date: values.ewaybill_date
-          ? dayjs(values.ewaybill_date).format("DD-MM-YYYY")
-          : null,
+        ewaybill_date: formatFormDate(values.ewaybill_date),
         invoice_no: values.invoice_no,
-        invoice_date: values.invoice_date
-          ? dayjs(values.invoice_date).format("DD-MM-YYYY")
-          : null,
-        payment_due_date: values.payment_due_date
-          ? dayjs(values.payment_due_date).format("DD-MM-YYYY")
-          : null,
-        dispatch_from: values.dispatch_from,
-        ship_to: values.ship_to,
-        gross_weight: values.gross_weight,
-        total_gross_weight: values.gross_weight,
+        invoice_date: formatFormDate(values.invoice_date),
+        payment_due_date: formatFormDate(values.payment_due_date),
+        dispatch_from: values.dispatch_from || "Haldia",
+        ship_to: values.ship_to || null,
+        gross_weight: Number(values.gross_weight || 0),
+        total_gross_weight: Number(values.gross_weight || 0),
         total_net_wt: totalNetWtVal,
         total_net_weight: totalNetWtVal,
         total_qty: Number(form.getFieldValue("total_qty") || 0),
@@ -1375,17 +1777,19 @@ export default function PurchaseInvoice() {
         round_off_amount: String(roundOffVal),
         grand_total: grandTotalVal,
         items: (values.items || []).map((item) => ({
-          sale_contract: item.sale_contract,
-          sale_contract_item: item.sale_contract_item,
-          purchase_contract: item.purchase_contract,
-          purchase_contract_item: item.purchase_contract_item,
-          product: item.product,
+          sale_contract: item.sale_contract || null,
+          sale_contract_item: item.sale_contract_item || null,
+          purchase_contract: item.purchase_contract || null,
+          purchase_contract_item: item.purchase_contract_item || null,
+          product: item.product || null,
           item_name: item.item_name,
           qty: Number(item.qty || item.available_qty || item.invoice_qty || 0),
           invoice_qty: Number(item.invoice_qty || item.qty || 0),
-          unit: item.unit,
+          unit: item.unit || "MT",
           net_wt: Number(item.net_wt || 0),
-          net_weight_kg: Number(item.net_weight_kg || 0),
+          net_weight_kg: Number(
+            item.net_weight_kg || (item.net_wt ? Number(item.net_wt) * 1000 : 0),
+          ),
           gross_weight_kg: Number(item.gross_weight_kg || 0),
           gst_percent: Number(item.gst_percent || 0),
           sgst_amount: Number(item.sgst_amount || 0),
@@ -1401,6 +1805,8 @@ export default function PurchaseInvoice() {
         formattedPayload.invoice_copy = fileList[0];
       }
 
+      console.log("Submitting purchase invoice payload:", formattedPayload);
+
       if (editingId) {
         await updatePurchaseInvoice(editingId, formattedPayload);
         message.success("Purchase Invoice updated successfully!");
@@ -1415,6 +1821,20 @@ export default function PurchaseInvoice() {
       fetchInvoices();
     } catch (error) {
       console.error("Submit Error:", error);
+      if (error && error.errorFields && error.errorFields.length > 0) {
+        const firstError =
+          error.errorFields[0]?.errors?.[0] || "Please fill all required fields";
+        const fieldNames = error.errorFields
+          .map((f) => (Array.isArray(f.name) ? f.name.join(".") : f.name))
+          .join(", ");
+        console.warn(
+          "Form validation failed on fields:",
+          fieldNames,
+          error.errorFields,
+        );
+        message.warning(`Please fill required field: ${firstError}`);
+        return;
+      }
       message.error(
         error.response?.data?.message ||
           error.message ||
@@ -1910,14 +2330,55 @@ export default function PurchaseInvoice() {
           >
             Export
           </Button>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            className="bg-amber-500! hover:bg-amber-600! border-none!"
-            onClick={openAddModal}
+          <Dropdown
+            menu={{
+              items: [
+                {
+                  key: "with_flow",
+                  icon: <TruckOutlined className="text-amber-600" />,
+                  label: (
+                    <div className="py-1">
+                      <div className="font-semibold text-gray-800">
+                        With Flow (Standard PO)
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        From Vehicle Placement & Loading Advice
+                      </div>
+                    </div>
+                  ),
+                  onClick: () => openAddModal("with_flow"),
+                },
+                {
+                  type: "divider",
+                },
+                {
+                  key: "by_contract",
+                  icon: <FileTextOutlined className="text-amber-600" />,
+                  label: (
+                    <div className="py-1">
+                      <div className="font-semibold text-gray-800">
+                        By Contract (Direct)
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Direct Entry against Purchase Contract
+                      </div>
+                    </div>
+                  ),
+                  onClick: () => openAddModal("by_contract"),
+                },
+              ],
+            }}
+            trigger={["click"]}
+            placement="bottomRight"
           >
-            Add New
-          </Button>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              className="bg-amber-500! hover:bg-amber-600! border-none!"
+            >
+              Add New <DownOutlined className="text-xs ml-1" />
+            </Button>
+          </Dropdown>
         </Col>
       </Row>
 
@@ -1962,9 +2423,23 @@ export default function PurchaseInvoice() {
       {/* CREATE / EDIT PURCHASE ENTRY MODAL */}
       <Modal
         title={
-          <span className="text-amber-800 text-2xl font-semibold">
-            {editingId ? "Edit Purchase Entry Form" : "Purchase Entry Form"}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-amber-800 text-2xl font-semibold">
+              {editingId
+                ? "Edit Purchase Entry Form"
+                : invoiceCreationMode === "by_contract"
+                ? "Purchase Entry Form (By Contract)"
+                : "Purchase Entry Form (With Flow)"}
+            </span>
+            {!editingId && (
+              <Tag
+                color={invoiceCreationMode === "by_contract" ? "purple" : "gold"}
+                className="font-bold uppercase text-xs"
+              >
+                {invoiceCreationMode === "by_contract" ? "By Contract" : "With Flow"}
+              </Tag>
+            )}
+          </div>
         }
         open={modalOpen}
         onCancel={() => {
@@ -2035,7 +2510,11 @@ export default function PurchaseInvoice() {
                     optionFilterProp="children"
                     onChange={handleSupplierChange}
                   >
-                    {suppliers.map((s) => (
+                    {(invoiceCreationMode === "by_contract" &&
+                    allVendorsList.length > 0
+                      ? allVendorsList
+                      : suppliers
+                    ).map((s) => (
                       <Option key={s.id} value={s.id}>
                         {s.name}
                       </Option>
@@ -2077,8 +2556,12 @@ export default function PurchaseInvoice() {
                   name="place"
                 >
                   <Input
-                    disabled
-                    className="bg-gray-50! font-bold text-gray-900"
+                    disabled={invoiceCreationMode !== "by_contract"}
+                    className={
+                      invoiceCreationMode === "by_contract"
+                        ? "font-bold text-gray-900 border-amber-300!"
+                        : "bg-gray-50! font-bold text-gray-900"
+                    }
                     style={{
                       color: "#111827",
                       WebkitTextFillColor: "#111827",
@@ -2097,8 +2580,15 @@ export default function PurchaseInvoice() {
                   name="lr_no"
                 >
                   <Input
-                    disabled
-                    className="bg-gray-50! font-bold text-gray-900"
+                    disabled={invoiceCreationMode !== "by_contract"}
+                    placeholder={
+                      invoiceCreationMode === "by_contract" ? "Enter LR No" : "-"
+                    }
+                    className={
+                      invoiceCreationMode === "by_contract"
+                        ? "font-bold text-gray-900 border-amber-300!"
+                        : "bg-gray-50! font-bold text-gray-900"
+                    }
                     style={{
                       color: "#111827",
                       WebkitTextFillColor: "#111827",
@@ -2118,8 +2608,17 @@ export default function PurchaseInvoice() {
                   name="lr_date"
                 >
                   <AppDatePicker
-                    disabled
-                    className="bg-gray-50! font-bold text-gray-900 w-full"
+                    disabled={invoiceCreationMode !== "by_contract"}
+                    placeholder={
+                      invoiceCreationMode === "by_contract"
+                        ? "Select LR Date"
+                        : "-"
+                    }
+                    className={`w-full ${
+                      invoiceCreationMode === "by_contract"
+                        ? "font-bold text-gray-900 border-amber-300!"
+                        : "bg-gray-50! font-bold text-gray-900"
+                    }`}
                     style={{
                       color: "#111827",
                       WebkitTextFillColor: "#111827",
@@ -2138,15 +2637,60 @@ export default function PurchaseInvoice() {
                   }
                   name="transport_name"
                 >
-                  <Input
-                    disabled
-                    className="bg-gray-50! font-bold text-gray-900"
-                    style={{
-                      color: "#111827",
-                      WebkitTextFillColor: "#111827",
-                      fontWeight: 700,
-                    }}
-                  />
+                  {invoiceCreationMode === "by_contract" ? (
+                    <Select
+                      placeholder="Select or Search Transporter"
+                      showSearch
+                      allowClear
+                      optionFilterProp="children"
+                      className="w-full font-bold text-gray-900"
+                      onChange={(val) => {
+                        form.setFieldsValue({ transport_name: val });
+                      }}
+                      onSearch={(val) => setCustomTransporterInput(val)}
+                      filterOption={(input, option) =>
+                        String(option?.children || "")
+                          .toLowerCase()
+                          .includes(String(input || "").toLowerCase())
+                      }
+                      onBlur={() => {
+                        if (customTransporterInput) {
+                          form.setFieldsValue({
+                            transport_name: customTransporterInput,
+                          });
+                        }
+                      }}
+                    >
+                      {allKnownTransporters.map((t) => (
+                        <Option key={t.value} value={t.value}>
+                          {t.label}
+                        </Option>
+                      ))}
+                      {customTransporterInput &&
+                        !allKnownTransporters.some(
+                          (t) =>
+                            t.value.toLowerCase() ===
+                            customTransporterInput.toLowerCase(),
+                        ) && (
+                          <Option
+                            key={customTransporterInput}
+                            value={customTransporterInput}
+                          >
+                            Use "{customTransporterInput}"
+                          </Option>
+                        )}
+                    </Select>
+                  ) : (
+                    <Input
+                      disabled
+                      className="bg-gray-50! font-bold text-gray-900"
+                      style={{
+                        color: "#111827",
+                        WebkitTextFillColor: "#111827",
+                        fontWeight: 700,
+                      }}
+                    />
+                  )}
                 </Form.Item>
               </Col>
 
@@ -2162,24 +2706,72 @@ export default function PurchaseInvoice() {
                     { required: true, message: "Vehicle No is required" },
                   ]}
                 >
-                  <Select
-                    ref={vehicleSelectRef}
-                    placeholder="Select Pending Vehicle"
-                    showSearch
-                    open={vehicleDropdownOpen}
-                    onDropdownVisibleChange={(open) =>
-                      setVehicleDropdownOpen(open)
-                    }
-                    optionFilterProp="children"
-                    onChange={handleVehicleChange}
-                    disabled={!form.getFieldValue("vendor")}
-                  >
-                    {availableVehicles.map((v) => (
-                      <Option key={v.vehicle_no} value={v.vehicle_no}>
-                        {v.vehicle_no}
-                      </Option>
-                    ))}
-                  </Select>
+                  {invoiceCreationMode === "by_contract" ? (
+                    <Select
+                      ref={vehicleSelectRef}
+                      placeholder="Select or Search Vehicle No"
+                      showSearch
+                      allowClear
+                      optionFilterProp="children"
+                      className="w-full font-bold text-gray-900"
+                      onChange={(val) => {
+                        form.setFieldsValue({ vehicle_no: val });
+                      }}
+                      onSearch={(val) => setCustomVehicleInput(val)}
+                      filterOption={(input, option) =>
+                        String(option?.children || "")
+                          .toLowerCase()
+                          .includes(String(input || "").toLowerCase())
+                      }
+                      onBlur={() => {
+                        if (customVehicleInput) {
+                          form.setFieldsValue({
+                            vehicle_no: customVehicleInput,
+                          });
+                        }
+                      }}
+                      disabled={!form.getFieldValue("vendor")}
+                    >
+                      {allKnownVehicles.map((v) => (
+                        <Option key={v.value} value={v.value}>
+                          {v.label}
+                        </Option>
+                      ))}
+                      {customVehicleInput &&
+                        !allKnownVehicles.some(
+                          (v) =>
+                            v.value.toLowerCase() ===
+                            customVehicleInput.toLowerCase(),
+                        ) && (
+                          <Option
+                            key={customVehicleInput}
+                            value={customVehicleInput}
+                          >
+                            Use "{customVehicleInput}"
+                          </Option>
+                        )}
+                    </Select>
+                  ) : (
+                    <Select
+                      ref={vehicleSelectRef}
+                      placeholder="Select Pending Vehicle"
+                      showSearch
+                      allowClear
+                      open={vehicleDropdownOpen}
+                      onDropdownVisibleChange={(open) =>
+                        setVehicleDropdownOpen(open)
+                      }
+                      optionFilterProp="children"
+                      onChange={handleVehicleChange}
+                      disabled={!form.getFieldValue("vendor")}
+                    >
+                      {availableVehicles.map((v) => (
+                        <Option key={v.vehicle_no} value={v.vehicle_no}>
+                          {v.vehicle_no}
+                        </Option>
+                      ))}
+                    </Select>
+                  )}
                 </Form.Item>
               </Col>
 
@@ -2322,9 +2914,11 @@ export default function PurchaseInvoice() {
             styles={{ body: { padding: "12px 16px" } }}
           >
             <div style={{ minWidth: 1680 }}>
-              <h6 className="text-amber-600 font-bold mb-2">
-                Items Information
-              </h6>
+              <div className="flex justify-between items-center mb-2">
+                <h6 className="text-amber-600 font-bold mb-0">
+                  Items Information
+                </h6>
+              </div>
 
               {/* Table Header */}
               <div
@@ -2359,62 +2953,122 @@ export default function PurchaseInvoice() {
 
               {/* Items List Rows */}
               <Form.List name="items">
-                {(fields) =>
-                  fields.map((field) => {
-                    const itemName = form.getFieldValue([
-                      "items",
-                      field.name,
-                      "item_name",
-                    ]);
-                    const availableRates =
-                      soudaRatesMap[itemName] || soudaRatesMap[field.name] || [];
+                {(fields) => (
+                  <>
+                    {fields.map((field) => {
+                      const itemName = form.getFieldValue([
+                        "items",
+                        field.name,
+                        "item_name",
+                      ]);
+                      const availableRates =
+                        soudaRatesMap[itemName] ||
+                        soudaRatesMap[field.name] ||
+                        [];
 
-                    return (
-                      <div
-                        key={field.key}
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns:
-                            "3.2fr 0.7fr 0.85fr 0.75fr 0.8fr 0.55fr 1.5fr 1.25fr 1.0fr 1.0fr 1.0fr 1.45fr 60px",
-                          gap: "6px",
-                          alignItems: "center",
-                          marginBottom: "6px",
-                        }}
-                      >
-                        {/* 1. Item Name */}
-                        <div>
-                          <Tooltip title={itemName || form.getFieldValue(["items", field.name, "item_name"]) || "Item Name"} placement="topLeft">
+                      return (
+                        <div
+                          key={field.key}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                              "3.2fr 0.7fr 0.85fr 0.75fr 0.8fr 0.55fr 1.5fr 1.25fr 1.0fr 1.0fr 1.0fr 1.45fr 60px",
+                            gap: "6px",
+                            alignItems: "center",
+                            marginBottom: "6px",
+                          }}
+                        >
+                          {/* 1. Item Name */}
+                          <div>
+                            {invoiceCreationMode === "by_contract" ? (
+                              <Form.Item
+                                name={[field.name, "item_name"]}
+                                style={{ marginBottom: 0 }}
+                                rules={[
+                                  {
+                                    required: true,
+                                    message: "Select item",
+                                  },
+                                ]}
+                              >
+                                <Select
+                                  placeholder="Select Item"
+                                  showSearch
+                                  optionFilterProp="children"
+                                  className="w-full font-bold text-xs"
+                                  onChange={(val, opt) =>
+                                    handleByContractItemSelect(
+                                      field.name,
+                                      val,
+                                      opt,
+                                    )
+                                  }
+                                >
+                                  {vendorProducts.map((p) => {
+                                    const pName = p.name || p.product_name;
+                                    return (
+                                      <Option
+                                        key={p.id || p.product_id || pName}
+                                        value={pName}
+                                        data={p}
+                                      >
+                                        {pName}
+                                      </Option>
+                                    );
+                                  })}
+                                </Select>
+                              </Form.Item>
+                            ) : (
+                              <Tooltip
+                                title={
+                                  itemName ||
+                                  form.getFieldValue([
+                                    "items",
+                                    field.name,
+                                    "item_name",
+                                  ]) ||
+                                  "Item Name"
+                                }
+                                placement="topLeft"
+                              >
+                                <Form.Item
+                                  name={[field.name, "item_name"]}
+                                  style={{ marginBottom: 0 }}
+                                >
+                                  <Input
+                                    disabled
+                                    className="bg-gray-50! font-bold text-gray-900 text-xs"
+                                    style={{
+                                      color: "#111827",
+                                      WebkitTextFillColor: "#111827",
+                                      fontWeight: 700,
+                                    }}
+                                  />
+                                </Form.Item>
+                              </Tooltip>
+                            )}
                             <Form.Item
-                              name={[field.name, "item_name"]}
-                              style={{ marginBottom: 0 }}
+                              name={[field.name, "sale_contract"]}
+                              hidden
                             >
-                              <Input
-                                disabled
-                                className="bg-gray-50! font-bold text-gray-900 text-xs"
-                                style={{
-                                  color: "#111827",
-                                  WebkitTextFillColor: "#111827",
-                                  fontWeight: 700,
-                                }}
-                              />
+                              <Input />
                             </Form.Item>
-                          </Tooltip>
-                          <Form.Item name={[field.name, "sale_contract"]} hidden>
-                            <Input />
-                          </Form.Item>
-                          <Form.Item
-                            name={[field.name, "sale_contract_item"]}
-                            hidden
-                          >
-                            <Input />
-                          </Form.Item>
-                          <Form.Item name={[field.name, "product"]} hidden>
-                            <Input />
-                          </Form.Item>
-                          <Form.Item name={[field.name, "unit_net_wt"]} hidden>
-                            <InputNumber />
-                          </Form.Item>
-                        </div>
+                            <Form.Item
+                              name={[field.name, "sale_contract_item"]}
+                              hidden
+                            >
+                              <Input />
+                            </Form.Item>
+                            <Form.Item name={[field.name, "product"]} hidden>
+                              <Input />
+                            </Form.Item>
+                            <Form.Item
+                              name={[field.name, "unit_net_wt"]}
+                              hidden
+                            >
+                              <InputNumber />
+                            </Form.Item>
+                          </div>
 
                         {/* 2. Avail Qty */}
                         <div>
@@ -2455,35 +3109,39 @@ export default function PurchaseInvoice() {
                           >
                             <InputNumber
                               min={0.01}
-                              max={(() => {
-                                const allItems = form.getFieldValue("items") || [];
-                                const current = allItems[field.name] || {};
-                                const totalAv = Number(
-                                  current.available_qty !== undefined
-                                    ? current.available_qty
-                                    : (current.original_qty !== undefined
-                                        ? current.original_qty
-                                        : (current.qty || 0))
-                                );
-                                const otherAlloc = allItems
-                                  .filter(
-                                    (it, idx) =>
-                                      idx !== field.name &&
-                                      ((it.product && it.product === current.product) ||
-                                        (it.item_name && it.item_name === current.item_name))
-                                  )
-                                  .reduce(
-                                    (sum, it) =>
-                                      sum +
-                                      Number(
-                                        it.invoice_qty !== undefined
-                                          ? it.invoice_qty
-                                          : it.qty || 0
-                                      ),
-                                    0
-                                  );
-                                return Math.max(0.01, Number((totalAv - otherAlloc).toFixed(3)));
-                              })()}
+                              max={
+                                invoiceCreationMode === "by_contract"
+                                  ? undefined
+                                  : (() => {
+                                      const allItems = form.getFieldValue("items") || [];
+                                      const current = allItems[field.name] || {};
+                                      const totalAv = Number(
+                                        current.available_qty !== undefined
+                                          ? current.available_qty
+                                          : (current.original_qty !== undefined
+                                              ? current.original_qty
+                                              : (current.qty || 0))
+                                      );
+                                      const otherAlloc = allItems
+                                        .filter(
+                                          (it, idx) =>
+                                            idx !== field.name &&
+                                            ((it.product && it.product === current.product) ||
+                                              (it.item_name && it.item_name === current.item_name))
+                                        )
+                                        .reduce(
+                                          (sum, it) =>
+                                            sum +
+                                            Number(
+                                              it.invoice_qty !== undefined
+                                                ? it.invoice_qty
+                                                : it.qty || 0
+                                            ),
+                                          0
+                                        );
+                                      return Math.max(0.01, Number((totalAv - otherAlloc).toFixed(3)));
+                                    })()
+                              }
                               precision={2}
                               className="w-full border-amber-400! font-bold text-center text-gray-900 text-xs"
                               placeholder="Qty"
@@ -2756,76 +3414,113 @@ export default function PurchaseInvoice() {
 
                         {/* 13. Action */}
                         <div className="text-center flex justify-center items-center gap-1">
-                          {(() => {
-                            const allItems = form.getFieldValue("items") || [];
-                            const rowItem = allItems[field.name] || {};
-                            const rowTotalAvail = Number(
-                              rowItem.available_qty !== undefined
-                                ? rowItem.available_qty
-                                : (rowItem.original_qty !== undefined
+                          {invoiceCreationMode === "by_contract" ? (
+                            <Tooltip title="Remove this item row">
+                              <Button
+                                type="text"
+                                danger
+                                size="small"
+                                icon={<DeleteOutlined />}
+                                onClick={() => handleRemoveItem(field.name)}
+                                disabled={
+                                  (form.getFieldValue("items") || []).length <= 1
+                                }
+                              />
+                            </Tooltip>
+                          ) : (
+                            <>
+                              {(() => {
+                                const allItems =
+                                  form.getFieldValue("items") || [];
+                                const rowItem = allItems[field.name] || {};
+                                const rowTotalAvail = Number(
+                                  rowItem.available_qty !== undefined
+                                    ? rowItem.available_qty
+                                    : rowItem.original_qty !== undefined
                                     ? rowItem.original_qty
-                                    : (rowItem.qty || 0))
-                            );
-                            const totalAlloc = allItems
-                              .filter(
-                                (it) =>
-                                  (it.product && it.product === rowItem.product) ||
-                                  (it.item_name && it.item_name === rowItem.item_name)
-                              )
-                              .reduce(
-                                (sum, it) =>
-                                  sum +
-                                  Number(
-                                    it.invoice_qty !== undefined
-                                      ? it.invoice_qty
-                                      : it.qty || 0
-                                  ),
-                                0
-                              );
-                            const remaining = Number(
-                              (rowTotalAvail - totalAlloc).toFixed(3)
-                            );
-                            if (rowTotalAvail > 0 && remaining > 0.001) {
-                              return (
-                                <Tooltip
-                                  title={`Add another row for this item (Remaining: ${remaining} ${
-                                    rowItem.unit || ""
-                                  })`}
-                                >
-                                  <Button
-                                    type="text"
-                                    size="small"
-                                    icon={
-                                      <PlusOutlined
-                                        style={{
-                                          color: "#d97706",
-                                          fontWeight: "bold",
-                                        }}
+                                    : rowItem.qty || 0,
+                                );
+                                const totalAlloc = allItems
+                                  .filter(
+                                    (it) =>
+                                      (it.product &&
+                                        it.product === rowItem.product) ||
+                                      (it.item_name &&
+                                        it.item_name === rowItem.item_name),
+                                  )
+                                  .reduce(
+                                    (sum, it) =>
+                                      sum +
+                                      Number(
+                                        it.invoice_qty !== undefined
+                                          ? it.invoice_qty
+                                          : it.qty || 0,
+                                      ),
+                                    0,
+                                  );
+                                const remaining = Number(
+                                  (rowTotalAvail - totalAlloc).toFixed(3),
+                                );
+                                if (rowTotalAvail > 0 && remaining > 0.001) {
+                                  return (
+                                    <Tooltip
+                                      title={`Add another row for this item (Remaining: ${remaining} ${
+                                        rowItem.unit || ""
+                                      })`}
+                                    >
+                                      <Button
+                                        type="text"
+                                        size="small"
+                                        icon={
+                                          <PlusOutlined
+                                            style={{
+                                              color: "#d97706",
+                                              fontWeight: "bold",
+                                            }}
+                                          />
+                                        }
+                                        onClick={() =>
+                                          handleAddSplitItem(field.name)
+                                        }
                                       />
-                                    }
-                                    onClick={() => handleAddSplitItem(field.name)}
-                                  />
-                                </Tooltip>
-                              );
-                            }
-                            return null;
-                          })()}
-                          <Tooltip title="Remove item from this invoice">
-                            <Button
-                              type="text"
-                              danger
-                              size="small"
-                              icon={<DeleteOutlined />}
-                              onClick={() => handleRemoveItem(field.name)}
-                              disabled={form.getFieldValue("items")?.length <= 1}
-                            />
-                          </Tooltip>
+                                    </Tooltip>
+                                  );
+                                }
+                                return null;
+                              })()}
+                              <Tooltip title="Remove item from this invoice">
+                                <Button
+                                  type="text"
+                                  danger
+                                  size="small"
+                                  icon={<DeleteOutlined />}
+                                  onClick={() => handleRemoveItem(field.name)}
+                                  disabled={
+                                    form.getFieldValue("items")?.length <= 1
+                                  }
+                                />
+                              </Tooltip>
+                            </>
+                          )}
                         </div>
                       </div>
                     );
-                  })
-                }
-              </Form.List>
+                  })}
+                  {invoiceCreationMode === "by_contract" && (
+                    <div className="mt-3 flex justify-start">
+                      <Button
+                        type="dashed"
+                        icon={<PlusOutlined />}
+                        onClick={handleAddByContractItemRow}
+                        className="border-amber-400! text-amber-700! hover:text-amber-800! hover:border-amber-500! font-semibold text-xs"
+                      >
+                        + Add Another Item
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </Form.List>
 
               {/* Total Row */}
               <Divider style={{ margin: "10px 0 6px 0" }} />
@@ -3009,8 +3704,12 @@ export default function PurchaseInvoice() {
                   name="gross_weight"
                 >
                   <InputNumber
-                    disabled
-                    className="w-full bg-gray-50! font-bold text-gray-900 text-xs"
+                    disabled={invoiceCreationMode !== "by_contract"}
+                    className={`w-full font-bold text-gray-900 text-xs ${
+                      invoiceCreationMode === "by_contract"
+                        ? "border-amber-300!"
+                        : "bg-gray-50!"
+                    }`}
                     precision={3}
                     style={{
                       color: "#111827",

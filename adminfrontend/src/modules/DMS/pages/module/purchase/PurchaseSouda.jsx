@@ -334,7 +334,10 @@ export default function PurchaseSouda() {
 
       editForm.setFieldsValue(formattedData);
 
-      setSelectedRecord(res);
+      setSelectedRecord({
+        ...res,
+        souda_number: res?.souda_number || record?.souda_number,
+      });
       setIsEditModalOpen(true);
     } finally {
       setLoading(false);
@@ -1788,6 +1791,9 @@ export default function PurchaseSouda() {
         title={
           <span className="text-amber-700 text-2xl font-semibold">
             Edit Purchase Contract
+            {selectedRecord?.souda_number
+              ? ` (${selectedRecord.souda_number})`
+              : ""}
           </span>
         }
         open={isEditModalOpen}

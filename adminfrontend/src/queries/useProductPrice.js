@@ -43,7 +43,7 @@ export const useProductPrice = (productId) => {
     // mutation
     updatePrice: updateMutation.mutate,
     updatePriceAsync: updateMutation.mutateAsync,
-    isUpdating: updateMutation.isLoading,
+    isUpdating: updateMutation.isPending, // react-query v5: mutations use isPending (isLoading was removed)
 
     // helpers
     refreshData,
