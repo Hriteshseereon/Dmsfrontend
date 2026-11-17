@@ -84,6 +84,52 @@ const getProductItemRate = (product) =>
     product?.item_rate ?? product?.itemRate ?? product?.default_rate ?? 0,
   ) || 0;
 
+/**
+ * Item grid — every item row, its header and the Gross Total row share these columns so they
+ * line up and always stay on ONE line. Item Name takes all the remaining width; every other
+ * column is fixed so nothing can wrap or squeeze it.
+ * Order (grid lines 1-16): Item | Qty | Free Qty | Unit | Gross Wt | GST % | Item Rate |
+ * Discount | Premium | Contract Rate | Rate | Amount | GST Amt | Ro. Off | Total | Remove
+ */
+const ITEM_GRID_COLUMNS = [
+  "minmax(200px, 1fr)", // Item Name
+  "64px", // Quantity
+  "60px", // Free Qty
+  "84px", // Unit
+  "66px", // Gross wt
+  "54px", // GST %
+  "80px", // Item Rate
+  "72px", // Discount
+  "72px", // Premium
+  "94px", // Contract Rate
+  "90px", // Rate
+  "102px", // Amount
+  "94px", // GST Amount
+  "64px", // Ro. Off
+  "106px", // Total Amount
+  "36px", // Remove
+].join(" ");
+
+const itemGridStyle = {
+  display: "grid",
+  gridTemplateColumns: ITEM_GRID_COLUMNS,
+  columnGap: 4,
+  alignItems: "start",
+};
+
+// Gross Total cells sit under the item column they total (CSS grid lines are 1-based).
+const SUMMARY_GRID_COLUMN = {
+  qty: "2 / span 2", // Quantity + Free Qty
+  weight: "5 / span 2", // Gross wt + GST %
+  amount: "12", // Amount
+  gst: "13", // GST Amount
+  gross: "15", // Total Amount
+};
+
+// Min width the modal form needs so the one-line grid never overflows its card;
+// narrower screens scroll sideways instead of wrapping.
+const ITEM_FORM_MIN_WIDTH = 1430;
+
 export default function SalesSouda() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -1524,32 +1570,36 @@ export default function SalesSouda() {
             </div>
 
             {/* Header Row */}
-            <Row
-              gutter={4}
-              className="pb-2 mb-2 text-amber-800 font-semibold text-xs"
+            <div
+              className="pb-2 mb-2 text-amber-800 font-semibold text-xs whitespace-nowrap [&>*]:min-w-0"
+              style={itemGridStyle}
             >
-              <Col span={4}>Item Name</Col>
-              <Col span={1}>Quantity</Col>
-              <Col span={1}>Free Qty</Col>
-              <Col span={1}>Unit</Col>
-              <Col span={1}>Gross wt</Col>
-              <Col span={1}>GST %</Col>
-              <Col span={1}>Item Rate</Col>
-              <Col span={1}>Discount</Col>
-              <Col span={1}>Premium</Col>
-              <Col span={2}>Contract Rate</Col>
-              <Col span={2}>Rate</Col>
-              <Col span={2}>Amount</Col>
-              <Col span={2}>GST Amount</Col>
-              <Col span={1}>Ro. Off</Col>
-              <Col span={2}>Total Amount</Col>
-              <Col span={1}></Col>
-            </Row>
+              <div>Item Name</div>
+              <div>Quantity</div>
+              <div>Free Qty</div>
+              <div>Unit</div>
+              <div>Gross wt</div>
+              <div>GST %</div>
+              <div>Item Rate</div>
+              <div>Discount</div>
+              <div>Premium</div>
+              <div>Contract Rate</div>
+              <div>Rate</div>
+              <div>Amount</div>
+              <div>GST Amount</div>
+              <div>Ro. Off</div>
+              <div>Total Amount</div>
+              <div></div>
+            </div>
 
             {fields.map((field) => (
-              <Row key={field.key} gutter={4} align="middle" className="mb-5">
+              <div
+                key={field.key}
+                className="mb-5 [&>*]:min-w-0"
+                style={itemGridStyle}
+              >
                 {/* Item Select — auto fills UOM + GST + Item Rate */}
-                <Col span={4}>
+                <div>
                   <Form.Item
                     name={[field.name, "item"]}
                     style={{ marginBottom: 0 }}
@@ -1584,17 +1634,17 @@ export default function SalesSouda() {
                       ))}
                     </Select>
                   </Form.Item>
-                </Col>
+                </div>
 
                 {/* Qty — recalculate on change */}
-                <Col span={1}>
+                <div>
                   <Form.Item
                     name={[field.name, "qty"]}
                     style={{ marginBottom: 0 }}
                   >
                     <InputNumber
                       ref={(el) => (qtyRefs.current[field.name] = el)}
-                      className="w-full!"
+                      className="w-full! [&_input]:px-1!"
                       type="number"
                       controls={false}
                       maxLength={5}
@@ -1623,17 +1673,17 @@ export default function SalesSouda() {
                       }}
                     />
                   </Form.Item>
-                </Col>
+                </div>
 
                 {/* Free Qty */}
-                <Col span={1}>
+                <div>
                   <Form.Item
                     name={[field.name, "freeQty"]}
                     style={{ marginBottom: 0 }}
                   >
                     <InputNumber
                       type="number"
-                      className="w-full!"
+                      className="w-full! [&_input]:px-1!"
                       controls={false}
                       maxLength={5}
                       onInput={(e) => {
@@ -1654,39 +1704,39 @@ export default function SalesSouda() {
                       }}
                     />
                   </Form.Item>
-                </Col>
+                </div>
                 {/* UOM — auto filled */}
-                <Col span={1}>
+                <div>
                   <Form.Item
                     name={[field.name, "uom"]}
                     style={{ marginBottom: 0 }}
                   >
                     <Input disabled className="px-1!" />
                   </Form.Item>
-                </Col>
+                </div>
 
                 {/* Weight in Ton — auto calculated */}
-                <Col span={1}>
+                <div>
                   <Form.Item
                     name={[field.name, "weightTon"]}
                     style={{ marginBottom: 0 }}
                   >
-                    <Input disabled />
+                    <Input disabled className="px-1!" />
                   </Form.Item>
-                </Col>
+                </div>
 
                 {/* GST % — auto filled */}
-                <Col span={1}>
+                <div>
                   <Form.Item
                     name={[field.name, "gstPercent"]}
                     style={{ marginBottom: 0 }}
                   >
-                    <Input disabled />
+                    <Input disabled className="px-1!" />
                   </Form.Item>
-                </Col>
+                </div>
 
                 {/* Item Rate — auto filled from the product */}
-                <Col span={1}>
+                <div>
                   <Form.Item
                     name={[field.name, "itemRate"]}
                     style={{ marginBottom: 0 }}
@@ -1703,10 +1753,10 @@ export default function SalesSouda() {
                       }
                     />
                   </Form.Item>
-                </Col>
+                </div>
 
                 {/* Discount — user inputs either Discount or Premium (not both) */}
-                <Col span={1}>
+                <div>
                   <Form.Item noStyle shouldUpdate={rateInputsChanged(field.name)}>
                     {({ getFieldValue }) => {
                       const row = getFieldValue(["items", field.name]) || {};
@@ -1759,10 +1809,10 @@ export default function SalesSouda() {
                       );
                     }}
                   </Form.Item>
-                </Col>
+                </div>
 
                 {/* Premium — added on top of the item rate */}
-                <Col span={1}>
+                <div>
                   <Form.Item noStyle shouldUpdate={rateInputsChanged(field.name)}>
                     {({ getFieldValue }) => {
                       const row = getFieldValue(["items", field.name]) || {};
@@ -1802,10 +1852,10 @@ export default function SalesSouda() {
                       );
                     }}
                   </Form.Item>
-                </Col>
+                </div>
 
                 {/* Contract Rate — auto (item rate ∓ discount/premium); manual only when the item has no rate */}
-                <Col span={2}>
+                <div>
                   <Form.Item noStyle shouldUpdate={rateInputsChanged(field.name)}>
                     {({ getFieldValue }) => {
                       const hasItemRate =
@@ -1908,10 +1958,10 @@ export default function SalesSouda() {
                       );
                     }}
                   </Form.Item>
-                </Col>
+                </div>
 
                 {/* Rate — auto calculated (con.rate ex-GST) */}
-                <Col span={2}>
+                <div>
                   <Form.Item
                     name={[field.name, "rate"]}
                     style={{ marginBottom: 0 }}
@@ -1927,10 +1977,10 @@ export default function SalesSouda() {
                       }
                     />
                   </Form.Item>
-                </Col>
+                </div>
 
                 {/* Amount — auto calculated */}
-                <Col span={2}>
+                <div>
                   <Form.Item
                     name={[field.name, "amount"]}
                     style={{ marginBottom: 0 }}
@@ -1946,10 +1996,10 @@ export default function SalesSouda() {
                       }
                     />
                   </Form.Item>
-                </Col>
+                </div>
 
                 {/* GST Amount — auto calculated */}
-                <Col span={2}>
+                <div>
                   <Form.Item
                     name={[field.name, "gstAmount"]}
                     style={{ marginBottom: 0 }}
@@ -1965,8 +2015,8 @@ export default function SalesSouda() {
                       }
                     />
                   </Form.Item>
-                </Col>
-                <Col span={1}>
+                </div>
+                <div>
                   <Form.Item
                     name={[field.name, "roundOff"]}
                     style={{ marginBottom: 0 }}
@@ -1982,10 +2032,10 @@ export default function SalesSouda() {
                       }
                     />
                   </Form.Item>
-                </Col>
+                </div>
 
                 {/* Total Amount — auto calculated */}
-                <Col span={2}>
+                <div>
                   <Form.Item
                     name={[field.name, "totalAmount"]}
                     style={{ marginBottom: 0 }}
@@ -2001,9 +2051,9 @@ export default function SalesSouda() {
                       }
                     />
                   </Form.Item>
-                </Col>
+                </div>
 
-                <Col span={1}>
+                <div>
                   {allowRemove && (
                     <Button
                       type="text"
@@ -2012,8 +2062,8 @@ export default function SalesSouda() {
                       onClick={() => remove(field.name)}
                     />
                   )}
-                </Col>
-              </Row>
+                </div>
+              </div>
             ))}
           </>
         )}
@@ -2410,9 +2460,11 @@ export default function SalesSouda() {
         }}
         footer={null}
         width={1800}
+        styles={{ body: { overflowX: "auto" } }}
       >
         <Form
           form={addForm}
+          style={{ minWidth: ITEM_FORM_MIN_WIDTH }}
           layout="vertical"
           onFinish={handleAddFinish}
           onValuesChange={handleAddValuesChange}
@@ -2767,19 +2819,18 @@ export default function SalesSouda() {
             {/* Tax & totals */}
             {/* <h6 className="text-amber-500">Summary</h6> */}
 
-            <Row gutter={8}>
-              <Col span={4}>
+            <div className="[&>*]:min-w-0" style={itemGridStyle}>
+<div style={{ gridColumn: 1 }}>
                 <span className="text-amber-700 font-bold text-2xl">
                   Gross Total
                 </span>
-              </Col>
-              <Col span={2}>
+              </div>
+<div style={{ gridColumn: SUMMARY_GRID_COLUMN.qty }}>
                 <Form.Item name={["orderTotals", "totalQty"]}>
                   <Input disabled />
                 </Form.Item>
-              </Col>
-              <Col span={1}></Col>
-              <Col span={2}>
+              </div>
+<div style={{ gridColumn: SUMMARY_GRID_COLUMN.weight }}>
                 <Form.Item
                   shouldUpdate={(prev, current) =>
                     prev?.contratGrossWeight !== current?.contratGrossWeight ||
@@ -2860,10 +2911,8 @@ export default function SalesSouda() {
                     );
                   }}
                 </Form.Item>
-              </Col>
-              <Col span={7}></Col>
-
-              <Col span={2}>
+              </div>
+<div style={{ gridColumn: SUMMARY_GRID_COLUMN.amount }}>
                 <Form.Item name={["orderTotals", "totalAmount"]}>
                   <InputNumber
                     className="w-full!"
@@ -2876,9 +2925,8 @@ export default function SalesSouda() {
                     }
                   />
                 </Form.Item>
-              </Col>
-
-              <Col span={2}>
+              </div>
+<div style={{ gridColumn: SUMMARY_GRID_COLUMN.gst }}>
                 <Form.Item name={["orderTotals", "totalGSTAmount"]}>
                   <InputNumber
                     className="w-full!"
@@ -2891,9 +2939,8 @@ export default function SalesSouda() {
                     }
                   />
                 </Form.Item>
-              </Col>
-              <Col span={1}></Col>
-              <Col span={2}>
+              </div>
+<div style={{ gridColumn: SUMMARY_GRID_COLUMN.gross }}>
                 <Form.Item name={["orderTotals", "grossAmount"]}>
                   <InputNumber
                     className="w-full!"
@@ -2906,8 +2953,8 @@ export default function SalesSouda() {
                     }
                   />
                 </Form.Item>
-              </Col>
-            </Row>
+              </div>
+</div>
           </Card>
           <div className="flex justify-end gap-2 mt-4">
             <Button
@@ -2950,9 +2997,11 @@ export default function SalesSouda() {
         }}
         footer={null}
         width={1800}
+        styles={{ body: { overflowX: "auto" } }}
       >
         <Form
           form={editForm}
+          style={{ minWidth: ITEM_FORM_MIN_WIDTH }}
           layout="vertical"
           onFinish={handleEditFinish}
           onValuesChange={handleEditValuesChange}
@@ -3253,19 +3302,18 @@ export default function SalesSouda() {
           >
             {/* <h6 className="text-amber-500">Summary</h6> */}
 
-            <Row gutter={8}>
-              <Col span={4}>
+            <div className="[&>*]:min-w-0" style={itemGridStyle}>
+<div style={{ gridColumn: 1 }}>
                 <span className="text-amber-700 font-bold text-2xl">
                   Gross Total
                 </span>
-              </Col>
-              <Col span={2}>
+              </div>
+<div style={{ gridColumn: SUMMARY_GRID_COLUMN.qty }}>
                 <Form.Item name={["orderTotals", "totalQty"]}>
                   <Input disabled />
                 </Form.Item>
-              </Col>
-              <Col span={1}></Col>
-              <Col span={1}>
+              </div>
+<div style={{ gridColumn: SUMMARY_GRID_COLUMN.weight }}>
                 <Form.Item
                   shouldUpdate={(prev, current) =>
                     prev?.contratGrossWeight !== current?.contratGrossWeight ||
@@ -3346,10 +3394,8 @@ export default function SalesSouda() {
                     );
                   }}
                 </Form.Item>
-              </Col>
-              <Col span={8}></Col>
-
-              <Col span={2}>
+              </div>
+<div style={{ gridColumn: SUMMARY_GRID_COLUMN.amount }}>
                 <Form.Item name={["orderTotals", "totalAmount"]}>
                   <InputNumber
                     className="w-full!"
@@ -3362,8 +3408,8 @@ export default function SalesSouda() {
                     }
                   />
                 </Form.Item>
-              </Col>
-              <Col span={2}>
+              </div>
+<div style={{ gridColumn: SUMMARY_GRID_COLUMN.gst }}>
                 <Form.Item name={["orderTotals", "totalGSTAmount"]}>
                   <InputNumber
                     className="w-full!"
@@ -3376,10 +3422,8 @@ export default function SalesSouda() {
                     }
                   />
                 </Form.Item>
-              </Col>
-              <Col span={1}></Col>
-
-              <Col span={2}>
+              </div>
+<div style={{ gridColumn: SUMMARY_GRID_COLUMN.gross }}>
                 <Form.Item name={["orderTotals", "grossAmount"]}>
                   <InputNumber
                     className="w-full!"
@@ -3392,8 +3436,8 @@ export default function SalesSouda() {
                     }
                   />
                 </Form.Item>
-              </Col>
-            </Row>
+              </div>
+</div>
           </Card>
           <div className="flex justify-end gap-2 mt-4">
             <Button
@@ -3433,8 +3477,13 @@ export default function SalesSouda() {
         }}
         footer={null}
         width={1800}
+        styles={{ body: { overflowX: "auto" } }}
       >
-        <Form layout="vertical" form={viewForm}>
+        <Form
+          layout="vertical"
+          form={viewForm}
+          style={{ minWidth: ITEM_FORM_MIN_WIDTH }}
+        >
           {/* Basic Information */}
           <Card
             size="small"
@@ -3569,94 +3618,93 @@ export default function SalesSouda() {
             styles={{ body: { padding: "0px 12px" } }}
           >
             <h6 className="text-amber-500">Items</h6>
-            <Row
-              gutter={4}
-              className="pb-2 mb-2 text-amber-800 font-semibold text-xs"
+            <div
+              className="pb-2 mb-2 text-amber-800 font-semibold text-xs whitespace-nowrap [&>*]:min-w-0"
+              style={itemGridStyle}
             >
-              <Col span={4}>Item Name</Col>
-              <Col span={1}>Qty</Col>
-              <Col span={1}>F.Qty</Col>
-              <Col span={1}>Unit</Col>
-              <Col span={1}>Wt (Ton)</Col>
-              <Col span={1}>GST %</Col>
-              <Col span={1}>Item Rate</Col>
-              <Col span={1}>Discount</Col>
-              <Col span={1}>Premium</Col>
-              <Col span={2}>Con. Rate</Col>
-              <Col span={2}>Rate</Col>
-              <Col span={2}>Amount</Col>
-              <Col span={2}>GST Amt</Col>
-              <Col span={1}>Ro. Off</Col>
-              <Col span={2}>Total Amt</Col>
-              <Col span={1}></Col>
-            </Row>
+              <div>Item Name</div>
+              <div>Qty</div>
+              <div>F.Qty</div>
+              <div>Unit</div>
+              <div>Wt (Ton)</div>
+              <div>GST %</div>
+              <div>Item Rate</div>
+              <div>Discount</div>
+              <div>Premium</div>
+              <div>Con. Rate</div>
+              <div>Rate</div>
+              <div>Amount</div>
+              <div>GST Amt</div>
+              <div>Ro. Off</div>
+              <div>Total Amt</div>
+              <div></div>
+            </div>
 
             {(selectedRecord?.items || []).map((it, idx) => (
-              <Row
+              <div
                 key={it.lineKey || idx}
-                gutter={4}
-                align="middle"
-                className="mb-2"
+                className="mb-2 [&>*]:min-w-0"
+                style={itemGridStyle}
               >
-                <Col span={4}>
+                <div>
                   <Input disabled value={it.itemName || "-"} />
-                </Col>
-                <Col span={1}>
+                </div>
+                <div>
                   <Input disabled className="px-1!" value={it.qty} />
-                </Col>
-                <Col span={1}>
+                </div>
+                <div>
                   <Input disabled className="px-1!" value={it.freeQty} />
-                </Col>
-                <Col span={1}>
+                </div>
+                <div>
                   <Input disabled className="px-1!" value={it.uom || "-"} />
-                </Col>
-                <Col span={1}>
+                </div>
+                <div>
                   <Input disabled className="px-1!" value={it.weightTon} />
-                </Col>
-                <Col span={1}>
+                </div>
+                <div>
                   <Input disabled className="px-1!" value={it.gstPercent} />
-                </Col>
-                <Col span={1}>
+                </div>
+                <div>
                   <Input
                     disabled
                     className="px-1!"
                     value={Number(it.itemRate || 0).toFixed(2)}
                   />
-                </Col>
-                <Col span={1}>
+                </div>
+                <div>
                   <Input
                     disabled
                     className="px-1!"
                     value={Number(it.discount || 0).toFixed(2)}
                   />
-                </Col>
-                <Col span={1}>
+                </div>
+                <div>
                   <Input
                     disabled
                     className="px-1!"
                     value={Number(it.premium || 0).toFixed(2)}
                   />
-                </Col>
-                <Col span={2}>
+                </div>
+                <div>
                   <Input disabled value={it.contractRate} />
-                </Col>
-                <Col span={2}>
+                </div>
+                <div>
                   <Input disabled value={it.rate} />
-                </Col>
-                <Col span={2}>
+                </div>
+                <div>
                   <Input disabled value={it.amount} />
-                </Col>
-                <Col span={2}>
+                </div>
+                <div>
                   <Input disabled value={it.gstAmount} />
-                </Col>
-                <Col span={1}>
+                </div>
+                <div>
                   <Input disabled value={it.roundOff} />
-                </Col>
-                <Col span={2}>
+                </div>
+                <div>
                   <Input disabled value={it.totalAmount} />
-                </Col>
-                <Col span={1}></Col>
-              </Row>
+                </div>
+                <div></div>
+              </div>
             ))}
           </Card>
           {/* Summary — identical to Add/Edit */}
@@ -3666,41 +3714,38 @@ export default function SalesSouda() {
             styles={{ body: { padding: "6px 12px 0px 12px" } }}
           >
             {/* <h6 className="text-amber-500 mt-2">Summary</h6> */}
-            <Row gutter={8}>
-              <Col span={4}>
+            <div className="[&>*]:min-w-0" style={itemGridStyle}>
+<div style={{ gridColumn: 1 }}>
                 <span className="text-amber-700 font-bold text-2xl">
                   Gross Total
                 </span>
-              </Col>
-              <Col span={2}>
+              </div>
+<div style={{ gridColumn: SUMMARY_GRID_COLUMN.qty }}>
                 <Form.Item name={["orderTotals", "totalQty"]}>
                   <Input disabled />
                 </Form.Item>
-              </Col>
-              <Col span={1}></Col>
-              <Col span={2}>
+              </div>
+<div style={{ gridColumn: SUMMARY_GRID_COLUMN.weight }}>
                 <Form.Item name={["orderTotals", "totalWeightTon"]}>
                   <Input disabled />
                 </Form.Item>
-              </Col>
-              <Col span={7}></Col>
-              <Col span={2}>
+              </div>
+<div style={{ gridColumn: SUMMARY_GRID_COLUMN.amount }}>
                 <Form.Item name={["orderTotals", "totalAmount"]}>
                   <Input disabled />
                 </Form.Item>
-              </Col>
-              <Col span={2}>
+              </div>
+<div style={{ gridColumn: SUMMARY_GRID_COLUMN.gst }}>
                 <Form.Item name={["orderTotals", "totalGSTAmount"]}>
                   <Input disabled />
                 </Form.Item>
-              </Col>
-              <Col span={1}></Col>
-              <Col span={2}>
+              </div>
+<div style={{ gridColumn: SUMMARY_GRID_COLUMN.gross }}>
                 <Form.Item name={["orderTotals", "grossAmount"]}>
                   <Input disabled />
                 </Form.Item>
-              </Col>
-            </Row>
+              </div>
+</div>
           </Card>
         </Form>
       </Modal>
