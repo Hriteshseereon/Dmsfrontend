@@ -6,6 +6,7 @@ import VehicleMaster from "./VehicleMaster";
 import VehicleOwnermaster from "./VehicleOwnermaster";
 import VehicleDriverMaster from "./VehicleDriverMaster";
 import FreightMaster from "./FreightMaster";
+import TdsMaster from "./TdsMaster";
 
 export default function GroupMaster() {
   const items = [
@@ -33,6 +34,11 @@ export default function GroupMaster() {
       key: "freightmaster",
       label: "Freight Master",
       children: <FreightMaster />,
+    },
+    {
+      key: "tdsmaster",
+      label: "TDS Master",
+      children: <TdsMaster />,
     },
   ];
 
