@@ -60,6 +60,7 @@ import {
 } from "../../../../../utils/financialYearValidation";
 import AppDatePicker from "../../../../../components/AppDatePicker";
 import useSessionStore from "../../../../../store/sessionStore";
+import PurchaseTdsPanel from "./PurchaseTdsPanel";
 
 dayjs.extend(customParseFormat);
 
@@ -3844,6 +3845,9 @@ export default function PurchaseInvoice() {
               </Col>
             </Row>
           </Card>
+
+          {/* TDS: supplier cumulative purchases (Grand Total basis) vs TDS Master threshold */}
+          <PurchaseTdsPanel form={form} invoiceId={editingId} />
         </Form>
       </Modal>
 
@@ -4053,6 +4057,48 @@ export default function PurchaseInvoice() {
                 </div>
               </Col>
             </Row>
+
+            {viewRecord.tds_amount !== undefined &&
+              viewRecord.tds_amount !== null && (
+                <Row gutter={[16, 12]} style={{ marginTop: 12 }}>
+                  <Col span={6}>
+                    <Text type="secondary">TDS Applicable Amount: </Text>
+                    <div className="font-bold">
+                      ₹
+                      {Number(viewRecord.tds_applicable_amount || 0).toLocaleString(
+                        "en-IN",
+                        { minimumFractionDigits: 2 },
+                      )}
+                    </div>
+                  </Col>
+                  <Col span={4}>
+                    <Text type="secondary">TDS Rate: </Text>
+                    <div className="font-bold">
+                      {Number(viewRecord.tds_percentage || 0).toFixed(2)}%
+                    </div>
+                  </Col>
+                  <Col span={6}>
+                    <Text type="secondary">TDS Deducted: </Text>
+                    <div className="font-bold text-red-600">
+                      - ₹
+                      {Number(viewRecord.tds_amount || 0).toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                      })}
+                    </div>
+                  </Col>
+                  <Col span={6}>
+                    <Text type="secondary">Net Payable: </Text>
+                    <div className="font-bold text-lg text-amber-800">
+                      {/* Grand Total - TDS: invoices saved before TDS existed have net_payable_amount = 0 */}
+                      ₹
+                      {(
+                        Number(viewRecord.grand_total || 0) -
+                        Number(viewRecord.tds_amount || 0)
+                      ).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </div>
+                  </Col>
+                </Row>
+              )}
 
             {viewRecord.invoice_copy_url && (
               <div style={{ marginTop: 16 }}>
