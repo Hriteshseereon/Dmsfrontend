@@ -570,6 +570,31 @@ export const getPurchaseInvoices = async (filters = {}) => {
   return res.data;
 };
 
+// Live TDS preview for a purchase invoice: the supplier's cumulative purchases in the FY vs the TDS Master
+// threshold. Mirrors what the server calculates when the invoice is saved (purchase/services/tds_service.py),
+// so pass the same inputs the save payload carries: vendor, supplier GST / name, invoice date and grand total.
+// `invoiceId` excludes the invoice being edited from the supplier's prior purchases.
+export const calculatePurchaseInvoiceTds = async (
+  { vendorId, supplierName, supplierGst, amount, invoiceDate, invoiceId },
+  { signal } = {},
+) => {
+  const { currentOrgId } = useSessionStore.getState();
+  const params = {
+    organisation: currentOrgId,
+    vendor_id: vendorId,
+    amount,
+  };
+  if (supplierName) params.supplier_name = supplierName;
+  if (supplierGst) params.supplier_gst = supplierGst;
+  if (invoiceDate) params.invoice_date = invoiceDate; // DD-MM-YYYY or YYYY-MM-DD
+  if (invoiceId) params.invoice_id = invoiceId;
+  const res = await api.get("/purchase/invoices/calculate-tds/", {
+    params,
+    signal,
+  });
+  return res.data;
+};
+
 export const createPurchaseInvoice = async (payload) => {
   const { currentOrgId, selectedFY } = useSessionStore.getState();
   
