@@ -1,5 +1,6 @@
 import api from './axios';
 import useSessionStore from '../store/sessionStore';
+import { showApiErrorAlert } from '../utils/apiAlerts';
 
 //dashboard
 export const getDashboardData = async () => {
@@ -474,13 +475,15 @@ export const createSaleInvoice = async (payload) => {
     headers: isFormData ? { "Content-Type": "multipart/form-data" } : {},
   };
   try {
-    const res = await api.post("/sales/invoices/", payload, config);
+    // First attempt is silent: a 404 here just means "try the other endpoint"
+    const res = await api.post("/sales/invoices/", payload, { ...config, skipErrorAlert: true });
     return res.data;
   } catch (err) {
     if (err.response?.status === 404) {
       const res2 = await api.post("/sales/sales-invoices/", payload, config);
       return res2.data;
     }
+    showApiErrorAlert(err); // any other failure is real, so tell the user
     throw err;
   }
 };
@@ -509,13 +512,15 @@ export const updateSaleInvoice = async (id, payload) => {
     headers: isFormData ? { "Content-Type": "multipart/form-data" } : {},
   };
   try {
-    const res = await api.patch(`/sales/invoices/${id}/`, payload, config);
+    // First attempt is silent: a 404 here just means "try the other endpoint"
+    const res = await api.patch(`/sales/invoices/${id}/`, payload, { ...config, skipErrorAlert: true });
     return res.data;
   } catch (err) {
     if (err.response?.status === 404) {
       const res2 = await api.patch(`/sales/sales-invoices/${id}/`, payload, config);
       return res2.data;
     }
+    showApiErrorAlert(err); // any other failure is real, so tell the user
     throw err;
   }
 };
@@ -523,8 +528,10 @@ export const updateSaleInvoice = async (id, payload) => {
 export const deleteSaleInvoice = async (id) => {
   const { currentOrgId } = useSessionStore.getState();
   try {
+    // First attempt is silent: a 404 here just means "try the other endpoint"
     const res = await api.delete(`/sales/invoices/${id}/`, {
       params: { organisation: currentOrgId },
+      skipErrorAlert: true,
     });
     return res.data;
   } catch (err) {
@@ -534,6 +541,7 @@ export const deleteSaleInvoice = async (id) => {
       });
       return res2.data;
     }
+    showApiErrorAlert(err); // any other failure is real, so tell the user
     throw err;
   }
 };

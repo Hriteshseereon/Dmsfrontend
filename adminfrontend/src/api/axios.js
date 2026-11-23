@@ -1,5 +1,6 @@
 import axios from "axios";
 import useSessionStore from "../store/sessionStore";
+import { notifyWriteRequestFailure } from "../utils/apiAlerts";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -120,6 +121,10 @@ api.interceptors.response.use(
         isRefreshing = false;
       }
     }
+
+    // Every failed save / update / delete tells the user why (401s were handled above: token refresh).
+    // Opt out for one request with `{ skipErrorAlert: true }` in its axios config.
+    notifyWriteRequestFailure(error);
 
     return Promise.reject(error);
   }

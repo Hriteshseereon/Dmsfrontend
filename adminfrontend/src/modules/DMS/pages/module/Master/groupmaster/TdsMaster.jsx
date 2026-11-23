@@ -28,6 +28,7 @@ import {
   updateTdsMaster,
   deleteTdsMaster,
 } from "../../../../../../api/tdsmaster";
+import { getApiErrorMessage } from "../../../../../../utils/apiError";
 
 const formatINR = (value) =>
   `₹${Number(value || 0).toLocaleString("en-IN", {
@@ -51,21 +52,6 @@ const toList = (res) => {
   if (Array.isArray(res?.data)) return res.data;
   if (Array.isArray(res?.results)) return res.results;
   return [];
-};
-
-const getErrorMessage = (err, fallback) => {
-  const data = err?.response?.data;
-  if (!data) return fallback;
-  if (typeof data === "string") return data;
-  if (data.message) return data.message;
-  if (data.detail) return data.detail;
-  const firstKey = Object.keys(data)[0];
-  const firstVal = firstKey ? data[firstKey] : null;
-  if (firstVal) {
-    const text = Array.isArray(firstVal) ? firstVal[0] : firstVal;
-    return `${firstKey}: ${typeof text === "string" ? text : JSON.stringify(text)}`;
-  }
-  return fallback;
 };
 
 export default function TdsMaster() {
@@ -179,7 +165,7 @@ export default function TdsMaster() {
     } catch (err) {
       console.error(err);
       message.error(
-        getErrorMessage(
+        getApiErrorMessage(
           err,
           editingRow
             ? "Failed to update TDS configuration"
@@ -198,7 +184,7 @@ export default function TdsMaster() {
       fetchAll();
     } catch (err) {
       console.error(err);
-      message.error(getErrorMessage(err, "Failed to delete TDS configuration"));
+      message.error(getApiErrorMessage(err, "Failed to delete TDS configuration"));
     }
   };
 
