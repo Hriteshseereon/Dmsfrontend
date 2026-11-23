@@ -1,5 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+// Must come before anything that can call message.* / Modal.confirm (static antd helpers render nothing on React 19 otherwise)
+import "./utils/antdReact19Compat";
 import App from "./App.jsx";
 import "./index.css";
 import { AuthProvider } from "./context/AuthContext.jsx";
