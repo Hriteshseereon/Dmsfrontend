@@ -2644,9 +2644,14 @@ export default function PurchaseInvoice() {
                       showSearch
                       allowClear
                       optionFilterProp="children"
+                      // The box shows the plain value; the dropdown still shows `Use "..."` for typed text
+                      optionLabelProp="label"
                       className="w-full font-bold text-gray-900"
                       onChange={(val) => {
                         form.setFieldsValue({ transport_name: val });
+                        // antd clears its own search box on select but never calls onSearch(""), so the
+                        // typed text must be dropped here or onBlur would overwrite the picked option.
+                        setCustomTransporterInput("");
                       }}
                       onSearch={(val) => setCustomTransporterInput(val)}
                       filterOption={(input, option) =>
@@ -2659,11 +2664,12 @@ export default function PurchaseInvoice() {
                           form.setFieldsValue({
                             transport_name: customTransporterInput,
                           });
+                          setCustomTransporterInput("");
                         }
                       }}
                     >
                       {allKnownTransporters.map((t) => (
-                        <Option key={t.value} value={t.value}>
+                        <Option key={t.value} value={t.value} label={t.label}>
                           {t.label}
                         </Option>
                       ))}
@@ -2676,6 +2682,7 @@ export default function PurchaseInvoice() {
                           <Option
                             key={customTransporterInput}
                             value={customTransporterInput}
+                            label={customTransporterInput}
                           >
                             Use "{customTransporterInput}"
                           </Option>
@@ -2714,9 +2721,15 @@ export default function PurchaseInvoice() {
                       showSearch
                       allowClear
                       optionFilterProp="children"
+                      // The box shows the plain value; the dropdown still shows `Use "..."` for typed text
+                      optionLabelProp="label"
                       className="w-full font-bold text-gray-900"
                       onChange={(val) => {
                         form.setFieldsValue({ vehicle_no: val });
+                        // antd clears its own search box on select but never calls onSearch(""), so the
+                        // typed text (e.g. "1234") must be dropped here, otherwise onBlur would overwrite
+                        // the picked vehicle (OD09F1234) with it.
+                        setCustomVehicleInput("");
                       }}
                       onSearch={(val) => setCustomVehicleInput(val)}
                       filterOption={(input, option) =>
@@ -2729,12 +2742,13 @@ export default function PurchaseInvoice() {
                           form.setFieldsValue({
                             vehicle_no: customVehicleInput,
                           });
+                          setCustomVehicleInput("");
                         }
                       }}
                       disabled={!form.getFieldValue("vendor")}
                     >
                       {allKnownVehicles.map((v) => (
-                        <Option key={v.value} value={v.value}>
+                        <Option key={v.value} value={v.value} label={v.label}>
                           {v.label}
                         </Option>
                       ))}
@@ -2747,6 +2761,7 @@ export default function PurchaseInvoice() {
                           <Option
                             key={customVehicleInput}
                             value={customVehicleInput}
+                            label={customVehicleInput}
                           >
                             Use "{customVehicleInput}"
                           </Option>
