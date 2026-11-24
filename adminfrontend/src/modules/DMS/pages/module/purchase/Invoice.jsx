@@ -88,6 +88,10 @@ const fmtDate = (d) => {
   return parsed ? parsed.format("DD-MM-YYYY") : "-";
 };
 
+// LR numbers are written like "aum/001" - in By Contract mode the field starts with the prefix
+// and the user only types the number after it.
+const LR_PREFIX = "aum/";
+
 export default function PurchaseInvoice() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -117,8 +121,12 @@ export default function PurchaseInvoice() {
   const [customTransporterInput, setCustomTransporterInput] = useState("");
   const [soudaRatesMap, setSoudaRatesMap] = useState({}); // keyed by item_name
   const [fileList, setFileList] = useState([]);
+  // LR copy upload (sits next to the invoice copy upload)
+  const [lrFileList, setLrFileList] = useState([]);
+  const [editingRecordLrUrl, setEditingRecordLrUrl] = useState(null);
 
   // Form field focus and navigation refs
+  const lrNoRef = useRef(null);
   const vehicleSelectRef = useRef(null);
   const [vehicleDropdownOpen, setVehicleDropdownOpen] = useState(false);
   const ewaybillNoRef = useRef(null);
@@ -466,7 +474,7 @@ export default function PurchaseInvoice() {
     // Reset dependant fields with default dispatch_from: "Haldia"
     form.setFieldsValue({
       vehicle_no: undefined,
-      lr_no: "",
+      lr_no: invoiceCreationMode === "by_contract" ? LR_PREFIX : "",
       lr_date: null,
       transport_name: "",
       place: "",
@@ -490,6 +498,14 @@ export default function PurchaseInvoice() {
     setAvailableVehicles([]);
     setVendorProducts([]);
     setCustomVehicleInput("");
+
+    // By Contract: supplier GST / place are filled automatically, so the next field the user has to
+    // type into is LR No. Move there right away (not after the vendor products / contracts finish
+    // loading, which can take seconds and would leave the cursor stuck on the supplier box). The small
+    // delay lets the supplier dropdown finish closing first, otherwise it takes the focus back.
+    if (invoiceCreationMode === "by_contract") {
+      setTimeout(() => lrNoRef.current?.focus({ cursor: "end" }), 50);
+    }
 
     const suppliersPool =
       invoiceCreationMode === "by_contract" && allVendorsList.length > 0
@@ -639,10 +655,8 @@ export default function PurchaseInvoice() {
           ],
         });
 
-        // Focus vehicle input
-        setTimeout(() => {
-          vehicleSelectRef.current?.focus();
-        }, 150);
+        // No focus change here: the cursor is already on LR No (see above). Moving it again after the
+        // network calls finish would pull it away while the user is typing.
       } catch (err) {
         console.error("Error loading vendor products:", err);
         message.destroy("load_vendor_products");
@@ -1101,6 +1115,23 @@ export default function PurchaseInvoice() {
 
       const updatedItems = [...items];
       updatedItems[index] = updatedCurrentItem;
+
+      // By Contract: never add a row on its own - the user adds the next item with "Add Another Item".
+      // (With Flow keeps its automatic row for the remaining vehicle quantity.)
+      if (invoiceCreationMode === "by_contract") {
+        form.setFieldsValue({ items: updatedItems });
+        recalculateGrandTotals(updatedItems);
+
+        message.warning(
+          `Souda #${rateOption.souda_no || ""} has only ${allocatedQty} ${
+            currentItem.unit || ""
+          } balance, so this row is set to ${allocatedQty}. For the remaining ${remainingQty} ${
+            currentItem.unit || ""
+          }, click "Add Another Item" and pick another contract.`,
+        );
+        return;
+      }
+
       updatedItems.splice(index + 1, 0, newSplitItem);
 
       form.setFieldsValue({ items: updatedItems });
@@ -1444,9 +1475,12 @@ export default function PurchaseInvoice() {
     setInvoiceCreationMode(mode);
     setEditingId(null);
     setEditingRecordDocUrl(null);
+    setEditingRecordLrUrl(null);
     form.resetFields();
     form.setFieldsValue({
       dispatch_from: "Haldia",
+      // By Contract: LR No starts as "aum/" and the user adds the number
+      lr_no: mode === "by_contract" ? LR_PREFIX : undefined,
       round_off_amount: 0,
       total_net_wt: 0,
       total_sgst: 0,
@@ -1479,6 +1513,7 @@ export default function PurchaseInvoice() {
           : [],
     });
     setFileList([]);
+    setLrFileList([]);
     setSoudaRatesMap({});
     setAvailableVehicles([]);
     setVendorProducts([]);
@@ -1496,6 +1531,7 @@ export default function PurchaseInvoice() {
     setEditingRecordDocUrl(
       record.invoice_copy_url || record.invoice_copy || record.file || null,
     );
+    setEditingRecordLrUrl(record.lr_copy_url || record.lr_copy || null);
     form.resetFields();
 
     if (record.vendor) {
@@ -1638,6 +1674,7 @@ export default function PurchaseInvoice() {
     });
 
     setFileList([]);
+    setLrFileList([]);
     setVehicleDropdownOpen(false);
 
     // Fetch Souda rates for items in this record
@@ -1748,13 +1785,18 @@ export default function PurchaseInvoice() {
       const grandTotalVal = Number(form.getFieldValue("grand_total") || 0);
       const roundOffVal = Number(form.getFieldValue("round_off_amount") || 0);
 
+      // "aum/" alone means the user never typed a number - do not save the bare prefix as an LR No
+      const lrNoVal = String(values.lr_no || "").trim();
+      const lrNoToSave =
+        lrNoVal && lrNoVal.toLowerCase() !== LR_PREFIX ? lrNoVal : null;
+
       const formattedPayload = {
         invoice_type: invoiceCreationMode,
         vendor: values.vendor,
         supplier_name: resolvedSupplierName,
         supplier_gst: values.supplier_gst || null,
         place: values.place,
-        lr_no: values.lr_no || null,
+        lr_no: lrNoToSave,
         lr_date: formatFormDate(values.lr_date),
         transport_name: values.transport_name || null,
         vehicle_no: values.vehicle_no,
@@ -1804,6 +1846,9 @@ export default function PurchaseInvoice() {
 
       if (fileList[0]) {
         formattedPayload.invoice_copy = fileList[0];
+      }
+      if (lrFileList[0]) {
+        formattedPayload.lr_copy = lrFileList[0];
       }
 
       console.log("Submitting purchase invoice payload:", formattedPayload);
@@ -2581,10 +2626,28 @@ export default function PurchaseInvoice() {
                   name="lr_no"
                 >
                   <Input
+                    ref={lrNoRef}
                     disabled={invoiceCreationMode !== "by_contract"}
                     placeholder={
                       invoiceCreationMode === "by_contract" ? "Enter LR No" : "-"
                     }
+                    // Tabbing into an input selects its text; typing would then wipe the "aum/" prefix.
+                    // Keep the prefix and put the cursor after it instead.
+                    onFocus={(e) => {
+                      const el = e.target;
+                      if (
+                        invoiceCreationMode === "by_contract" &&
+                        String(el.value || "").toLowerCase().startsWith(LR_PREFIX)
+                      ) {
+                        setTimeout(() => {
+                          try {
+                            el.setSelectionRange(el.value.length, el.value.length);
+                          } catch {
+                            /* element unmounted */
+                          }
+                        }, 0);
+                      }
+                    }}
                     className={
                       invoiceCreationMode === "by_contract"
                         ? "font-bold text-gray-900 border-amber-300!"
@@ -3736,7 +3799,7 @@ export default function PurchaseInvoice() {
                   />
                 </Form.Item>
               </Col>
-              <Col span={5}>
+              <Col span={4}>
                 <Form.Item
                   label={<span className="text-amber-700 font-semibold text-xs">Despatch From</span>}
                   name="dispatch_from"
@@ -3744,7 +3807,7 @@ export default function PurchaseInvoice() {
                   <Input placeholder="Despatch plant location" className="text-xs" style={{ height: "32px" }} />
                 </Form.Item>
               </Col>
-              <Col span={5}>
+              <Col span={4}>
                 <Form.Item
                   label={<span className="text-amber-700 font-semibold text-xs">Ship To</span>}
                   name="ship_to"
@@ -3752,7 +3815,7 @@ export default function PurchaseInvoice() {
                   <Input placeholder="Destination location" className="text-xs" style={{ height: "32px" }} />
                 </Form.Item>
               </Col>
-              <Col span={5}>
+              <Col span={4}>
                 <Form.Item
                   label={
                     <span className="text-amber-700 font-semibold text-xs">
@@ -3819,7 +3882,49 @@ export default function PurchaseInvoice() {
                   </div>
                 </Form.Item>
               </Col>
-              <Col span={3}>
+              <Col span={4}>
+                <Form.Item
+                  label={
+                    <span className="text-amber-700 font-semibold text-xs">
+                      Upload LR Copy
+                    </span>
+                  }
+                >
+                  <Upload
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    beforeUpload={(file) => {
+                      setLrFileList([file]);
+                      return false;
+                    }}
+                    onRemove={() => setLrFileList([])}
+                    fileList={lrFileList}
+                    maxCount={1}
+                  >
+                    <Button
+                      size="middle"
+                      icon={<UploadOutlined />}
+                      className="w-full border-amber-300! text-xs"
+                    >
+                      {editingRecordLrUrl && !lrFileList.length
+                        ? "Change File"
+                        : "Choose File"}
+                    </Button>
+                  </Upload>
+                  {editingRecordLrUrl && !lrFileList.length && (
+                    <div className="mt-1 text-xs">
+                      <a
+                        href={editingRecordLrUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-600 font-semibold hover:underline"
+                      >
+                        View Current Document
+                      </a>
+                    </div>
+                  )}
+                </Form.Item>
+              </Col>
+              <Col span={2}>
                 <Form.Item
                   label={<span className="text-amber-700 font-semibold text-xs">Round Off</span>}
                   name="round_off_amount"
@@ -4121,6 +4226,22 @@ export default function PurchaseInvoice() {
                 <div>
                   <a
                     href={viewRecord.invoice_copy_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-600 font-semibold hover:underline"
+                  >
+                    View Document
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {viewRecord.lr_copy_url && (
+              <div style={{ marginTop: 16 }}>
+                <Text type="secondary">Uploaded LR Copy: </Text>
+                <div>
+                  <a
+                    href={viewRecord.lr_copy_url}
                     target="_blank"
                     rel="noreferrer"
                     className="text-blue-600 font-semibold hover:underline"
