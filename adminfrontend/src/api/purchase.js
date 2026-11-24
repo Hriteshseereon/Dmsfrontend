@@ -595,33 +595,37 @@ export const calculatePurchaseInvoiceTds = async (
   return res.data;
 };
 
+// File fields on a purchase invoice. When any of them holds a file the request is sent as multipart.
+const INVOICE_FILE_FIELDS = ["invoice_copy", "lr_copy"];
+
+const isUploadFile = (value) =>
+  value instanceof File ||
+  Boolean(value && typeof value === "object" && value.originFileObj);
+
+// JSON body normally; multipart/form-data (items sent as a JSON string) when a file is attached
+const buildInvoiceRequestBody = (payload) => {
+  const hasFile = INVOICE_FILE_FIELDS.some((field) => isUploadFile(payload[field]));
+  if (!hasFile) return { dataToPost: payload, headers: {} };
+
+  const formData = new FormData();
+  Object.keys(payload).forEach((key) => {
+    if (key === "items") {
+      formData.append(key, JSON.stringify(payload[key]));
+    } else if (INVOICE_FILE_FIELDS.includes(key)) {
+      if (isUploadFile(payload[key])) {
+        formData.append(key, payload[key].originFileObj || payload[key]);
+      }
+    } else if (payload[key] !== null && payload[key] !== undefined) {
+      formData.append(key, payload[key]);
+    }
+  });
+  return { dataToPost: formData, headers: { "Content-Type": "multipart/form-data" } };
+};
+
 export const createPurchaseInvoice = async (payload) => {
   const { currentOrgId, selectedFY } = useSessionStore.getState();
-  
-  const hasFile =
-    payload.invoice_copy instanceof File ||
-    (payload.invoice_copy &&
-      typeof payload.invoice_copy === "object" &&
-      payload.invoice_copy.originFileObj);
-      
-  let dataToPost = payload;
-  let headers = {};
-  
-  if (hasFile) {
-    const formData = new FormData();
-    Object.keys(payload).forEach((key) => {
-      if (key === "items") {
-        formData.append(key, JSON.stringify(payload[key]));
-      } else if (key === "invoice_copy") {
-        const fileObj = payload[key].originFileObj || payload[key];
-        formData.append(key, fileObj);
-      } else if (payload[key] !== null && payload[key] !== undefined) {
-        formData.append(key, payload[key]);
-      }
-    });
-    dataToPost = formData;
-    headers["Content-Type"] = "multipart/form-data";
-  }
+
+  const { dataToPost, headers } = buildInvoiceRequestBody(payload);
 
   const params = {};
   if (currentOrgId) params.organisation = currentOrgId;
@@ -643,30 +647,7 @@ export const createPurchaseInvoice = async (payload) => {
 export const updatePurchaseInvoice = async (id, payload) => {
   const { currentOrgId } = useSessionStore.getState();
 
-  const hasFile =
-    payload.invoice_copy instanceof File ||
-    (payload.invoice_copy &&
-      typeof payload.invoice_copy === "object" &&
-      payload.invoice_copy.originFileObj);
-
-  let dataToPost = payload;
-  let headers = {};
-
-  if (hasFile) {
-    const formData = new FormData();
-    Object.keys(payload).forEach((key) => {
-      if (key === "items") {
-        formData.append(key, JSON.stringify(payload[key]));
-      } else if (key === "invoice_copy") {
-        const fileObj = payload[key].originFileObj || payload[key];
-        formData.append(key, fileObj);
-      } else if (payload[key] !== undefined && payload[key] !== null) {
-        formData.append(key, payload[key]);
-      }
-    });
-    dataToPost = formData;
-    headers["Content-Type"] = "multipart/form-data";
-  }
+  const { dataToPost, headers } = buildInvoiceRequestBody(payload);
 
   const res = await api.patch(`/purchase/invoices/${id}/`, dataToPost, {
     params: { organisation: currentOrgId },
