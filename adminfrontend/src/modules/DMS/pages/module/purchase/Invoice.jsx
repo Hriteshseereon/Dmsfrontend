@@ -60,6 +60,11 @@ import {
 } from "../../../../../utils/financialYearValidation";
 import AppDatePicker from "../../../../../components/AppDatePicker";
 import useSessionStore from "../../../../../store/sessionStore";
+import {
+  getDispatchFromOptions,
+  getDispatchToOptions,
+  lookupDispatchDistance,
+} from "../../../../../api/dispatchdistance";
 import PurchaseTdsPanel from "./PurchaseTdsPanel";
 
 dayjs.extend(customParseFormat);
@@ -88,9 +93,18 @@ const fmtDate = (d) => {
   return parsed ? parsed.format("DD-MM-YYYY") : "-";
 };
 
-// LR numbers are written like "aum/001" - in By Contract mode the field starts with the prefix
+// Keeps every cell and header of a table on a single line
+const withNoWrap = (cols) =>
+  cols.map((col) => ({
+    ...col,
+    onCell: () => ({ style: { whiteSpace: "nowrap" } }),
+    onHeaderCell: () => ({ style: { whiteSpace: "nowrap" } }),
+  }));
+
+// LR numbers are written like "SR/HLD/0001" - in By Contract mode the field starts with the prefix
 // and the user only types the number after it.
-const LR_PREFIX = "aum/";
+const LR_PREFIX = "SR/HLD/";
+const LR_PREFIX_LOWER = LR_PREFIX.toLowerCase();
 
 export default function PurchaseInvoice() {
   const [data, setData] = useState([]);
@@ -125,8 +139,20 @@ export default function PurchaseInvoice() {
   const [lrFileList, setLrFileList] = useState([]);
   const [editingRecordLrUrl, setEditingRecordLrUrl] = useState(null);
 
+  // Dispatch From / To dropdowns (By Contract) come from the Distance Master
+  const [dispatchFromOptions, setDispatchFromOptions] = useState([]);
+  const [dispatchToOptions, setDispatchToOptions] = useState([]);
+  // Which item row's dropdown is open (opened automatically after Payment Due Date)
+  const [openItemIdx, setOpenItemIdx] = useState(null);
+
   // Form field focus and navigation refs
   const lrNoRef = useRef(null);
+  const lrDateRef = useRef(null);
+  const transportSelectRef = useRef(null);
+  const itemSelectRefs = useRef([]);
+  const qtyInputRefs = useRef([]);
+  // True while E-waybill Date simply follows LR Date; becomes false once the user types their own
+  const ewaybillFollowsLrRef = useRef(true);
   const vehicleSelectRef = useRef(null);
   const [vehicleDropdownOpen, setVehicleDropdownOpen] = useState(false);
   const ewaybillNoRef = useRef(null);
@@ -470,18 +496,75 @@ export default function PurchaseInvoice() {
     }
   };
 
+  // Dispatch From options + the Dispatch To options of the selected place (Distance Master)
+  const loadDispatchOptions = async (dispatchFrom) => {
+    try {
+      const [fromList, toList] = await Promise.all([
+        getDispatchFromOptions(),
+        dispatchFrom ? getDispatchToOptions(dispatchFrom) : Promise.resolve([]),
+      ]);
+      setDispatchFromOptions(fromList);
+      setDispatchToOptions(toList);
+    } catch (error) {
+      console.warn("Could not load dispatch options:", error);
+    }
+  };
+
+  const handleDispatchFromChange = async (dispatchFrom) => {
+    // A different start place means the old destination / distance no longer apply
+    form.setFieldsValue({ ship_to: undefined, distance_km: undefined });
+    setDispatchToOptions([]);
+    if (!dispatchFrom) return;
+    try {
+      setDispatchToOptions(await getDispatchToOptions(dispatchFrom));
+    } catch (error) {
+      console.warn("Could not load dispatch-to options:", error);
+    }
+  };
+
+  const handleDispatchToChange = async (dispatchTo) => {
+    form.setFieldsValue({ distance_km: undefined });
+    const dispatchFrom = form.getFieldValue("dispatch_from");
+    if (!dispatchFrom || !dispatchTo) return;
+    try {
+      const km = await lookupDispatchDistance(dispatchFrom, dispatchTo);
+      // The user may have changed the places while the lookup was running
+      if (
+        form.getFieldValue("dispatch_from") !== dispatchFrom ||
+        form.getFieldValue("ship_to") !== dispatchTo
+      ) {
+        return;
+      }
+      if (km === null) {
+        message.warning(
+          `No distance found for ${dispatchFrom} to ${dispatchTo}. Add it in Master Data > Group Master > Distance Master.`,
+        );
+      } else {
+        form.setFieldsValue({ distance_km: km });
+      }
+    } catch (error) {
+      console.warn("Could not look up distance:", error);
+    }
+  };
+
   const handleSupplierChange = async (supplierId) => {
     // Reset dependant fields with default dispatch_from: "Haldia"
     form.setFieldsValue({
       vehicle_no: undefined,
       lr_no: invoiceCreationMode === "by_contract" ? LR_PREFIX : "",
-      lr_date: null,
+      // By Contract: LR date is always today unless changed (E-waybill date follows it)
+      lr_date: invoiceCreationMode === "by_contract" ? dayjs() : null,
+      ...(invoiceCreationMode === "by_contract" && ewaybillFollowsLrRef.current
+        ? { ewaybill_date: dayjs() }
+        : {}),
       transport_name: "",
       place: "",
       supplier_gst: "",
       gross_weight: undefined,
-      dispatch_from: "Haldia",
-      ship_to: "",
+      // By Contract keeps the Dispatch From / To / Distance the user picked from the master
+      ...(invoiceCreationMode === "by_contract"
+        ? {}
+        : { dispatch_from: "Haldia", ship_to: "" }),
       items: [],
       total_qty: 0,
       total_net_wt: 0,
@@ -1390,6 +1473,13 @@ export default function PurchaseInvoice() {
       },
     ];
     form.setFieldsValue({ items: newItems });
+
+    // Cursor goes to the new row with its item list open
+    const newIndex = currentItems.length;
+    setTimeout(() => {
+      itemSelectRefs.current[newIndex]?.focus();
+      setOpenItemIdx(newIndex);
+    }, 80);
   };
 
   const recalculateGrandTotals = (itemsOverride) => {
@@ -1479,8 +1569,11 @@ export default function PurchaseInvoice() {
     form.resetFields();
     form.setFieldsValue({
       dispatch_from: "Haldia",
-      // By Contract: LR No starts as "aum/" and the user adds the number
+      // By Contract: LR No starts as "SR/HLD/" and the user adds the number
       lr_no: mode === "by_contract" ? LR_PREFIX : undefined,
+      // ...and LR Date is today, with E-waybill Date following it
+      lr_date: mode === "by_contract" ? dayjs() : undefined,
+      ewaybill_date: mode === "by_contract" ? dayjs() : undefined,
       round_off_amount: 0,
       total_net_wt: 0,
       total_sgst: 0,
@@ -1520,6 +1613,10 @@ export default function PurchaseInvoice() {
     setCustomVehicleInput("");
     setCustomTransporterInput("");
     setVehicleDropdownOpen(false);
+    setOpenItemIdx(null);
+    ewaybillFollowsLrRef.current = true;
+    setDispatchToOptions([]);
+    if (mode === "by_contract") loadDispatchOptions("Haldia");
     setModalOpen(true);
   };
 
@@ -1653,6 +1750,10 @@ export default function PurchaseInvoice() {
       payment_due_date: parseApiDate(record.payment_due_date),
       dispatch_from: record.dispatch_from || "Haldia",
       ship_to: record.ship_to || "",
+      distance_km:
+        record.distance_km !== null && record.distance_km !== undefined && record.distance_km !== ""
+          ? Number(record.distance_km)
+          : undefined,
       gross_weight: Number(record.total_gross_weight || record.gross_weight || 0),
       total_gross_weight: Number(record.total_gross_weight || record.gross_weight || 0),
       round_off_amount: Number(record.round_off_amount || 0),
@@ -1676,6 +1777,13 @@ export default function PurchaseInvoice() {
     setFileList([]);
     setLrFileList([]);
     setVehicleDropdownOpen(false);
+    setOpenItemIdx(null);
+    // An existing invoice keeps its own E-waybill date; never overwrite it from LR Date
+    ewaybillFollowsLrRef.current = false;
+    setDispatchToOptions([]);
+    if ((record.invoice_type || (record.loading_advice_id ? "with_flow" : "by_contract")) === "by_contract") {
+      loadDispatchOptions(record.dispatch_from || "Haldia");
+    }
 
     // Fetch Souda rates for items in this record
     if (record.vendor) {
@@ -1785,10 +1893,10 @@ export default function PurchaseInvoice() {
       const grandTotalVal = Number(form.getFieldValue("grand_total") || 0);
       const roundOffVal = Number(form.getFieldValue("round_off_amount") || 0);
 
-      // "aum/" alone means the user never typed a number - do not save the bare prefix as an LR No
+      // "SR/HLD/" alone means the user never typed a number - do not save the bare prefix as an LR No
       const lrNoVal = String(values.lr_no || "").trim();
       const lrNoToSave =
-        lrNoVal && lrNoVal.toLowerCase() !== LR_PREFIX ? lrNoVal : null;
+        lrNoVal && lrNoVal.toLowerCase() !== LR_PREFIX_LOWER ? lrNoVal : null;
 
       const formattedPayload = {
         invoice_type: invoiceCreationMode,
@@ -1807,6 +1915,11 @@ export default function PurchaseInvoice() {
         payment_due_date: formatFormDate(values.payment_due_date),
         dispatch_from: values.dispatch_from || "Haldia",
         ship_to: values.ship_to || null,
+        ...(invoiceCreationMode === "by_contract" &&
+        values.distance_km !== null &&
+        values.distance_km !== undefined
+          ? { distance_km: values.distance_km }
+          : {}),
         gross_weight: Number(values.gross_weight || 0),
         total_gross_weight: Number(values.gross_weight || 0),
         total_net_wt: totalNetWtVal,
@@ -1926,7 +2039,7 @@ export default function PurchaseInvoice() {
     exportToExcel(rows, "Purchase_Invoices", "Invoices");
   };
 
-  const columns = [
+  const baseColumns = [
     {
       title: (
         <span className="text-amber-700 font-semibold">Supplier Name</span>
@@ -2053,8 +2166,9 @@ export default function PurchaseInvoice() {
         `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Total Net Wt</span>,
+      title: <span className="text-amber-700 font-semibold">Total Net Wt (Ton)</span>,
       dataIndex: "total_net_weight",
+      render: (val) => (val === null || val === undefined || val === "" ? "-" : val),
     },
     {
       title: (
@@ -2140,6 +2254,9 @@ export default function PurchaseInvoice() {
       },
     },
   ];
+
+  // Every value stays on ONE line (dates, LR numbers, amounts used to wrap onto two lines); the table scrolls sideways instead
+  const columns = withNoWrap(baseColumns);
 
   const supplierDetailColumns = [
     {
@@ -2241,7 +2358,7 @@ export default function PurchaseInvoice() {
         `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
     },
     {
-      title: <span className="text-amber-700 font-semibold">Total Net Wt</span>,
+      title: <span className="text-amber-700 font-semibold">Total Net Wt (Ton)</span>,
       dataIndex: "total_net_weight",
     },
     {
@@ -2445,7 +2562,7 @@ export default function PurchaseInvoice() {
           rowKey="id"
           pagination={{ pageSize: 10 }}
           className="border-amber-100"
-          scroll={{ x: 1300 }}
+          scroll={{ x: "max-content" }}
           onRow={(record) => {
             const vKey = String(record.vehicle_no || "").trim().toUpperCase();
             const isSameVehicle =
@@ -2522,6 +2639,18 @@ export default function PurchaseInvoice() {
           layout="vertical"
           initialValues={{ dispatch_from: "Haldia" }}
           onValuesChange={(changedValues) => {
+            // E-waybill Date follows LR Date (By Contract, new invoice) until the user types their own
+            if ("ewaybill_date" in changedValues) {
+              ewaybillFollowsLrRef.current = false;
+            }
+            if (
+              "lr_date" in changedValues &&
+              invoiceCreationMode === "by_contract" &&
+              !editingId &&
+              ewaybillFollowsLrRef.current
+            ) {
+              form.setFieldsValue({ ewaybill_date: changedValues.lr_date });
+            }
             if (changedValues.invoice_date) {
               const invDate = parseApiDate(changedValues.invoice_date);
               if (invDate && invDate.isValid()) {
@@ -2627,17 +2756,25 @@ export default function PurchaseInvoice() {
                 >
                   <Input
                     ref={lrNoRef}
+                    // Moves on when Enter is RELEASED: the key-up must not land on the date box, which
+                    // already holds today's date and would treat it as "date complete" and skip ahead.
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.preventDefault();
+                    }}
+                    onKeyUp={(e) => {
+                      if (e.key === "Enter") lrDateRef.current?.focus();
+                    }}
                     disabled={invoiceCreationMode !== "by_contract"}
                     placeholder={
                       invoiceCreationMode === "by_contract" ? "Enter LR No" : "-"
                     }
-                    // Tabbing into an input selects its text; typing would then wipe the "aum/" prefix.
+                    // Tabbing into an input selects its text; typing would then wipe the "SR/HLD/" prefix.
                     // Keep the prefix and put the cursor after it instead.
                     onFocus={(e) => {
                       const el = e.target;
                       if (
                         invoiceCreationMode === "by_contract" &&
-                        String(el.value || "").toLowerCase().startsWith(LR_PREFIX)
+                        String(el.value || "").toLowerCase().startsWith(LR_PREFIX_LOWER)
                       ) {
                         setTimeout(() => {
                           try {
@@ -2672,6 +2809,10 @@ export default function PurchaseInvoice() {
                   name="lr_date"
                 >
                   <AppDatePicker
+                    ref={lrDateRef}
+                    onTabComplete={() => {
+                      setTimeout(() => transportSelectRef.current?.focus(), 50);
+                    }}
                     disabled={invoiceCreationMode !== "by_contract"}
                     placeholder={
                       invoiceCreationMode === "by_contract"
@@ -2703,6 +2844,7 @@ export default function PurchaseInvoice() {
                 >
                   {invoiceCreationMode === "by_contract" ? (
                     <Select
+                      ref={transportSelectRef}
                       placeholder="Select or Search Transporter"
                       showSearch
                       allowClear
@@ -2715,6 +2857,7 @@ export default function PurchaseInvoice() {
                         // antd clears its own search box on select but never calls onSearch(""), so the
                         // typed text must be dropped here or onBlur would overwrite the picked option.
                         setCustomTransporterInput("");
+                        if (val) setTimeout(() => vehicleSelectRef.current?.focus(), 50);
                       }}
                       onSearch={(val) => setCustomTransporterInput(val)}
                       filterOption={(input, option) =>
@@ -2793,6 +2936,7 @@ export default function PurchaseInvoice() {
                         // typed text (e.g. "1234") must be dropped here, otherwise onBlur would overwrite
                         // the picked vehicle (OD09F1234) with it.
                         setCustomVehicleInput("");
+                        if (val) setTimeout(() => ewaybillNoRef.current?.focus(), 50);
                       }}
                       onSearch={(val) => setCustomVehicleInput(val)}
                       filterOption={(input, option) =>
@@ -2866,6 +3010,16 @@ export default function PurchaseInvoice() {
                   <Input
                     ref={ewaybillNoRef}
                     placeholder="Enter E-waybill No"
+                    // A complete 12 digit E-waybill number: go straight to the date. Done on key-up so the
+                    // released key is not delivered to the date box (it may already hold a date).
+                    onKeyUp={(e) => {
+                      if (
+                        /^\d$/.test(e.key) &&
+                        /^\d{12}$/.test(String(e.target.value).trim())
+                      ) {
+                        ewaybillDateRef.current?.focus();
+                      }
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -2913,6 +3067,15 @@ export default function PurchaseInvoice() {
                   <Input
                     ref={invoiceNoRef}
                     placeholder="Enter Invoice No"
+                    // A complete 10 digit invoice number: go straight to the date (on key-up, see E-waybill No)
+                    onKeyUp={(e) => {
+                      if (
+                        /^\d$/.test(e.key) &&
+                        /^\d{10}$/.test(String(e.target.value).trim())
+                      ) {
+                        invoiceDateRef.current?.focus();
+                      }
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -2974,7 +3137,15 @@ export default function PurchaseInvoice() {
                       createFinancialYearDisabledDate(selectedFY)(current)
                     }
                     onTabComplete={() => {
-                      setTimeout(() => rateSelectRefs.current[0]?.focus(), 50);
+                      if (invoiceCreationMode === "by_contract") {
+                        // Straight into the first item, with its list already open
+                        setTimeout(() => {
+                          itemSelectRefs.current[0]?.focus();
+                          setOpenItemIdx(0);
+                        }, 50);
+                      } else {
+                        setTimeout(() => rateSelectRefs.current[0]?.focus(), 50);
+                      }
                     }}
                   />
                 </Form.Item>
@@ -3019,7 +3190,7 @@ export default function PurchaseInvoice() {
                 <div className="text-center">Avail Qty</div>
                 <div className="text-center">Invoice Qty</div>
                 <div className="text-center">Unit</div>
-                <div className="text-center">Net Wt (Ton)</div>
+                <div className="text-center">Net Wt (Kg)</div>
                 <div className="text-center">GST %</div>
                 <div className="text-left">Rate Selection (Soudas)</div>
                 <div className="text-center">Taxable Amt</div>
@@ -3071,17 +3242,29 @@ export default function PurchaseInvoice() {
                                 ]}
                               >
                                 <Select
+                                  ref={(el) =>
+                                    (itemSelectRefs.current[field.name] = el)
+                                  }
+                                  open={openItemIdx === field.name}
+                                  onDropdownVisibleChange={(open) =>
+                                    setOpenItemIdx(open ? field.name : null)
+                                  }
                                   placeholder="Select Item"
                                   showSearch
                                   optionFilterProp="children"
                                   className="w-full font-bold text-xs"
-                                  onChange={(val, opt) =>
+                                  onChange={(val, opt) => {
                                     handleByContractItemSelect(
                                       field.name,
                                       val,
                                       opt,
-                                    )
-                                  }
+                                    );
+                                    // Item chosen: on to its quantity
+                                    setTimeout(
+                                      () => qtyInputRefs.current[field.name]?.focus(),
+                                      50,
+                                    );
+                                  }}
                                 >
                                   {vendorProducts.map((p) => {
                                     const pName = p.name || p.product_name;
@@ -3222,6 +3405,10 @@ export default function PurchaseInvoice() {
                                     })()
                               }
                               precision={2}
+                              ref={(el) => (qtyInputRefs.current[field.name] = el)}
+                              onPressEnter={() =>
+                                rateSelectRefs.current[field.name]?.focus()
+                              }
                               className="w-full border-amber-400! font-bold text-center text-gray-900 text-xs"
                               placeholder="Qty"
                               onChange={(val) =>
@@ -3249,16 +3436,23 @@ export default function PurchaseInvoice() {
                           </Form.Item>
                         </div>
 
-                        {/* 5. Net Wt */}
+                        {/* 5. Net Wt - stored and calculated in Ton, shown in Kg (the Total row below stays in Ton) */}
                         <div>
                           <Form.Item
                             name={[field.name, "net_wt"]}
                             style={{ marginBottom: 0 }}
+                            getValueProps={(tonValue) => ({
+                              value:
+                                tonValue === null ||
+                                tonValue === undefined ||
+                                tonValue === ""
+                                  ? ""
+                                  : Number((Number(tonValue) * 1000).toFixed(3)),
+                            })}
                           >
-                            <InputNumber
+                            <Input
                               disabled
                               className="w-full bg-gray-50! text-center font-bold text-gray-900 text-xs"
-                              precision={3}
                               style={{
                                 color: "#111827",
                                 WebkitTextFillColor: "#111827",
@@ -3799,22 +3993,60 @@ export default function PurchaseInvoice() {
                   />
                 </Form.Item>
               </Col>
-              <Col span={4}>
+              <Col span={invoiceCreationMode === "by_contract" ? 3 : 4}>
                 <Form.Item
                   label={<span className="text-amber-700 font-semibold text-xs">Despatch From</span>}
                   name="dispatch_from"
                 >
-                  <Input placeholder="Despatch plant location" className="text-xs" style={{ height: "32px" }} />
+                  {invoiceCreationMode === "by_contract" ? (
+                    <Select
+                      showSearch
+                      allowClear
+                      placeholder="Select Despatch From"
+                      className="text-xs"
+                      options={dispatchFromOptions.map((v) => ({ value: v, label: v }))}
+                      onChange={handleDispatchFromChange}
+                    />
+                  ) : (
+                    <Input placeholder="Despatch plant location" className="text-xs" style={{ height: "32px" }} />
+                  )}
                 </Form.Item>
               </Col>
-              <Col span={4}>
+              <Col span={invoiceCreationMode === "by_contract" ? 3 : 4}>
                 <Form.Item
                   label={<span className="text-amber-700 font-semibold text-xs">Ship To</span>}
                   name="ship_to"
                 >
-                  <Input placeholder="Destination location" className="text-xs" style={{ height: "32px" }} />
+                  {invoiceCreationMode === "by_contract" ? (
+                    <Select
+                      showSearch
+                      allowClear
+                      placeholder="Select Ship To"
+                      className="text-xs"
+                      options={dispatchToOptions.map((v) => ({ value: v, label: v }))}
+                      onChange={handleDispatchToChange}
+                    />
+                  ) : (
+                    <Input placeholder="Destination location" className="text-xs" style={{ height: "32px" }} />
+                  )}
                 </Form.Item>
               </Col>
+              {invoiceCreationMode === "by_contract" && (
+                <Col span={2}>
+                  <Form.Item
+                    label={<span className="text-amber-700 font-semibold text-xs">Distance (KM)</span>}
+                    name="distance_km"
+                  >
+                    <InputNumber
+                      className="w-full font-semibold text-xs border-amber-300!"
+                      min={0}
+                      precision={2}
+                      placeholder="Auto"
+                      style={{ height: "32px" }}
+                    />
+                  </Form.Item>
+                </Col>
+              )}
               <Col span={4}>
                 <Form.Item
                   label={
@@ -4094,7 +4326,14 @@ export default function PurchaseInvoice() {
                   render: (val, r) => `${r.invoice_qty || val} ${r.unit || ""}`,
                 },
                 { title: "Unit", dataIndex: "unit" },
-                { title: "Net Wt (Ton)", dataIndex: "net_wt" },
+                {
+                  title: "Net Wt (Kg)",
+                  dataIndex: "net_wt",
+                  render: (val) =>
+                    val === null || val === undefined || val === ""
+                      ? "-"
+                      : Number((Number(val) * 1000).toFixed(3)),
+                },
                 {
                   title: "GST %",
                   dataIndex: "gst_percent",
@@ -4291,7 +4530,7 @@ export default function PurchaseInvoice() {
           </strong>
         </div>
         <Table
-          columns={supplierDetailColumns}
+          columns={withNoWrap(supplierDetailColumns)}
           dataSource={selectedMergedSupplier?.underlyingRecords || []}
           rowKey="id"
           pagination={{ pageSize: 10 }}
